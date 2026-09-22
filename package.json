@@ -1,0 +1,62 @@
+{
+  "name": "american-rider",
+  "version": "1.0.0",
+  "main": "expo-router/entry",
+  "dependencies": {
+    "@expo-google-fonts/ibm-plex-mono": "^0.4.1",
+    "@maplibre/maplibre-react-native": "^11.3.10",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@stripe/stripe-react-native": "0.64.0",
+    "expo": "~57.0.8",
+    "expo-apple-authentication": "~57.0.2",
+    "expo-auth-session": "~57.0.12",
+    "expo-constants": "~57.0.3",
+    "expo-crypto": "~57.0.3",
+    "expo-device": "~57.0.1",
+    "expo-font": "~57.0.0",
+    "expo-image-picker": "~57.0.10",
+    "expo-linking": "~57.0.4",
+    "expo-local-authentication": "~57.0.2",
+    "expo-localization": "~57.0.1",
+    "expo-location": "~57.0.7",
+    "expo-maps": "~57.0.1",
+    "expo-notifications": "~57.0.13",
+    "expo-router": "~57.0.8",
+    "expo-splash-screen": "~57.0.5",
+    "expo-status-bar": "~57.0.1",
+    "expo-task-manager": "~57.0.16",
+    "expo-web-browser": "~57.0.3",
+    "expo-widgets": "~57.0.15",
+    "firebase": "^12.16.0",
+    "i18n-js": "^4.5.3",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.0",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
+    "react-native-svg": "15.15.4",
+    "react-native-web": "^0.21.2"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.2",
+    "typescript": "~6.0.3"
+  },
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web",
+    "test:backend": "for f in backend/*.test.js; do echo \"--- $f\"; node \"$f\" || exit 1; done",
+    "typecheck": "tsc --noEmit",
+    "i18n": "node scripts/check-i18n.mjs && node scripts/check-untranslated.mjs && node scripts/check-unused-i18n.mjs",
+    "check": "npm run typecheck && npm run i18n && npm run test:backend",
+    "eas-build-pre-install": "bash scripts/eas-build-pre-install.sh",
+    "build:sim": "bash scripts/build-simulator.sh",
+    "parity": "node scripts/check-simulator-parity.mjs"
+  },
+  "private": true,
+  "allowScripts": {
+    "@firebase/util@1.15.1": true,
+    "protobufjs@7.6.5": true
+  }
+}

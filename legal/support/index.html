@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Support — American Rider</title>
+<style>
+  /* src/theme.ts, hex for hex. Cards: white, radius 16, 1px hairline, NO shadow.
+     Mono is ONLY ever used for amounts and travel numbers, exactly as in the app. */
+  :root {
+    --paper:#F7F7F5; --ink:#14171F; --hairline:#ECEBE6; --border:#E3E2DC;
+    --muted:#8A8A82; --faint:#B4B3AB; --blue:#2E5FE0;
+    --blue-tint:#F0F3FD; --blue-border:#DCE4FA;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink);
+    font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    line-height:1.6; letter-spacing:-0.005em; -webkit-font-smoothing:antialiased; }
+  main { max-width:680px; margin:0 auto; padding:44px 24px 64px; }
+
+  /* Letterhead: hamburger-free on the web, but the same lockup and the same tagline. */
+  a.lockup { display:block; text-decoration:none; color:inherit; }
+  .brand { text-align:center; font-size:13px; font-weight:600; letter-spacing:4px; }
+  .tagline { text-align:center; font-size:10.5px; font-weight:600; letter-spacing:2px;
+    color:var(--muted); margin-top:7px; }
+
+  nav { display:flex; flex-wrap:wrap; justify-content:center; gap:18px;
+    margin-top:30px; padding-bottom:24px; border-bottom:1px solid var(--hairline); }
+  a.nav { font-size:13.5px; color:var(--muted); text-decoration:none; }
+  a.nav.on { color:var(--ink); font-weight:600; }
+  a.nav:hover { color:var(--ink); }
+
+  h1 { font-size:34px; font-weight:600; letter-spacing:-0.68px; margin:44px 0 10px; }
+  .lede { font-size:16.5px; color:var(--muted); margin:0 0 6px; }
+  .updated { color:var(--faint); font-size:12.5px; margin:0 0 22px;
+    font-family:ui-monospace,"SF Mono",Menlo,monospace; letter-spacing:0.4px; }
+
+  section { background:#fff; border:1px solid var(--hairline); border-radius:16px;
+    padding:20px 22px; margin-top:14px; }
+  h2 { font-size:11px; font-weight:600; letter-spacing:1.65px; text-transform:uppercase;
+    color:var(--muted); margin:0 0 12px; }
+  h3 { font-size:16px; font-weight:600; margin:0 0 6px; letter-spacing:-0.2px; }
+  p, li { font-size:15px; margin:0 0 10px; }
+  li { margin-bottom:8px; }
+  p:last-child, li:last-child { margin-bottom:0; }
+  ul { padding-left:20px; margin:0; }
+  a { color:var(--blue); }
+
+  .panel { background:var(--blue-tint); border:1px solid var(--blue-border);
+    border-radius:16px; padding:16px 18px; font-size:14.5px; line-height:1.55; }
+
+  /* THE WELCOME. A page that opens on a card opens on business; an institution introduces
+     itself first. There is no photography to do that with, so it is done with scale and air —
+     the name set large, one line of purpose, and a great deal of space around both. The
+     entrance is a single quiet rise, once, on the opening only: enough to feel considered,
+     far short of a performance. Anyone who has asked their system not to animate gets the
+     page still. */
+  .hero { text-align:center; padding:78px 8px 66px; }
+  .hero .name { font-size:54px; font-weight:600; letter-spacing:-1.2px; line-height:1.03; }
+  .hero .line { font-size:18px; color:var(--muted); margin:20px auto 0; max-width:30rem;
+    line-height:1.5; }
+  .hero .rule { width:44px; height:1px; background:var(--border); margin:34px auto 0; }
+  @media (max-width:560px) {
+    .hero { padding:56px 4px 48px; }
+    .hero .name { font-size:40px; letter-spacing:-0.9px; }
+    .hero .line { font-size:16.5px; margin-top:16px; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .hero .name, .hero .line, .hero .rule { animation: rise .5s cubic-bezier(.2,.7,.3,1) both; }
+    .hero .line { animation-delay: .06s; }
+    .hero .rule { animation-delay: .12s; }
+    @keyframes rise { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
+  }
+
+  /* THE STATEMENT. The founders' own demo states the figure that matters this way — a
+     centred blue-tinted card, a quiet blue label above, and the number itself set large in
+     mono. It is the house idiom for "this is the thing", and the site earns its authority by
+     opening with the principle rather than with a price list. */
+  .statement { background:var(--blue-tint); border:1px solid var(--blue-border);
+    border-radius:16px; padding:30px 22px 26px; margin-top:26px; text-align:center; }
+  .statement .lbl { font-size:11px; font-weight:600; letter-spacing:1.65px;
+    text-transform:uppercase; color:var(--blue); }
+  .statement .figure { font-family:ui-monospace,"SF Mono",Menlo,monospace; font-size:46px;
+    font-weight:600; letter-spacing:0.06em; margin-top:14px; line-height:1; }
+  .statement .note { font-size:14.5px; color:var(--muted); margin-top:12px; }
+
+  /* A rule between the two halves of one table, where the second half is the consequence
+     of the first. Heavier than a row hairline, quieter than a new card. */
+  .rows .split { border-top:1px solid var(--border); margin-top:4px; padding-top:17px; }
+  .rows > div { display:flex; justify-content:space-between; gap:14px;
+    padding:13px 0; border-top:1px solid var(--hairline); }
+  .rows > div:first-child { border-top:0; }
+  .rows .k { color:var(--muted); font-size:14.5px; }
+  .mono { font-family:ui-monospace,"SF Mono",Menlo,monospace; }
+  .amount { font-family:ui-monospace,"SF Mono",Menlo,monospace; font-size:15px; }
+
+  /* The app points onward with a blue label and a chevron — "Select ›", "View profile ›".
+     The site uses the same idiom rather than inventing a second one. */
+  .more { display:inline-block; color:var(--blue); font-weight:500; font-size:15px;
+    text-decoration:none; margin-top:12px; }
+
+  .cta { display:inline-block; background:var(--ink); color:#fff; text-decoration:none;
+    font-size:16px; font-weight:600; letter-spacing:0.16px; padding:14px 22px;
+    border-radius:13px; margin-top:16px; }
+  .ghost { display:inline-block; border:1px solid var(--border); color:var(--ink);
+    text-decoration:none; font-size:16px; font-weight:600; padding:13px 21px;
+    border-radius:13px; margin-top:16px; }
+
+  .foot { text-align:center; margin-top:34px; color:var(--muted); font-size:12.5px;
+    line-height:1.7; }
+  .foot .stamp { font-family:ui-monospace,"SF Mono",Menlo,monospace; font-size:11.5px;
+    letter-spacing:1px; color:var(--faint); }
+  .foot a { color:var(--muted); }
+</style>
+</head>
+<body><main>
+<a class="lockup" href="/">
+<div class="brand">AMERICAN RIDER</div>
+<div class="tagline">NATIONAL TRANSPORTATION</div>
+</a>
+<nav><a class="nav" href="/travel">Travel</a><a class="nav" href="/operate">Operate</a><a class="nav" href="/safety">Safety</a><a class="nav on" href="/support">Support</a></nav>
+
+<h1>Support</h1>
+<p class="lede">Reaching a person about a travel.</p>
+
+<section>
+  <h2>Emergencies</h2>
+  <p>Call <strong>911</strong>. During every travel the app carries the operator's name,
+  vehicle, license plate and the traveler's location, to be read to a dispatcher.</p>
+</section>
+
+<section>
+  <h2>A travel</h2>
+  <p>Patron Support opens from the menu or from the travel itself. It covers travel cost, a
+  lost item, a route concern, a cancellation and safety.</p>
+  <p>Cases are settled against the record of the travel. Anything that should not be settled
+  automatically, including any matter of safety, is directed to a person.</p>
+</section>
+
+<section>
+  <h2>A lost item</h2>
+  <p>A lost item is reported from the travel in the Travel Log. The operator who drove the
+  travel is contacted first; where that operator has finished for the day, the return is
+  dispatched to the nearest available operator.</p>
+</section>
+
+<section>
+  <h2>Payment</h2>
+  <p>Every travel carries a receipt in the Travel Log stating the fare, the platform fee and
+  the total charged. A disputed amount is examined against the record of what was charged.</p>
+  <p>A travel cancelled before the operator arrives is refunded in full. After arrival, a
+  $3.00 arrival fee is retained for the operator. A travel already underway is settled through
+  Patron Support rather than cancelled.</p>
+</section>
+
+<section>
+  <h2>Operators</h2>
+  <p>Payouts, qualification and insurance are handled on the operator side of the app, under
+  Getting Paid and Documents.</p>
+</section>
+
+<div class="foot">
+<a href="/about">About</a> · <a href="/terms">Terms of Service</a> ·
+<a href="/privacy">Privacy Policy</a><br>
+<span class="stamp">AMERICAN RIDER · MIAMI, FL</span></div>
+</main></body></html>

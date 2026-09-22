@@ -1,0 +1,582 @@
+<meta charset="utf-8">
+<title>American Rider — Operator</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+  :root{
+    --ink:#14171F; --ink2:#3A3F49; --muted:#8A8A82; --faint:#B4B3AB;
+    --blue:#2E5FE0; --blue-t:#F0F3FC; --blue-b:#E1E9FB; --green:#1F8A5B; --green-t:#E9F3EE; --red:#B3432E; --red-b:#E6C4BC;
+    --bg:#F7F7F5; --canvas:#E7E6E1; --card:#FFFFFF; --line:#ECEBE6; --line2:#E3E2DC; --fill:#EFEEE9;
+    --solid:#14171F; --solid-fg:#fff; /* strong surfaces (buttons, avatars) — stay legible in both themes */
+    --sans:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text','Helvetica Neue',Helvetica,Arial,sans-serif;
+    --mono:'SF Mono',ui-monospace,Menlo,Consolas,monospace;
+  }
+  :root[data-theme="dark"]{
+    --ink:#F3F3F1; --ink2:#C3C6CC; --muted:#8B8E96; --faint:#65686F;
+    --blue:#5C86F6; --blue-t:#1A2131; --blue-b:#2B3651; --green:#41BE82; --green-t:#15271D; --red:#E0674F; --red-b:#4A2A24;
+    --bg:#14171F; --canvas:#0B0D12; --card:#1B1F27; --line:#2A2E38; --line2:#343945; --fill:#232732;
+    --solid:#EDEDEB; --solid-fg:#14171F;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; height:100%; }
+  body{ background:var(--canvas); font-family:var(--sans); color:var(--ink); display:flex; align-items:center; justify-content:center; -webkit-font-smoothing:antialiased; letter-spacing:-.005em; }
+  #phone{ position:relative; width:100%; max-width:412px; height:100%; max-height:892px; background:var(--bg); overflow:hidden; display:flex; flex-direction:column; }
+  @media (min-width:480px) and (min-height:720px){ #phone{ border-radius:44px; box-shadow:0 30px 80px rgba(20,23,31,.26), 0 0 0 11px #14161c, 0 0 0 13px #23262e; height:844px; } }
+  #screen{ flex:1; position:relative; overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; }
+  .pad{ padding:58px 24px 40px; min-height:100%; display:flex; flex-direction:column; }
+  .padnav{ padding-bottom:96px; }
+  @media (min-width:480px) and (min-height:720px){ .pad{ padding-top:40px; } }
+
+  .bar{ display:flex; align-items:center; justify-content:space-between; height:26px; margin-bottom:22px; }
+  .wm{ font-size:12px; font-weight:600; letter-spacing:.22em; color:var(--ink); }
+  .wm .op{ color:var(--blue); }
+  .icn{ width:22px; height:22px; color:var(--ink2); cursor:pointer; flex-shrink:0; }
+  .icn.g{ color:var(--faint); }
+
+  h1{ margin:0; font-weight:600; }
+  .display{ font-size:32px; font-weight:600; letter-spacing:-.02em; line-height:1.14; }
+  .title{ font-size:26px; font-weight:600; letter-spacing:-.02em; margin:0; }
+  .sub{ font-size:14px; color:var(--muted); margin:8px 0 0; line-height:1.5; }
+  .lbl{ font-size:11px; font-weight:600; letter-spacing:.15em; color:var(--muted); text-transform:uppercase; }
+  .mono{ font-family:var(--mono); font-variant-numeric:tabular-nums; letter-spacing:-.01em; }
+  .num{ font-variant-numeric:tabular-nums; }
+  .figure{ font-variant-numeric:tabular-nums; font-weight:600; letter-spacing:-.02em; }
+  .row{ display:flex; justify-content:space-between; align-items:center; }
+  .spring{ flex:1; }
+
+  .card{ background:var(--card); border:1px solid var(--line); border-radius:16px; }
+  .hair{ border-top:1px solid var(--line); }
+  .field{ width:100%; border:1px solid var(--line2); border-radius:12px; outline:none; background:var(--card); font-size:15px; color:var(--ink); font-family:inherit; padding:14px 16px; }
+
+  button{ font-family:inherit; }
+  .btn{ display:block; width:100%; border:0; border-radius:13px; padding:18px; text-align:center; font-size:16px; font-weight:600; letter-spacing:.01em; color:var(--solid-fg); background:var(--solid); cursor:pointer; transition:opacity .2s ease; }
+  .btn:active{ opacity:.86; }
+  .btn.blue{ background:var(--blue); } .btn.green{ background:var(--green); }
+  .btn.ghost{ background:var(--card); border:1px solid var(--line2); color:var(--ink); }
+  .btn.red{ background:var(--card); border:1px solid var(--red-b); color:var(--red); }
+  .link{ color:var(--blue); cursor:pointer; font-weight:500; }
+  .cta-space{ margin-top:24px; }
+
+  .lrow{ display:flex; align-items:center; gap:14px; padding:16px 0; }
+  .chev{ color:var(--faint); font-size:19px; margin-left:auto; }
+  .dot{ width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+  .av{ border-radius:50%; background:var(--solid); color:var(--solid-fg); display:flex; align-items:center; justify-content:center; font-weight:600; flex-shrink:0; }
+  .badge-ok{ display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:600; color:var(--green); background:var(--green-t); border-radius:999px; padding:5px 12px; }
+
+  .map{ height:180px; border-radius:16px; border:1px solid var(--line); background:#EEEEE9; position:relative; overflow:hidden; }
+  .tag{ position:absolute; left:12px; top:12px; background:rgba(255,255,255,.9); border:1px solid var(--line); border-radius:8px; padding:5px 10px; font-family:var(--mono); font-size:9px; letter-spacing:.14em; color:var(--muted); }
+  .cbar{ height:4px; border-radius:2px; background:var(--line2); overflow:hidden; }
+  .cbar>div{ height:100%; background:var(--blue); width:100%; }
+
+  /* find-your-traveler arrow */
+  .finder{ background:#EEEEE9; border:1px solid var(--line); border-radius:16px; padding:20px 18px 16px; display:flex; flex-direction:column; align-items:center; }
+  .finderFace{ position:relative; width:190px; height:190px; }
+  .fring{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); border-radius:50%; border:1px solid rgba(46,95,224,.18); }
+  .youdot{ position:absolute; left:50%; top:50%; width:14px; height:14px; border-radius:50%; background:var(--blue); transform:translate(-50%,-50%); box-shadow:0 0 0 4px rgba(46,95,224,.15); z-index:3; }
+  .findarrow{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); transition:transform .3s ease; z-index:2; }
+  .tdot{ position:absolute; width:26px; height:26px; border-radius:50%; background:var(--solid); color:var(--solid-fg); font-size:10px; font-weight:600; display:flex; align-items:center; justify-content:center; transform:translate(-50%,-50%); border:2px solid var(--card); z-index:4; transition:left .3s ease,top .3s ease; }
+  .fdist{ font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:28px; font-weight:600; margin-top:16px; }
+  .fdist span{ font-size:13px; color:var(--muted); }
+  .fsub{ font-size:13.5px; color:var(--blue); margin-top:5px; font-weight:600; }
+
+  .steps{ display:flex; gap:6px; } .steps .b{ flex:1; height:3px; border-radius:2px; background:var(--line2); } .steps .b.on{ background:var(--blue); }
+  .toggle{ width:50px; height:29px; border-radius:999px; padding:3px; display:flex; cursor:pointer; transition:background .2s; } .knob{ width:23px; height:23px; border-radius:50%; background:#fff; }
+  .seg{ position:relative; display:flex; background:var(--fill); border-radius:12px; padding:3px; }
+  .seg .thumb{ position:absolute; top:3px; bottom:3px; left:3px; border-radius:9px; background:var(--solid); z-index:0; transition:transform .32s cubic-bezier(.34,.7,0,1); }
+  .seg .opt{ position:relative; z-index:1; flex:1; text-align:center; padding:11px 4px; font-size:14px; font-weight:500; color:var(--ink2); cursor:pointer; user-select:none; transition:color .25s ease; }
+  .seg .opt.on{ color:var(--solid-fg); font-weight:600; }
+  .bubble{ max-width:78%; padding:12px 15px; border-radius:15px; font-size:14.5px; line-height:1.45; }
+
+  .nav{ position:absolute; left:0; right:0; bottom:0; height:76px; background:rgba(255,255,255,.96); backdrop-filter:blur(8px); border-top:1px solid var(--line); display:flex; }
+  .nav .item{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; cursor:pointer; font-size:10.5px; letter-spacing:.03em; color:var(--faint); font-weight:600; }
+  .nav .item.on{ color:var(--ink); }
+  .nav svg{ width:21px; height:21px; }
+
+  @keyframes soft{ 0%,100%{ opacity:1;} 50%{ opacity:.4;} }
+  @keyframes halo{ 0%{ transform:scale(.7); opacity:.5;} 100%{ transform:scale(1.9); opacity:0;} }
+  @keyframes fadein{ from{ opacity:0; transform:translateY(7px);} to{ opacity:1; transform:translateY(0);} }
+  .soft{ animation:soft 1.8s ease-in-out infinite; }
+  #screen.fx{ animation:fadein .3s cubic-bezier(.2,.6,.2,1); }
+  @media (prefers-reduced-motion:reduce){ #screen.fx,.soft{ animation:none; } }
+  .availwrap{ position:relative; height:140px; display:flex; align-items:center; justify-content:center; }
+  .availwrap .halo{ position:absolute; width:56px; height:56px; border-radius:50%; background:var(--blue); animation:halo 2.4s ease-out infinite; }
+  .availwrap .halo.d{ animation-delay:1.2s; }
+  .availwrap .core{ position:relative; width:60px; height:60px; border-radius:50%; background:var(--blue); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:600; z-index:2; }
+  .note{ position:absolute; left:24px; right:24px; bottom:96px; background:var(--ink); color:#fff; border-radius:12px; padding:14px 16px; font-size:13.5px; line-height:1.45; z-index:8; animation:fadein .3s ease; }
+  /* Uber-style quick-access drawer (hamburger) */
+  .scrim{ position:absolute; inset:0; background:rgba(20,23,31,.42); opacity:0; pointer-events:none; transition:opacity .3s ease; z-index:20; }
+  .scrim.on{ opacity:1; pointer-events:auto; }
+  .drawer{ position:absolute; top:0; bottom:0; left:0; width:78%; max-width:320px; background:var(--bg); z-index:21; transform:translateX(-103%); transition:transform .32s cubic-bezier(.2,.6,.2,1); display:flex; flex-direction:column; padding:56px 22px 28px; overflow-y:auto; box-shadow:0 0 44px rgba(20,23,31,.2); }
+  .drawer.on{ transform:translateX(0); }
+  .drow{ display:flex; align-items:center; justify-content:space-between; padding:15px 2px; font-size:15.5px; cursor:pointer; border-top:1px solid var(--line); }
+  @media (prefers-reduced-motion:reduce){ .drawer,.scrim{ transition:none; } }
+</style>
+
+<div id="phone"><div id="screen"></div></div>
+<script>
+(function(){
+  var esc=function(s){ return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); };
+  var fmt=function(n){ return '$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); };
+  var cutOf=function(f){ return Math.floor(Math.min(f*0.01,1)*100)/100; };
+  var earnOf=function(f){ return +(f-cutOf(f)).toFixed(2); };
+
+  var OP={ name:'Miguel D.', init:'MD', rating:4.98, car:'Gray Toyota Camry', plate:'KTR 4821', since:2025 };
+  // When launched from the unified app, the signed-up user IS the operator.
+  (function(){ var qn=new URLSearchParams(location.search).get('n'); if(qn){ qn=qn.replace(/[<>&"'`]/g,'').trim().slice(0,40); if(qn){ OP.name=qn; OP.init=qn.split(/\s+/).map(function(w){return w[0];}).slice(0,2).join('').toUpperCase(); } } })();
+  var REQ={ traveler:'J. Reyes', tInit:'JR', tRating:4.92, pickup:'Brickell City Centre', pickupMin:3, dest:'Miami International Airport', tripMin:24, dist:14.2, fare:24.5 };
+
+  var S={
+    screen:'home', nav:[], online:false, arrived:false,
+    balance:214.50, today:46.93, goal:0, todayOps:3, week:612.40, month:2680.15, year:28450.00,
+    seed:[ {arr:'South Beach', earn:18.02, time:'12:35 PM'}, {arr:'Coral Gables', earn:16.24, time:'11:05 AM'}, {arr:'Wynwood', earn:12.67, time:'9:40 AM'} ],
+    op:null, tripStep:0, msgs:[{me:false,text:'I\'m out front by the lobby doors.'}], msgInput:'',
+    method:'standard', cashDone:false, countdown:15, note:'', theme:'light',
+    inbox:[
+      {title:'Welcome to American Rider', body:'You\'re one of our founding operators. We\'re building this the honest way — you keep 99% of every fare, always. Thank you for starting this with us. — Adrian & Chad', time:'2 days ago', read:false},
+      {title:'42 new travelers joined this week', body:'Awareness is growing across Miami. Rides will pick up as more travelers discover us — thank you for your patience while we build the demand side. Every trip you run helps us grow.', time:'1 day ago', read:false},
+      {title:'We\'ll always keep you in the loop', body:'You\'ll hear from us as we grow — how many travelers are signing up, what we\'re building, and where we\'re headed. Ideas or questions? We read every one. — The American Rider team', time:'5 hours ago', read:false}
+    ]
+  };
+  var reqTimer=null, cdTimer=null, msgTimer=null;
+
+  // ---- theme (light / dark) — shared across the whole app via localStorage 'ar-theme' ----
+  function applyTheme(t){ document.documentElement.setAttribute('data-theme',t); try{ localStorage.setItem('ar-theme',t); }catch(e){} S.theme=t; }
+  (function(){ var s=null; try{ s=localStorage.getItem('ar-theme'); }catch(e){} S.theme=(s==='dark')?'dark':'light'; document.documentElement.setAttribute('data-theme',S.theme); })(); // default LIGHT; only DARK if the user chose it (never follows the phone)
+
+  function go(s){ S.note=''; S.nav.push(S.screen); S.screen=s; render(); }
+  function tab(s){ S.note=''; S.nav=[]; S.screen=s; render(); }
+  function back(){ S.note=''; S.screen=S.nav.pop()||'home'; render(); }
+
+  function armRequest(){ clearTimeout(reqTimer); reqTimer=setTimeout(function(){ if(S.online&&S.screen==='home'){ openRequest(); } }, 2600); }
+  function goAvailable(){ S.online=true; render(); armRequest(); }
+  function goOffline(){ S.online=false; clearTimeout(reqTimer); render(); }
+  function openRequest(){
+    S.countdown=15; S.screen='request'; render();
+    clearInterval(cdTimer);
+    cdTimer=setInterval(function(){
+      S.countdown--;
+      if(S.countdown<=0){ clearInterval(cdTimer); if(S.screen==='request') declineOp(); return; }
+      var bar=document.getElementById('cdbar'), t=document.getElementById('cdtext');
+      if(bar) bar.style.width=(S.countdown/15*100)+'%';
+      if(t) t.textContent='Respond within '+S.countdown+'s';
+    },1000);
+  }
+  function commenceOp(){
+    clearInterval(cdTimer);
+    S.op={ traveler:REQ.traveler, dest:REQ.dest, pickup:REQ.pickup, fare:REQ.fare, earn:earnOf(REQ.fare), dist:REQ.dist, tripMin:REQ.tripMin };
+    S.arrived=false; S.msgs=[{me:false,text:'I\'m out front by the lobby doors.'}];
+    tab('pickup');
+  }
+  function declineOp(){ clearInterval(cdTimer); S.screen='home'; render(); if(S.online) armRequest(); }
+  function completeOp(){
+    var e=S.op.earn;
+    S.todayOps++; S.today=+(S.today+e).toFixed(2); S.balance=+(S.balance+e).toFixed(2); S.week=+(S.week+e).toFixed(2); S.month=+(S.month+e).toFixed(2); S.year=+(S.year+e).toFixed(2);
+    S.seed.unshift({ arr:S.op.dest, earn:e, time:'Just now' });
+    tab('complete');
+  }
+  function sendMsg(){ var t=(S.msgInput||'').trim(); if(!t)return; S.msgs.push({me:true,text:t}); S.msgInput=''; clearTimeout(msgTimer); msgTimer=setTimeout(function(){ S.msgs.push({me:false,text:'Thank you — see you shortly.'}); if(S.screen==='communicate')render(); },1500); render(); }
+  function withdraw(){ S.lastTransfer=+(S.balance-(S.method==='instant'?0.5:0)).toFixed(2); S.balance=0; S.cashDone=true; render(); }
+
+  function av(init,size){ return '<div class="av" style="width:'+size+'px;height:'+size+'px;font-size:'+(size*0.36)+'px">'+init+'</div>'; }
+  function mapSVG(tag){
+    var s='<div class="map"><svg width="100%" height="100%" viewBox="0 0 364 180" preserveAspectRatio="xMidYMid slice" style="position:absolute;inset:0">';
+    s+='<rect width="364" height="180" fill="#EEEEE9"/><rect x="210" y="96" width="92" height="46" rx="4" fill="#E4EADD"/>';
+    [70,150,236,312].forEach(function(x){ s+='<line x1="'+x+'" y1="0" x2="'+x+'" y2="180" stroke="#F6F5F1" stroke-width="7"/>'; });
+    [50,100,150].forEach(function(y){ s+='<line x1="0" y1="'+y+'" x2="364" y2="'+y+'" stroke="#F6F5F1" stroke-width="7"/>'; });
+    var route='M60,144 L210,144 L210,44 L308,44';
+    s+='<path d="'+route+'" fill="none" stroke="#CBD6F1" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>';
+    s+='<path id="mroute" d="'+route+'" fill="none" stroke="#2E5FE0" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>';
+    s+='<circle cx="308" cy="44" r="5.5" fill="#2E5FE0" stroke="#fff" stroke-width="2.2"/><g id="mapcar" transform="translate(60,144)"><rect x="-6.5" y="-4" width="13" height="8" rx="2.5" fill="#14171F"/><rect x="2" y="-2.6" width="3" height="5.2" rx="1" fill="rgba(255,255,255,.85)"/></g>';
+    s+='</svg><div class="tag">'+esc(tag||'LIVE · MIA')+'</div></div>';
+    return s;
+  }
+  var mapTimer=null;
+  function stopMap(){ if(mapTimer){ clearInterval(mapTimer); mapTimer=null; } }
+  function animateMap(){
+    stopMap();
+    var path=document.getElementById('mroute'); if(!path||!document.getElementById('mapcar')) return;
+    var L=path.getTotalLength(), t0=Date.now(), dur=7000;
+    mapTimer=setInterval(function(){
+      var car=document.getElementById('mapcar'), pt=document.getElementById('mroute');
+      if(!car||!pt){ stopMap(); return; }
+      var frac=((Date.now()-t0)%dur)/dur;
+      var p=pt.getPointAtLength(L*frac), q=pt.getPointAtLength(Math.min(L,L*frac+2));
+      var ang=Math.atan2(q.y-p.y,q.x-p.x)*180/Math.PI;
+      car.setAttribute('transform','translate('+p.x.toFixed(1)+','+p.y.toFixed(1)+') rotate('+ang.toFixed(1)+')');
+    },40);
+  }
+  // ---- find-your-traveler arrow (Tesla-style, operator side) ----
+  var finderTimer=null, finderStart=0;
+  function stopFinder(){ if(finderTimer){ clearInterval(finderTimer); finderTimer=null; } }
+  function dirWord(b){ var a=b; while(a>180)a-=360; while(a<-180)a+=360; var m=Math.abs(a); if(m<20)return 'Straight ahead'; if(m>150)return 'Behind you'; return a>0?'To your right':'To your left'; }
+  function finderHTML(){
+    return '<div class="finder"><div class="finderFace">'
+      +'<div class="fring" style="width:190px;height:190px"></div><div class="fring" style="width:126px;height:126px"></div><div class="fring" style="width:62px;height:62px"></div>'
+      +'<div class="youdot"></div>'
+      +'<div class="tdot" id="fTdot" style="left:95px;top:35px">'+REQ.tInit+'</div>'
+      +'<svg class="findarrow" id="fArrow" width="60" height="60" viewBox="0 0 24 24"><path d="M12 2 L19 20 L12 15.5 L5 20 Z" fill="#2E5FE0"/></svg>'
+      +'</div>'
+      +'<div class="fdist" id="fDist">Locating…</div><div class="fsub" id="fSub">Finding '+REQ.traveler+'</div>'
+      +'<div style="display:flex;gap:16px;margin-top:12px;font-size:11.5px;color:var(--muted)"><span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--blue);margin-right:5px"></span>You</span><span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ink);margin-right:5px"></span>'+REQ.traveler+'</span></div></div>';
+  }
+  function startFinder(){ stopFinder(); if(!document.getElementById('fArrow'))return; finderStart=Date.now(); updateFinder(); finderTimer=setInterval(updateFinder,90); }
+  function updateFinder(){
+    var arrow=document.getElementById('fArrow'), dvr=document.getElementById('fTdot'), dist=document.getElementById('fDist'), sub=document.getElementById('fSub');
+    if(!arrow||!dvr||!dist||!sub||S.screen!=='pickup'||!S.arrived){ stopFinder(); return; }
+    var el=(Date.now()-finderStart)/1000;
+    var d=Math.max(0, 80-80*Math.min(1,el/7));
+    var bearing=44*(d/80)+3*Math.sin(el*1.1);
+    var rad=bearing*Math.PI/180, tip=64;
+    dvr.style.left=(95+tip*Math.sin(rad))+'px'; dvr.style.top=(95-tip*Math.cos(rad))+'px';
+    if(d<=6){
+      arrow.innerHTML='<circle cx="12" cy="12" r="9" stroke="#1F8A5B" stroke-width="2" fill="none"/><path d="M8.5 12 l2.3 2.3 l4.5 -5" stroke="#1F8A5B" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>';
+      arrow.style.transform='translate(-50%,-50%)'; dist.textContent='Here'; sub.textContent='You have reached '+REQ.traveler; sub.style.color='var(--green)';
+    } else {
+      arrow.innerHTML='<path d="M12 2 L19 20 L12 15.5 L5 20 Z" fill="#2E5FE0"/>';
+      arrow.style.transform='translate(-50%,-50%) rotate('+bearing+'deg)'; dist.innerHTML=Math.round(d)+'<span> ft</span>'; sub.textContent=dirWord(bearing); sub.style.color='var(--blue)';
+    }
+  }
+  function bar(active){
+    var un=unreadCount();
+    return '<div class="bar">'
+      +'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#B4B3AB" stroke-width="1.6" data-act="opendrawer" style="cursor:pointer;flex-shrink:0"><path d="M4 7h16M4 12h16M4 17h16" stroke-linecap="round"/></svg>'
+      +'<div class="wm">AMERICAN RIDER <span class="op">· OPERATOR</span></div>'
+      +'<div style="display:flex;align-items:center;gap:15px">'
+      +'<div data-act="openinbox" style="position:relative;cursor:pointer;display:flex" aria-label="Inbox"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#B4B3AB" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M4 7l8 6 8-6" stroke-linecap="round" stroke-linejoin="round"/></svg>'+(un?'<span style="position:absolute;top:-5px;right:-6px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--red);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1">'+un+'</span>':'')+'</div>'
+      +'<div data-act="menu" style="cursor:pointer">'+av(OP.init,34)+'</div>'
+      +'</div>'
+      +'</div>';
+  }
+  function unreadCount(){ return S.inbox.filter(function(m){ return !m.read; }).length; }
+  function inboxScr(){
+    var h='<div class="pad"><button class="link" data-act="back" style="background:none;border:0;padding:6px 0;text-align:left;font-size:15px;align-self:flex-start">‹ Back</button>';
+    h+='<div class="title">Inbox</div><div class="sub">Updates from the American Rider team.</div>';
+    h+='<div style="margin-top:22px;display:flex;flex-direction:column;gap:12px">';
+    S.inbox.forEach(function(m){
+      h+='<div class="card" style="padding:16px 18px'+(m.read?'':';border-color:var(--blue-b);background:var(--blue-t)')+'">'
+        +'<div class="row"><div style="display:flex;align-items:center;gap:9px"><div class="av" style="width:27px;height:27px;font-size:10.5px">AR</div><span style="font-size:12.5px;font-weight:600;color:var(--blue)">American Rider</span>'+(m.read?'':'<span style="width:7px;height:7px;border-radius:50%;background:var(--blue);display:inline-block"></span>')+'</div><span style="font-size:11.5px;color:var(--muted)">'+m.time+'</span></div>'
+        +'<div style="font-size:15.5px;font-weight:600;margin-top:11px">'+m.title+'</div>'
+        +'<div style="font-size:13.5px;color:var(--ink2);margin-top:6px;line-height:1.55">'+m.body+'</div></div>';
+    });
+    h+='</div><div class="spring"></div></div>';
+    return h;
+  }
+  // Money stays OFF the dashboard — one discreet Wallet card; amounts live one tap away.
+  function walletCard(){
+    return '<div class="card" data-act="tab" data-s="revenue" style="margin-top:22px;padding:18px 20px;cursor:pointer"><div class="row"><div style="display:flex;align-items:center;gap:13px"><div style="width:40px;height:40px;border-radius:10px;background:var(--ink);display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18M16 15h2" stroke-linecap="round"/></svg></div><div><div style="font-size:15.5px;font-weight:600">Wallet</div><div style="font-size:12.5px;color:var(--muted);margin-top:2px">'+S.todayOps+' operations today · view revenue</div></div></div><span class="chev">›</span></div></div>';
+  }
+  function navBar(active){
+    var items=[['home','Operations','M4 11l8-7 8 7M6 10v9h12v-9'],['revenue','Revenue','M12 3v18M6 8h9a2.5 2.5 0 0 1 0 5H6h11'],['profile','Profile','M12 8a3.4 3.4 0 1 0 0-.1M5.5 20c1.4-3.3 11.6-3.3 13 0']];
+    var h='<div class="nav">';
+    items.forEach(function(it){ h+='<div class="item'+(active===it[0]?' on':'')+'" data-act="tab" data-s="'+it[0]+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="'+it[2]+'"/></svg>'+it[1]+'</div>'; });
+    return h+'</div>';
+  }
+
+  // ---- screens ----
+  function home(){
+    var h='<div class="pad padnav">'+bar();
+    if(!S.online){
+      h+='<div class="display" style="margin-top:8px">Ready to operate</div>';
+      h+='<div class="sub">You retain 99% of every fare. Go available when you\'re ready for travelers.</div>';
+      h+=walletCard();
+      h+='<div class="spring"></div><button class="btn green cta-space" data-act="available">Go Available</button>';
+    } else {
+      h+='<div class="availwrap" style="margin-top:20px"><div class="halo"></div><div class="halo d"></div><div class="core">'+OP.init+'</div></div>';
+      h+='<div style="text-align:center"><div style="font-size:20px;font-weight:600">Available for Operations</div><div class="sub" style="text-align:center">Matching you with nearby travelers…</div></div>';
+      h+=walletCard();
+      h+='<div class="spring"></div><button class="btn ghost cta-space" data-act="offline">Go Offline</button>';
+    }
+    return h+'</div>'+navBar('home');
+  }
+
+  function request(){
+    var earn=earnOf(REQ.fare);
+    var h='<div class="pad" style="justify-content:flex-end;background:rgba(20,23,31,.4)">';
+    h+='<div class="card" style="padding:22px">';
+    h+='<div class="cbar"><div id="cdbar" style="transition:width 1s linear"></div></div>';
+    h+='<div id="cdtext" style="font-size:12px;color:var(--muted);margin-top:8px;text-align:center;letter-spacing:.02em">Respond within 15s</div>';
+    h+='<div style="font-size:20px;font-weight:600;margin-top:14px">Operation Request</div>';
+    h+='<div class="row" style="margin-top:14px">'+av(REQ.tInit,44)+'<div style="flex:1;margin-left:12px"><div style="font-size:16px;font-weight:600">'+REQ.traveler+'</div><div style="font-size:13px;color:var(--muted);margin-top:2px">★ '+REQ.tRating+'</div></div><div style="text-align:right"><div class="lbl" style="font-size:9.5px">Estimated Revenue</div><div class="figure" style="font-size:24px;color:var(--green);margin-top:3px">'+fmt(earn)+'</div></div></div>';
+    h+='<div class="card" style="margin-top:16px;padding:2px 18px;background:var(--fill);border-color:var(--line)">';
+    h+='<div class="lrow hair" style="border-top:0"><span class="dot" style="background:var(--ink)"></span><div><div style="font-size:12px;color:var(--muted)">Pickup · '+REQ.pickupMin+' min away</div><div style="font-size:15px;margin-top:2px">'+REQ.pickup+'</div></div></div>';
+    h+='<div class="lrow hair"><span class="dot" style="background:var(--blue)"></span><div><div style="font-size:12px;color:var(--muted)">Destination · '+REQ.tripMin+' min · '+REQ.dist+' mi</div><div style="font-size:15px;margin-top:2px">'+REQ.dest+'</div></div></div>';
+    h+='</div>';
+    h+='<div style="display:flex;gap:10px;margin-top:18px"><button class="btn red" data-act="decline" style="flex:1">Decline</button><button class="btn green" data-act="commence" style="flex:1.6">Commence Operation</button></div>';
+    h+='</div></div>';
+    return h;
+  }
+
+  function pickup(){
+    var h='<div class="pad"><button class="link" data-act="cancelop" style="background:none;border:0;padding:6px 0;text-align:left;font-size:15px;align-self:flex-start">‹ Cancel</button>';
+    h+='<div class="row" style="align-items:flex-start;margin-top:6px"><div><div class="title" style="font-size:22px">'+(S.arrived?'At Pickup':'Proceed to Pickup')+'</div><div class="sub">'+REQ.pickup+' · '+(S.arrived?'meet '+REQ.traveler:REQ.pickupMin+' min away')+'</div></div><div style="background:var(--ink);border-radius:10px;padding:8px 14px"><span class="mono" style="font-size:13px;color:#fff">'+(S.arrived?'Arrived':REQ.pickupMin+' min')+'</span></div></div>';
+    h+='<div style="margin-top:16px">'+mapSVG(S.arrived?'ARRIVED · PICKUP':'NAVIGATION · TO PICKUP')+'</div>';
+    h+='<div class="card" style="margin-top:14px;padding:16px 18px"><div class="row"><div style="display:flex;align-items:center;gap:12px">'+av(REQ.tInit,42)+'<div><div style="font-size:16px;font-weight:600">'+REQ.traveler+'</div><div style="font-size:12.5px;color:var(--muted);margin-top:2px">'+REQ.pickup+' → '+REQ.dest+'</div></div></div><div class="link" data-act="go" data-s="communicate" style="font-size:14px">Contact</div></div></div>';
+    h+='<div class="card" style="margin-top:12px;padding:16px 18px"><div class="lbl" style="color:var(--blue)">Travel Notes</div><div style="font-size:14px;margin-top:8px;line-height:1.5">Atmosphere: Quiet · Climate: Moderate · Operator Playlist offered at pickup. You retain final discretion.</div></div>';
+    h+='<div class="spring"></div>';
+    if(!S.arrived) h+='<button class="btn cta-space" data-act="confirmarrival">Confirm Arrival</button>';
+    else h+='<button class="btn green cta-space" data-act="commencetravel">Commence Travel</button>';
+    return h;
+  }
+
+  function trip(){
+    var st=S.tripStep;
+    var h='<div class="pad">';
+    h+='<div class="row" style="align-items:flex-start;margin-top:6px"><div><div class="title" style="font-size:22px">Operation in Progress</div><div class="sub">To '+S.op.dest+'</div></div><div style="text-align:right"><div class="lbl" style="font-size:9.5px">Arrival</div><div class="figure" style="font-size:18px;margin-top:3px">18 min</div></div></div>';
+    h+='<div style="margin-top:16px">'+mapSVG('NAVIGATION · TO DESTINATION')+'</div>';
+    h+='<div class="card" style="margin-top:12px;padding:14px 18px;background:var(--blue-t);border-color:var(--blue-b)"><div class="lbl" style="color:var(--blue)">Route Suggestion</div><div style="font-size:12.5px;color:var(--ink2);margin-top:6px;line-height:1.5">Navigation suggests an exit before I-95 to stay ahead of a forecast traffic buildup. Follow it or keep your route — your call.</div></div>';
+    h+='<div class="card" style="margin-top:14px;padding:16px 18px"><div class="row"><div style="display:flex;align-items:center;gap:12px">'+av(REQ.tInit,42)+'<div><div style="font-size:16px;font-weight:600">'+S.op.traveler+'</div><div style="font-size:12.5px;color:var(--muted);margin-top:2px">Playing · Operator Playlist</div></div></div><div class="link" data-act="go" data-s="communicate" style="font-size:14px">Contact</div></div></div>';
+    h+='<div class="card" style="margin-top:12px;padding:16px 18px;display:flex;justify-content:space-between;align-items:center"><div><div class="lbl">Your Revenue</div><div class="figure" style="font-size:22px;color:var(--green);margin-top:5px">'+fmt(S.op.earn)+'</div></div><div style="text-align:right;font-size:12.5px;color:var(--muted);max-width:150px;line-height:1.45">99% of the '+fmt(S.op.fare)+' fare</div></div>';
+    h+='<div class="spring"></div><button class="btn cta-space" data-act="complete">Complete Operation</button></div>';
+    return h;
+  }
+
+  function complete(){
+    var fare=S.op.fare, earn=S.op.earn, cut=cutOf(fare);
+    var frow=function(l,v,c,strong){ return '<div class="row hair" style="padding:13px 0"><span style="font-size:14.5px;color:'+(strong?'var(--ink);font-weight:600':'var(--ink2)')+'">'+l+'</span><span class="num" style="font-size:14.5px'+(c?';color:'+c:'')+(strong?';font-weight:600':'')+'">'+(v<0?'−'+fmt(-v):fmt(v))+'</span></div>'; };
+    var h='<div class="pad" style="text-align:center">';
+    h+='<div style="margin-top:14px"><svg width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="#1F8A5B" stroke-width="2" style="margin:0 auto"><circle cx="28" cy="28" r="20"/><path d="M20 28l6 6 11-12" stroke-linecap="round" stroke-linejoin="round"/></svg></div>';
+    h+='<div class="title" style="margin-top:14px">Operation Complete</div><div class="sub" style="text-align:center">'+REQ.pickup+' → '+S.op.dest+'</div>';
+    h+='<div class="figure" style="font-size:44px;color:var(--green);margin-top:18px">'+fmt(earn)+'</div><div style="font-size:13.5px;color:var(--muted)">added to your revenue</div>';
+    h+='<div class="card" style="margin-top:22px;padding:4px 20px;text-align:left">'+frow('Traveler\'s fare',fare)+frow('Platform commission (1%)',-cut,'var(--muted2)')+frow('You retain',earn,'var(--green)',true)+'</div>';
+    h+='<div class="card" style="margin-top:12px;padding:4px 20px;text-align:left"><div class="row hair" style="padding:13px 0;border-top:0"><span style="font-size:14px;color:var(--ink2)">Travel Number</span><span class="mono" style="font-size:12.5px">AR-2047-MIA</span></div><div class="row hair" style="padding:13px 0"><span style="font-size:14px;color:var(--ink2)">Distance</span><span class="num" style="font-size:14px">'+S.op.dist+' mi</span></div><div class="row" style="padding:13px 0"><span style="font-size:14px;color:var(--ink2)">Duration</span><span class="num" style="font-size:14px">'+S.op.tripMin+' min</span></div></div>';
+    h+='<div class="spring"></div><button class="btn green cta-space" data-act="nextop">Return to Operations</button><div class="link" data-act="tab-revenue" style="margin-top:16px;font-weight:600">View Revenue</div></div>';
+    return h;
+  }
+
+  function revenue(){
+    var h='<div class="pad padnav">'+bar();
+    h+='<div class="title" style="margin-top:4px">Revenue</div>';
+    h+='<div class="card" style="margin-top:18px;padding:20px"><div class="row"><div><div class="lbl">Today</div><div class="figure" style="font-size:34px;margin-top:6px">'+fmt(S.today)+'</div><div style="font-size:12.5px;color:var(--muted);margin-top:3px">'+S.todayOps+' operations</div></div><div style="text-align:right"><div class="lbl">This Week</div><div class="figure" style="font-size:22px;margin-top:6px">'+fmt(S.week)+'</div></div></div></div>';
+    h+='<div style="display:flex;gap:12px;margin-top:12px"><div class="card" style="flex:1;padding:16px 18px"><div class="lbl">Month</div><div class="figure" style="font-size:19px;margin-top:5px">'+fmt(S.month)+'</div></div><div class="card" style="flex:1;padding:16px 18px"><div class="lbl">Year</div><div class="figure" style="font-size:19px;margin-top:5px">'+fmt(S.year)+'</div></div></div>';
+    h+='<div class="card" style="margin-top:14px;padding:18px 20px"><div class="row"><span style="font-size:14px;color:var(--ink2)">Available to withdraw</span><span class="figure" style="font-size:18px">'+fmt(S.balance)+'</span></div><button class="btn cta-space" data-act="go" data-s="withdrawal" style="margin-top:14px">Withdraw Revenue</button></div>';
+    h+='<div style="margin-top:24px" class="lbl">Recent Operations</div><div class="card" style="margin-top:12px;padding:2px 20px">';
+    S.seed.forEach(function(t,i){ h+='<div class="lrow'+(i>0?' hair':'')+'" style="cursor:default"><div><div style="font-size:15px">'+esc(t.arr)+'</div><div style="font-size:12.5px;color:var(--muted);margin-top:2px">'+t.time+'</div></div><span class="num" style="margin-left:auto;font-size:13.5px;color:var(--green)">+'+fmt(t.earn)+'</span></div>'; });
+    h+='</div></div>'+navBar('revenue');
+    return h;
+  }
+
+  function withdrawal(){
+    var fee=S.method==='instant'?0.5:0, net=+(S.balance-fee).toFixed(2);
+    var h='<div class="pad"><button class="link" data-act="back" style="background:none;border:0;padding:6px 0;text-align:left;font-size:15px;align-self:flex-start">‹ Back</button>';
+    if(S.cashDone){
+      h+='<div style="text-align:center;margin-top:30px"><svg width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="#1F8A5B" stroke-width="2" style="margin:0 auto"><circle cx="28" cy="28" r="20"/><path d="M20 28l6 6 11-12" stroke-linecap="round" stroke-linejoin="round"/></svg><div class="title" style="margin-top:14px">Transfer initiated</div><div class="sub" style="text-align:center">'+fmt(S.lastTransfer)+' is on its way to your bank'+(S.method==='instant'?' — arrives in minutes':' — 1–3 business days')+'.</div></div><div class="spring"></div><button class="btn cta-space" data-act="tab-revenue">Complete</button></div>';
+      return h;
+    }
+    h+='<div class="title">Revenue Withdrawal</div>';
+    h+='<div class="card" style="margin-top:18px;padding:22px;text-align:center"><div class="lbl">Available</div><div class="figure" style="font-size:36px;margin-top:6px">'+fmt(S.balance)+'</div></div>';
+    h+='<div style="margin-top:22px" class="lbl">Transfer Speed</div>';
+    [['standard','Standard Transfer','No fee · 1–3 business days'],['instant','Instant Transfer','Arrives in minutes · $0.50']].forEach(function(m){
+      var on=S.method===m[0];
+      h+='<div class="card" data-act="method" data-m="'+m[0]+'" style="margin-top:12px;padding:16px 18px;cursor:pointer;border-color:'+(on?'var(--blue)':'var(--line)')+';border-width:'+(on?'2px':'1px')+'"><div class="row"><div><div style="font-size:15px;font-weight:600">'+m[1]+'</div><div style="font-size:12.5px;color:var(--muted);margin-top:3px">'+m[2]+'</div></div>'+(on?'<span style="color:var(--blue);font-weight:700">✓</span>':'')+'</div></div>';
+    });
+    h+='<div class="row" style="margin-top:16px;padding:0 4px"><span style="font-size:14px;color:var(--ink2)">To Bank Account ····4417</span><span class="figure" style="font-size:16px">'+fmt(net)+'</span></div>';
+    h+='<div class="spring"></div><button class="btn cta-space" data-act="withdraw">Transfer '+fmt(net)+'</button></div>';
+    return h;
+  }
+
+  function profile(){
+    var h='<div class="pad padnav">'+bar();
+    h+='<div style="display:flex;align-items:center;gap:14px;margin-top:4px">'+av(OP.init,54)+'<div><div style="font-size:20px;font-weight:600">'+OP.name+'</div><div style="font-size:13px;color:var(--muted);margin-top:3px">★ '+OP.rating+' · Operating since '+OP.since+'</div></div></div>';
+    h+='<div style="margin-top:16px"><span class="badge-ok">✓ Operator Commissioned</span></div>';
+    h+='<div style="margin-top:24px" class="lbl">Vehicle</div><div class="card" data-act="go" data-s="vehicle" style="margin-top:12px;padding:16px 20px;cursor:pointer"><div class="row"><div><div style="font-size:15px;font-weight:600">'+OP.car+'</div><div style="font-size:13px;color:var(--muted);margin-top:3px">License Plate '+OP.plate+'</div></div><span class="chev">›</span></div></div>';
+    h+='<div style="margin-top:22px" class="lbl">Operations</div><div class="card" style="margin-top:12px;padding:2px 20px">'
+      +'<div class="lrow" data-act="go" data-s="documents" style="cursor:pointer"><span style="font-size:15px">Documents</span><span class="badge-ok" style="margin-left:auto">✓ Verified</span><span class="chev" style="margin-left:10px">›</span></div>'
+      +'<div class="lrow hair" data-act="go" data-s="roadmap" style="cursor:pointer"><span style="font-size:15px">Revenue Roadmap</span><span class="chev">›</span></div>'
+      +'<div class="lrow hair" data-act="note" data-t="Driving insights and safety tips — helpful feedback for you, never a grade that affects your standing — open in the full build." style="cursor:pointer"><span style="font-size:15px">Driving Insights</span><span class="chev">›</span></div></div>';
+    h+='<div class="card" data-act="go" data-s="insurance" style="margin-top:16px;padding:16px 20px;cursor:pointer"><div class="row"><div style="font-size:15px">Insurance</div><span class="link" style="font-size:14px">Find coverage ›</span></div><div style="font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.5">American Rider verifies your coverage but does not sell it. We direct you to providers with qualifying commercial rates.</div></div>';
+    h+='</div>'+navBar('profile');
+    return h;
+  }
+
+  function menuScreen(){
+    var row=function(label,act,s,first){ return '<div class="lrow'+(first?'':' hair')+'" data-act="'+act+'"'+(s?' data-s="'+s+'"':'')+' style="cursor:pointer"><span style="font-size:15px">'+label+'</span><span class="chev">›</span></div>'; };
+    var h='<div class="pad"><button class="link" data-act="back" style="background:none;border:0;padding:6px 0;text-align:left;font-size:15px;align-self:flex-start">‹ Back</button>';
+    h+='<div class="title">Menu</div>';
+    h+='<div style="margin-top:22px" class="lbl">Operations</div><div class="card" style="margin-top:12px;padding:2px 20px">';
+    h+=row('Revenue Roadmap','go','roadmap',true);
+    h+=row('Documents','go','documents');
+    h+='<div class="lrow hair" data-act="note" data-t="Vehicle details, photos, and maintenance open in the full build." style="cursor:pointer"><span style="font-size:15px">Vehicle</span><span class="chev">›</span></div>';
+    h+='</div>';
+    h+='<div style="margin-top:22px" class="lbl">General</div><div class="card" style="margin-top:12px;padding:2px 20px">';
+    h+='<div class="lrow" data-act="note" data-t="Patron Support for operators is available 24 hours in the full build." style="cursor:pointer"><span style="font-size:15px">Patron Support</span><span class="chev">›</span></div>';
+    h+='<div class="lrow hair" data-act="note" data-t="Bank, privacy, security, language, and appearance open in the full build." style="cursor:pointer"><span style="font-size:15px">Settings</span><span class="chev">›</span></div>';
+    h+='<div class="lrow hair" data-act="note" data-t="Mission, privacy, terms, and version open in the full build." style="cursor:pointer"><span style="font-size:15px">About American Rider</span><span class="chev">›</span></div>';
+    h+='</div>';
+    h+='<div class="spring"></div></div>';
+    return h;
+  }
+
+  function vehicle(){
+    var h='<div class="pad"><button class="link" data-act="back" style="background:none;border:0;padding:6px 0;text-align:left;font-size:15px;align-self:flex-start">‹ Back</button>';
+    h+='<div class="title">Vehicle</div>';
+    h+='<div class="card" style="margin-top:20px;padding:18px 20px"><div style="font-size:17px;font-weight:600">'+OP.car+'</div><div style="font-size:13px;color:var(--muted);margin-top:4px">License Plate '+OP.plate+' · 2022 · Gray</div></div>';
+    h+='<div class="lbl" style="margin-top:22px">Photos</div><div style="display:flex;gap:10px;margin-top:12px">';
+    for(var i=0;i<3;i++){ h+='<div style="flex:1;height:74px;border-radius:12px;background:var(--fill);border:1px solid var(--line);display:flex;align-items:center;justify-content:center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#B4B3AB" stroke-width="1.6"><path d="M5 11l1.6-4.2A2 2 0 0 1 8.5 5.5h7a2 2 0 0 1 1.9 1.3L19 11v6H5zM5 17v2M19 17v2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>'; }
+    h+='</div>';
+    h+='<div class="lbl" style="margin-top:22px">Status</div><div class="card" style="margin-top:12px;padding:2px 20px">';
+    [['Registration','Valid through 2026'],['Inspection','Completed Mar 2026'],['Commercial insurance','Active · for-hire']].forEach(function(d,i){ h+='<div class="lrow'+(i>0?' hair':'')+'" style="cursor:default"><div><div style="font-size:15px">'+d[0]+'</div><div style="font-size:12.5px;color:var(--muted);margin-top:2px">'+d[1]+'</div></div><span class="badge-ok" style="margin-left:auto">✓ Current</span></div>'; });
+    h+='</div>';
+    h+='<div class="card" style="margin-top:16px;padding:16px 18px"><div class="lbl" style="color:var(--blue)">Maintenance</div><div style="font-size:14px;margin-top:7px;line-height:1.5">Next reminder: oil service in about 1,200 miles. Renewal alerts for registration and inspection are automatic.</div></div>';
+    h+='<div class="spring"></div></div>';
+    return h;
+  }
+  function insuranceScr(){
+    var h='<div class="pad"><button class="link" data-act="back" style="background:none;border:0;padding:6px 0;text-align:left;font-size:15px;align-self:flex-start">‹ Back</button>';
+    h+='<div class="title">Insurance</div><div class="sub">American Rider verifies your coverage but does not sell it.</div>';
+    h+='<div class="card" style="margin-top:20px;padding:16px 20px"><div class="row"><div><div style="font-size:15px;font-weight:600">Commercial for-hire policy</div><div style="font-size:12.5px;color:var(--muted);margin-top:3px">Verified at onboarding · renewal alert 30 days out</div></div><span class="badge-ok">✓ Active</span></div></div>';
+    h+='<div class="lbl" style="margin-top:24px">Compare Qualifying Providers</div><div class="card" style="margin-top:12px;padding:2px 20px">';
+    [['Progressive Commercial','For-hire livery coverage','https://www.progressivecommercial.com/commercial-auto-insurance/livery-insurance/rideshare-insurance/'],['State Farm','Local agent rideshare coverage','https://www.statefarm.com/simple-insights/auto-and-vehicles/rideshare-insurance-what-to-know'],['Insurify','Compare multiple providers','https://insurify.com/car-insurance/florida/rideshare-insurance/']].forEach(function(x,i){ h+='<a href="'+x[2]+'" target="_blank" rel="noopener" class="lrow'+(i>0?' hair':'')+'" style="text-decoration:none;color:inherit"><div><div style="font-size:15px">'+x[0]+'</div><div style="font-size:12.5px;color:var(--muted);margin-top:3px">'+x[1]+'</div></div><span style="margin-left:auto;font-size:13px;font-weight:600;color:var(--blue);white-space:nowrap">Quote ›</span></a>'; });
+    h+='</div><div style="font-size:11.5px;color:var(--faint);margin-top:10px;line-height:1.5">Estimates only — not insurance or financial advice. Requirements vary by state.</div>';
+    h+='<div class="spring"></div></div>';
+    return h;
+  }
+  function settingsScr(){
+    var h='<div class="pad"><button class="link" data-act="back" style="background:none;border:0;padding:6px 0;text-align:left;font-size:15px;align-self:flex-start">‹ Back</button>';
+    h+='<div class="title">Settings</div>';
+    h+='<div class="lbl" style="margin-top:24px">Appearance</div>';
+    h+='<div class="seg" style="margin-top:12px"><div class="thumb" style="width:calc((100% - 6px)/2);transform:translateX('+(S.theme==='dark'?100:0)+'%)"></div>'
+      +'<div class="opt'+(S.theme==='light'?' on':'')+'" data-act="settheme" data-v="light">Light</div>'
+      +'<div class="opt'+(S.theme==='dark'?' on':'')+'" data-act="settheme" data-v="dark">Dark</div></div>';
+    h+='<div style="font-size:12.5px;color:var(--muted);margin-top:9px;line-height:1.5">Dark mode applies across the whole app on this device. New devices start in light.</div>';
+    h+='<div class="lbl" style="margin-top:22px">Payout</div><div class="card" style="margin-top:12px;padding:2px 20px"><div class="lrow" style="cursor:default"><span style="font-size:15px">Bank Account</span><span style="margin-left:auto;font-size:14px;color:var(--muted)">····4417</span></div></div>';
+    h+='<div class="lbl" style="margin-top:22px">App</div><div class="card" style="margin-top:12px;padding:2px 20px">';
+    [['Notifications','On'],['Language','English'],['Security','Face ID on']].forEach(function(r,i){ h+='<div class="lrow'+(i>0?' hair':'')+'" style="cursor:default"><span style="font-size:15px">'+r[0]+'</span><span style="margin-left:auto;font-size:14px;color:var(--muted)">'+r[1]+'</span></div>'; });
+    h+='</div><div class="spring"></div></div>';
+    return h;
+  }
+  function aboutScr(){
+    var h='<div class="pad"><button class="link" data-act="back" style="background:none;border:0;padding:6px 0;text-align:left;font-size:15px;align-self:flex-start">‹ Back</button>';
+    h+='<div style="text-align:center;margin-top:26px"><div class="wm" style="font-size:14px;letter-spacing:.28em">AMERICAN RIDER</div><div style="font-size:10.5px;letter-spacing:.3em;color:var(--faint);font-weight:600;margin-top:6px">NATIONAL TRANSPORTATION</div></div>';
+    h+='<div style="font-size:14.5px;color:var(--ink2);text-align:center;margin-top:20px;line-height:1.6">Getting America where it\'s going — with operators who keep 99% of every fare.</div>';
+    h+='<div class="card" style="margin-top:26px;padding:2px 20px">';
+    [['Terms of Service'],['Privacy Policy'],['Licenses']].forEach(function(r,i){ h+='<div class="lrow'+(i>0?' hair':'')+'" data-act="note" data-t="'+r[0]+' opens in the full build." style="cursor:pointer"><span style="font-size:15px">'+r[0]+'</span><span class="chev">›</span></div>'; });
+    h+='</div>';
+    h+='<div style="font-size:12px;color:var(--faint);text-align:center;margin-top:16px">Version 1.0 · Miami</div>';
+    h+='<div class="spring"></div></div>';
+    return h;
+  }
+  function opsupport(){
+    var h='<div class="pad"><button class="link" data-act="back" style="background:none;border:0;padding:6px 0;text-align:left;font-size:15px;align-self:flex-start">‹ Back</button>';
+    h+='<div class="title">Patron Support</div><div class="sub">Specialists for operators — any hour.</div>';
+    h+='<div class="card" style="margin-top:20px;padding:2px 20px">';
+    [['Revenue or payout issue'],['Traveler incident'],['Document or insurance question'],['App problem']].forEach(function(r,i){ h+='<div class="lrow'+(i>0?' hair':'')+'" data-act="note" data-t="A specialist takes this case in the full build — everything about your operation travels with it, so you never repeat yourself." style="cursor:pointer"><span style="font-size:15px">'+r[0]+'</span><span class="chev">›</span></div>'; });
+    h+='</div>';
+    h+='<button class="btn cta-space" data-act="note" data-t="Connecting you to an American Rider specialist — typically under a minute.">Contact a Specialist</button>';
+    h+='<div class="spring"></div></div>';
+    return h;
+  }
+
+  function documents(){
+    var docs=[['Driver License','Valid through 2029'],['Vehicle Registration','Valid through 2026'],['Vehicle Inspection','Completed Mar 2026'],['Commercial Insurance','For-hire · active'],['Identity','Verified']];
+    var h='<div class="pad"><button class="link" data-act="back" style="background:none;border:0;padding:6px 0;text-align:left;font-size:15px;align-self:flex-start">‹ Back</button>';
+    h+='<div class="title">Documents</div><div class="sub">All qualifications current. Renewal alerts are automatic.</div>';
+    h+='<div class="card" style="margin-top:20px;padding:2px 20px">';
+    docs.forEach(function(d,i){ h+='<div class="lrow'+(i>0?' hair':'')+'" style="cursor:default"><div><div style="font-size:15px">'+d[0]+'</div><div style="font-size:12.5px;color:var(--muted);margin-top:3px">'+d[1]+'</div></div><span class="badge-ok" style="margin-left:auto">✓ Verified</span></div>'; });
+    h+='</div><div class="spring"></div></div>';
+    return h;
+  }
+
+  function roadmap(){
+    var h='<div class="pad"><button class="link" data-act="back" style="background:none;border:0;padding:6px 0;text-align:left;font-size:15px;align-self:flex-start">‹ Back</button>';
+    h+='<div class="title">Revenue Roadmap</div><div class="sub">Forecasts where rides pay more — never where you must be. Where you operate is always your choice.</div>';
+    // Today card — the operator's own earnings. Any goal is set by the operator, never by American Rider.
+    var stepBtn=function(d){ return '<button data-act="goalstep" data-d="'+d+'" style="width:32px;height:32px;border-radius:9px;border:1px solid var(--line2);background:var(--fill);font-size:18px;line-height:1;cursor:pointer;color:var(--ink)">'+(d<0?'−':'+')+'</button>'; };
+    h+='<div class="card" style="margin-top:20px;padding:20px"><div class="row"><div><div class="lbl">Earned so far</div><div class="figure" style="font-size:30px;margin-top:6px">'+fmt(S.today)+'</div></div><div style="text-align:right"><div class="lbl">On pace for</div><div class="figure" style="font-size:22px;margin-top:6px;color:var(--green)">'+fmt(312)+'</div><div style="font-size:10.5px;color:var(--faint);margin-top:3px">estimate</div></div></div>';
+    if(S.goal>0){
+      var pct=Math.min(100,Math.round(S.today/S.goal*100));
+      h+='<div style="border-top:1px solid var(--line);margin-top:16px;padding-top:16px"><div class="row"><span class="lbl">Your goal</span><div style="display:flex;align-items:center;gap:12px">'+stepBtn(-1)+'<span class="num" style="font-size:15px;font-weight:600;min-width:62px;text-align:center">'+fmt(S.goal)+'</span>'+stepBtn(1)+'</div></div>';
+      h+='<div class="cbar" style="margin-top:14px"><div style="width:'+pct+'%"></div></div>';
+      h+='<div class="row" style="margin-top:8px"><span style="font-size:12.5px;color:var(--muted)">'+pct+'% of the goal you set</span><span data-act="setgoal" style="font-size:12.5px;color:var(--blue);font-weight:600;cursor:pointer">Turn off</span></div></div>';
+    } else {
+      h+='<div style="border-top:1px solid var(--line);margin-top:16px;padding-top:16px;display:flex;align-items:center;justify-content:space-between;gap:14px"><div style="font-size:12.5px;color:var(--muted);line-height:1.5">Want a personal target? You set it yourself — just for you, never a quota. American Rider never sets a goal for you.</div><button class="btn" data-act="setgoal" style="width:auto;padding:11px 16px;font-size:13.5px;border-radius:11px;white-space:nowrap">Set a goal</button></div>';
+    }
+    h+='</div>';
+    h+='<div style="margin-top:24px" class="lbl">Ride Bonuses · Optional</div><div class="card" style="margin-top:12px;padding:2px 20px">';
+    [['Miami International Airport','Peak demand 4–7 PM','+$3.00 / ride'],['Brickell','Steady evening travel','+$1.50 / ride'],['South Beach','Rising after 9 PM','+$1.00 / ride']].forEach(function(a,i){ h+='<div class="lrow'+(i>0?' hair':'')+'" style="cursor:default"><div><div style="font-size:15px">'+a[0]+'</div><div style="font-size:12.5px;color:var(--muted);margin-top:2px">'+a[1]+'</div></div><span class="num" style="margin-left:auto;font-size:13px;font-weight:600;color:var(--green)">'+a[2]+'</span></div>'; });
+    h+='</div>';
+    h+='<div style="margin-top:24px" class="lbl">Conditions</div><div style="display:flex;gap:12px;margin-top:12px">';
+    [['Events','Heat game · 7:30 PM'],['Weather','Clear · 84°'],['Traffic','Light on I-95']].forEach(function(c){ h+='<div class="card" style="flex:1;padding:14px 16px"><div style="font-size:12px;color:var(--muted)">'+c[0]+'</div><div style="font-size:13px;font-weight:600;margin-top:5px;line-height:1.35">'+c[1]+'</div></div>'; });
+    h+='</div>';
+    h+='<div style="margin-top:20px;background:var(--blue-t);border:1px solid var(--blue-b);border-radius:12px;padding:15px 18px;font-size:13.5px;color:var(--ink2);line-height:1.5">Bonuses show where rides pay more right now. Take them or skip them — there is never a penalty for operating wherever you choose.</div>';
+    h+='<div class="spring"></div></div>';
+    return h;
+  }
+
+  function communicate(){
+    var h='<div class="pad"><button class="link" data-act="back" style="background:none;border:0;padding:6px 0;text-align:left;font-size:15px;align-self:flex-start">‹ Back</button>';
+    h+='<div style="display:flex;align-items:center;gap:12px;margin-top:6px">'+av(REQ.tInit,40)+'<div><div style="font-size:18px;font-weight:600">'+REQ.traveler+'</div><div style="font-size:12px;color:var(--muted);margin-top:2px">Your traveler</div></div></div>';
+    h+='<div style="flex:1;display:flex;flex-direction:column;gap:10px;margin-top:22px">';
+    S.msgs.forEach(function(m){ h+='<div class="bubble" style="align-self:'+(m.me?'flex-end':'flex-start')+';background:'+(m.me?'var(--solid)':'var(--card)')+';color:'+(m.me?'var(--solid-fg)':'var(--ink)')+';'+(m.me?'':'border:1px solid var(--line)')+'">'+esc(m.text)+'</div>'; });
+    h+='</div>';
+    h+='<div style="display:flex;gap:10px;margin-top:16px"><input class="field" id="msg" data-input="msgInput" data-enter="1" placeholder="Message '+REQ.traveler+'" value="'+esc(S.msgInput)+'"><button class="btn" data-act="send" style="width:auto;padding:14px 20px;font-size:15px;border-radius:12px">Send</button></div></div>';
+    return h;
+  }
+
+  var SCREENS={ home:home, request:request, pickup:pickup, trip:trip, complete:complete, revenue:revenue, withdrawal:withdrawal, profile:profile, documents:documents, roadmap:roadmap, communicate:communicate, menu:menuScreen, vehicle:vehicle, insurance:insuranceScr, settings:settingsScr, about:aboutScr, opsupport:opsupport, inbox:inboxScr };
+  function render(){
+    var el=document.getElementById('screen');
+    var f=document.activeElement, fid=f&&f.id, fp=f&&f.selectionStart;
+    el.className=''; el.innerHTML=(SCREENS[S.screen]||home)(); void el.offsetWidth; el.className='fx';
+    if(fid){ var n=document.getElementById(fid); if(n){ n.focus(); try{n.setSelectionRange(fp,fp);}catch(e){} } } else el.scrollTop=0;
+    if(S.screen==='request'){ var b=document.getElementById('cdbar'); if(b) b.style.width='100%'; }
+    var showMap=(S.screen==='pickup'&&!S.arrived)||S.screen==='trip';
+    if(showMap) animateMap(); else stopMap();
+    if(S.note){ el.insertAdjacentHTML('beforeend','<div class="note">'+esc(S.note)+'</div>'); }
+  }
+
+  document.addEventListener('click',function(e){
+    var t=e.target.closest('[data-act]'); if(!t)return;
+    var a=t.getAttribute('data-act');
+    if(t.closest('#drawer') && a!=='opendrawer') closeDrawer(); // drawer taps navigate + close
+    var A={
+      opendrawer:openDrawer, closedrawer:closeDrawer,
+      switchtraveler:function(){ if(window.self!==window.top){ try{ window.parent.postMessage('ar:switchTraveler','*'); return; }catch(err){} } var m='Traveler view opens in the full app.'; S.note=m; render(); setTimeout(function(){ if(S.note===m){ S.note=''; render(); } },2500); },
+      menu:function(){ tab('profile'); },
+      settheme:function(){ applyTheme(t.getAttribute('data-v')); render(); },
+      openinbox:function(){ go('inbox'); setTimeout(function(){ var ch=false; S.inbox.forEach(function(m){ if(!m.read){ m.read=true; ch=true; } }); if(ch&&S.screen==='inbox')render(); },1500); },
+      appmenu:function(){ go('menu'); },
+      available:goAvailable, offline:goOffline,
+      commence:commenceOp, decline:declineOp,
+      cancelop:function(){ S.op=null; S.online=false; tab('home'); },
+      confirmarrival:function(){ S.arrived=true; render(); },
+      commencetravel:function(){ S.tripStep=0; tab('trip'); },
+      complete:completeOp,
+      nextop:function(){ S.op=null; S.online=true; S.screen='home'; render(); armRequest(); },
+      go:function(){ go(t.getAttribute('data-s')); },
+      back:back,
+      tab:function(){ var s=t.getAttribute('data-s'); tab(s); if(s==='home'&&S.online) armRequest(); },
+      'tab-revenue':function(){ tab('revenue'); },
+      method:function(){ S.method=t.getAttribute('data-m'); render(); },
+      withdraw:withdraw,
+      setgoal:function(){ S.goal = S.goal>0 ? 0 : 250; render(); },
+      goalstep:function(){ var d=+t.getAttribute('data-d'); S.goal=Math.max(50, S.goal + d*25); render(); },
+      send:sendMsg,
+      note:function(){ var m=t.getAttribute('data-t'); S.note=m; render(); setTimeout(function(){ if(S.note===m){ S.note=''; render(); } },2500); }
+    };
+    if(A[a]){ e.preventDefault(); A[a](); }
+  });
+  document.addEventListener('input',function(e){ var k=e.target.getAttribute&&e.target.getAttribute('data-input'); if(k) S[k]=e.target.value; });
+  document.addEventListener('keydown',function(e){ if(e.key==='Enter'&&e.target.getAttribute&&e.target.getAttribute('data-enter')){ e.preventDefault(); sendMsg(); } });
+
+  // Uber-style quick-access drawer — lives outside #screen so it survives re-renders.
+  function openDrawer(){ document.getElementById('scrim').classList.add('on'); document.getElementById('drawer').classList.add('on'); }
+  function closeDrawer(){ document.getElementById('scrim').classList.remove('on'); document.getElementById('drawer').classList.remove('on'); }
+  function drow(label,act,s){ return '<div class="drow" data-act="'+act+'"'+(s?' data-s="'+s+'"':'')+'><span>'+label+'</span><span class="chev">›</span></div>'; }
+  document.getElementById('phone').insertAdjacentHTML('beforeend',
+    '<div id="scrim" class="scrim" data-act="closedrawer"></div>'
+    +'<div id="drawer" class="drawer">'
+    +'<div data-act="menu" style="display:flex;align-items:center;gap:13px;padding-bottom:20px;cursor:pointer">'+av(OP.init,48)+'<div><div style="font-size:17px;font-weight:600">'+OP.name+'</div><div style="font-size:12.5px;color:var(--blue);margin-top:3px;font-weight:500">★ '+OP.rating+' · View profile ›</div></div></div>'
+    +drow('Switch to Traveler','switchtraveler')
+    +drow('Inbox','openinbox')
+    +drow('Revenue Roadmap','go','roadmap')
+    +drow('Documents','go','documents')
+    +drow('Vehicle','go','vehicle')
+    +drow('Insurance','go','insurance')
+    +drow('Patron Support','go','opsupport')
+    +drow('Settings','go','settings')
+    +drow('About American Rider','go','about')
+    +'<div class="spring"></div>'
+    +'</div>');
+
+  render();
+})();
+</script>

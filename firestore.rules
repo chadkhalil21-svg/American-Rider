@@ -1,0 +1,271 @@
+rules_version = '2';
+
+// American Rider - Firestore security rules.
+//
+// Replaces "test mode" (which lets ANYONE on the internet read and write everything,
+// and stops working entirely ~30 days after the database is created).
+//
+// Principle: a signed-in traveler can see and create only their OWN records. Nobody can
+// write the operator fleet from the app - the fleet is seeded from the backend, which uses
+// admin access and bypasses rules.
+//
+// ⚠️ DEPLOY THIS FILE AFTER EDITING IT, or the app writes below fail silently:
+//     firebase deploy --only firestore:rules
+//
+// A NOTE ON WHY THE RIDES RULE CHANGED, 16 Aug 2026. It carried `allow update: if false`
+// while the app called updateDoc on rides in two places - setRideStatus (completed /
+// cancelled) and, from that date, the travel review. Both swallow their errors, so every
+// one of those writes had been quietly refused: the Travel Log's completed-vs-cancelled
+// distinction was being written by code the database was rejecting. That is the same defect
+// the rest of this build is clearing out, one layer down - an outcome with nothing behind
+// it. Updates are now allowed, but ONLY on the handful of fields a phone has any business
+// changing. Money and the operator assignment stay unwritable from a phone.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+    function ownsExisting() {
+      return signedIn() && resource.data.travelerUid == request.auth.uid;
+    }
+    function ownsIncoming() {
+      return signedIn() && request.resource.data.travelerUid == request.auth.uid;
+    }
+    // The OPERATOR this travel was dispatched to. `operatorId` is written by dispatch and is
+    // the operator's own Firebase uid (see POST /operator/online), so this identifies exactly
+    // one person and cannot be claimed by anybody else.
+    function drivesExisting() {
+      return signedIn() && resource.data.operatorId == request.auth.uid;
+    }
+    // The set of fields this update touches, and nothing more.
+    function touchesOnly(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
+    }
+    // Does this update change a particular field?
+    //
+    // hasAny() ON PURPOSE. This was written as `'status' in ...affectedKeys()`, and `in` is
+    // documented for List and Map, not for the Set that affectedKeys() returns. A rules
+    // expression that will not evaluate does not fail loudly — it denies the write, which
+    // is precisely the silent-refusal bug this file was rewritten to fix. Only Set methods
+    // the reference actually documents are used here.
+    function changes(field) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny([field]);
+    }
+
+    // ---- rides -------------------------------------------------------------
+    match /rides/{rideId} {
+      // You may read a travel that is yours — as the traveler who booked it, or as the
+      // operator it was dispatched to.
+      //
+      // THE OPERATOR CLAUSE IS NEW, and without it the operator app could not see its own
+      // work. Dispatch assigned travels to operators and the operator's screen showed a
+      // scripted request instead, because a real one was unreadable: this rule matched the
+      // traveler only. An operator app that cannot read the travel it was given is an
+      // operator app that has to invent one.
+      allow read: if ownsExisting() || drivesExisting();
+
+      // NOBODY CREATES A TRAVEL FROM A PHONE ANY MORE.
+      //
+      // This used to be `allow create: if ownsIncoming()` — one condition, that travelerUid was
+      // the signed-in user. Nothing checked the operator. The phone read the whole fleet, chose
+      // its own operator and wrote the assignment, so the screening, insurance and disclosure
+      // gates in backend/matching.js guarded the re-offer sweep and scheduled travel and never
+      // the booking a traveler actually makes (docs/SWEEP-2026-09-19.md, F-A).
+      //
+      // POST /travel/dispatch writes travels now, with admin access, after running those gates.
+      // Verified before closing this: no `addDoc(collection(db, 'rides')` remains anywhere in
+      // src/ or app/.
+      allow create: if false;
+
+      // Outcome and review only. Not the fare, not the operator, not the trip number -
+      // a phone that could rewrite costCents could rewrite what it owes us.
+      allow update: if ownsExisting()
+                    && touchesOnly(['status', 'statusAt', 'rating', 'tipCents', 'reviewedAt'])
+                    && (!changes('status')
+                        || request.resource.data.status in ['completed', 'cancelled'])
+                    && (!changes('rating')
+                        || request.resource.data.rating == null
+                        || (request.resource.data.rating >= 1 && request.resource.data.rating <= 5));
+
+      // The operator's own progress through the travel they were given. A separate, narrower
+      // grant than the traveler's: an operator may move the travel along and record when they
+      // arrived, and may touch nothing else. Not the fare, not the traveler, not the rating
+      // of their own work, and not the operator assignment — an operator cannot hand a travel
+      // to somebody else or take one that was not given to them.
+      //
+      // opLat/opLng/opAt/stillSince are the operator's POSITION WHILE CARRYING A TRAVELER —
+      // what route monitoring watches. Writable by the operator because the phone is the only
+      // thing that knows where the car is; `monitor` is NOT, in either direction, because it
+      // decides whether a case is opened and neither party may clear a concern raised about
+      // the other. That field is written only by the server (backend/monitor.js), which
+      // bypasses these rules, and answered only through POST /travel/check-in.
+      // `needsPayout` IS THE QUEUE MARKER THE SETTLEMENT SWEEP READS, and leaving it off this
+      // list cost a real payout on 2 Sept 2026.
+      //
+      // The operator app began stamping it when a travel completes, so the sweep could query
+      // the travels that owe somebody money instead of scanning every completed travel ever.
+      // It was never added here — so touchesOnly() rejected the WHOLE update, and setStatus's
+      // `catch` swallowed the rejection. The effect was not a missing flag: completion itself
+      // stopped being written. The operator saw "Operation Complete" and $17.77, the traveler's
+      // record stayed `onboard`, and nobody was paid. Adding a field to a client write without
+      // adding it here does not fail loudly; it fails silently and takes the rest of the write
+      // with it.
+      //
+      // A CLIENT-SETTABLE "PAY ME" FLAG IS SAFE ONLY BECAUSE IT AUTHORIZES NOTHING. It is a
+      // hint that a travel is ready to be looked at. The sweep still re-reads the travel,
+      // still checks the operator's payout account, and transferToOperator still verifies the
+      // traveler's uid against Stripe's own metadata on the payment before a cent moves. So
+      // the worst an operator can do by setting it is ask to be paid for a travel they were
+      // actually assigned — which is what it means. It is constrained to `true`, and only
+      // alongside a status of `completed`, so it cannot be used to un-queue a payout either.
+      allow update: if drivesExisting()
+                    && touchesOnly(['status', 'statusAt', 'acceptedAt', 'arrivedAt', 'declinedAt',
+                                    'opLat', 'opLng', 'opAt', 'stillSince', 'needsPayout'])
+                    && (!changes('status')
+                        || request.resource.data.status in
+                             ['accepted', 'arrived', 'onboard', 'completed', 'declined'])
+                    && (!changes('needsPayout')
+                        || (request.resource.data.needsPayout == true
+                            && request.resource.data.status == 'completed'));
+
+      // A travel record is history. It is never deleted from a phone.
+      allow delete: if false;
+    }
+
+    // ---- lost_items --------------------------------------------------------
+    // A report the traveler files, and a return they arrange. The rungs an OPERATOR sets -
+    // 'located', 'not-found', 'returned' - are deliberately not writable here: the whole
+    // point of the status ladder is that nobody can mark an item found except the person
+    // who found it.
+    match /lost_items/{itemId} {
+      allow read: if ownsExisting();
+      allow create: if ownsIncoming();
+      allow update: if ownsExisting()
+                    && touchesOnly(['return', 'status', 'statusAt', 'description'])
+                    && (!changes('status')
+                        || request.resource.data.status in ['reported', 'operator-notified', 'return-arranged']);
+      allow delete: if false;
+    }
+
+    // ---- messages ----------------------------------------------------------
+    // One thread per travel, readable by BOTH parties and writable by each only as themselves.
+    //
+    // THE HALF-LOOP THIS CLOSES. The rule matched the traveler alone, so an operator could not
+    // read a message written to them - and the operator screen answered itself from a local
+    // array while both sides told their reader they were in touch. The reason recorded for
+    // that was "an operator has no account identity"; operators sign in now, and operatorId is
+    // a Firebase uid used by dispatch, screening, payouts and the duty gate.
+    //
+    // `from` is checked against the uid doing the writing, so neither party can forge a
+    // message from the other. That was the point of the old rule and it survives intact.
+    match /messages/{messageId} {
+      allow read: if ownsExisting() || drivesExisting();
+
+      allow create: if signedIn()
+                    && request.resource.data.tripNo is string
+                    && ((request.resource.data.from == 'traveler'
+                         && request.resource.data.travelerUid == request.auth.uid)
+                     || (request.resource.data.from == 'operator'
+                         && request.resource.data.operatorId == request.auth.uid));
+
+      // A conversation is a record. Neither side edits or deletes what was said.
+      allow update, delete: if false;
+    }
+
+    // ---- scheduled_rides ---------------------------------------------------
+    // A reservation, which the traveler may also cancel - unlike a travel that happened,
+    // this one is a plan and deleting it is what cancelling means.
+    match /scheduled_rides/{schedId} {
+      allow read: if ownsExisting();
+      allow create: if ownsIncoming();
+      allow update: if false;
+      allow delete: if ownsExisting();
+    }
+
+    // ---- support_tickets ---------------------------------------------------
+    // Written ONLY by the backend with admin access (backend/tickets.js), which bypasses
+    // these rules. Closed to the app in both directions: a traveler must not be able to
+    // read another person's case, and must not be able to close their own.
+    match /support_tickets/{caseNo} {
+      allow read, write: if false;
+    }
+
+    // ---- operators ---------------------------------------------------------
+    match /operators/{operatorId} {
+      // THE FLEET IS NOT READABLE FROM A PHONE.
+      //
+      // This was `allow read: if signedIn()`, because dispatch ran on the phone and needed the
+      // fleet to match against. Every signed-in account could therefore read every operator's
+      // live position, plate, insurance expiry date and screening status, continuously, for as
+      // long as they cared to. Operators are private individuals, frequently working alone at
+      // night; that is a tracking capability, and it was also their insurance and background
+      // check status.
+      //
+      // Matching moved to the server, and with it the two lost-item questions that were the
+      // last reason to read the fleet — POST /travel/return-operator answers those with a name
+      // and a position and nothing else. No client code reads this collection any more.
+      //
+      // An operator reads their OWN record through the backend, which uses admin access and
+      // bypasses these rules.
+      allow read: if false;
+
+      // Never writable from the app - otherwise a user could invent operators,
+      // move them, or mark themselves available.
+      allow write: if false;
+    }
+
+    // ---- users -------------------------------------------------------------
+    //
+    // THE FIELDS ON THIS DOCUMENT ARE NOT ALL THE SAME KIND OF THING, and treating them as if
+    // they were is what this rule used to do. `allow write: if request.auth.uid == uid` let a
+    // signed-in person write ANY field on their own record. Three of those fields are read by
+    // the server and trusted as decisions somebody else made:
+    //
+    //   screening            gates whether a person may carry passengers at all
+    //                        (server.js: screeningCurrent(snap.data().screening), live mode)
+    //   insuranceDisclosure  the §627.748(8)(a) acknowledgement, gates going on duty
+    //                        (server.js: disclosureCurrent(snap.data().insuranceDisclosure))
+    //   stripeAccountId      where an operator's money is sent
+    //                        (payments.js: operatorPayoutAccount)
+    //
+    // The app never writes any of them. The rule allowed it anyway, and the Firebase web
+    // config is public by design — so anybody holding it could write
+    // `screening: {decision:'pass', recheckDue: <future>}` onto their own record and go on
+    // duty without a background check, or forge the disclosure acknowledgement and defeat the
+    // one thing standing between an operator and Florida's written-disclosure requirement.
+    // A gate that reads a value the gated party can write is not a gate.
+    //
+    // Found in the pre-launch sweep, 19 Sept 2026. All three are written by the backend with
+    // admin access, which bypasses these rules entirely, so denying them here costs nothing.
+    //
+    // The list below is what the app actually writes: the profile it collects at sign-up, and
+    // the push token and preferences. Anything else is the server's to write.
+    function userFieldsAreOwn() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'name', 'mobile', 'email',
+        'pushToken', 'pushPlatform', 'pushUpdatedAt', 'pushPrefs',
+      ]);
+    }
+    match /users/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      // Sign-up writes the profile before any document exists, so a create is judged on the
+      // incoming keys alone — there is nothing to diff against.
+      allow create: if signedIn() && request.auth.uid == uid
+                    && request.resource.data.keys().hasOnly([
+                         'name', 'mobile', 'email',
+                         'pushToken', 'pushPlatform', 'pushUpdatedAt', 'pushPrefs',
+                       ]);
+      allow update: if signedIn() && request.auth.uid == uid && userFieldsAreOwn();
+      // A person may close their account. AuthContext.deleteAccount deletes this document as
+      // part of that, and Apple requires the whole flow to work from inside the app.
+      allow delete: if signedIn() && request.auth.uid == uid;
+    }
+
+    // ---- everything else ---------------------------------------------------
+    // Deny by default. Add explicit rules above as new collections are introduced.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,45 @@
+# Render blueprint for the OpenTripPlanner transit engine (South Florida).
+#
+# This is a second, separate service from the backend in /render.yaml. It runs the Docker image
+# in infra/otp/Dockerfile and serves the graph from a persistent disk. The backend reaches it
+# over Render's private network at http://american-rider-otp:8080 (set OTP_URL on the backend
+# service to that address) — nothing here needs to be public.
+#
+# PLAN: pro (4 GB RAM). The served graph holds 1.2 million street vertices and the loaded
+# process measured 1.8 GB resident on a 16 GB Mac with a 4 GB heap ceiling; with OTP_XMX=2500m
+# it fits a 4 GB instance with room for the JVM's own overhead. Standard (2 GB) is not enough.
+# Pro is Blueprint-managed: a plan changed in the dashboard is reverted on the next sync.
+#
+# DISK: a service with a disk runs as exactly one instance and restarts with a short outage on
+# each deploy (Render cannot do zero-downtime deploys with disks attached). For a planner whose
+# answers are cached upstream that is acceptable; the disk is what makes the 229 MB graph
+# survive restarts without a re-download.
+#
+# GRAPH_URL: set once in the dashboard to the HTTPS address of graph.obj in object storage
+# (Cloudflare R2 or any bucket). The container downloads it on first start only; to ship a new
+# graph, upload it, then delete /var/otp/graph.obj from the Render shell and restart.
+
+services:
+  - type: web
+    name: american-rider-otp
+    runtime: docker
+    dockerfilePath: infra/otp/Dockerfile
+    dockerContext: infra/otp
+    plan: pro
+    # No region is set so it lands in the same default region (Oregon) as the backend service in
+    # /render.yaml; private networking only works between services in one region.
+    # Java has 120 seconds to load the 229 MB graph before Render decides the service is down.
+    # Loading measured 4 seconds locally; the allowance covers a slow disk.
+    healthCheckPath: /otp/actuators/health
+    autoDeploy: true
+    disk:
+      name: otp-graph
+      mountPath: /var/otp
+      sizeGB: 10
+    envVars:
+      - key: GRAPH_URL
+        sync: false
+      - key: OTP_XMX
+        value: 2500m
+      - key: PORT
+        value: "8080"

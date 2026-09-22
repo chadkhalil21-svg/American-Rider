@@ -1,0 +1,843 @@
+<meta charset="utf-8">
+<title>American Rider — Traveler</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+  :root{
+    --ink:#14171F; --ink2:#3A3F49; --muted:#8A8A82; --faint:#B4B3AB;
+    --blue:#2E5FE0; --blue-t:#F0F3FC; --blue-b:#E1E9FB; --green:#1F8A5B; --green-t:#E9F3EE; --red:#B3432E; --red-b:#E6C4BC;
+    --bg:#F7F7F5; --canvas:#E7E6E1; --card:#FFFFFF; --line:#ECEBE6; --line2:#E3E2DC; --fill:#EFEEE9;
+    --solid:#14171F; --solid-fg:#fff; /* strong surfaces (buttons, avatars) — stay legible in both themes */
+    --sans:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text','Helvetica Neue',Helvetica,Arial,sans-serif;
+    --mono:'SF Mono',ui-monospace,Menlo,Consolas,monospace;
+  }
+  :root[data-theme="dark"]{
+    --ink:#F3F3F1; --ink2:#C3C6CC; --muted:#8B8E96; --faint:#65686F;
+    --blue:#5C86F6; --blue-t:#1A2131; --blue-b:#2B3651; --green:#41BE82; --green-t:#15271D; --red:#E0674F; --red-b:#4A2A24;
+    --bg:#14171F; --canvas:#0B0D12; --card:#1B1F27; --line:#2A2E38; --line2:#343945; --fill:#232732;
+    --solid:#EDEDEB; --solid-fg:#14171F;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; height:100%; }
+  body{ background:var(--canvas); font-family:var(--sans); color:var(--ink); display:flex; align-items:center; justify-content:center; -webkit-font-smoothing:antialiased; letter-spacing:-.005em; }
+  #phone{ position:relative; width:100%; max-width:412px; height:100%; max-height:892px; background:var(--bg); overflow:hidden; display:flex; flex-direction:column; }
+  @media (min-width:480px) and (min-height:720px){ #phone{ border-radius:44px; box-shadow:0 30px 80px rgba(20,23,31,.26), 0 0 0 11px #14161c, 0 0 0 13px #23262e; height:844px; } }
+  #screen{ flex:1; position:relative; overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; }
+  .pad{ padding:58px 24px 40px; min-height:100%; display:flex; flex-direction:column; }
+  @media (min-width:480px) and (min-height:720px){ .pad{ padding-top:40px; } }
+
+  .bar{ display:flex; align-items:center; justify-content:space-between; height:22px; margin-bottom:24px; }
+  .wm{ font-size:12px; font-weight:600; letter-spacing:.26em; color:var(--ink); text-align:center; }
+  .wm .n{ display:block; font-size:7.5px; letter-spacing:.34em; color:var(--faint); font-weight:600; margin-top:2px; }
+  .icn{ width:22px; height:22px; color:var(--ink2); cursor:pointer; flex-shrink:0; }
+  .icn.g{ color:var(--faint); }
+
+  h1{ margin:0; font-weight:600; }
+  .display{ font-size:34px; font-weight:600; letter-spacing:-.02em; line-height:1.12; }
+  .title{ font-size:27px; font-weight:600; letter-spacing:-.02em; margin:0; }
+  .sub{ font-size:14.5px; color:var(--muted); margin:9px 0 0; line-height:1.5; font-weight:400; }
+  .lbl{ font-size:11px; font-weight:600; letter-spacing:.15em; color:var(--muted); text-transform:uppercase; }
+  .mono{ font-family:var(--mono); font-variant-numeric:tabular-nums; letter-spacing:-.01em; }
+  .num{ font-variant-numeric:tabular-nums; }
+  .row{ display:flex; justify-content:space-between; align-items:center; }
+  .spring{ flex:1; }
+
+  .card{ background:var(--card); border:1px solid var(--line); border-radius:16px; }
+  .hair{ border-top:1px solid var(--line); }
+  .field{ width:100%; border:0; outline:none; background:transparent; font-size:16.5px; color:var(--ink); font-family:inherit; padding:0; }
+
+  button{ font-family:inherit; }
+  .btn{ display:block; width:100%; border:0; border-radius:13px; padding:18px; text-align:center; font-size:16px; font-weight:600; letter-spacing:.01em; color:var(--solid-fg); background:var(--solid); cursor:pointer; transition:opacity .2s ease; }
+  .btn:active{ opacity:.86; }
+  .btn:disabled{ background:#DEDDD7; color:#A9A89F; }
+  .btn.blue{ background:var(--blue); }
+  .btn.ghost{ background:var(--card); border:1px solid var(--line2); color:var(--ink); }
+  .btn.red{ background:var(--card); border:1px solid var(--red-b); color:var(--red); }
+  .link{ color:var(--blue); cursor:pointer; font-weight:500; }
+  .cta-space{ margin-top:24px; }
+
+  .seg{ position:relative; display:flex; background:var(--fill); border-radius:12px; padding:3px; }
+  .seg .thumb{ position:absolute; top:3px; bottom:3px; left:3px; border-radius:9px; background:var(--solid); z-index:0; transition:transform .32s cubic-bezier(.34,.7,0,1); }
+  .seg .opt{ position:relative; z-index:1; flex:1; text-align:center; padding:11px 4px; font-size:14px; font-weight:500; color:var(--ink2); cursor:pointer; user-select:none; transition:color .25s ease; }
+  .seg .opt.on{ color:var(--solid-fg); font-weight:600; }
+
+  .chips{ display:flex; flex-wrap:wrap; gap:9px; }
+  .chip{ padding:11px 16px; border-radius:11px; font-size:14px; border:1px solid var(--line2); background:var(--card); color:var(--ink2); cursor:pointer; transition:all .18s ease; }
+  .chip.on{ background:var(--solid); border-color:var(--solid); color:var(--solid-fg); }
+
+  .lrow{ display:flex; align-items:center; gap:14px; padding:16px 0; cursor:pointer; }
+  .pin{ width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+  .chev{ color:var(--faint); font-size:19px; margin-left:auto; }
+
+  .av{ border-radius:50%; background:var(--solid); color:var(--solid-fg); display:flex; align-items:center; justify-content:center; font-weight:600; flex-shrink:0; }
+  .badge-ok{ display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:600; color:var(--green); background:var(--green-t); border-radius:999px; padding:4px 10px; }
+
+  .map{ height:190px; border-radius:16px; border:1px solid var(--line); background:#EEEEE9; position:relative; overflow:hidden; }
+  .tag{ position:absolute; left:12px; top:12px; background:rgba(255,255,255,.9); border:1px solid var(--line); border-radius:8px; padding:5px 10px; font-family:var(--mono); font-size:9px; letter-spacing:.14em; color:var(--muted); }
+
+  .steps{ display:flex; gap:6px; }
+  .steps .b{ flex:1; height:3px; border-radius:2px; background:var(--line2); }
+  .steps .b.on{ background:var(--blue); }
+
+  .bubble{ max-width:78%; padding:12px 15px; border-radius:15px; font-size:14.5px; line-height:1.45; }
+  .toggle{ width:50px; height:29px; border-radius:999px; padding:3px; display:flex; cursor:pointer; transition:background .2s; }
+  .knob{ width:23px; height:23px; border-radius:50%; background:#fff; }
+  .step-btn{ width:38px; height:38px; border-radius:10px; border:1px solid var(--line2); background:var(--card); font-size:19px; color:var(--ink); cursor:pointer; }
+
+  @keyframes sweep{ to{ transform:rotate(360deg);} }
+  @keyframes fadein{ from{ opacity:0; transform:translateY(7px);} to{ opacity:1; transform:translateY(0);} }
+  .sweep{ animation:sweep 1.5s linear infinite; transform-origin:center; }
+  #screen.fx{ animation:fadein .3s cubic-bezier(.2,.6,.2,1); }
+  @media (prefers-reduced-motion:reduce){ #screen.fx{ animation:none; } .sweep{ animation:none; } }
+  .note{ position:absolute; left:24px; right:24px; bottom:26px; background:var(--solid); color:var(--solid-fg); border-radius:12px; padding:14px 16px; font-size:13.5px; line-height:1.45; z-index:8; animation:fadein .3s ease; }
+  .mono-ar{ width:54px; height:54px; }
+  .ar-mark{ width:86px; height:57px; margin-top:2px; background-color:var(--ink); -webkit-mask:url("data:image/png;base64,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") center/contain no-repeat; mask:url("data:image/png;base64,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") center/contain no-repeat; }
+  /* Uber-style quick-access drawer (hamburger) */
+  .scrim{ position:absolute; inset:0; background:rgba(20,23,31,.42); opacity:0; pointer-events:none; transition:opacity .3s ease; z-index:20; }
+  .scrim.on{ opacity:1; pointer-events:auto; }
+  .drawer{ position:absolute; top:0; bottom:0; left:0; width:78%; max-width:320px; background:var(--bg); z-index:21; transform:translateX(-103%); transition:transform .32s cubic-bezier(.2,.6,.2,1); display:flex; flex-direction:column; padding:56px 22px 28px; overflow-y:auto; box-shadow:0 0 44px rgba(20,23,31,.2); }
+  .drawer.on{ transform:translateX(0); }
+  .drow{ display:flex; align-items:center; justify-content:space-between; padding:15px 2px; font-size:15.5px; cursor:pointer; border-top:1px solid var(--line); }
+  @media (prefers-reduced-motion:reduce){ .drawer,.scrim{ transition:none; } }
+  .sw{ width:46px; height:28px; border-radius:999px; background:var(--line2); padding:3px; cursor:pointer; transition:background .2s; flex-shrink:0; }
+  .sw.on{ background:var(--green); }
+  .sw .swk{ width:22px; height:22px; border-radius:50%; background:#fff; transition:transform .2s; box-shadow:0 1px 2px rgba(0,0,0,.2); }
+  .sw.on .swk{ transform:translateX(18px); }
+  /* Find-your-operator (Find My style) — shown to the traveler when the car arrives */
+  .finder{ background:#EEEEE9; border:1px solid var(--line); border-radius:16px; padding:20px 18px 16px; display:flex; flex-direction:column; align-items:center; }
+  .finderFace{ position:relative; width:190px; height:190px; }
+  .fring{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); border-radius:50%; border:1px solid rgba(46,95,224,.18); }
+  .youdot{ position:absolute; left:50%; top:50%; width:14px; height:14px; border-radius:50%; background:var(--blue); transform:translate(-50%,-50%); box-shadow:0 0 0 4px rgba(46,95,224,.15); z-index:3; }
+  .findarrow{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); transition:transform .3s ease; z-index:2; }
+  .tdot{ position:absolute; width:26px; height:26px; border-radius:50%; background:var(--solid); color:var(--solid-fg); font-size:10px; font-weight:600; display:flex; align-items:center; justify-content:center; transform:translate(-50%,-50%); border:2px solid var(--card); z-index:4; transition:left .3s ease,top .3s ease; }
+  .fdist{ font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:28px; font-weight:600; margin-top:16px; }
+  .fdist span{ font-size:13px; color:var(--muted); }
+  .fsub{ font-size:13.5px; color:var(--blue); margin-top:5px; font-weight:600; }
+</style>
+
+<div id="phone"><div id="screen"></div></div>
+<script>
+(function(){
+  var esc=function(s){ return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); };
+  var fmt=function(n){ return '$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); };
+  var coord=function(c){ return Math.floor(Math.min(0.01*c,1)*100)/100; };
+  // Chad's consolidated model: Total = Travel Cost + $1.50. The $1.50 ABSORBS
+  // payment processing — it is never billed on top (so PROC=0 in rider math).
+  // Operator payout = 99% x Travel Cost; the $1.50 never touches it.
+  var APP_FEE=1.5, PROC=0;
+
+  var DEPART='Brickell City Centre';
+  var PLACES=[
+    {name:'Miami International Airport', short:'MIA Airport', base:24.5, eta:24},
+    {name:'Fort Lauderdale Airport', short:'FLL Airport', base:38.4, eta:41},
+    {name:'PortMiami · Cruise Terminal', short:'PortMiami', base:11.9, eta:12},
+    {name:'South Beach', short:'South Beach', base:18.2, eta:22},
+    {name:'Wynwood', short:'Wynwood', base:12.8, eta:14},
+    {name:'Coral Gables', short:'Coral Gables', base:16.4, eta:18},
+    {name:'Kaseya Center', short:'Kaseya Center', base:10.6, eta:10},
+    {name:'Aventura Mall', short:'Aventura', base:31.2, eta:34}
+  ];
+  var RECENT=[ PLACES[0], {name:'Home — Brickell City Centre', short:'Home', base:15.2, eta:17}, {name:'Downtown Miami', short:'Downtown', base:9.8, eta:9} ];
+  var CLASSES=[
+    {k:'Standard', mult:1.00, seats:'4 seats', desc:'Everyday private travel'},
+    {k:'Premium', mult:1.42, seats:'4 seats · luxury', desc:'Highest-rated operators, premium vehicles'},
+    {k:'Shared', mult:0.68, seats:'Shared route', desc:'Lowest travel cost'},
+    {k:'Large Vehicle', mult:1.55, seats:'6 seats', desc:'Extra passengers or luggage'},
+    {k:'Accessible', mult:1.00, seats:'Wheelchair accessible', desc:'Ramp or assistance equipped'},
+    {k:'Pet Friendly', mult:1.00, flat:3, seats:'Pets welcome', desc:'The extra goes to your operator for welcoming them'}
+  ];
+  var OP={ name:'Miguel D.', init:'MD', rating:4.98, car:'Gray Toyota Camry', plate:'KTR 4821' };
+  var RIDER={ name:'John Rider', init:'JR', since:2026, rating:4.92 };
+  // When launched from the unified app, use the signed-up name.
+  (function(){ var qn=new URLSearchParams(location.search).get('n'); if(qn){ qn=qn.replace(/[<>&"'`]/g,'').trim().slice(0,40); if(qn){ RIDER.name=qn; RIDER.init=qn.split(/\s+/).map(function(w){return w[0];}).slice(0,2).join('').toUpperCase(); } } })();
+  var ISSUES={
+    fare:{ label:'Incorrect Travel Cost', title:'Adjustment issued — $1.15', body:'The route deviated 0.8 miles from the optimal path. The difference has been credited to your payment method, and the operator revenue was adjusted to match. The adjustment now appears on your Travel Receipt.' },
+    lost:{ label:'Lost Item', title:'Operator notified', body:'Your operator has been notified. Upon completing the current operation, arrangements can be made to return the item. If there is no response within two hours, a specialist will contact you.' },
+    route:{ label:'Route Concern', title:'Route verified', body:'The route was optimized to I-95 as congestion developed on the standard path, reducing travel time by approximately six minutes. No adjustment is required.' },
+    cancel:{ label:'Cancellation', title:'Cancellation processed', body:'The reservation has been cancelled. As it was within the grace period, no cancellation fee applies. Any authorization hold will be released within 1–3 business days.' },
+    safety:{ label:'Safety', title:'A specialist is responding', body:'This has been routed to a safety specialist who will contact you immediately. For any immediate danger, contact 911 first — that option is always one tap away on the Safe Travels screen. Case AR-C-0447.' }
+  };
+  var TRAVEL_NO='AR-2047-MIA';
+
+  var S={
+    screen:'welcome', nav:[],
+    dest:PLACES[0], travelClass:'Standard', searchQ:'',
+    climate:'Moderate', atmosphere:'Quiet', music:'None',
+    add:{ Charger:false, Luggage:true },
+    pay:'ACH', enrouteStep:0, schedWhen:'Now', upcoming:[],
+    msgs:[{me:false,text:'On my way — a few minutes out.'}], msgInput:'',
+    tip:0, rating:0, note:'', smart:false, smartLeg:0, tripCount:0, tripNo:'AR-2047-MIA',
+    issue:null, issueState:null,
+    sharedWith:null, trusted:[{name:'Maria (Mother)'}],
+    logFilter:'All', viewTrip:null,
+    econ:{ fare:18.5, rides:40, ins:250 },
+    theme:'light', notif:{ arrived:true, enroute:true, complete:true, promos:false },
+    seed:[
+      {arr:'Miami International Airport', dep:DEPART, date:'Jul 6 · 2:43 PM', cost:24.5, no:'AR-2041-MIA'},
+      {arr:'Coral Gables', dep:'Wynwood', date:'Jun 21 · 8:40 PM', cost:17.65, no:'AR-1902-MIA'},
+      {arr:'South Beach', dep:DEPART, date:'Jun 14 · 9:05 PM', cost:20.05, no:'AR-1861-MIA'}
+    ]
+  };
+  var timers=[], rideTimers=[];
+  function clearRide(){ rideTimers.forEach(clearTimeout); rideTimers=[]; } // ride-phase timers only
+  function clearTimers(){ timers.forEach(clearTimeout); timers=[]; clearRide(); }
+  function after(ms,fn){ var t=setTimeout(fn,ms); timers.push(t); return t; }
+  function afterRide(ms,fn){ var t=setTimeout(fn,ms); rideTimers.push(t); return t; } // reset on every render() so re-renders can't stack ride timers
+  // ---- theme (light / dark) ----
+  function applyTheme(t){ document.documentElement.setAttribute('data-theme',t); try{ localStorage.setItem('ar-theme',t); }catch(e){} S.theme=t; }
+  (function(){ var s=null; try{ s=localStorage.getItem('ar-theme'); }catch(e){} S.theme=(s==='dark')?'dark':'light'; document.documentElement.setAttribute('data-theme',S.theme); })(); // default LIGHT always; only DARK if the user chose it in Settings (never follows the phone's system setting)
+  function go(s){ clearTimers(); S.note=''; S.nav.push(S.screen); S.screen=s; render(); }
+  function reset(s){ clearTimers(); S.note=''; S.nav=[]; S.screen=s; render(); }
+  function scheduledScr(){
+    var u=S.upcoming[0]||{dest:'',when:''};
+    var h='<div class="pad" style="text-align:center"><div class="spring"></div>';
+    h+='<svg width="58" height="58" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.6" style="margin:0 auto"><rect x="3" y="4.5" width="18" height="16" rx="3"/><path d="M3 9h18M8 2.5v4M16 2.5v4M9 14l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    h+='<div class="title" style="margin-top:16px">Travel Scheduled</div>';
+    h+='<div class="sub" style="text-align:center">Your travel to '+esc(u.dest)+' is set for <b>'+esc(u.when)+'</b>. We\'ll match you with an operator automatically and notify you before pickup.</div>';
+    h+='<div class="spring"></div><button class="btn" data-act="reset" data-s="home">Done</button></div>';
+    return h;
+  }
+  function referralScr(){
+    var first=((RIDER.name||'Traveler').trim().split(' ')[0]||'Traveler').toUpperCase().replace(/[^A-Z]/g,'');
+    var code=(first||'RIDER').slice(0,6)+'-4821';
+    var h='<div class="pad">'+bar('back')+'<div class="title">Invite Friends</div><div class="sub">Give a friend their first travel on us — and earn credit yourself.</div>';
+    h+='<div class="card" style="margin-top:22px;padding:22px;text-align:center;background:var(--blue-t);border-color:var(--blue-b)"><div class="lbl" style="color:var(--blue)">Your Invite Code</div><div class="mono" style="font-size:29px;font-weight:600;letter-spacing:.08em;margin-top:10px">'+code+'</div><button class="btn cta-space" data-act="note" data-t="Your phone\'s share sheet opens here in the full app — text, email, or copy your link." style="margin-top:18px">Share invite</button></div>';
+    h+='<div style="margin-top:24px" class="lbl">How It Works</div><div class="card" style="margin-top:12px;padding:2px 20px">';
+    [['Your friend gets $10 off','Applied to their first travel'],['You get $10 in credit','Once their first travel is complete'],['No limit','Invite as many friends as you like']].forEach(function(r,i){ h+='<div class="lrow'+(i>0?' hair':'')+'" style="cursor:default;display:block;padding:15px 0"><div style="font-size:15px;font-weight:600">'+r[0]+'</div><div style="font-size:12.5px;color:var(--muted);margin-top:3px">'+r[1]+'</div></div>'; });
+    h+='</div>';
+    h+='<div style="margin-top:24px" class="lbl">Your Invites</div><div class="card" style="margin-top:12px;padding:2px 20px"><div class="lrow" style="cursor:default"><span style="font-size:15px">Friends joined</span><span class="num" style="margin-left:auto;font-size:15px;font-weight:600">3</span></div><div class="lrow hair" style="cursor:default"><span style="font-size:15px">Credit earned</span><span class="num" style="margin-left:auto;font-size:15px;font-weight:600;color:var(--green)">$30.00</span></div></div>';
+    h+='<div style="font-size:11.5px;color:var(--faint);margin-top:12px;line-height:1.5">Credits apply to your travel cost. Operators always keep their full 99% — invite credits come from American Rider, never from your operator.</div>';
+    h+='<div class="spring"></div></div>';
+    return h;
+  }
+  function back(){ clearTimers(); S.note=''; S.screen=S.nav.pop()||'home'; render(); }
+
+  function classObj(){ for(var i=0;i<CLASSES.length;i++) if(CLASSES[i].k===S.travelClass) return CLASSES[i]; return CLASSES[0]; }
+  function classCost(c){ return +((S.dest.base*c.mult)+(c.flat||0)).toFixed(2); }
+  function cost(){ return classCost(classObj()); }
+  function total(){ return +(cost()+APP_FEE+PROC).toFixed(2); }
+  function allIn(c){ return +(c+APP_FEE+PROC).toFixed(2); } // riders see ONE all-in price everywhere — quoted price = charged price
+  function operatorRevenue(){ return +(cost()-coord(cost())).toFixed(2); }
+
+  // ---- shared bits ----
+  function bar(mode){
+    var left = mode==='back'
+      ? '<svg class="icn" data-act="back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M15 5l-7 7 7 7" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+      : '<svg class="icn g" data-act="opendrawer" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 7h16M4 12h16M4 17h16" stroke-linecap="round"/></svg>';
+    return '<div class="bar">'+left
+      +'<div class="wm">AMERICAN RIDER<span class="n">NATIONAL TRANSPORTATION</span></div>'
+      +'<svg class="icn g" data-act="go" data-s="profile" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="3.4"/><path d="M5.5 19c1.4-3.3 11.6-3.3 13 0" stroke-linecap="round"/></svg></div>';
+  }
+  function av(init,size){ return '<div class="av" style="width:'+size+'px;height:'+size+'px;font-size:'+(size*0.36)+'px">'+init+'</div>'; }
+  function mapSVG(tag){
+    var s='<div class="map"><svg width="100%" height="100%" viewBox="0 0 364 190" preserveAspectRatio="xMidYMid slice" style="position:absolute;inset:0">';
+    s+='<rect width="364" height="190" fill="#EEEEE9"/>';
+    s+='<rect x="212" y="104" width="96" height="52" rx="4" fill="#E4EADD"/>';
+    s+='<rect x="44" y="40" width="70" height="40" rx="4" fill="#DEE6EC"/>';
+    [70,150,236,312].forEach(function(x){ s+='<line x1="'+x+'" y1="0" x2="'+x+'" y2="190" stroke="#F6F5F1" stroke-width="7"/>'; });
+    [52,104,156].forEach(function(y){ s+='<line x1="0" y1="'+y+'" x2="364" y2="'+y+'" stroke="#F6F5F1" stroke-width="7"/>'; });
+    var route='M60,150 L212,150 L212,44 L308,44';
+    s+='<path d="'+route+'" fill="none" stroke="#CBD6F1" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>';
+    s+='<path id="mroute" d="'+route+'" fill="none" stroke="#2E5FE0" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>';
+    s+='<circle cx="308" cy="44" r="5.5" fill="#2E5FE0" stroke="#fff" stroke-width="2.2"/>';
+    s+='<g id="mapcar" transform="translate(60,150)"><rect x="-6.5" y="-4" width="13" height="8" rx="2.5" fill="#14171F"/><rect x="2" y="-2.6" width="3" height="5.2" rx="1" fill="rgba(255,255,255,.85)"/></g>';
+    s+='</svg><div class="tag">'+esc(tag||'LIVE · MIA')+'</div></div>';
+    return s;
+  }
+  var mapTimer=null;
+  function stopMap(){ if(mapTimer){ clearInterval(mapTimer); mapTimer=null; } }
+  function animateMap(){
+    stopMap();
+    var path=document.getElementById('mroute'); if(!path||!document.getElementById('mapcar')) return;
+    var L=path.getTotalLength(), t0=Date.now(), dur=7000;
+    mapTimer=setInterval(function(){
+      var car=document.getElementById('mapcar'), pt=document.getElementById('mroute');
+      if(!car||!pt){ stopMap(); return; }
+      var frac=((Date.now()-t0)%dur)/dur;
+      var p=pt.getPointAtLength(L*frac), q=pt.getPointAtLength(Math.min(L,L*frac+2));
+      var ang=Math.atan2(q.y-p.y,q.x-p.x)*180/Math.PI;
+      car.setAttribute('transform','translate('+p.x.toFixed(1)+','+p.y.toFixed(1)+') rotate('+ang.toFixed(1)+')');
+    },40);
+  }
+  // Find-your-operator — the TRAVELER gets the Find My arrow when the car arrives.
+  var finderTimer=null, finderStart=0;
+  function stopFinder(){ if(finderTimer){ clearInterval(finderTimer); finderTimer=null; } }
+  function dirWord(b){ var a=b; while(a>180)a-=360; while(a<-180)a+=360; var m=Math.abs(a); if(m<20)return 'Straight ahead'; if(m>150)return 'Behind you'; return a>0?'To your right':'To your left'; }
+  function finderHTML(){
+    return '<div class="finder"><div class="finderFace">'
+      +'<div class="fring" style="width:190px;height:190px"></div><div class="fring" style="width:126px;height:126px"></div><div class="fring" style="width:62px;height:62px"></div>'
+      +'<div class="youdot"></div>'
+      +'<div class="tdot" id="fTdot" style="left:95px;top:35px">'+OP.init+'</div>'
+      +'<svg class="findarrow" id="fArrow" width="60" height="60" viewBox="0 0 24 24"><path d="M12 2 L19 20 L12 15.5 L5 20 Z" fill="#2E5FE0"/></svg>'
+      +'</div>'
+      +'<div class="fdist" id="fDist">Locating…</div><div class="fsub" id="fSub">Finding your operator</div>'
+      +'<div style="display:flex;gap:16px;margin-top:12px;font-size:11.5px;color:var(--muted)"><span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--blue);margin-right:5px"></span>You</span><span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ink);margin-right:5px"></span>'+OP.name+'</span></div></div>';
+  }
+  function startFinder(){ stopFinder(); if(!document.getElementById('fArrow'))return; finderStart=Date.now(); updateFinder(); finderTimer=setInterval(updateFinder,90); }
+  function updateFinder(){
+    var arrow=document.getElementById('fArrow'), dvr=document.getElementById('fTdot'), dist=document.getElementById('fDist'), sub=document.getElementById('fSub');
+    if(!arrow||!dvr||!dist||!sub||S.screen!=='enroute'||S.enrouteStep!==1){ stopFinder(); return; }
+    var el=(Date.now()-finderStart)/1000;
+    var d=Math.max(0, 80-80*Math.min(1,el/6));
+    var bearing=44*(d/80)+3*Math.sin(el*1.1);
+    var rad=bearing*Math.PI/180, tip=64;
+    dvr.style.left=(95+tip*Math.sin(rad))+'px'; dvr.style.top=(95-tip*Math.cos(rad))+'px';
+    if(d<=6){
+      arrow.innerHTML='<circle cx="12" cy="12" r="9" stroke="#1F8A5B" stroke-width="2" fill="none"/><path d="M8.5 12 l2.3 2.3 l4.5 -5" stroke="#1F8A5B" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>';
+      arrow.style.transform='translate(-50%,-50%)'; dist.textContent='Here'; sub.textContent=OP.car+' · '+OP.plate; sub.style.color='var(--green)';
+    } else {
+      arrow.innerHTML='<path d="M12 2 L19 20 L12 15.5 L5 20 Z" fill="#2E5FE0"/>';
+      arrow.style.transform='translate(-50%,-50%) rotate('+bearing+'deg)'; dist.innerHTML=Math.round(d)+'<span> ft</span>'; sub.textContent=dirWord(bearing); sub.style.color='var(--blue)';
+    }
+  }
+  function updateEnroute(){
+    var labels=['Operator En Route','Operator Arrived','Traveler Onboard','Arrival'], subs=['Your operator is on the way.','Find your operator outside.','Travel in progress.','Approaching your destination.'], etas=['4 min','Here','18 min','Arriving'];
+    var st=S.enrouteStep, set=function(id,txt){ var e=document.getElementById(id); if(e)e.textContent=txt; };
+    set('erTitle',labels[st]); set('erSub',subs[st]); set('erEta',etas[st]);
+    var steps=document.getElementById('erSteps'); if(steps){ for(var i=0;i<steps.children.length;i++) steps.children[i].className='b'+(i<=st?' on':''); }
+    var lab=document.getElementById('erLabels'); if(lab){ for(var j=0;j<lab.children.length;j++){ lab.children[j].style.color=(j===st?'var(--ink)':'var(--faint)'); lab.children[j].style.fontWeight=(j===st?600:400); } }
+    // Swap the visual: map while driving, Find My arrow while the car waits outside.
+    var v=document.getElementById('erVisual');
+    if(v){ if(st===1){ stopMap(); v.innerHTML=finderHTML(); startFinder(); } else { stopFinder(); v.innerHTML=mapSVG('TRAVEL · MIA'); animateMap(); } }
+  }
+
+  // ---- onboarding ----
+  function welcome(){
+    var cb=function(k,glyph){ return '<button class="btn ghost" data-act="reset" data-s="home" style="display:flex;align-items:center;justify-content:center;gap:10px;font-weight:500"><span style="display:inline-flex">'+glyph+'</span>Continue with '+k+'</button>'; };
+    var apple='<svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor"><path d="M16.4 12.9c0-2 1.6-2.9 1.7-3-1-1.4-2.4-1.6-2.9-1.6-1.2-.1-2.4.7-3 .7-.6 0-1.6-.7-2.6-.7-1.3 0-2.6.8-3.3 2-1.4 2.4-.4 6 1 8 .7 1 1.4 2 2.4 2 1 0 1.3-.6 2.5-.6 1.1 0 1.5.6 2.5.6s1.7-.9 2.3-1.9c.7-1 1-2 1-2-.1 0-2-.7-2-2.9zM14.6 6.2c.5-.7.9-1.6.8-2.5-.8 0-1.7.5-2.3 1.2-.5.6-.9 1.5-.8 2.4.9.1 1.7-.4 2.3-1.1z"/></svg>';
+    var google='<svg viewBox="0 0 24 24" width="16" height="16"><path fill="#4285F4" d="M22 12.2c0-.7-.1-1.4-.2-2H12v3.8h5.6c-.2 1.3-1 2.4-2 3.1v2.6h3.3c1.9-1.8 3.1-4.4 3.1-7.5z"/><path fill="#34A853" d="M12 22c2.7 0 5-.9 6.6-2.4l-3.3-2.6c-.9.6-2 1-3.3 1-2.5 0-4.7-1.7-5.4-4H3.2v2.6C4.9 19.9 8.2 22 12 22z"/><path fill="#FBBC05" d="M6.6 14c-.2-.6-.3-1.3-.3-2s.1-1.4.3-2V7.4H3.2C2.4 8.8 2 10.4 2 12s.4 3.2 1.2 4.6z"/><path fill="#EA4335" d="M12 6c1.5 0 2.8.5 3.8 1.5l2.9-2.9C16.9 2.9 14.7 2 12 2 8.2 2 4.9 4.1 3.2 7.4L6.6 10c.7-2.3 2.9-4 5.4-4z"/></svg>';
+    var mail='<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M4 7l8 6 8-6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    return '<div class="pad" style="text-align:center"><div class="spring"></div>'
+      +'<div class="ar-mark" role="img" aria-label="American Rider" style="align-self:center"></div>'
+      +'<div class="wm" style="margin-top:18px;font-size:14px;letter-spacing:.28em">AMERICAN RIDER</div>'
+      +'<div style="font-size:11px;letter-spacing:.32em;color:var(--faint);font-weight:600;margin-top:6px">NATIONAL TRANSPORTATION</div>'
+      +'<div class="spring"></div>'
+      +'<div class="sub" style="font-size:15px;color:var(--muted);font-weight:400;letter-spacing:.02em">Safe. Reliable. American.</div>'
+      +'<div class="spring"></div>'
+      +'<button class="btn" data-act="reset" data-s="home">Create Account</button>'
+      +'<button class="btn ghost" data-act="reset" data-s="home" style="margin-top:11px">Sign In</button>'
+      +'<div class="row" style="margin:22px 4px 0;gap:12px"><span class="hair" style="flex:1"></span><span style="font-size:11px;color:var(--faint);letter-spacing:.1em">OR</span><span class="hair" style="flex:1"></span></div>'
+      +'<div style="display:flex;flex-direction:column;gap:10px;margin-top:20px">'+cb('Apple',apple)+cb('Google',google)+cb('Email',mail)+'</div>'
+      +'<div style="font-size:11px;color:var(--faint);margin-top:22px;line-height:1.5">By continuing you accept the Terms of Service and Privacy Policy.</div>'
+      +'</div>';
+  }
+
+  // ---- home ----
+  function home(){
+    var h='<div class="pad">'+bar('menu');
+    h+='<div class="display">Begin Travel</div>';
+    if(S.upcoming.length){ var u0=S.upcoming[0];
+      h+='<div class="card" style="margin-top:18px;padding:16px 18px;background:var(--blue-t);border-color:var(--blue-b)"><div class="row"><div><div class="lbl" style="color:var(--blue)">Upcoming Travel</div><div style="font-size:15.5px;font-weight:600;margin-top:7px">'+esc(u0.dest)+'</div><div style="font-size:13px;color:var(--ink2);margin-top:3px">'+esc(u0.when)+' · '+fmt(u0.total)+'</div></div><span data-act="cancelsched" data-i="0" style="font-size:13px;color:var(--red);font-weight:600;cursor:pointer;align-self:flex-start">Cancel</span></div></div>';
+    }
+    h+='<div class="card" data-act="go" data-s="search" style="margin-top:22px;padding:17px 18px;display:flex;align-items:center;gap:13px;cursor:pointer">'
+      +'<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#8A8A82" stroke-width="1.7"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.2-3.2" stroke-linecap="round"/></svg>'
+      +'<span style="font-size:16.5px;color:var(--muted)">Destination</span></div>';
+    h+='<div style="margin-top:26px" class="lbl">Suggested Travel</div>';
+    h+='<div class="card" data-act="pickdest" data-i="0" style="margin-top:12px;padding:18px 20px;cursor:pointer"><div class="row"><div><div style="font-size:16.5px;font-weight:600">'+PLACES[0].name+'</div><div style="font-size:13px;color:var(--muted);margin-top:4px">Terminal D · '+PLACES[0].eta+' min</div></div><div style="text-align:right"><div class="num" style="font-size:16px;font-weight:600">'+fmt(allIn(PLACES[0].base))+'</div><div style="font-size:12px;color:var(--blue);font-weight:600;margin-top:4px">Travel ›</div></div></div></div>';
+    h+='<div style="margin-top:28px" class="lbl">Recent Travel</div>';
+    h+='<div class="card" style="margin-top:12px;padding:2px 20px">';
+    RECENT.forEach(function(r,i){ h+='<div class="lrow'+(i>0?' hair':'')+'" data-act="pickrecent" data-i="'+i+'"><span class="pin" style="background:var(--faint)"></span><div><div style="font-size:15px">'+esc(r.name)+'</div><div style="font-size:12.5px;color:var(--muted);margin-top:3px">'+r.eta+' min</div></div><span class="num" style="margin-left:auto;font-size:13.5px;color:var(--ink2)">'+fmt(allIn(r.base))+'</span></div>'; });
+    h+='</div>';
+    h+='<div class="spring"></div>';
+    h+='<button class="btn cta-space" data-act="go" data-s="search">Reserve Travel</button></div>';
+    return h;
+  }
+
+  function search(){
+    var q=S.searchQ.trim().toLowerCase();
+    var list=PLACES.filter(function(p){ return q===''||p.name.toLowerCase().indexOf(q)>=0; });
+    var h='<div class="pad">'+bar('back');
+    h+='<div class="title">Destination</div>';
+    h+='<div class="card" style="margin-top:18px;padding:16px 18px;display:flex;align-items:center;gap:12px">'
+      +'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8A8A82" stroke-width="1.7"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.2-3.2" stroke-linecap="round"/></svg>'
+      +'<input class="field" id="q" data-input="searchQ" placeholder="Search a place or address" value="'+esc(S.searchQ)+'"></div>';
+    h+='<div class="card" style="margin-top:14px;padding:2px 20px">';
+    list.forEach(function(p,i){ h+='<div class="lrow'+(i>0?' hair':'')+'" data-act="pickdest" data-i="'+PLACES.indexOf(p)+'"><span class="pin" style="background:var(--blue)"></span><div><div style="font-size:15px">'+esc(p.name)+'</div><div style="font-size:12.5px;color:var(--muted);margin-top:3px">'+p.eta+' min</div></div><span class="num" style="margin-left:auto;font-size:13.5px;color:var(--ink2)">'+fmt(allIn(p.base))+'</span></div>'; });
+    if(!list.length && q!==''){
+      // Any typed place works — never dead-end a destination search.
+      var cap=S.searchQ.trim().replace(/\b\w/g,function(c){return c.toUpperCase();});
+      h+='<div class="lrow" data-act="pickcustom" data-name="'+esc(cap)+'"><span class="pin" style="background:var(--blue)"></span><div><div style="font-size:15px">'+esc(cap)+'</div><div style="font-size:12.5px;color:var(--muted);margin-top:3px">Set as destination</div></div><span class="chev">›</span></div>';
+    }
+    h+='</div><div class="spring"></div></div>';
+    return h;
+  }
+
+  function options(){
+    var h='<div class="pad">'+bar('back');
+    h+='<div class="title">Travel Options</div><div class="sub">'+esc(DEPART)+' → '+esc(S.dest.name)+'</div>';
+    // Smart Travel earns emphasis only when rail genuinely wins — long trips.
+    // On short hops a rail detour makes no sense, so the card doesn't appear.
+    var showSmart=S.dest.eta>=20;
+    if(showSmart) h+='<div class="card" data-act="gosmart" style="margin-top:20px;padding:16px 18px;cursor:pointer;border-color:var(--blue-b);background:var(--blue-t)"><div class="row"><div style="display:flex;align-items:center;gap:12px"><div style="width:36px;height:36px;border-radius:9px;background:var(--blue);display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7"><rect x="6" y="3" width="12" height="13" rx="3"/><path d="M6 10h12M9 20l2-3M15 20l-2-3" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div><div style="font-size:15.5px;font-weight:600">Smart Travel</div><div style="font-size:12.5px;color:#1F49B8;margin-top:2px">Car → rail → car · skips I-95</div></div></div><div style="text-align:right"><div class="num" style="font-size:14.5px;font-weight:600;color:var(--green)">Save ~50%</div><div style="font-size:12px;color:var(--muted);margin-top:2px">'+SMART_TIME+' vs '+SMART_DIRECT_TIME+' in traffic</div></div></div></div>';
+    if(showSmart) h+='<div class="lbl" style="margin-top:24px">Direct Travel</div>';
+    h+='<div class="card" style="margin-top:'+(showSmart?12:20)+'px;padding:2px 20px">';
+    CLASSES.forEach(function(c,i){ // tap selects; tapping the selected class continues
+      var on=S.travelClass===c.k, cc=classCost(c);
+      h+='<div class="lrow'+(i>0?' hair':'')+'" data-act="pickclass" data-k="'+c.k+'" style="align-items:flex-start"><div style="width:8px;height:8px;border-radius:50%;margin-top:6px;background:'+(on?'var(--blue)':'var(--line2)')+';box-shadow:'+(on?'0 0 0 3px var(--blue-b)':'none')+'"></div>'
+        +'<div style="flex:1"><div style="font-size:15.5px;font-weight:'+(on?600:500)+'">'+c.k+'</div><div style="font-size:12.5px;color:var(--muted);margin-top:3px">'+c.seats+' · '+c.desc+'</div></div>'
+        +'<div style="text-align:right"><div class="num" style="font-size:15px;font-weight:600">'+fmt(allIn(cc))+'</div><div style="font-size:12px;color:var(--muted);margin-top:3px">'+S.dest.eta+' min</div></div></div>';
+    });
+    h+='</div>';
+    h+='<div class="spring"></div>';
+    // Sticky, labeled CTA — always visible, updates as you pick a class.
+    h+='<div style="position:sticky;bottom:0;padding:16px 0 4px;background:linear-gradient(to top,var(--bg) 62%,rgba(247,247,245,0))"><button class="btn" data-act="go" data-s="prefs">Continue · '+S.travelClass+' · '+fmt(allIn(cost()))+'</button></div></div>';
+    return h;
+  }
+
+  function prefs(){
+    var seg=function(key,opts){ var idx=Math.max(0,opts.indexOf(S[key])); var h='<div class="seg" data-seg="'+key+'"><div class="thumb" style="width:calc((100% - 6px)/'+opts.length+');transform:translateX('+(idx*100)+'%)"></div>'; opts.forEach(function(o,i){ h+='<div class="opt'+(S[key]===o?' on':'')+'" data-act="segset" data-k="'+key+'" data-v="'+o+'" data-i="'+i+'">'+o+'</div>'; }); return h+'</div>'; };
+    var h='<div class="pad">'+bar('back');
+    h+='<div class="title">Travel Preferences</div><div class="sub">Configure this travel. Applies to this reservation only.</div>';
+    h+='<div style="margin-top:26px" class="lbl">Climate</div><div style="margin-top:11px">'+seg('climate',['Cool','Moderate','Warm'])+'</div>';
+    h+='<div style="margin-top:24px" class="lbl">Atmosphere</div><div style="margin-top:11px">'+seg('atmosphere',['Quiet','Conversation'])+'</div>';
+    h+='<div style="margin-top:24px" class="lbl">Music</div><div style="margin-top:11px">'+seg('music',['None','Traveler Choice'])+'</div>';
+    h+='<div id="musicNote" style="display:'+(S.music==='Traveler Choice'?'block':'none')+';font-size:12.5px;color:var(--muted);margin-top:9px;line-height:1.5">You will choose the source on arrival — Apple Music, Spotify, YouTube Music, or the Operator Playlist. The operator retains final discretion.</div>';
+    h+='<div style="margin-top:24px" class="lbl">Additional Requests</div><div class="chips" style="margin-top:11px">';
+    Object.keys(S.add).forEach(function(k){ h+='<div class="chip'+(S.add[k]?' on':'')+'" data-act="toggle" data-k="'+k+'">'+k+'</div>'; });
+    h+='</div>';
+    h+='<div class="spring"></div><button class="btn cta-space" data-act="go" data-s="confirm">Continue</button></div>';
+    return h;
+  }
+
+  // Rider sees one price; the 99% is anchored to the named fare so it reconciles exactly.
+  function operatorBox(fare,past){
+    return '<div style="margin-top:14px;background:var(--blue-t);border:1px solid var(--blue-b);border-radius:12px;padding:16px 18px">'
+      +'<div class="row"><span style="font-size:13.5px;color:var(--ink2)">Operator '+(past?'retained':'retains')+'</span><span class="num" style="font-size:16px;font-weight:600;color:var(--blue)">99% of the fare</span></div>'
+      +'<div style="font-size:12.5px;color:var(--ink2);margin-top:7px;line-height:1.5">American Rider\'s commission is just 1% — the operator keeps the rest.</div>'
+      +'</div>';
+  }
+  function confirm(){
+    var h='<div class="pad">'+bar('back');
+    h+='<div class="title">Travel Confirmation</div><div class="sub">Please review and confirm.</div>';
+    h+='<div class="card" style="margin-top:20px;padding:4px 20px">';
+    h+='<div class="lrow hair" style="cursor:default;border-top-width:0"><span class="pin" style="background:var(--ink)"></span><div><div style="font-size:12px;color:var(--muted)">Departure</div><div style="font-size:15px;margin-top:2px">'+esc(DEPART)+'</div></div></div>';
+    h+='<div class="lrow hair" style="cursor:default"><span class="pin" style="background:var(--blue)"></span><div><div style="font-size:12px;color:var(--muted)">Arrival · '+S.travelClass+'</div><div style="font-size:15px;margin-top:2px">'+esc(S.dest.name)+'</div></div></div>';
+    h+='</div>';
+    h+='<div class="lbl" style="margin-top:20px">When</div><div class="chips" style="margin-top:11px">';
+    ['Now','In 1 hour','Tonight 7 PM','Tomorrow 8 AM'].forEach(function(w){ h+='<div class="chip'+(S.schedWhen===w?' on':'')+'" data-act="setwhen" data-w="'+w+'">'+(w==='Now'?'Travel now':w)+'</div>'; });
+    h+='</div>';
+    h+='<div class="card" style="margin-top:14px;padding:18px 20px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:16px;font-weight:600">Total</span><span class="num" style="font-size:20px;font-weight:600">'+fmt(total())+'</span></div>';
+    h+=operatorBox(cost(),false);
+    h+='<div class="card" data-act="note" data-t="Payment methods are managed in your Wallet." style="margin-top:14px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;cursor:pointer"><div><div style="font-size:12px;color:var(--muted)">Payment Method</div><div style="font-size:15px;margin-top:3px">Bank Account · ACH ····4417</div></div><span class="link" style="font-size:13.5px">Change</span></div>';
+    h+='<div style="font-size:11.5px;color:var(--faint);text-align:center;margin-top:16px;line-height:1.5">Travel cost is fixed upon confirmation and will not change.</div>';
+    var sched=S.schedWhen&&S.schedWhen!=='Now';
+    h+='<div class="spring"></div><button class="btn cta-space" data-act="'+(sched?'schedule':'search-op')+'">'+(sched?'Schedule Travel':'Confirm Travel')+'</button></div>';
+    return h;
+  }
+
+  function searching(){
+    var h='<div class="pad" style="text-align:center">'+bar('menu');
+    h+='<div class="spring"></div>';
+    h+='<svg width="92" height="92" viewBox="0 0 92 92" style="align-self:center"><circle cx="46" cy="46" r="34" fill="none" stroke="#ECEBE6" stroke-width="2"/><circle cx="46" cy="46" r="21" fill="none" stroke="#ECEBE6" stroke-width="2"/><circle cx="46" cy="46" r="4" fill="#14171F"/><g class="sweep"><path d="M46 46 L46 10 A36 36 0 0 1 74 30 Z" fill="#2E5FE0" opacity="0.12"/><line x1="46" y1="46" x2="46" y2="12" stroke="#2E5FE0" stroke-width="2" stroke-linecap="round"/></g></svg>';
+    h+='<div class="title" style="margin-top:28px;font-size:22px">Finding the best available Operator</div>';
+    h+='<div class="sub" style="text-align:center">Matching your reservation to the nearest qualified operator.</div>';
+    h+='<div style="margin-top:22px" class="lbl">Estimated Search Time</div><div class="mono" style="font-size:20px;margin-top:6px">~ 00:12</div>';
+    h+='<div class="spring"></div>';
+    h+='<div data-act="cancelTravel" style="text-align:center;padding:14px 10px;font-weight:500;color:var(--muted);cursor:pointer;font-size:15px">Cancel Travel</div></div>';
+    return h;
+  }
+
+  function enroute(){
+    var labels=['Operator En Route','Operator Arrived','Traveler Onboard','Arrival'], subs=['Your operator is on the way.','Find your operator outside.','Travel in progress.','Approaching your destination.'], etas=['4 min','Here','18 min','Arriving'];
+    var st=S.enrouteStep;
+    var h='<div class="pad">'+bar('menu');
+    h+='<div class="row" style="align-items:flex-start"><div><div class="title" id="erTitle" style="font-size:23px">'+labels[st]+'</div><div class="sub" id="erSub">'+subs[st]+'</div></div><div style="text-align:right;flex-shrink:0;margin-left:12px"><div class="lbl" style="font-size:9.5px">Arrival</div><div class="num" id="erEta" style="font-size:18px;font-weight:600;margin-top:3px">'+etas[st]+'</div></div></div>';
+    h+='<div id="erVisual" style="margin-top:18px">'+(st===1?finderHTML():mapSVG('TRAVEL · MIA'))+'</div>';
+    h+='<div class="card" style="margin-top:14px;padding:15px 18px;background:var(--blue-t);border-color:var(--blue-b)"><div class="row"><span class="lbl" style="color:var(--blue)">Predictive Routing</span><span style="font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--green)">ACTIVE</span></div><div style="font-size:12.5px;color:var(--ink2);margin-top:7px;line-height:1.5">Rerouted around an I-95 slowdown forecast for the next 15 minutes — we adjust before it forms, so your arrival time is unchanged.</div></div>';
+    h+='<div class="card" style="margin-top:14px;padding:16px 18px"><div class="row"><div style="display:flex;align-items:center;gap:13px">'+av(OP.init,46)+'<div><div style="font-size:16px;font-weight:600">'+OP.name+'</div><div style="font-size:12.5px;color:var(--muted);margin-top:2px">'+OP.car+' · '+OP.plate+'</div></div></div><div style="text-align:right"><div class="num" style="font-size:15px;font-weight:600">★ '+OP.rating+'</div><div class="lbl" style="font-size:9px;margin-top:2px">Verified</div></div></div></div>';
+    h+='<div class="steps" id="erSteps" style="margin-top:18px">'+[0,1,2,3].map(function(i){return '<div class="b'+(i<=st?' on':'')+'"></div>';}).join('')+'</div>';
+    h+='<div class="row" id="erLabels" style="margin-top:9px">'+['En Route','Arrived','Onboard','Arrival'].map(function(l,i){return '<div style="font-size:11px;font-weight:'+(i===st?600:400)+';color:'+(i===st?'var(--ink)':'var(--faint)')+'">'+l+'</div>';}).join('')+'</div>';
+    h+='<div class="card" data-act="go" data-s="safety" style="margin-top:16px;padding:15px 18px;display:flex;align-items:center;gap:13px;cursor:pointer;background:var(--blue-t);border-color:var(--blue-b)">'
+      +'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="1.8" style="flex-shrink:0"><path d="M12 3l7.5 3v5.5c0 5-3.3 8.4-7.5 10.5C7.8 19.9 4.5 16.5 4.5 11.5V6z" stroke-linejoin="round"/><path d="M9.2 12.2l2 2 3.6-3.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+      +'<div style="flex:1"><div style="font-size:15px;font-weight:600">Safe Travels</div><div style="font-size:12px;color:var(--ink2);margin-top:2px">911 · Share your trip · Verify your operator</div></div>'
+      +'<span class="chev">›</span></div>';
+    h+='<div class="card" style="margin-top:12px;padding:15px 18px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:13.5px;color:var(--ink2)">Travel Number</span><span class="mono" style="font-size:13px">'+S.tripNo+'</span></div>';
+    h+='<div class="spring"></div>';
+    h+='<div style="display:flex;gap:10px" class="cta-space"><button class="btn" data-act="go" data-s="communicate" style="flex:1">Communicate</button><button class="btn ghost" data-act="support" style="flex:1">Patron Support</button></div>';
+    h+='<div data-act="cancelTravel" style="text-align:center;padding:14px 10px 0;font-weight:500;color:var(--muted);cursor:pointer;font-size:14px">Cancel Travel</div></div>';
+    return h;
+  }
+
+  function communicate(){
+    var h='<div class="pad">'+bar('back');
+    h+='<div style="display:flex;align-items:center;gap:12px;margin-top:6px">'+av(OP.init,40)+'<div><div style="font-size:18px;font-weight:600">'+OP.name+'</div><div style="font-size:12px;color:var(--muted);margin-top:2px">Your operator</div></div></div>';
+    h+='<div style="flex:1;display:flex;flex-direction:column;gap:10px;margin-top:22px">';
+    S.msgs.forEach(function(m){ h+='<div class="bubble" style="align-self:'+(m.me?'flex-end':'flex-start')+';background:'+(m.me?'var(--ink)':'#fff')+';color:'+(m.me?'#fff':'var(--ink)')+';'+(m.me?'':'border:1px solid var(--line)')+'">'+esc(m.text)+'</div>'; });
+    h+='</div>';
+    h+='<div style="display:flex;gap:10px;margin-top:16px"><input class="field" id="msg" data-input="msgInput" data-enter="1" placeholder="Message '+OP.name+'" value="'+esc(S.msgInput)+'" style="border:1px solid var(--line2);border-radius:12px;padding:14px 16px"><button class="btn" data-act="send" style="width:auto;padding:14px 20px;font-size:15px;border-radius:12px">Send</button></div></div>';
+    return h;
+  }
+
+  function complete(){
+    if(S.smart) return smartComplete();
+    var tips=[0,2,5,10];
+    var h='<div class="pad">'+bar('menu');
+    h+='<div style="text-align:center;margin-top:8px"><svg width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="#1F8A5B" stroke-width="2" style="margin:0 auto"><circle cx="28" cy="28" r="20"/><path d="M20 28l6 6 11-12" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    h+='<div class="title" style="margin-top:16px">Travel Complete</div><div class="sub" style="text-align:center">'+esc(DEPART)+' → '+esc(S.dest.name)+'</div></div>';
+    h+='<div class="card" style="margin-top:22px;padding:4px 20px">';
+    h+='<div class="row hair" style="padding:14px 0;border-top-width:0"><span style="font-size:14px;color:var(--ink2)">Total Charged</span><span class="num" style="font-size:15px;font-weight:600">'+fmt(total())+'</span></div>';
+    h+='<div class="row" style="padding:14px 0"><span style="font-size:14px;color:var(--ink2)">Travel Number</span><span class="mono" style="font-size:12.5px">'+S.tripNo+'</span></div>';
+    h+='</div>';
+    h+=operatorBox(cost(),true);
+    h+='<div style="margin-top:24px" class="lbl">Travel Review</div><div style="display:flex;gap:10px;margin-top:12px">';
+    for(var i=1;i<=5;i++){ h+='<svg data-act="rate" data-n="'+i+'" width="30" height="30" viewBox="0 0 24 24" fill="'+(i<=S.rating?'var(--ink)':'none')+'" stroke="var(--ink)" stroke-width="1.5" style="cursor:pointer"><path d="M12 3.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8-5.3-2.8-5.3 2.8 1-5.8-4.2-4.1 5.9-.9z" stroke-linejoin="round"/></svg>'; }
+    h+='</div>';
+    h+='<div style="margin-top:24px" class="lbl">Tip Operator</div><div style="font-size:12.5px;color:var(--muted);margin-top:6px">The operator keeps 100% of every tip.</div><div class="chips" style="margin-top:12px">';
+    tips.forEach(function(t){ h+='<div class="chip'+(S.tip===t?' on':'')+'" data-act="tip" data-v="'+t+'" style="min-width:64px;text-align:center">'+(t===0?'None':'$'+t)+'</div>'; });
+    h+='</div>';
+    h+='<div class="spring"></div>';
+    h+='<button class="btn ghost cta-space" data-act="viewreceipt">View Travel Receipt</button>';
+    h+='<button class="btn" data-act="finish" style="margin-top:11px">Complete</button></div>';
+    return h;
+  }
+
+  // ---- account & sub-screens ----
+  function navrow(label,act,s,first){ return '<div class="lrow'+(first?'':' hair')+'" data-act="'+act+'"'+(s?' data-s="'+s+'"':'')+'><span style="font-size:15px">'+label+'</span><span class="chev">›</span></div>'; }
+  function profile(){
+    var h='<div class="pad">'+bar('back');
+    h+='<div style="display:flex;align-items:center;gap:16px;margin-top:10px">'+av(RIDER.init,64)+'<div><div style="font-size:22px;font-weight:600">'+RIDER.name+'</div><div style="font-size:13.5px;color:var(--muted);margin-top:4px">Traveler since '+RIDER.since+' · ★ '+RIDER.rating+'</div></div></div>';
+    h+='<div style="margin-top:28px" class="lbl">Saved Locations</div><div class="card" style="margin-top:12px;padding:2px 20px">';
+    h+='<div class="lrow" style="cursor:default"><div><div style="font-size:15px">Home</div><div style="font-size:12.5px;color:var(--muted);margin-top:2px">Brickell City Centre</div></div></div>';
+    h+='<div class="lrow hair" style="cursor:default"><div><div style="font-size:15px">Work</div><div style="font-size:12.5px;color:var(--muted);margin-top:2px">Coral Gables</div></div></div>';
+    h+='</div>';
+    h+='<div style="margin-top:24px" class="lbl">Travel Statistics</div><div class="card" style="margin-top:12px;padding:2px 20px">';
+    h+='<div class="lrow" style="cursor:default"><span style="font-size:15px">Travels this year</span><span class="num" style="margin-left:auto;font-size:15px;font-weight:600">23</span></div>';
+    h+='<div class="lrow hair" style="cursor:default"><span style="font-size:15px">Rating</span><span class="num" style="margin-left:auto;font-size:15px;font-weight:600">★ '+RIDER.rating+'</span></div>';
+    h+='</div>';
+    h+='<div class="card" data-act="go" data-s="wallet" style="margin-top:24px;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;cursor:pointer"><span style="font-size:15px">Default payment · ACH ····4417</span><span class="chev">›</span></div>';
+    h+='<div class="spring"></div></div>';
+    return h;
+  }
+
+  function account(){
+    var h='<div class="pad">'+bar('back');
+    h+='<div class="title" style="margin-top:6px">Menu</div>';
+    h+='<div style="margin-top:26px" class="lbl">Account</div><div class="card" style="margin-top:12px;padding:2px 20px">'
+      +navrow('Profile','go','profile',true)+navrow('Payment Methods · Wallet','go','wallet')+navrow('Notifications','go','notif')+navrow('Security','note-t','')+'</div>';
+    h+='<div style="margin-top:24px" class="lbl">Travel</div><div class="card" style="margin-top:12px;padding:2px 20px">'
+      +navrow('Travel Log','go','log',true)+navrow('Travel Preferences','go','prefs')+navrow('Patron Support','support','')+navrow('Safe Travels','go','safety')+navrow('Invite Friends','go','refer')+'</div>';
+    h+='<div style="margin-top:24px" class="lbl">Operate</div>';
+    h+='<div class="card" data-act="go" data-s="economics" style="margin-top:12px;padding:18px 20px;cursor:pointer"><div class="row"><div><div style="font-size:15.5px;font-weight:600">Become an Operator</div><div style="font-size:12.5px;color:var(--muted);margin-top:4px">Keep 99% of every fare. Review the economics.</div></div><span class="chev">›</span></div></div>';
+    h+='<div style="margin-top:24px" class="lbl">General</div><div class="card" style="margin-top:12px;padding:2px 20px">'
+      +navrow('Settings','go','settings',true)+navrow('About American Rider','note-t','')+'</div>';
+    h+='<div class="spring"></div><button class="btn ghost cta-space" data-act="reset" data-s="welcome" style="color:var(--red)">Sign Out</button></div>';
+    return h;
+  }
+
+  function wallet(){
+    var pays=[['ACH','Bank Account · ACH ····4417','Preferred'],['Apple','Apple Pay',''],['Google','Google Pay',''],['Card','Visa ····8802','']];
+    var h='<div class="pad">'+bar('back')+'<div class="title">Wallet</div><div class="sub">Manage how you pay for travel.</div>';
+    h+='<div style="margin-top:24px" class="lbl">Payment Methods</div><div class="card" style="margin-top:12px;padding:2px 20px">';
+    pays.forEach(function(p,i){ h+='<div class="lrow'+(i>0?' hair':'')+'" data-act="setpay" data-k="'+p[0]+'"><div><div style="font-size:15px">'+p[1]+'</div>'+(p[2]?'<div style="font-size:12px;color:var(--muted);margin-top:3px">'+p[2]+'</div>':'')+'</div><span style="margin-left:auto;font-size:11.5px;font-weight:600;color:var(--blue)">'+(S.pay===p[0]?'DEFAULT':'Set default')+'</span></div>'; });
+    h+='</div>';
+    h+='<div style="margin-top:24px" class="lbl">Transit Tickets</div>';
+    h+='<div class="card" style="margin-top:12px;padding:16px 18px"><div class="row"><div style="display:flex;align-items:center;gap:12px"><div style="width:38px;height:38px;border-radius:9px;background:var(--ink);display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7"><rect x="6" y="3" width="12" height="13" rx="3"/><path d="M6 10h12M9 20l2-3M15 20l-2-3" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div><div style="font-size:15px;font-weight:600">Metrorail · Orange Line</div><div style="font-size:12.5px;color:var(--muted);margin-top:2px">Dadeland South → Government Center</div></div></div><svg width="34" height="34" viewBox="0 0 24 24" fill="#14171F"><rect x="2" y="2" width="7" height="7" rx="1"/><rect x="4" y="4" width="3" height="3" fill="#fff"/><rect x="15" y="2" width="7" height="7" rx="1"/><rect x="17" y="4" width="3" height="3" fill="#fff"/><rect x="2" y="15" width="7" height="7" rx="1"/><rect x="4" y="17" width="3" height="3" fill="#fff"/><rect x="13" y="13" width="2" height="2"/><rect x="17" y="13" width="2" height="2"/><rect x="20.5" y="13" width="1.5" height="1.5"/><rect x="13" y="17" width="2" height="2"/><rect x="17" y="17" width="2" height="2"/><rect x="15" y="20.5" width="2" height="1.5"/><rect x="20" y="19" width="2" height="2"/></svg></div><div style="font-size:11.5px;color:var(--muted);margin-top:11px;line-height:1.45">Purchased automatically with Smart Travel — ready to scan at the gate.</div></div>';
+    h+='<div style="margin-top:24px" class="lbl">Travel Credits</div><div class="card" style="margin-top:12px;padding:18px 20px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:15px">Available balance</span><span class="num" style="font-size:16px;font-weight:600">$0.00</span></div>';
+    h+='<div class="card" data-act="go" data-s="log" style="margin-top:12px;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;cursor:pointer"><span style="font-size:15px">Receipts · Travel Log</span><span class="chev">›</span></div>';
+    h+='<div class="spring"></div></div>';
+    return h;
+  }
+
+  function logScreen(){
+    var filters=['All','Airport','This Month'];
+    var trips=S.seed;
+    var h='<div class="pad">'+bar('back')+'<div class="title">Travel Log</div><div class="sub">'+trips.length+' completed · tap for receipt.</div>';
+    h+='<div class="chips" style="margin-top:18px">';
+    filters.forEach(function(f){ h+='<div class="chip'+(S.logFilter===f?' on':'')+'" data-act="logfilter" data-k="'+f+'">'+f+'</div>'; });
+    h+='</div>';
+    h+='<div class="card" style="margin-top:16px;padding:2px 20px">';
+    trips.forEach(function(t,i){ h+='<div class="lrow'+(i>0?' hair':'')+'" data-act="viewtrip" data-no="'+t.no+'"><div><div style="font-size:15px">'+esc(t.arr)+'</div><div style="font-size:12.5px;color:var(--muted);margin-top:3px">'+t.date+'</div></div><div style="margin-left:auto;text-align:right;display:flex;align-items:center;gap:10px"><span class="num" style="font-size:13.5px">'+fmt(t.cost+APP_FEE+PROC)+'</span><span class="chev">›</span></div></div>'; });
+    h+='</div><div class="spring"></div><button class="btn ghost cta-space" data-act="note" data-t="A monthly statement PDF has been generated and saved.">Download Statement</button></div>';
+    return h;
+  }
+
+  function receipt(){
+    var t=S.viewTrip||S.seed[0];
+    var tot=+(t.cost+APP_FEE+PROC).toFixed(2), rev=+(t.cost-coord(t.cost)).toFixed(2);
+    var frow=function(l,v,c){ return '<div class="row hair" style="padding:13px 0"><span style="font-size:14px;color:var(--ink2)">'+l+'</span><span class="num" style="font-size:14px'+(c?';color:'+c:'')+'">'+fmt(v)+'</span></div>'; };
+    var h='<div class="pad">'+bar('back')+'<div class="title">Travel Receipt</div><div class="sub">'+esc(t.dep)+' → '+esc(t.arr)+' · '+t.date+'</div>';
+    h+='<div class="card" style="margin-top:20px;padding:18px 20px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:15.5px;font-weight:600">Total Charged</span><span class="num" style="font-size:18px;font-weight:600">'+fmt(tot)+'</span></div>';
+    h+=operatorBox(t.cost,true);
+    h+='<div class="card" style="margin-top:14px;padding:4px 20px"><div class="row hair" style="padding:13px 0;border-top:0"><span style="font-size:14px;color:var(--ink2)">Operator</span><span style="font-size:14px">'+OP.name+' · ★ '+OP.rating+'</span></div><div class="row hair" style="padding:13px 0"><span style="font-size:14px;color:var(--ink2)">Payment Method</span><span style="font-size:14px">ACH ····4417</span></div><div class="row" style="padding:13px 0"><span style="font-size:14px;color:var(--ink2)">Travel Number</span><span class="mono" style="font-size:12.5px">'+t.no+'</span></div></div>';
+    h+='<div class="spring"></div><button class="btn ghost cta-space" data-act="support">Report an Issue</button></div>';
+    return h;
+  }
+
+  function support(){
+    var h='<div class="pad">'+bar('back')+'<div class="title">Patron Support</div><div class="sub">Resolved instantly where possible. A specialist steps in only when needed.</div>';
+    if(S.issueState===null){
+      h+='<div class="card" style="margin-top:20px;padding:2px 20px">';
+      Object.keys(ISSUES).forEach(function(k,i,a){ h+='<div class="lrow'+(i>0?' hair':'')+'" data-act="pickissue" data-k="'+k+'"><span style="font-size:15px">'+ISSUES[k].label+'</span><span class="chev">›</span></div>'; });
+      h+='</div>';
+    } else if(S.issueState==='resolving'){
+      h+='<div class="card" style="margin-top:20px;padding:20px"><div style="display:flex;align-items:center;gap:10px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2E5FE0" stroke-width="2" class="sweep"><path d="M12 3a9 9 0 1 0 9 9" stroke-linecap="round"/></svg><span style="font-size:14px;font-weight:600;color:var(--blue)">Assessing</span></div><div style="font-size:14px;color:var(--ink2);margin-top:12px;line-height:1.55">Reviewing the travel route, GPS record, and fare. This takes a few seconds.</div></div>';
+    } else if(S.issueState==='resolved'){
+      var r=ISSUES[S.issue];
+      h+='<div class="card" style="margin-top:20px;padding:20px;border-color:var(--blue-b)"><div class="lbl" style="color:var(--blue)">Resolved</div><div style="font-size:17px;font-weight:600;margin-top:10px">'+r.title+'</div><div style="font-size:14px;color:var(--ink2);margin-top:8px;line-height:1.55">'+r.body+'</div></div>';
+      if(S.issue!=='safety') h+='<div class="link" data-act="escalate" style="font-size:14px;margin-top:16px">Not resolved? Contact a specialist ›</div>';
+      h+='<div class="spring"></div><button class="btn cta-space" data-act="back">Complete</button>';
+    } else if(S.issueState==='escalated'){
+      h+='<div class="card" style="margin-top:20px;padding:20px"><div class="lbl" style="color:var(--green)">A specialist is responding</div><div style="font-size:17px;font-weight:600;margin-top:10px">You will be contacted shortly</div><div style="font-size:14px;color:var(--ink2);margin-top:8px;line-height:1.55">Typically under five minutes. Everything already reviewed travels with your case. Case AR-C-0447.</div></div><div class="spring"></div><button class="btn cta-space" data-act="back">Complete</button>';
+    }
+    h+='</div>';
+    return h;
+  }
+
+  function safety(){
+    var h='<div class="pad">'+bar('back')+'<div class="title">Safe Travels</div><div class="sub">American Rider monitors every route — quietly, with a specialist one tap away.</div>';
+    h+='<div style="margin-top:24px" class="lbl">Share This Travel</div><div class="card" style="margin-top:12px;padding:18px 20px">';
+    if(S.sharedWith){ h+='<div style="font-size:14.5px;line-height:1.5">'+esc(S.sharedWith)+' can follow your live travel until you arrive.</div><div class="link" data-act="stopshare" style="font-size:13.5px;color:var(--red);margin-top:10px">Stop sharing</div>'; }
+    else { h+='<div style="font-size:14px;color:var(--ink2);line-height:1.5">Share your live location, operator, and arrival time with a trusted contact.</div><button class="btn blue" data-act="share" style="margin-top:14px;padding:14px">Share Travel</button>'; }
+    h+='</div>';
+    h+='<div style="margin-top:24px" class="lbl">Trusted Contacts</div><div class="card" style="margin-top:12px;padding:2px 20px">';
+    S.trusted.forEach(function(p,i){ h+='<div class="lrow'+(i>0?' hair':'')+'" style="cursor:default"><span style="font-size:15px">'+esc(p.name)+'</span><span style="margin-left:auto;font-size:12px;color:var(--muted)">Can follow travel</span></div>'; });
+    h+='<div class="lrow hair" data-act="addtrusted"><span style="font-size:15px;color:var(--blue);font-weight:500">Add a contact</span><span class="chev">›</span></div></div>';
+    h+='<div style="margin-top:24px" class="lbl">Vehicle Verification</div><div class="card" style="margin-top:12px;padding:18px 20px"><div style="font-size:13.5px;color:var(--ink2)">Confirm today\'s verification word with your operator:</div><div class="mono" style="font-size:26px;font-weight:600;letter-spacing:.05em;margin-top:8px">BANYAN</div></div>';
+    h+='<div style="margin-top:24px" class="lbl">Immediate Assistance</div><div style="display:flex;gap:10px;margin-top:12px"><button class="btn red" data-act="note" data-t="In a live emergency this dials 911 and shares your exact location and Travel Number." style="flex:1">Call 911</button><button class="btn" data-act="note" data-t="Connecting you to an American Rider specialist — any hour." style="flex:1">Contact a Specialist</button></div>';
+    h+='<div class="spring"></div></div>';
+    return h;
+  }
+
+  function economics(){
+    var d=S.econ, ridesMonth=Math.round(d.rides*52/12);
+    var arPer=+(d.fare-Math.min(d.fare*0.01,1)).toFixed(2);
+    var bigMonth=+(d.fare*0.5*ridesMonth).toFixed(2), arMonth=+(arPer*ridesMonth).toFixed(2);
+    var diff=+(arMonth-bigMonth).toFixed(2);
+    var net=+(diff-d.ins).toFixed(2), covers=diff>=d.ins;
+    var stepper=function(label,val,key,first){ return '<div class="row" style="padding:14px 0'+(first?'':';border-top:1px solid var(--line)')+'"><span style="font-size:15px">'+label+'</span><div style="display:flex;align-items:center;gap:12px"><button class="step-btn" data-act="step" data-k="'+key+'" data-d="-1">−</button><span class="num" style="font-size:15px;font-weight:600;min-width:66px;text-align:center">'+val+'</span><button class="step-btn" data-act="step" data-k="'+key+'" data-d="1">+</button></div></div>'; };
+    var frow=function(l,v,c,strong){ return '<div class="row hair" style="padding:13px 0"><span style="font-size:14px;color:var(--ink2)'+(strong?';font-weight:600;color:var(--ink)':'')+'">'+l+'</span><span class="num" style="font-size:14px'+(c?';color:'+c:'')+(strong?';font-weight:600':'')+'">'+(v<0?'-'+fmt(-v):fmt(v))+'</span></div>'; };
+    var h='<div class="pad">'+bar('back')+'<div class="title">Operate with American Rider</div><div class="sub">The fare is yours. Operators keep 99% of every travel cost — American Rider\'s commission on the fare is just 1%.</div>';
+    // ---- Why operate (the value, before the math) ----
+    var why=[
+      ['Keep 99% of every fare','On a $30 travel you keep $29.70. Most platforms leave an operator closer to $15.'],
+      ['You are in control','Operate when you want and where you want. American Rider never assigns you a zone, and never penalizes you for declining a travel.'],
+      ['Get paid on your schedule','Cash out your balance the same day, or let it build. Your money, your timing.'],
+      ['Bonuses are an invitation, never a quota','Busier areas may be highlighted because they pay more. Taking one is always your choice — never an instruction.'],
+      ['Treated as a professional','You are an Operator, not a number. Transparent rules, real support, and no hidden cuts taken from your side.']
+    ];
+    h+='<div style="margin-top:24px" class="lbl">Why Operators Choose American Rider</div><div class="card" style="margin-top:12px;padding:2px 20px">';
+    why.forEach(function(w,i){ h+='<div class="lrow'+(i>0?' hair':'')+'" style="cursor:default;display:block;padding:15px 0"><div style="font-size:15px;font-weight:600">'+w[0]+'</div><div style="font-size:13px;color:var(--muted);margin-top:5px;line-height:1.5">'+w[1]+'</div></div>'; });
+    h+='</div>';
+    h+='<div style="font-size:12px;color:var(--faint);margin-top:12px;line-height:1.55">Travelers pay one flat $1.50 fee per travel that keeps American Rider running. It is never deducted from your 99%.</div>';
+    h+='<div style="margin-top:26px" class="lbl">The Numbers — Without The Sales Pitch</div>';
+    h+='<div style="margin-top:24px" class="lbl">Take Rate</div><div class="card" style="margin-top:12px;padding:16px 20px"><div class="row" style="padding:8px 0"><span style="font-size:14.5px;color:var(--ink2)">American Rider</span><span class="num" style="font-size:15px;font-weight:600;color:var(--green)">99% to operator</span></div><div class="row" style="padding:8px 0"><span style="font-size:14.5px;color:var(--ink2)">Average platform</span><span class="num" style="font-size:15px;font-weight:600;color:var(--red)">~50% to operator</span></div></div>';
+    h+='<div style="margin-top:24px" class="lbl">Your Numbers</div><div class="card" style="margin-top:12px;padding:2px 20px">'+stepper('Average travel cost',fmt(d.fare),'fare',true)+stepper('Travels per week',String(d.rides),'rides')+stepper('Insurance / month',fmt(d.ins),'ins')+'</div>';
+    h+='<div style="margin-top:14px" class="lbl">Revenue Comparison · Monthly</div><div class="card" style="margin-top:12px;padding:4px 20px">'+frow('Average platform (~50%)',bigMonth)+frow('American Rider',arMonth)+frow('Difference',diff,'var(--green)',true)+'</div>';
+    h+='<div style="margin-top:14px;background:'+(covers?'var(--green-t)':'var(--blue-t)')+';border:1px solid '+(covers?'#CDE6D9':'var(--blue-b)')+';border-radius:12px;padding:15px 18px"><div class="lbl" style="color:'+(covers?'var(--green)':'var(--blue)')+'">Commercial Insurance Recovery</div><div style="font-size:14px;color:var(--ink2);margin-top:8px;line-height:1.55">'+(covers?('The additional '+fmt(diff)+' retained each month exceeds a '+fmt(d.ins)+' commercial policy. Estimated net gain after insurance: <b>'+fmt(net)+' per month</b>.'):('At this volume the additional '+fmt(diff)+'/month does not yet cover a '+fmt(d.ins)+' policy. Increasing travel volume closes the gap.'))+'</div></div>';
+    h+='<div style="margin-top:24px" class="lbl">Qualifying Insurance</div><div style="font-size:13px;color:var(--ink2);line-height:1.5;margin:8px 0 12px">Operating requires commercial for-hire coverage. American Rider verifies coverage but does not sell it — compare qualifying providers below.</div>';
+    var ins=[['Progressive Commercial','For-hire livery coverage','https://www.progressivecommercial.com/commercial-auto-insurance/livery-insurance/rideshare-insurance/'],['State Farm','Local agent rideshare coverage','https://www.statefarm.com/simple-insights/auto-and-vehicles/rideshare-insurance-what-to-know'],['Insurify','Compare multiple providers','https://insurify.com/car-insurance/florida/rideshare-insurance/']];
+    h+='<div class="card" style="padding:2px 20px">';
+    ins.forEach(function(x,i){ h+='<a href="'+x[2]+'" target="_blank" rel="noopener" class="lrow'+(i>0?' hair':'')+'" style="text-decoration:none;color:inherit"><div><div style="font-size:15px">'+x[0]+'</div><div style="font-size:12.5px;color:var(--muted);margin-top:3px">'+x[1]+'</div></div><span style="margin-left:auto;font-size:13px;font-weight:600;color:var(--blue);white-space:nowrap">Quote ›</span></a>'; });
+    h+='</div><div style="font-size:11.5px;color:var(--faint);margin-top:10px;line-height:1.5">Estimates only — not insurance or financial advice. Requirements vary by state.</div>';
+    h+='<div class="spring"></div><button class="btn cta-space" data-act="becomeop">Begin Operator Qualification</button></div>';
+    return h;
+  }
+
+  // ---- Smart Travel (multi-modal: car → rail → car) ----
+  var SMART_TIME='43 min', SMART_DIRECT_TIME='72 min', SMART_DIRECT_TOTAL=46.50; // $45 fare + $1.50
+  function smartLegs(){ return [
+    {icon:'car', label:'First mile · American Rider', from:DEPART, to:'Dadeland South Station', cost:8.00, min:9},
+    {icon:'rail', label:'Metrorail · Orange Line', from:'Dadeland South', to:'Government Center', cost:2.25, min:18},
+    {icon:'car', label:'Last mile · American Rider', from:'Government Center', to:S.dest.name, cost:8.50, min:8}
+  ]; }
+  function smartCarCost(){ return 8.00+8.50; }
+  function smartCost(){ return +(smartCarCost()+2.25).toFixed(2); }
+  // ONE combined flat fee for the whole multi-leg journey — never per leg.
+  // (Two fees on short connector legs would quietly erode the price advantage.)
+  function smartTotal(){ return +(smartCost()+APP_FEE+PROC).toFixed(2); }
+  function railIcon(){ return '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7"><rect x="6" y="3" width="12" height="13" rx="3"/><path d="M6 10h12M9 20l2-3M15 20l-2-3" stroke-linecap="round" stroke-linejoin="round"/></svg>'; }
+  function carIcon(){ return '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7"><path d="M5 11l1.6-4.2A2 2 0 0 1 8.5 5.5h7a2 2 0 0 1 1.9 1.3L19 11v6H5zM5 17v2M19 17v2" stroke-linecap="round" stroke-linejoin="round"/></svg>'; }
+
+  function smart(){
+    var legs=smartLegs();
+    var frow=function(l,v,strong){ return '<div class="row hair" style="padding:13px 0'+(strong?';border-top-width:0':'')+'"><span style="font-size:14px;color:'+(strong?'var(--ink);font-weight:600':'var(--ink2)')+'">'+l+'</span><span class="num" style="font-size:14px'+(strong?';font-weight:600':'')+'">'+fmt(v)+'</span></div>'; };
+    var h='<div class="pad">'+bar('back');
+    h+='<div class="title">Smart Travel</div><div class="sub">Around the traffic. Car to rail, rail to car — booked in one tap.</div>';
+    h+='<div style="display:flex;gap:12px;margin-top:20px">';
+    h+='<div class="card" style="flex:1;padding:16px 18px"><div class="lbl">Direct</div><div class="figure" style="font-size:23px;margin-top:6px;color:var(--muted)">'+fmt(SMART_DIRECT_TOTAL)+'</div><div style="font-size:12.5px;color:var(--muted);margin-top:4px">'+SMART_DIRECT_TIME+' · I-95 traffic</div></div>';
+    h+='<div class="card" style="flex:1;padding:16px 18px;border-color:#CDE6D9;background:var(--green-t)"><div class="lbl" style="color:var(--green)">Smart Travel</div><div class="figure" style="font-size:23px;margin-top:6px;color:var(--green)">'+fmt(smartTotal())+'</div><div style="font-size:12.5px;color:var(--ink2);margin-top:4px">'+SMART_TIME+' · around traffic</div></div>';
+    h+='</div>';
+    h+='<div style="text-align:center;margin-top:12px;font-size:13.5px;font-weight:600;color:var(--green)">Save '+fmt(SMART_DIRECT_TOTAL-smartTotal())+' and 29 minutes</div>';
+    h+='<div class="lbl" style="margin-top:24px">Your Route</div><div class="card" style="margin-top:12px;padding:6px 20px">';
+    legs.forEach(function(l,i){
+      h+='<div class="lrow'+(i>0?' hair':'')+'" style="cursor:default;align-items:flex-start"><div style="width:34px;height:34px;border-radius:9px;background:'+(l.icon==='rail'?'var(--ink)':'var(--blue)')+';display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px">'+(l.icon==='rail'?railIcon():carIcon())+'</div><div style="flex:1"><div style="font-size:14.5px;font-weight:600">'+l.label+'</div><div style="font-size:12.5px;color:var(--muted);margin-top:3px">'+esc(l.from)+' → '+esc(l.to)+'</div></div><div class="num" style="font-size:13.5px;font-weight:600;color:var(--ink2)">'+l.min+' min</div></div>';
+    });
+    h+='</div>';
+    h+='<div class="lbl" style="margin-top:22px">Total</div><div class="card" style="margin-top:12px;padding:18px 20px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:15.5px;font-weight:600">Total</span><span class="num" style="font-size:19px;font-weight:600">'+fmt(smartTotal())+'</span></div>';
+    h+='<div style="margin-top:14px;background:var(--blue-t);border:1px solid var(--blue-b);border-radius:12px;padding:14px 18px;font-size:13px;color:var(--ink2);line-height:1.5">A first-mile operator takes you to the station; a last-mile operator is waiting as you step off — each keeps <b>99% of their fare</b>. Your Metrorail ticket is purchased automatically and waiting in your Wallet.</div>';
+    h+='<div class="spring"></div><button class="btn cta-space" data-act="confirmsmart">Confirm Smart Travel</button></div>';
+    return h;
+  }
+
+  function smartlive(){
+    var legs=smartLegs(), st=S.smartLeg;
+    var titles=['First-Mile Operator En Route','Aboard Metrorail','Last-Mile Operator En Route'];
+    var subs=['Heading to Dadeland South Station.','Bypassing I-95 on the Orange Line.','Your operator is waiting at the curb.'];
+    var h='<div class="pad">'+bar('menu');
+    h+='<div class="row" style="align-items:flex-start"><div><div class="title" style="font-size:22px">'+titles[st]+'</div><div class="sub">'+subs[st]+'</div></div><div style="text-align:right;flex-shrink:0;margin-left:12px"><div class="lbl" style="font-size:9.5px">Arrival</div><div class="num" style="font-size:16px;font-weight:600;margin-top:3px">'+SMART_TIME+'</div></div></div>';
+    if(legs[st].icon==='rail'){
+      h+='<div class="card" style="margin-top:16px;padding:20px;display:flex;align-items:center;gap:14px;background:var(--fill)"><div style="width:44px;height:44px;border-radius:11px;background:var(--ink);display:flex;align-items:center;justify-content:center;flex-shrink:0">'+railIcon()+'</div><div style="flex:1"><div style="font-size:15px;font-weight:600">Metrorail · Orange Line</div><div style="font-size:12.5px;color:var(--muted);margin-top:3px">Dadeland South → Government Center · 18 min</div></div><span style="font-size:11px;font-weight:600;color:var(--green);background:var(--green-t);border-radius:999px;padding:5px 10px;white-space:nowrap">Ticket ✓</span></div>';
+    } else {
+      h+='<div style="margin-top:16px">'+mapSVG(st===0?'FIRST MILE · MIA':'LAST MILE · MIA')+'</div>';
+    }
+    h+='<div class="lbl" style="margin-top:20px">Journey</div><div class="card" style="margin-top:12px;padding:6px 20px">';
+    legs.forEach(function(l,i){
+      var done=i<st, active=i===st;
+      var dot=done?'<div style="width:22px;height:22px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M5 12l5 5 9-11" stroke-linecap="round" stroke-linejoin="round"/></svg></div>':active?'<div style="width:22px;height:22px;border-radius:50%;background:var(--blue);box-shadow:0 0 0 4px var(--blue-b);flex-shrink:0"></div>':'<div style="width:22px;height:22px;border-radius:50%;border:2px solid var(--line2);flex-shrink:0"></div>';
+      h+='<div class="lrow'+(i>0?' hair':'')+'" style="cursor:default">'+dot+'<div><div style="font-size:14.5px;font-weight:'+(active?600:500)+';color:'+(i>st?'var(--faint)':'var(--ink)')+'">'+l.label+'</div><div style="font-size:12px;color:var(--muted);margin-top:2px">'+esc(l.to)+'</div></div><span style="margin-left:auto;font-size:12px;color:'+(active?'var(--blue)':'var(--muted)')+';font-weight:600">'+(done?'Done':active?'Now':l.min+' min')+'</span></div>';
+    });
+    h+='</div>';
+    h+='<div class="card" style="margin-top:16px;padding:15px 18px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:13.5px;color:var(--ink2)">Travel Number</span><span class="mono" style="font-size:13px">'+S.tripNo+'</span></div>';
+    h+='<div class="spring"></div><div style="display:flex;gap:10px" class="cta-space"><button class="btn" data-act="go" data-s="communicate" style="flex:1">Communicate</button><button class="btn ghost" data-act="support" style="flex:1">Patron Support</button></div></div>';
+    return h;
+  }
+
+  function smartComplete(){
+    var op1=+(8.00-coord(8.00)).toFixed(2), op2=+(8.50-coord(8.50)).toFixed(2), saved=+(SMART_DIRECT_TOTAL-smartTotal()).toFixed(2), tips=[0,2,5,10];
+    var frow=function(l,v,strong){ return '<div class="row hair" style="padding:13px 0"><span style="font-size:14px;color:'+(strong?'var(--ink);font-weight:600':'var(--ink2)')+'">'+l+'</span><span class="num" style="font-size:14px'+(strong?';font-weight:600':'')+'">'+fmt(v)+'</span></div>'; };
+    var h='<div class="pad">'+bar('menu');
+    h+='<div style="text-align:center;margin-top:8px"><svg width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="#1F8A5B" stroke-width="2" style="margin:0 auto"><circle cx="28" cy="28" r="20"/><path d="M20 28l6 6 11-12" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    h+='<div class="title" style="margin-top:16px">Travel Complete</div><div class="sub" style="text-align:center">'+esc(DEPART)+' → '+esc(S.dest.name)+' · via Metrorail</div></div>';
+    h+='<div style="margin-top:20px;background:var(--green-t);border:1px solid #CDE6D9;border-radius:12px;padding:14px 18px;text-align:center"><div style="font-size:14px;font-weight:600;color:var(--green)">You saved '+fmt(saved)+' and 29 minutes</div><div style="font-size:12.5px;color:var(--ink2);margin-top:3px">vs. a direct car in rush-hour traffic.</div></div>';
+    h+='<div class="card" style="margin-top:16px;padding:18px 20px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:15.5px;font-weight:600">Total Charged</span><span class="num" style="font-size:18px;font-weight:600">'+fmt(smartTotal())+'</span></div>';
+    h+='<div style="margin-top:14px;background:var(--blue-t);border:1px solid var(--blue-b);border-radius:12px;padding:14px 18px"><div class="row"><span style="font-size:13.5px;color:var(--ink2)">Operators kept</span><span class="num" style="font-size:14px;font-weight:600;color:var(--blue)">'+fmt(op1)+' + '+fmt(op2)+'</span></div><div style="font-size:12.5px;color:var(--ink2);margin-top:5px;line-height:1.5">Two operators, each keeping <b>99% of their fare</b>.</div></div>';
+    h+='<div style="margin-top:24px" class="lbl">Travel Review</div><div style="display:flex;gap:10px;margin-top:12px">';
+    for(var i=1;i<=5;i++){ h+='<svg data-act="rate" data-n="'+i+'" width="30" height="30" viewBox="0 0 24 24" fill="'+(i<=S.rating?'var(--ink)':'none')+'" stroke="var(--ink)" stroke-width="1.5" style="cursor:pointer"><path d="M12 3.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8-5.3-2.8-5.3 2.8 1-5.8-4.2-4.1 5.9-.9z" stroke-linejoin="round"/></svg>'; }
+    h+='</div>';
+    h+='<div style="margin-top:24px" class="lbl">Tip Operators</div><div style="font-size:12.5px;color:var(--muted);margin-top:6px">Split between both operators. They keep 100%.</div><div class="chips" style="margin-top:12px">';
+    tips.forEach(function(tt){ h+='<div class="chip'+(S.tip===tt?' on':'')+'" data-act="tip" data-v="'+tt+'" style="min-width:64px;text-align:center">'+(tt===0?'None':'$'+tt)+'</div>'; });
+    h+='</div><div class="spring"></div><button class="btn cta-space" data-act="finish">Complete</button></div>';
+    return h;
+  }
+
+  function settingsScr(){
+    var h='<div class="pad">'+bar('back')+'<div class="title">Settings</div>';
+    h+='<div class="lbl" style="margin-top:24px">Appearance</div>';
+    h+='<div class="seg" style="margin-top:12px"><div class="thumb" style="width:calc((100% - 6px)/2);transform:translateX('+(S.theme==='dark'?100:0)+'%)"></div>'
+      +'<div class="opt'+(S.theme==='light'?' on':'')+'" data-act="settheme" data-v="light">Light</div>'
+      +'<div class="opt'+(S.theme==='dark'?' on':'')+'" data-act="settheme" data-v="dark">Dark</div></div>';
+    h+='<div style="font-size:12.5px;color:var(--muted);margin-top:9px;line-height:1.5">Choose a look that\'s easy on your eyes. Dark mode applies across the whole app on this device. New devices start in light.</div>';
+    h+='<div class="lbl" style="margin-top:26px">Preferences</div><div class="card" style="margin-top:12px;padding:2px 20px">';
+    h+='<div class="lrow" data-act="go" data-s="notif" style="cursor:pointer"><span style="font-size:15px">Notifications</span><span class="chev">›</span></div>';
+    h+='<div class="lrow hair" data-act="note-t" style="cursor:pointer"><span style="font-size:15px">Language</span><span style="margin-left:auto;font-size:14px;color:var(--muted)">English</span><span class="chev" style="margin-left:10px">›</span></div>';
+    h+='<div class="lrow hair" data-act="note-t" style="cursor:pointer"><span style="font-size:15px">Privacy</span><span class="chev">›</span></div>';
+    h+='<div class="lrow hair" data-act="note-t" style="cursor:pointer"><span style="font-size:15px">Security &amp; Face ID</span><span class="chev">›</span></div>';
+    h+='</div><div class="spring"></div></div>';
+    return h;
+  }
+  function notifScr(){
+    var items=[['arrived','Operator arrived','Chime the moment your operator reaches you'],['enroute','Operator en route','When your operator is on the way'],['complete','Travel complete','Your receipt, ready after each trip'],['promos','Offers &amp; promotions','Occasional deals — off by default']];
+    var h='<div class="pad">'+bar('back')+'<div class="title">Notifications</div><div class="sub">Choose what American Rider alerts you about — with sound.</div>';
+    h+='<div class="card" style="margin-top:20px;padding:4px 20px">';
+    items.forEach(function(it,i){ var on=S.notif[it[0]]; h+='<div class="lrow'+(i>0?' hair':'')+'" style="cursor:default"><div style="flex:1"><div style="font-size:15px">'+it[1]+'</div><div style="font-size:12.5px;color:var(--muted);margin-top:2px">'+it[2]+'</div></div><div class="sw'+(on?' on':'')+'" data-act="togglenotif" data-k="'+it[0]+'"><div class="swk"></div></div></div>'; });
+    h+='</div>';
+    h+='<div style="font-size:12px;color:var(--faint);margin-top:12px;line-height:1.5">Delivered to your phone with your chosen sound. You can silence any alert here at any time.</div>';
+    h+='<div class="spring"></div></div>';
+    return h;
+  }
+  var SCREENS={ welcome:welcome, home:home, search:search, options:options, smart:smart, prefs:prefs, confirm:confirm, searching:searching, enroute:enroute, smartlive:smartlive, communicate:communicate, complete:complete, account:account, profile:profile, wallet:wallet, log:logScreen, receipt:receipt, support:support, safety:safety, economics:economics, settings:settingsScr, notif:notifScr, scheduled:scheduledScr, refer:referralScr };
+
+  function render(){
+    var el=document.getElementById('screen');
+    var f=document.activeElement, fid=f&&f.id, fp=f&&f.selectionStart;
+    el.className='';
+    el.innerHTML=(SCREENS[S.screen]||home)();
+    void el.offsetWidth; el.className='fx';
+    if(fid){ var n=document.getElementById(fid); if(n){ n.focus(); try{n.setSelectionRange(fp,fp);}catch(e){} } } else el.scrollTop=0;
+    clearRide(); // re-renders never stack ride timers
+    if(S.screen==='searching'||S.screen==='enroute'){
+      // Absolute-timeline scheduling: phases fire at fixed targets from ride start,
+      // so an incidental re-render can neither stack nor delay the ride.
+      var t0=S.rideT0||Date.now(), el=Date.now()-t0;
+      var at=function(ms,fn){ if(ms>el) afterRide(ms-el,fn); };
+      if(S.screen==='searching'){ at(2600,function(){ S.enrouteStep=0; reset('enroute'); }); }
+      else {
+        if(S.enrouteStep===1) startFinder(); else animateMap();
+        at(5800,function(){ if(S.screen!=='enroute'||S.enrouteStep!==0)return; S.enrouteStep=1; updateEnroute(); });
+        at(12800,function(){ if(S.screen!=='enroute'||S.enrouteStep!==1)return; S.enrouteStep=2; updateEnroute(); });
+        at(16000,function(){ if(S.screen!=='enroute'||S.enrouteStep!==2)return; S.enrouteStep=3; updateEnroute(); });
+        at(18600,function(){ if(S.screen==='enroute') reset('complete'); });
+      }
+    } else if(S.screen==='smartlive'){
+      var lg=smartLegs()[S.smartLeg];
+      if(lg&&lg.icon==='car') animateMap(); else stopMap();
+      afterRide(4200,function(){ if(S.screen!=='smartlive')return; if(S.smartLeg<2){ S.smartLeg++; render(); } else { reset('complete'); } });
+    } else { stopMap(); stopFinder(); }
+    if(S.note){ el.insertAdjacentHTML('beforeend','<div class="note">'+esc(S.note)+'</div>'); }
+  }
+
+  function sendMsg(){ var t=(S.msgInput||'').trim(); if(!t)return; S.msgs.push({me:true,text:t}); S.msgInput=''; after(1500,function(){ S.msgs.push({me:false,text:'Understood — see you shortly.'}); if(S.screen==='communicate')render(); }); render(); }
+
+  document.addEventListener('click',function(e){
+    var t=e.target.closest('[data-act]'); if(!t)return;
+    var a=t.getAttribute('data-act');
+    if(t.closest('#drawer') && a!=='opendrawer') closeDrawer(); // drawer taps navigate + close
+    var A={
+      opendrawer:openDrawer, closedrawer:closeDrawer,
+      go:function(){ go(t.getAttribute('data-s')); },
+      reset:function(){ reset(t.getAttribute('data-s')); },
+      back:function(){ back(); },
+      pickdest:function(){ S.dest=PLACES[+t.getAttribute('data-i')]; S.travelClass='Standard'; S.smart=false; go('options'); },
+      pickrecent:function(){ var r=RECENT[+t.getAttribute('data-i')]; S.dest={name:r.name,short:r.short,base:r.base,eta:r.eta}; S.travelClass='Standard'; S.smart=false; go('options'); },
+      pickclass:function(){ var k=t.getAttribute('data-k'); if(S.travelClass===k){ go('prefs'); return; } S.travelClass=k; render(); },
+      pickcustom:function(){ var n=t.getAttribute('data-name'); var hsh=0; for(var i=0;i<n.length;i++)hsh=(hsh*31+n.charCodeAt(i))%97; S.dest={name:n,short:n,base:+(9+(hsh%23)+0.5).toFixed(2),eta:10+(hsh%25)}; S.travelClass='Standard'; S.smart=false; go('options'); },
+      gosmart:function(){ go('smart'); },
+      confirmsmart:function(){ S.smart=true; S.smartLeg=0; S.tripNo='AR-'+(2047+(++S.tripCount))+'-SMT'; reset('smartlive'); },
+      segset:function(){ var key=t.getAttribute('data-k'), v=t.getAttribute('data-v'), i=+t.getAttribute('data-i'); if(S[key]===v)return; S[key]=v; var seg=t.closest('.seg'); if(seg){ var thumb=seg.querySelector('.thumb'); if(thumb)thumb.style.transform='translateX('+(i*100)+'%)'; var opts=seg.querySelectorAll('.opt'); for(var j=0;j<opts.length;j++){ opts[j].classList.toggle('on', opts[j].getAttribute('data-v')===v); } } if(key==='music'){ var note=document.getElementById('musicNote'); if(note)note.style.display=(v==='Traveler Choice')?'block':'none'; } },
+      toggle:function(){ var k=t.getAttribute('data-k'); S.add[k]=!S.add[k]; t.classList.toggle('on', S.add[k]); },
+      setwhen:function(){ S.schedWhen=t.getAttribute('data-w'); render(); },
+      schedule:function(){ S.upcoming.unshift({ dest:S.dest.name, when:S.schedWhen, total:total(), no:'AR-'+(2047+(++S.tripCount))+'-MIA' }); S.schedWhen='Now'; reset('scheduled'); },
+      cancelsched:function(){ var i=+t.getAttribute('data-i'); S.upcoming.splice(i,1); render(); },
+      'search-op':function(){ S.tripNo='AR-'+(2047+(++S.tripCount))+'-MIA'; S.rideT0=Date.now(); reset('searching'); },
+      cancelTravel:function(){ S.smart=false; reset('home'); },
+      settheme:function(){ applyTheme(t.getAttribute('data-v')); render(); },
+      togglenotif:function(){ var k=t.getAttribute('data-k'); S.notif[k]=!S.notif[k]; t.classList.toggle('on', S.notif[k]); },
+      send:sendMsg,
+      rate:function(){ S.rating=+t.getAttribute('data-n'); render(); },
+      tip:function(){ S.tip=+t.getAttribute('data-v'); render(); },
+      finish:function(){ var tr={arr:S.dest.name, dep:DEPART, date:'Just now', cost:S.smart?smartCost():cost(), no:S.tripNo}; if(!S.seed.length||S.seed[0].no!==tr.no) S.seed.unshift(tr); S.tip=0; S.rating=0; S.smart=false; reset('home'); },
+      viewreceipt:function(){ var tr={arr:S.dest.name, dep:DEPART, date:'Just now', cost:S.smart?smartCost():cost(), no:S.tripNo}; if(!S.seed.length||S.seed[0].no!==tr.no) S.seed.unshift(tr); S.viewTrip=tr; go('receipt'); },
+      support:function(){ S.issue=null; S.issueState=null; go('support'); },
+      pickissue:function(){ S.issue=t.getAttribute('data-k'); S.issueState='resolving'; render(); after(1800,function(){ S.issueState='resolved'; if(S.screen==='support')render(); }); },
+      escalate:function(){ S.issueState='escalated'; render(); },
+      setpay:function(){ S.pay=t.getAttribute('data-k'); render(); },
+      logfilter:function(){ S.logFilter=t.getAttribute('data-k'); render(); },
+      viewtrip:function(){ var no=t.getAttribute('data-no'); S.viewTrip=S.seed.filter(function(x){return x.no===no;})[0]; go('receipt'); },
+      share:function(){ S.sharedWith=(S.trusted[0]&&S.trusted[0].name)||'A trusted contact'; render(); },
+      stopshare:function(){ S.sharedWith=null; render(); },
+      addtrusted:function(){ if(S.trusted.length<3)S.trusted.push({name:'Second contact'}); render(); },
+      step:function(){ var k=t.getAttribute('data-k'), d=+t.getAttribute('data-d'); if(k==='fare')S.econ.fare=Math.max(5,+(S.econ.fare+d*1.5).toFixed(2)); if(k==='rides')S.econ.rides=Math.max(5,S.econ.rides+d*5); if(k==='ins')S.econ.ins=Math.max(50,S.econ.ins+d*25); render(); },
+      becomeop:function(){ if(window.self!==window.top){ try{ window.parent.postMessage('ar:becomeOperator','*'); return; }catch(err){} } S.note='Operator qualification opens the document verification flow.'; render(); after(2600,function(){ S.note=''; render(); }); },
+      note:function(){ var msg=t.getAttribute('data-t'); S.note=msg; render(); after(2600,function(){ if(S.note===msg){ S.note=''; render(); } }); },
+      'note-t':function(){ S.note='This screen opens in the full build.'; render(); after(2400,function(){ S.note=''; render(); }); }
+    };
+    if(A[a]){ e.preventDefault(); A[a](); }
+  });
+  document.addEventListener('input',function(e){ var k=e.target.getAttribute&&e.target.getAttribute('data-input'); if(!k)return; S[k]=e.target.value; if(k==='searchQ')render(); });
+  document.addEventListener('keydown',function(e){ if(e.key==='Enter'&&e.target.getAttribute&&e.target.getAttribute('data-enter')){ e.preventDefault(); sendMsg(); } });
+
+  // Uber-style quick-access drawer — lives outside #screen so it survives re-renders.
+  function openDrawer(){ document.getElementById('scrim').classList.add('on'); document.getElementById('drawer').classList.add('on'); }
+  function closeDrawer(){ document.getElementById('scrim').classList.remove('on'); document.getElementById('drawer').classList.remove('on'); }
+  function drow(label,act,s){ return '<div class="drow" data-act="'+act+'"'+(s?' data-s="'+s+'"':'')+'><span>'+label+'</span><span class="chev">›</span></div>'; }
+  document.getElementById('phone').insertAdjacentHTML('beforeend',
+    '<div id="scrim" class="scrim" data-act="closedrawer"></div>'
+    +'<div id="drawer" class="drawer">'
+    +'<div data-act="go" data-s="profile" style="display:flex;align-items:center;gap:13px;padding-bottom:20px;cursor:pointer">'+av(RIDER.init,48)+'<div><div style="font-size:17px;font-weight:600">'+RIDER.name+'</div><div style="font-size:12.5px;color:var(--blue);margin-top:3px;font-weight:500">View profile ›</div></div></div>'
+    +drow('Wallet','go','wallet')
+    +drow('Travel Log','go','log')
+    +drow('Patron Support','support')
+    +drow('Safe Travels','go','safety')
+    +drow('Invite Friends','go','refer')
+    +drow('Become an Operator','go','economics')
+    +drow('Notifications','go','notif')
+    +drow('Settings','go','settings')
+    +drow('About American Rider','note-t')
+    +'<div class="spring"></div>'
+    +'<div class="drow" data-act="reset" data-s="welcome" style="color:var(--red)"><span>Sign Out</span></div>'
+    +'</div>');
+
+  // When embedded in the unified app, the account already exists — skip the welcome screen.
+  if(window.self!==window.top){ S.screen='home'; }
+  render();
+})();
+</script>

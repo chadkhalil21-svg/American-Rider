@@ -1,0 +1,115 @@
+{
+  "expo": {
+    "name": "American Rider",
+    "slug": "american-rider",
+    "locales": {
+      "es": "./locales/es.json",
+      "fr": "./locales/fr.json",
+      "it": "./locales/it.json",
+      "de": "./locales/de.json"
+    },
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "americanrider",
+    "experiments": {
+      "typedRoutes": true
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.americanrider.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleDisplayName": "American",
+        "NSSupportsLiveActivities": true,
+        "UIBackgroundModes": [
+          "location",
+          "remote-notification"
+        ],
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "com.googleusercontent.apps.777642740728-dtfqu8vi4scpo35sckd88va6lq78813g"
+            ]
+          }
+        ]
+      },
+      "usesAppleSignIn": true
+    },
+    "android": {
+      "package": "com.americanrider.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#050C2D",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-status-bar",
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "American Rider uses your location to set your pickup point and work out the price of your trip.",
+          "locationAlwaysAndWhenInUsePermission": "American Rider keeps you in service while your phone is locked, so travel can be assigned to you without the app open. Location is used only while you are in service and stops when you conclude operations.",
+          "isIosBackgroundLocationEnabled": true
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "American Rider attaches your photo to a lost item report, and lets you submit your operator documents from files you already have.",
+          "cameraPermission": "American Rider lets you photograph your driver licence, vehicle registration, inspection and insurance so they can be checked, and photograph a lost item so the operator searching the car knows what to look for."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#050C2D",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain"
+        }
+      ],
+      [
+        "expo-maps",
+        {
+          "requestLocationPermission": true,
+          "locationPermission": "American Rider shows your driver on the map while your trip is underway."
+        }
+      ],
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.com.americanrider.app",
+          "enableGooglePay": false
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#2E5FE0",
+          "defaultChannel": "travel"
+        }
+      ],
+      "expo-widgets",
+      "expo-localization",
+      "expo-apple-authentication",
+      "expo-web-browser",
+      "@maplibre/maplibre-react-native"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "bf6e7e6a-079d-4d91-bc42-f21732f069cb"
+      }
+    }
+  }
+}

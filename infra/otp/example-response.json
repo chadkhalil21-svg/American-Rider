@@ -1,0 +1,895 @@
+{
+  "data": {
+    "planConnection": {
+      "searchDateTime": "2026-09-09T21:40:35-04:00",
+      "routingErrors": [],
+      "edges": [
+        {
+          "node": {
+            "start": "2026-09-09T22:07:09-04:00",
+            "end": "2026-09-09T23:19:41-04:00",
+            "duration": 4352,
+            "numberOfTransfers": 2,
+            "walkDistance": 2551.08,
+            "walkTime": 2112,
+            "waitingTime": 620,
+            "generalizedCost": 13173,
+            "legs": [
+              {
+                "mode": "WALK",
+                "transitLeg": false,
+                "duration": 591.0,
+                "distance": 667.09,
+                "headsign": null,
+                "start": {
+                  "scheduledTime": "2026-09-09T22:07:09-04:00",
+                  "estimated": null
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T22:17:00-04:00",
+                  "estimated": null
+                },
+                "from": {
+                  "name": "Brickell",
+                  "lat": 25.7617,
+                  "lon": -80.1918,
+                  "stop": null
+                },
+                "to": {
+                  "name": "BRICKELL STATION RAIL NORTHBOUND",
+                  "lat": 25.763828,
+                  "lon": -80.19542,
+                  "stop": {
+                    "gtfsId": "MDT:9515",
+                    "name": "BRICKELL STATION RAIL NORTHBOUND"
+                  }
+                },
+                "route": null,
+                "trip": null,
+                "legGeometry": {
+                  "length": 70,
+                  "points": "qqf|CvmmhN@?@^@TSEA?@B@B@B@\\@t@BtA@N?BADABA@C@C@E?EA}AYc@GABAF?DAFA@A@A?A?G@E?C?A??B@HBNCD@B?BBtA@zABtA@pA?BA@A?A@gB@C??F?F@F?@E?A@?B@?H?@??@??D?@??F@ZE?uC@?I"
+                }
+              },
+              {
+                "mode": "RAIL",
+                "transitLeg": true,
+                "duration": 1200.0,
+                "distance": 8317.0,
+                "headsign": "EHT - CUL SINGLE TRACK AFTER 8 PM",
+                "start": {
+                  "scheduledTime": "2026-09-09T22:17:00-04:00",
+                  "estimated": null
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T22:37:00-04:00",
+                  "estimated": null
+                },
+                "from": {
+                  "name": "BRICKELL STATION RAIL NORTHBOUND",
+                  "lat": 25.763828,
+                  "lon": -80.19542,
+                  "stop": {
+                    "gtfsId": "MDT:9515",
+                    "name": "BRICKELL STATION RAIL NORTHBOUND"
+                  }
+                },
+                "to": {
+                  "name": "EARLINGTON HTS.STAT.RAIL NORTHBOUND",
+                  "lat": 25.812525,
+                  "lon": -80.229946,
+                  "stop": {
+                    "gtfsId": "MDT:9501",
+                    "name": "EARLINGTON HTS.STAT.RAIL NORTHBOUND"
+                  }
+                },
+                "route": {
+                  "gtfsId": "MDT:31009",
+                  "shortName": "2600",
+                  "longName": "REGULAR METRORAIL SERVICE",
+                  "mode": "RAIL",
+                  "agency": {
+                    "gtfsId": "MDT:DTPW305",
+                    "name": "Miami-Dade Transit"
+                  }
+                },
+                "trip": {
+                  "gtfsId": "MDT:6283859",
+                  "tripHeadsign": "EHT - CUL SINGLE TRACK AFTER 8 PM"
+                },
+                "legGeometry": {
+                  "length": 105,
+                  "points": "{~f|CtdnhNyF@_BBoBD_DJaINaQRiBH}CPoBJoADqINcCB??aPTyLNC?yEFi@@k@Ds@No@Pm@Vs@^o@d@k@h@a@j@e@v@[v@Ut@Ot@Kt@Gv@Ad@FpGBbB?jCMfFGvE?lAFvED~ATpDP|B@Dp@zIDfABt@Ax@G~@QjAWx@Yz@Wb@cIrLq@x@a@^g@^u@^w@Zy@Rw@Lu@BaGFG?uDBwTNqILA?aJN}JLoCCsCGcBGeBAeB@mKNuEDaFBqC@iBD_DFA?aGHeAFe@Fm@Lo@Rm@Vm@\\g@^o@p@e@l@_@p@Wf@Wx@Qt@Kf@Kz@Cv@?`AJ`J\\p]LzUBdD"
+                }
+              },
+              {
+                "mode": "RAIL",
+                "transitLeg": true,
+                "duration": 240.0,
+                "distance": 4110.0,
+                "headsign": "ORANGE LINE AIRPORT STATION",
+                "start": {
+                  "scheduledTime": "2026-09-09T22:44:00-04:00",
+                  "estimated": null
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T22:48:00-04:00",
+                  "estimated": null
+                },
+                "from": {
+                  "name": "EARLINGTON HTS.STAT.RAIL NORTHBOUND",
+                  "lat": 25.812525,
+                  "lon": -80.229946,
+                  "stop": {
+                    "gtfsId": "MDT:9501",
+                    "name": "EARLINGTON HTS.STAT.RAIL NORTHBOUND"
+                  }
+                },
+                "to": {
+                  "name": "MIAMI INTERNATIONAL AIRPORT STATION NORTHBOUND",
+                  "lat": 25.798002,
+                  "lon": -80.258746,
+                  "stop": {
+                    "gtfsId": "MDT:10495",
+                    "name": "MIAMI INTERNATIONAL AIRPORT STATION NORTHBOUND"
+                  }
+                },
+                "route": {
+                  "gtfsId": "MDT:31009",
+                  "shortName": "2600",
+                  "longName": "REGULAR METRORAIL SERVICE",
+                  "mode": "RAIL",
+                  "agency": {
+                    "gtfsId": "MDT:DTPW305",
+                    "name": "Miami-Dade Transit"
+                  }
+                },
+                "trip": {
+                  "gtfsId": "MDT:6283699",
+                  "tripHeadsign": "ORANGE LINE AIRPORT STATION"
+                },
+                "legGeometry": {
+                  "length": 40,
+                  "points": "wnp|Cp|thNDpIDvGAzD?|N]zAItCA|DCrGA~EDjLBfJNzIH~FDdDHnBf@pAv@|@zAv@j@`Af@zBP`AJ~@?bBDtBP~BRbCh@~BnAbElArBdBdBjBj@hD|@xDj@nFX`F\\vOxArIx@rIt@lA@"
+                }
+              },
+              {
+                "mode": "WALK",
+                "transitLeg": false,
+                "duration": 10.0,
+                "distance": 12.68,
+                "headsign": null,
+                "start": {
+                  "scheduledTime": "2026-09-09T22:48:00-04:00",
+                  "estimated": null
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T22:48:10-04:00",
+                  "estimated": null
+                },
+                "from": {
+                  "name": "MIAMI INTERNATIONAL AIRPORT STATION NORTHBOUND",
+                  "lat": 25.798002,
+                  "lon": -80.258746,
+                  "stop": {
+                    "gtfsId": "MDT:10495",
+                    "name": "MIAMI INTERNATIONAL AIRPORT STATION NORTHBOUND"
+                  }
+                },
+                "to": {
+                  "name": "AIRPORT STATION",
+                  "lat": 25.798116,
+                  "lon": -80.258748,
+                  "stop": {
+                    "gtfsId": "MDT:10493",
+                    "name": "AIRPORT STATION"
+                  }
+                },
+                "route": null,
+                "trip": null,
+                "legGeometry": {
+                  "length": 4,
+                  "points": "otm|CdpzhN?EU??D"
+                }
+              },
+              {
+                "mode": "TRAM",
+                "transitLeg": true,
+                "duration": 180.0,
+                "distance": 2050.0,
+                "headsign": "MIAMI INTERNATIONA AIRPORT CONCOURSE E",
+                "start": {
+                  "scheduledTime": "2026-09-09T22:51:30-04:00",
+                  "estimated": null
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T22:54:30-04:00",
+                  "estimated": null
+                },
+                "from": {
+                  "name": "AIRPORT STATION",
+                  "lat": 25.798116,
+                  "lon": -80.258748,
+                  "stop": {
+                    "gtfsId": "MDT:10493",
+                    "name": "AIRPORT STATION"
+                  }
+                },
+                "to": {
+                  "name": "MIAMI INTL AIRPORT GROUND LEVEL",
+                  "lat": 25.795179,
+                  "lon": -80.27803,
+                  "stop": {
+                    "gtfsId": "MDT:56",
+                    "name": "MIAMI INTL AIRPORT GROUND LEVEL"
+                  }
+                },
+                "route": {
+                  "gtfsId": "MDT:14458",
+                  "shortName": "MIA",
+                  "longName": "AIRPORT PEOPLE MOVER",
+                  "mode": "TRAM",
+                  "agency": {
+                    "gtfsId": "MDT:DTPW305",
+                    "name": "Miami-Dade Transit"
+                  }
+                },
+                "trip": {
+                  "gtfsId": "MDT:4833895",
+                  "tripHeadsign": "MIAMI INTERNATIONA AIRPORT CONCOURSE E"
+                },
+                "legGeometry": {
+                  "length": 41,
+                  "points": "_em|CvmzhNX@X?H?NDHFDPHz@MpC?zBA|CAtCAjB]dBg@v@cA~A?tBApBVjCd@xCP~AZbC\\fCAxADlBAjBAnB?bBG~BUjBS`BGzCA`CLpCHrBHv@BvADtG@t@?jA@v@"
+                }
+              },
+              {
+                "mode": "WALK",
+                "transitLeg": false,
+                "duration": 1511.0,
+                "distance": 1871.31,
+                "headsign": null,
+                "start": {
+                  "scheduledTime": "2026-09-09T22:54:30-04:00",
+                  "estimated": null
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T23:19:41-04:00",
+                  "estimated": null
+                },
+                "from": {
+                  "name": "MIAMI INTL AIRPORT GROUND LEVEL",
+                  "lat": 25.795179,
+                  "lon": -80.27803,
+                  "stop": {
+                    "gtfsId": "MDT:56",
+                    "name": "MIAMI INTL AIRPORT GROUND LEVEL"
+                  }
+                },
+                "to": {
+                  "name": "Miami International Airport",
+                  "lat": 25.7959,
+                  "lon": -80.287,
+                  "stop": null
+                },
+                "route": null,
+                "trip": null,
+                "legGeometry": {
+                  "length": 110,
+                  "points": "ybm|Cth~hN?@PA?PFA?D@H?BA?C?A??D?H???@?F?D?D?D?F@J?B_@@m@@W?O@CAC?GCEAAAk@YMIGCCCCECGEGe@aACACACCECISIOCGAC?AAEAu@?MAEAm@CcB?IAg@E{@C{@AWC?[??Im@@W@BfAB`B@`AB~@BbB@`ABtAB~A@lADtBBnCSx@Sn@eBnASn@HnA@t@@b@@jA@`@@pA?FBzABnA?\\@~@@X@v@BxB`@A?XfAC?d@@X@b@@v@?T@p@@\\B?B??IA@A_@@?FT"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "node": {
+            "start": "2026-09-09T21:51:39-04:00",
+            "end": "2026-09-09T23:23:11-04:00",
+            "duration": 5492,
+            "numberOfTransfers": 2,
+            "walkDistance": 1922.83,
+            "walkTime": 1592,
+            "waitingTime": 501,
+            "generalizedCost": 12595,
+            "legs": [
+              {
+                "mode": "WALK",
+                "transitLeg": false,
+                "duration": 81.0,
+                "distance": 51.52,
+                "headsign": null,
+                "start": {
+                  "scheduledTime": "2026-09-09T21:51:39-04:00",
+                  "estimated": null
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T21:53:00-04:00",
+                  "estimated": null
+                },
+                "from": {
+                  "name": "Brickell",
+                  "lat": 25.7617,
+                  "lon": -80.1918,
+                  "stop": null
+                },
+                "to": {
+                  "name": "BRICKELL AV & SE 12 ST",
+                  "lat": 25.762056,
+                  "lon": -80.191647,
+                  "stop": {
+                    "gtfsId": "MDT:1016",
+                    "name": "BRICKELL AV & SE 12 ST"
+                  }
+                },
+                "route": null,
+                "trip": null,
+                "legGeometry": {
+                  "length": 14,
+                  "points": "qqf|CvmmhN@??MKCE?A?CAE?ACC?E?IAUC??"
+                }
+              },
+              {
+                "mode": "BUS",
+                "transitLeg": true,
+                "duration": 1189.0,
+                "distance": 3439.0,
+                "headsign": "Midtown",
+                "start": {
+                  "scheduledTime": "2026-09-09T21:53:00-04:00",
+                  "estimated": null
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T22:12:49-04:00",
+                  "estimated": null
+                },
+                "from": {
+                  "name": "BRICKELL AV & SE 12 ST",
+                  "lat": 25.762056,
+                  "lon": -80.191647,
+                  "stop": {
+                    "gtfsId": "MDT:1016",
+                    "name": "BRICKELL AV & SE 12 ST"
+                  }
+                },
+                "to": {
+                  "name": "BISCAYNE BD @ NE 15 ST",
+                  "lat": 25.79002,
+                  "lon": -80.18895,
+                  "stop": {
+                    "gtfsId": "MDT:6719",
+                    "name": "BISCAYNE BD @ NE 15 ST"
+                  }
+                },
+                "route": {
+                  "gtfsId": "MDT:23904",
+                  "shortName": "MIABIS",
+                  "longName": "City of Miami - Biscayne Route",
+                  "mode": "BUS",
+                  "agency": {
+                    "gtfsId": "MDT:DTPW305",
+                    "name": "Miami-Dade Transit"
+                  }
+                },
+                "trip": {
+                  "gtfsId": "MDT:5739247",
+                  "tripHeadsign": "Midtown"
+                },
+                "legGeometry": {
+                  "length": 123,
+                  "points": "{sf|C`mmhNc@IoBa@G?_@GkDi@o@KQCiDk@_BY{Ba@wB]}@OgB[q@KYE}ASSCo@Ma@EWAG?y@A[@O?M@K@}@B_AFiADK?EAEECEAGCEAUCsD?w@EiFCKGKEEQG_AAIGc@?aA?O?oBKs@QSA_A?e@Bq@@MBu@Pc@J}ANoBH}CLODUDg@H?@_Bb@k@Na@J{AP_@FC@_@Fa@FqCp@i@Ne@T_Ad@u@`@a@Tg@R]JYJ_@L[Hc@FgAHw@B_@@I?sBB}@@e@@{CFcB@U?W?o@Ei@Iw@c@MGS?KGMK[EKCMAUCC?C?AAa@?Y?wABe@BcADI?S?cB@o@A_DE}AC}ACC?"
+                }
+              },
+              {
+                "mode": "BUS",
+                "transitLeg": true,
+                "duration": 2030.0,
+                "distance": 11708.0,
+                "headsign": "20 - AIRPORT STATION VIA ALTON RD",
+                "start": {
+                  "scheduledTime": "2026-09-09T22:17:04-04:00",
+                  "estimated": null
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T22:50:54-04:00",
+                  "estimated": null
+                },
+                "from": {
+                  "name": "BISCAYNE BD @ NE 15 ST",
+                  "lat": 25.79002,
+                  "lon": -80.18895,
+                  "stop": {
+                    "gtfsId": "MDT:6719",
+                    "name": "BISCAYNE BD @ NE 15 ST"
+                  }
+                },
+                "to": {
+                  "name": "AIRPORT STATION",
+                  "lat": 25.798116,
+                  "lon": -80.258748,
+                  "stop": {
+                    "gtfsId": "MDT:10493",
+                    "name": "AIRPORT STATION"
+                  }
+                },
+                "route": {
+                  "gtfsId": "MDT:31110",
+                  "shortName": "20",
+                  "longName": "AIRPORT STATION TO LINCOLN RD",
+                  "mode": "BUS",
+                  "agency": {
+                    "gtfsId": "MDT:DTPW305",
+                    "name": "Miami-Dade Transit"
+                  }
+                },
+                "trip": {
+                  "gtfsId": "MDT:6313193",
+                  "tripHeadsign": "20 - AIRPORT STATION VIA ALTON RD"
+                },
+                "legGeometry": {
+                  "length": 224,
+                  "points": "sbl|Ct|lhNgBCgDIsCGi@@{FBm@@kEBDtD?N@`AAv@DZaB@Y?_@@g@@@`@@`@PfP?@BhB@d@Hj@Hf@BrC@fABvBB`B@~ABxC@b@Cj@Ad@?P@h@DhE@zABzDBjB@Z@zAD`H@t@?fB@\\?V?R@v@?|@@f@BjCBfBFlH@PJbK@|BDxGH|GBjB?L@D?NJrJ@|BF~GBhBFlHBdCHpG@|@H~IHpJ?b@DfDBnC@`B@lAHjI@hB?DB~A@fBBlBBlEDlE@f@D`E@v@B~B@n@BvD@r@@tB@N?L?|@ATETWt@eAzBi@fAWn@c@t@aCfFiA|B{@jB_@n@OX}@jA]^uAtAcA`A[Z_BtByCpE[`@_AAsB@sA@eBB}@?yBByDBmA@kBBsDBuDDmCBi@?{DB}AB}AB@hAB`BD`E?f@FvED|D@jB@hA@t@B`C@b@@r@?l@FnG@d@DnED`E?V?TCF@JCzA?B?pA?r@@T@f@@n@?PBhABnB?F@T?^?fC?P?l@?h@@z@?b@?j@@~A?TAd@HzC@x@sB@gCBo@GGGEI@[^c@vAmBdBGlAKNALAHAP?\\@j@B`@Cf@M~@Yv@K|@K`@@`ADjD^vANfCNrB?XAbA?xBC`AA^A`EAn@?dBGv@?rACbEA?c@[kXAu@Cq@UaCMaBrCA"
+                }
+              },
+              {
+                "mode": "TRAM",
+                "transitLeg": true,
+                "duration": 180.0,
+                "distance": 2050.0,
+                "headsign": "MIAMI INTERNATIONA AIRPORT CONCOURSE E",
+                "start": {
+                  "scheduledTime": "2026-09-09T22:55:00-04:00",
+                  "estimated": null
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T22:58:00-04:00",
+                  "estimated": null
+                },
+                "from": {
+                  "name": "AIRPORT STATION",
+                  "lat": 25.798116,
+                  "lon": -80.258748,
+                  "stop": {
+                    "gtfsId": "MDT:10493",
+                    "name": "AIRPORT STATION"
+                  }
+                },
+                "to": {
+                  "name": "MIAMI INTL AIRPORT GROUND LEVEL",
+                  "lat": 25.795179,
+                  "lon": -80.27803,
+                  "stop": {
+                    "gtfsId": "MDT:56",
+                    "name": "MIAMI INTL AIRPORT GROUND LEVEL"
+                  }
+                },
+                "route": {
+                  "gtfsId": "MDT:14458",
+                  "shortName": "MIA",
+                  "longName": "AIRPORT PEOPLE MOVER",
+                  "mode": "TRAM",
+                  "agency": {
+                    "gtfsId": "MDT:DTPW305",
+                    "name": "Miami-Dade Transit"
+                  }
+                },
+                "trip": {
+                  "gtfsId": "MDT:4833896",
+                  "tripHeadsign": "MIAMI INTERNATIONA AIRPORT CONCOURSE E"
+                },
+                "legGeometry": {
+                  "length": 41,
+                  "points": "_em|CvmzhNX@X?H?NDHFDPHz@MpC?zBA|CAtCAjB]dBg@v@cA~A?tBApBVjCd@xCP~AZbC\\fCAxADlBAjBAnB?bBG~BUjBS`BGzCA`CLpCHrBHv@BvADtG@t@?jA@v@"
+                }
+              },
+              {
+                "mode": "WALK",
+                "transitLeg": false,
+                "duration": 1511.0,
+                "distance": 1871.31,
+                "headsign": null,
+                "start": {
+                  "scheduledTime": "2026-09-09T22:58:00-04:00",
+                  "estimated": null
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T23:23:11-04:00",
+                  "estimated": null
+                },
+                "from": {
+                  "name": "MIAMI INTL AIRPORT GROUND LEVEL",
+                  "lat": 25.795179,
+                  "lon": -80.27803,
+                  "stop": {
+                    "gtfsId": "MDT:56",
+                    "name": "MIAMI INTL AIRPORT GROUND LEVEL"
+                  }
+                },
+                "to": {
+                  "name": "Miami International Airport",
+                  "lat": 25.7959,
+                  "lon": -80.287,
+                  "stop": null
+                },
+                "route": null,
+                "trip": null,
+                "legGeometry": {
+                  "length": 110,
+                  "points": "ybm|Cth~hN?@PA?PFA?D@H?BA?C?A??D?H???@?F?D?D?D?F@J?B_@@m@@W?O@CAC?GCEAAAk@YMIGCCCCECGEGe@aACACACCECISIOCGAC?AAEAu@?MAEAm@CcB?IAg@E{@C{@AWC?[??Im@@W@BfAB`B@`AB~@BbB@`ABtAB~A@lADtBBnCSx@Sn@eBnASn@HnA@t@@b@@jA@`@@pA?FBzABnA?\\@~@@X@v@BxB`@A?XfAC?d@@X@b@@v@?T@p@@\\B?B??IA@A_@@?FT"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "node": {
+            "start": "2026-09-09T22:16:03-04:00",
+            "end": "2026-09-09T23:47:41-04:00",
+            "duration": 5498,
+            "numberOfTransfers": 3,
+            "walkDistance": 2135.46,
+            "walkTime": 1766,
+            "waitingTime": 1149,
+            "generalizedCost": 13725,
+            "legs": [
+              {
+                "mode": "WALK",
+                "transitLeg": false,
+                "duration": 81.0,
+                "distance": 51.52,
+                "headsign": null,
+                "start": {
+                  "scheduledTime": "2026-09-09T22:16:03-04:00",
+                  "estimated": null
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T22:17:24-04:00",
+                  "estimated": null
+                },
+                "from": {
+                  "name": "Brickell",
+                  "lat": 25.7617,
+                  "lon": -80.1918,
+                  "stop": null
+                },
+                "to": {
+                  "name": "BRICKELL AV & SE 12 ST",
+                  "lat": 25.762056,
+                  "lon": -80.191647,
+                  "stop": {
+                    "gtfsId": "MDT:1016",
+                    "name": "BRICKELL AV & SE 12 ST"
+                  }
+                },
+                "route": null,
+                "trip": null,
+                "legGeometry": {
+                  "length": 14,
+                  "points": "qqf|CvmmhN@??MKCE?A?CAE?ACC?E?IAUC??"
+                }
+              },
+              {
+                "mode": "BUS",
+                "transitLeg": true,
+                "duration": 234.0,
+                "distance": 872.0,
+                "headsign": "City of Miami - Brickell Route",
+                "start": {
+                  "scheduledTime": "2026-09-09T22:17:24-04:00",
+                  "estimated": null
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T22:21:18-04:00",
+                  "estimated": null
+                },
+                "from": {
+                  "name": "BRICKELL AV & SE 12 ST",
+                  "lat": 25.762056,
+                  "lon": -80.191647,
+                  "stop": {
+                    "gtfsId": "MDT:1016",
+                    "name": "BRICKELL AV & SE 12 ST"
+                  }
+                },
+                "to": {
+                  "name": "BRICKELL STATION (WEST SIDE)",
+                  "lat": 25.76478,
+                  "lon": -80.195571,
+                  "stop": {
+                    "gtfsId": "MDT:8300",
+                    "name": "BRICKELL STATION (WEST SIDE)"
+                  }
+                },
+                "route": {
+                  "gtfsId": "MDT:23905",
+                  "shortName": "MIABRK",
+                  "longName": "City of Miami - Brickell Route",
+                  "mode": "BUS",
+                  "agency": {
+                    "gtfsId": "MDT:DTPW305",
+                    "name": "Miami-Dade Transit"
+                  }
+                },
+                "trip": {
+                  "gtfsId": "MDT:5739552",
+                  "tripHeadsign": "City of Miami - Brickell Route"
+                },
+                "legGeometry": {
+                  "length": 23,
+                  "points": "{sf|C`mmhNc@IoBa@G?_@G{Eu@QCEZE`@c@bDEp@Eh@ADB`BHlKpBCL\\@X?TcA@y@Bk@@[?"
+                }
+              },
+              {
+                "mode": "WALK",
+                "transitLeg": false,
+                "duration": 66.0,
+                "distance": 76.54,
+                "headsign": null,
+                "start": {
+                  "scheduledTime": "2026-09-09T22:21:18-04:00",
+                  "estimated": null
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T22:22:24-04:00",
+                  "estimated": null
+                },
+                "from": {
+                  "name": "BRICKELL STATION (WEST SIDE)",
+                  "lat": 25.76478,
+                  "lon": -80.195571,
+                  "stop": {
+                    "gtfsId": "MDT:8300",
+                    "name": "BRICKELL STATION (WEST SIDE)"
+                  }
+                },
+                "to": {
+                  "name": "BRICKELL STATION (EAST SIDE)",
+                  "lat": 25.764317,
+                  "lon": -80.195318,
+                  "stop": {
+                    "gtfsId": "MDT:78",
+                    "name": "BRICKELL STATION (EAST SIDE)"
+                  }
+                },
+                "route": null,
+                "trip": null,
+                "legGeometry": {
+                  "length": 14,
+                  "points": "{dg|CjenhNADFBD@D?TA?C?A?C@S@MBIl@A?E"
+                }
+              },
+              {
+                "mode": "BUS",
+                "transitLeg": true,
+                "duration": 1426.0,
+                "distance": 6403.0,
+                "headsign": "8 - SW 26 ST/152 AV",
+                "start": {
+                  "scheduledTime": "2026-09-09T22:30:00-04:00",
+                  "estimated": null
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T22:53:46-04:00",
+                  "estimated": null
+                },
+                "from": {
+                  "name": "BRICKELL STATION (EAST SIDE)",
+                  "lat": 25.764317,
+                  "lon": -80.195318,
+                  "stop": {
+                    "gtfsId": "MDT:78",
+                    "name": "BRICKELL STATION (EAST SIDE)"
+                  }
+                },
+                "to": {
+                  "name": "SW 8 ST @ SW 36 CT",
+                  "lat": 25.76481,
+                  "lon": -80.25435,
+                  "stop": {
+                    "gtfsId": "MDT:8147",
+                    "name": "SW 8 ST @ SW 36 CT"
+                  }
+                },
+                "route": {
+                  "gtfsId": "MDT:31102",
+                  "shortName": "8",
+                  "longName": "BRICKELL-107AV/WSTCHSTR VIA SW 8 ST",
+                  "mode": "BUS",
+                  "agency": {
+                    "gtfsId": "MDT:DTPW305",
+                    "name": "Miami-Dade Transit"
+                  }
+                },
+                "trip": {
+                  "gtfsId": "MDT:6311240",
+                  "tripHeadsign": "8 - SW 26 ST/152 AV"
+                },
+                "legGeometry": {
+                  "length": 108,
+                  "points": "_bg|CfcnhNzACL\\@X?TcA@y@Bk@@qB@a@Bs@@}A@m@@_EJB`EBlC@z@FpGDtE?R@N?L@\\?J?P?FFfH@h@HjIFnI@f@B~BB|B@d@HlI?d@HtI@j@HnHFnG@X?h@HlIF~E@lBJlIFbH@h@F~EAt@CtA?HFzHH|I?x@LxMD`I@N?L@h@H~IHtJ@`@HbK?T?dAtBnBfAdABdC?L@L@v@CJ?BDpE?^@pABxC@r@@h@BbDDbBB~@?J?L@nA@zA@h@DhC@jA?j@@n@?b@DJ?r@BnABbD?F@r@BdEBh@DhGBnB@~A?`@BjDDbE@p@"
+                }
+              },
+              {
+                "mode": "WALK",
+                "transitLeg": false,
+                "duration": 108.0,
+                "distance": 136.09,
+                "headsign": null,
+                "start": {
+                  "scheduledTime": "2026-09-09T22:53:46-04:00",
+                  "estimated": null
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T22:55:34-04:00",
+                  "estimated": null
+                },
+                "from": {
+                  "name": "SW 8 ST @ SW 36 CT",
+                  "lat": 25.76481,
+                  "lon": -80.25435,
+                  "stop": {
+                    "gtfsId": "MDT:8147",
+                    "name": "SW 8 ST @ SW 36 CT"
+                  }
+                },
+                "to": {
+                  "name": "SW 37 AV & SW 8 ST",
+                  "lat": 25.765423,
+                  "lon": -80.255062,
+                  "stop": {
+                    "gtfsId": "MDT:7531",
+                    "name": "SW 37 AV & SW 8 ST"
+                  }
+                },
+                "route": null,
+                "trip": null,
+                "legGeometry": {
+                  "length": 11,
+                  "points": "aeg|CttyhNB?@xBABABABA@C@C?oBF?A"
+                }
+              },
+              {
+                "mode": "BUS",
+                "transitLeg": true,
+                "duration": 743.0,
+                "distance": 3885.0,
+                "headsign": "37 - RED RD TRANSIT HUB VIA HIALEAH",
+                "start": {
+                  "scheduledTime": "2026-09-09T23:02:37-04:00",
+                  "estimated": null
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T23:15:00-04:00",
+                  "estimated": null
+                },
+                "from": {
+                  "name": "SW 37 AV & SW 8 ST",
+                  "lat": 25.765423,
+                  "lon": -80.255062,
+                  "stop": {
+                    "gtfsId": "MDT:7531",
+                    "name": "SW 37 AV & SW 8 ST"
+                  }
+                },
+                "to": {
+                  "name": "AIRPORT STATION",
+                  "lat": 25.798116,
+                  "lon": -80.258748,
+                  "stop": {
+                    "gtfsId": "MDT:10493",
+                    "name": "AIRPORT STATION"
+                  }
+                },
+                "route": {
+                  "gtfsId": "MDT:31120",
+                  "shortName": "37",
+                  "longName": "HIALEAH-SO.MIAMI VIA PALM/37 AVE",
+                  "mode": "BUS",
+                  "agency": {
+                    "gtfsId": "MDT:DTPW305",
+                    "name": "Miami-Dade Transit"
+                  }
+                },
+                "trip": {
+                  "gtfsId": "MDT:6315576",
+                  "tripHeadsign": "37 - RED RD TRANSIT HUB VIA HIALEAH"
+                },
+                "legGeometry": {
+                  "length": 88,
+                  "points": "{hg|CxyyhNO?O@eBDiCDI@EAK?kBDi@@_A@m@@aCFy@@k@@c@@o@?[@U@s@DaABm@@[Ak@?O@G?_BBoCBiCBgCBcCBkDBsCDa@?eBBeC@mCBkCBiBBmGFW?gA@mEDaA@qCB}BDk@?M@sA@o@@g@CcA@i@Dg@?Y@gA?yCD]?oBBsCBqCDyB@M@O?wCBu@?w@Be@?s@B_BH{AJy@@iB@UAQ?_BAu@CyAADzA?h@FjHAR}@@m@?]HqC~AgHFm@@"
+                }
+              },
+              {
+                "mode": "TRAM",
+                "transitLeg": true,
+                "duration": 180.0,
+                "distance": 2050.0,
+                "headsign": "MIAMI INTERNATIONA AIRPORT CONCOURSE E",
+                "start": {
+                  "scheduledTime": "2026-09-09T23:19:30-04:00",
+                  "estimated": null
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T23:22:30-04:00",
+                  "estimated": null
+                },
+                "from": {
+                  "name": "AIRPORT STATION",
+                  "lat": 25.798116,
+                  "lon": -80.258748,
+                  "stop": {
+                    "gtfsId": "MDT:10493",
+                    "name": "AIRPORT STATION"
+                  }
+                },
+                "to": {
+                  "name": "MIAMI INTL AIRPORT GROUND LEVEL",
+                  "lat": 25.795179,
+                  "lon": -80.27803,
+                  "stop": {
+                    "gtfsId": "MDT:56",
+                    "name": "MIAMI INTL AIRPORT GROUND LEVEL"
+                  }
+                },
+                "route": {
+                  "gtfsId": "MDT:14458",
+                  "shortName": "MIA",
+                  "longName": "AIRPORT PEOPLE MOVER",
+                  "mode": "TRAM",
+                  "agency": {
+                    "gtfsId": "MDT:DTPW305",
+                    "name": "Miami-Dade Transit"
+                  }
+                },
+                "trip": {
+                  "gtfsId": "MDT:4833903",
+                  "tripHeadsign": "MIAMI INTERNATIONA AIRPORT CONCOURSE E"
+                },
+                "legGeometry": {
+                  "length": 41,
+                  "points": "_em|CvmzhNX@X?H?NDHFDPHz@MpC?zBA|CAtCAjB]dBg@v@cA~A?tBApBVjCd@xCP~AZbC\\fCAxADlBAjBAnB?bBG~BUjBS`BGzCA`CLpCHrBHv@BvADtG@t@?jA@v@"
+                }
+              },
+              {
+                "mode": "WALK",
+                "transitLeg": false,
+                "duration": 1511.0,
+                "distance": 1871.31,
+                "headsign": null,
+                "start": {
+                  "scheduledTime": "2026-09-09T23:22:30-04:00",
+                  "estimated": null
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T23:47:41-04:00",
+                  "estimated": null
+                },
+                "from": {
+                  "name": "MIAMI INTL AIRPORT GROUND LEVEL",
+                  "lat": 25.795179,
+                  "lon": -80.27803,
+                  "stop": {
+                    "gtfsId": "MDT:56",
+                    "name": "MIAMI INTL AIRPORT GROUND LEVEL"
+                  }
+                },
+                "to": {
+                  "name": "Miami International Airport",
+                  "lat": 25.7959,
+                  "lon": -80.287,
+                  "stop": null
+                },
+                "route": null,
+                "trip": null,
+                "legGeometry": {
+                  "length": 110,
+                  "points": "ybm|Cth~hN?@PA?PFA?D@H?BA?C?A??D?H???@?F?D?D?D?F@J?B_@@m@@W?O@CAC?GCEAAAk@YMIGCCCCECGEGe@aACACACCECISIOCGAC?AAEAu@?MAEAm@CcB?IAg@E{@C{@AWC?[??Im@@W@BfAB`B@`AB~@BbB@`ABtAB~A@lADtBBnCSx@Sn@eBnASn@HnA@t@@b@@jA@`@@pA?FBzABnA?\\@~@@X@v@BxB`@A?XfAC?d@@X@b@@v@?T@p@@\\B?B??IA@A_@@?FT"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,38 @@
+# Smart Travel: car drop-off → transit restricted to specific routes → car pick-up.
+# `routes` are OTP gtfsIds ("<feedId>:<route_id>", e.g. "MDT:31009"); pass the gtfsId list from
+# backend/transit-routes.json. A filter with `include` lists is an allow-list: only trips on those
+# routes are used. Both list forms and the agency form are in schema-notes.md.
+query PlanSmartTravelOnRoutes($from: PlanCoordinateInput!, $to: PlanCoordinateInput!, $when: OffsetDateTime, $routes: [String!]!) {
+  planConnection(
+    origin: { location: { coordinate: $from } }
+    destination: { location: { coordinate: $to } }
+    dateTime: { earliestDeparture: $when }
+    first: 3
+    modes: {
+      transitOnly: true
+      transit: {
+        access: [CAR_DROP_OFF, WALK]
+        egress: [CAR_PICKUP, WALK]
+        transfer: [WALK]
+        transit: [{ mode: SUBWAY }, { mode: TRAM }, { mode: RAIL }, { mode: BUS }]
+      }
+    }
+    preferences: { transit: { filters: [{ include: [{ routes: $routes }] }] } }
+  ) {
+    searchDateTime
+    routingErrors { code description inputField }
+    edges {
+      node {
+        start end duration numberOfTransfers walkDistance waitingTime
+        legs {
+          mode transitLeg duration distance headsign
+          start { scheduledTime } end { scheduledTime }
+          from { name lat lon stop { gtfsId name } }
+          to { name lat lon stop { gtfsId name } }
+          route { gtfsId shortName longName mode }
+          legGeometry { length points }
+        }
+      }
+    }
+  }
+}

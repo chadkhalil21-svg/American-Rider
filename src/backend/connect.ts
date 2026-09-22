@@ -1,0 +1,173 @@
+// App-side Stripe Connect — the operator's payout account.
+//
+// The app never learns or sends an account id. It says "onboard me" and the server decides
+// which account that means from the caller's verified token, because a payout destination
+// supplied by a client is a payout destination an attacker can choose.
+import { PAYMENT_SERVER_URL } from '../config';
+import { auth } from '../firebase';
+import { t } from '../i18n';
+
+export type ConnectStatus = {
+  exists: boolean;
+  /** Stripe's answer, not ours. An account that exists but is unfinished cannot be paid. */
+  payoutsEnabled: boolean;
+  chargesEnabled: boolean;
+  /** What Stripe is still waiting for, in its own field names. */
+  due: string[];
+};
+
+const NONE: ConnectStatus = { exists: false, payoutsEnabled: false, chargesEnabled: false, due: [] };
+
+async function authHeaders(): Promise<Record<string, string>> {
+  const token = await auth.currentUser?.getIdToken().catch(() => null);
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
+/** Never throws. Unreachable server reads as "cannot be paid", which is the safe direction. */
+export async function connectStatus(): Promise<ConnectStatus> {
+  try {
+    const res = await fetch(`${PAYMENT_SERVER_URL}/connect/status`, {
+      headers: await authHeaders(),
+    });
+    if (!res.ok) return NONE;
+    const d = await res.json();
+    return {
+      exists: d?.exists === true,
+      payoutsEnabled: d?.payoutsEnabled === true,
+      chargesEnabled: d?.chargesEnabled === true,
+      due: Array.isArray(d?.due) ? d.due : [],
+    };
+  } catch {
+    return NONE;
+  }
+}
+
+export type OnboardResult = { ok: true; url: string } | { ok: false; error: string };
+
+/** Start or resume Stripe-hosted onboarding. Returns the single-use link to open. */
+export async function startConnectOnboarding(): Promise<OnboardResult> {
+  try {
+    const res = await fetch(`${PAYMENT_SERVER_URL}/connect/onboard`, {
+      method: 'POST',
+      headers: await authHeaders(),
+      body: '{}',
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || !d?.url) {
+      return {
+        ok: false,
+        error:
+          d?.code === 'no_admin_db'
+            ? t('traveler.errPayoutNotOn')
+            : d?.error || t('traveler.errPayoutStart'),
+      };
+    }
+    return { ok: true, url: d.url };
+  } catch {
+    return { ok: false, error: t('traveler.errReachAR') };
+  }
+}
+
+// ---- GOING ON DUTY ------------------------------------------------------------------------
+//
+// THE DEFECT THIS CLOSES. "Online" was a boolean in React state and "Commissioned" was a
+// string in this phone's storage. Neither reached any other device, and nothing ever wrote the
+// `operators` collection dispatch reads — so it always fell back to three hardcoded demo
+// drivers. A real, fully onboarded operator could stand in Brickell with the app open and
+// never be sent a single travel, because as far as dispatch was concerned they did not exist.
+//
+// Registration goes through the server, never straight to Firestore: the server is what can
+// check Stripe says payouts are enabled before making somebody dispatchable, and the
+// collection stays read-only to clients so no phone can invent a colleague or move one.
+export async function goOnline(opts: {
+  lat: number;
+  lng: number;
+  name?: string;
+  car?: string;
+  plate?: string;
+  classes?: string[];
+  /** The commercial policy's expiry date (YYYY-MM-DD). The server refuses a lapsed one. */
+  insuranceExpiry?: string;
+}): Promise<{ ok: boolean; error?: string; code?: string; due?: string[] }> {
+  try {
+    const res = await fetch(`${PAYMENT_SERVER_URL}/operator/online`, {
+      method: 'POST',
+      headers: await authHeaders(),
+      body: JSON.stringify({ ...opts, available: true }),
+    });
+    const d = await res.json().catch(() => ({}));
+    // The CODE as well as the message. A refusal an operator can act on needs the screen to
+    // know which refusal it is — 'disclosure_required' is cleared by reading one page, and
+    // pointing at that page is only possible if the reason survives the trip.
+    if (!res.ok) {
+      return { ok: false, error: d?.error || `Server error ${res.status}`, code: d?.code, due: d?.due };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, error: t('traveler.errReachDispatch') };
+  }
+}
+
+/** Stop being matchable. Never throws — going off duty must always be possible. */
+export async function goOffline(): Promise<void> {
+  try {
+    await fetch(`${PAYMENT_SERVER_URL}/operator/offline`, {
+      method: 'POST',
+      headers: await authHeaders(),
+      body: '{}',
+    });
+  } catch {
+    // The local toggle already flipped. A server we cannot reach must not trap somebody on duty.
+  }
+}
+
+/**
+ * Collect anything this operator is still owed.
+ *
+ * A travel settles once, when it completes. That attempt fails for ordinary reasons — money
+ * still clearing, onboarding not finished at the time, a dropped connection — and nothing
+ * used to try again, so the fare sat in the platform balance and the operator was simply not
+ * paid. Asked for on the operator's behalf whenever their app comes up.
+ *
+ * Never throws, and safe to call as often as we like: each transfer is still guarded by the
+ * travel's own transferId, so nothing can be paid twice.
+ */
+export async function settlePendingPayouts(): Promise<{ settled: number; centsPaid: number }> {
+  try {
+    const res = await fetch(`${PAYMENT_SERVER_URL}/operator/settle-pending`, {
+      method: 'POST',
+      headers: await authHeaders(),
+      body: '{}',
+    });
+    const d = await res.json().catch(() => ({}));
+    return { settled: Number(d?.settled ?? 0), centsPaid: Number(d?.centsPaid ?? 0) };
+  } catch {
+    return { settled: 0, centsPaid: 0 };
+  }
+}
+
+/**
+ * A link into the operator's own Stripe dashboard, where their payouts actually live.
+ *
+ * American Rider never holds their money: the 99% goes to their connected account as each
+ * travel completes, and Stripe pays it to their bank on its own schedule. Instant payouts are
+ * taken there too, at Stripe's fee, by the operator — which is what Chad asked for, and it
+ * needs no payout machinery of ours to be true.
+ */
+export async function openPayoutDashboard(): Promise<{ ok: boolean; url?: string; error?: string }> {
+  try {
+    const res = await fetch(`${PAYMENT_SERVER_URL}/connect/dashboard`, {
+      method: 'POST',
+      headers: await authHeaders(),
+      body: '{}',
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || !d?.url) return { ok: false, error: d?.error || `Server error ${res.status}` };
+    return { ok: true, url: d.url };
+  } catch {
+    return { ok: false, error: t('traveler.paymentServerUnreachable') };
+  }
+}

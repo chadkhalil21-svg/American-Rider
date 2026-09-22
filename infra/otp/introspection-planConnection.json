@@ -1,0 +1,1131 @@
+{
+  "planConnectionArgs": [
+    {
+      "name": "after",
+      "description": "Takes in cursor from a previous search. Used for forward pagination. If earliest departure time\nis used in the original query, the new search then returns itineraries that depart after\nthe start time of the last itinerary that was returned, or at the same time if there are multiple\nitinerary options that can depart at that moment in time.\nIf latest arrival time is defined, the new search returns itineraries that arrive before the end\ntime of the last itinerary that was returned in the previous search, or at the same time if there\nare multiple itinerary options that can arrive at that moment in time. This parameter is part of\nthe [GraphQL Cursor Connections Specification](https://relay.dev/graphql/connections.htm) and\nshould be used together with the `first` parameter.",
+      "type": {
+        "kind": "SCALAR",
+        "name": "String",
+        "ofType": null
+      }
+    },
+    {
+      "name": "before",
+      "description": "Takes in cursor from a previous search. Used for backwards pagination. If earliest departure time\nis used in the original query, the new search then returns itineraries that depart before that time.\nIf latest arrival time is defined, the new search returns itineraries that arrive after that time.\nThis parameter is part of the [GraphQL Cursor Connections Specification](https://relay.dev/graphql/connections.htm)\nand should be used together with the `last` parameter.",
+      "type": {
+        "kind": "SCALAR",
+        "name": "String",
+        "ofType": null
+      }
+    },
+    {
+      "name": "dateTime",
+      "description": "Datetime of the search. It's possible to either define the earliest departure time\nor the latest arrival time. By default, earliest departure time is set as now.",
+      "type": {
+        "kind": "INPUT_OBJECT",
+        "name": "PlanDateTimeInput",
+        "ofType": null
+      }
+    },
+    {
+      "name": "destination",
+      "description": "The destination where the search ends. Usually coordinates but can also be a stop location.",
+      "type": {
+        "kind": "NON_NULL",
+        "name": null,
+        "ofType": {
+          "kind": "INPUT_OBJECT",
+          "name": "PlanLabeledLocationInput",
+          "ofType": null
+        }
+      }
+    },
+    {
+      "name": "first",
+      "description": "How many new itineraries should at maximum be returned in either the first search or with\nforward pagination. This parameter is part of the\n[GraphQL Cursor Connections Specification](https://relay.dev/graphql/connections.htm)\nand should be used together with the `after` parameter (although `after` shouldn't be defined\nin the first search).",
+      "type": {
+        "kind": "SCALAR",
+        "name": "Int",
+        "ofType": null
+      }
+    },
+    {
+      "name": "flex",
+      "description": "Parameters that affect flexible transport routing per request.",
+      "type": {
+        "kind": "INPUT_OBJECT",
+        "name": "FlexRequest",
+        "ofType": null
+      }
+    },
+    {
+      "name": "itineraryFilter",
+      "description": "Settings that control the behavior of itinerary filtering. These are advanced settings and\nshould not be set by a user through user preferences.",
+      "type": {
+        "kind": "INPUT_OBJECT",
+        "name": "PlanItineraryFilterInput",
+        "ofType": null
+      }
+    },
+    {
+      "name": "last",
+      "description": "How many new itineraries should at maximum be returned in backwards pagination. It's recommended to\nuse the same value as was used for the `first` parameter in the original search for optimal\nperformance. This parameter is part of the\n[GraphQL Cursor Connections Specification](https://relay.dev/graphql/connections.htm)\nand should be used together with the `before` parameter.",
+      "type": {
+        "kind": "SCALAR",
+        "name": "Int",
+        "ofType": null
+      }
+    },
+    {
+      "name": "locale",
+      "description": "Locale used for translations. Note, there might not necessarily be translations available.\nIt's possible and recommended to use the \u00b4accept-language\u00b4 header instead of this parameter.",
+      "type": {
+        "kind": "SCALAR",
+        "name": "Locale",
+        "ofType": null
+      }
+    },
+    {
+      "name": "modes",
+      "description": "Street and transit modes used during the search. This also includes options to only return\nan itinerary that contains no transit legs or force transit to be used in all itineraries.\nBy default, all transit modes are usable and `WALK` is used for direct street suggestions,\naccess, egress and transfers.",
+      "type": {
+        "kind": "INPUT_OBJECT",
+        "name": "PlanModesInput",
+        "ofType": null
+      }
+    },
+    {
+      "name": "origin",
+      "description": "The origin where the search starts. Usually coordinates but can also be a stop location.",
+      "type": {
+        "kind": "NON_NULL",
+        "name": null,
+        "ofType": {
+          "kind": "INPUT_OBJECT",
+          "name": "PlanLabeledLocationInput",
+          "ofType": null
+        }
+      }
+    },
+    {
+      "name": "preferences",
+      "description": "Preferences that affect what itineraries are returned. Preferences are split into categories.",
+      "type": {
+        "kind": "INPUT_OBJECT",
+        "name": "PlanPreferencesInput",
+        "ofType": null
+      }
+    },
+    {
+      "name": "searchWindow",
+      "description": "Duration of the search window. This either starts at the defined earliest departure\ntime or ends at the latest arrival time. If this is not provided or the value is set as null,\na reasonable search window is automatically generated. When searching for earlier or later itineraries\nwith paging, this search window is no longer used and the new window will be based\non how many suggestions were returned in the previous search. The new search window can be\nshorter or longer than the original search window. Note, itineraries are returned faster\nwith a smaller search window and search window limitation is done mainly for performance reasons.\n    \nSetting this parameter makes especially sense if the transportation network is as sparse or dense\nin the whole itinerary search area. Otherwise, letting the system decide what is the search window\nis in combination of using paging can lead to better performance and to getting a more consistent\nnumber of itineraries in each search.",
+      "type": {
+        "kind": "SCALAR",
+        "name": "Duration",
+        "ofType": null
+      }
+    },
+    {
+      "name": "via",
+      "description": "The list of points the itinerary is required to pass through.",
+      "type": {
+        "kind": "LIST",
+        "name": null,
+        "ofType": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "INPUT_OBJECT",
+            "name": "PlanViaLocationInput"
+          }
+        }
+      }
+    }
+  ],
+  "types": {
+    "PlanModesInput": {
+      "name": "PlanModesInput",
+      "kind": "INPUT_OBJECT",
+      "description": "Mode selections for the plan search.",
+      "enumValues": null,
+      "inputFields": [
+        {
+          "name": "direct",
+          "description": "Street mode that is used when searching for itineraries that don't use any transit.\nIf more than one mode is selected, at least one of them must be used but not necessarily all.\nThere are modes that automatically also use walking such as the rental modes. To force rental\nto be used, this should only include the rental mode and not `WALK` in addition.",
+          "defaultValue": "[WALK]",
+          "type": {
+            "kind": "LIST",
+            "name": null,
+            "ofType": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "kind": "ENUM",
+                "name": "PlanDirectMode",
+                "ofType": null
+              }
+            }
+          }
+        },
+        {
+          "name": "directOnly",
+          "description": "Should only the direct search without any transit be done.",
+          "defaultValue": "false",
+          "type": {
+            "kind": "SCALAR",
+            "name": "Boolean",
+            "ofType": null
+          }
+        },
+        {
+          "name": "transit",
+          "description": "Modes for different phases of an itinerary when transit is included. Also\nincludes street mode selections related to connecting to the transit network\nand transfers. By default, all transit modes are usable.",
+          "defaultValue": null,
+          "type": {
+            "kind": "INPUT_OBJECT",
+            "name": "PlanTransitModesInput",
+            "ofType": null
+          }
+        },
+        {
+          "name": "transitOnly",
+          "description": "Should only the transit search be done and never suggest itineraries that don't\ncontain any transit legs.",
+          "defaultValue": "false",
+          "type": {
+            "kind": "SCALAR",
+            "name": "Boolean",
+            "ofType": null
+          }
+        }
+      ]
+    },
+    "PlanTransitModesInput": {
+      "name": "PlanTransitModesInput",
+      "kind": "INPUT_OBJECT",
+      "description": "Modes for different phases of an itinerary when transit is included. Also includes street\nmode selections related to connecting to the transit network and transfers.",
+      "enumValues": null,
+      "inputFields": [
+        {
+          "name": "access",
+          "description": "Street mode that is used when searching for access to the transit network from origin.\nIf more than one mode is selected, at least one of them must be used but not necessarily all.\nThere are modes that automatically also use walking such as the rental modes. To force rental\nto be used, this should only include the rental mode and not `WALK` in addition.",
+          "defaultValue": "[WALK]",
+          "type": {
+            "kind": "LIST",
+            "name": null,
+            "ofType": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "kind": "ENUM",
+                "name": "PlanAccessMode",
+                "ofType": null
+              }
+            }
+          }
+        },
+        {
+          "name": "egress",
+          "description": "Street mode that is used when searching for egress to destination from the transit network.\nIf more than one mode is selected, at least one of them must be used but not necessarily all.\nThere are modes that automatically also use walking such as the rental modes. To force rental\nto be used, this should only include the rental mode and not `WALK` in addition.",
+          "defaultValue": "[WALK]",
+          "type": {
+            "kind": "LIST",
+            "name": null,
+            "ofType": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "kind": "ENUM",
+                "name": "PlanEgressMode",
+                "ofType": null
+              }
+            }
+          }
+        },
+        {
+          "name": "transfer",
+          "description": "Street mode that is used when searching for transfers. Selection of only one allowed for now.",
+          "defaultValue": "[WALK]",
+          "type": {
+            "kind": "LIST",
+            "name": null,
+            "ofType": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "kind": "ENUM",
+                "name": "PlanTransferMode",
+                "ofType": null
+              }
+            }
+          }
+        },
+        {
+          "name": "transit",
+          "description": "Transit modes and reluctances associated with them. Each defined mode can be used in\nan itinerary but doesn't have to be. If direct search is not disabled, there can be an\nitinerary without any transit legs. By default, all transit modes are usable. For a transit trip\nto match PlanTransitModesInput, it must match one of the PlanTransitModePreferenceInputs given\nin the field.",
+          "defaultValue": "[{mode : AIRPLANE}, {mode : BUS}, {mode : CABLE_CAR}, {mode : CARPOOL}, {mode : COACH}, {mode : FERRY}, {mode : FUNICULAR}, {mode : GONDOLA}, {mode : MONORAIL}, {mode : RAIL}, {mode : SNOW_AND_ICE}, {mode : SUBWAY}, {mode : TAXI}, {mode : TRAM}, {mode : TROLLEYBUS}]",
+          "type": {
+            "kind": "LIST",
+            "name": null,
+            "ofType": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "kind": "INPUT_OBJECT",
+                "name": "PlanTransitModePreferenceInput",
+                "ofType": null
+              }
+            }
+          }
+        }
+      ]
+    },
+    "PlanTransitModePreferenceInput": {
+      "name": "PlanTransitModePreferenceInput",
+      "kind": "INPUT_OBJECT",
+      "description": "Transit mode and a reluctance associated with it.",
+      "enumValues": null,
+      "inputFields": [
+        {
+          "name": "cost",
+          "description": "Costs related to using a transit mode.",
+          "defaultValue": null,
+          "type": {
+            "kind": "INPUT_OBJECT",
+            "name": "TransitModePreferenceCostInput",
+            "ofType": null
+          }
+        },
+        {
+          "name": "mode",
+          "description": "Transit mode that could be (but doesn't have to be) used in an itinerary.",
+          "defaultValue": null,
+          "type": {
+            "kind": "NON_NULL",
+            "name": null,
+            "ofType": {
+              "kind": "ENUM",
+              "name": "TransitMode",
+              "ofType": null
+            }
+          }
+        },
+        {
+          "name": "replacement",
+          "description": "If present and not null, further limits the transit mode selection.  A transit trip matches\na PlanTransitModePreferenceInput if the mandatory TransitMode field mode matches. If replacement\nis REQUIRED, the trip must also be a replacement. If replacement is FORBIDDEN,\nthe trip must not be a replacement. If replacement is FEATURE_IGNORED or missing, it\ndoes not matter if the trip is a replacement or not. Whether a leg is a replacement is recognized\nboth by the NeTEx submode and the GTFS extended type, depending on the data source.\nNote that a bus replacing a train has mode: BUS, replacement: true, so it matches a query with\nmode: BUS, replacement: REQUIRED and mode: BUS, replacement: FEATURE_IGNORED, but it does not\nmatch mode: TRAIN with any replacement options. So to get both trains and buses replacing them,\nbut no other buses, query [(mode: TRAIN), (mode: BUS, replacement: REQUIRED)].",
+          "defaultValue": null,
+          "type": {
+            "kind": "INPUT_OBJECT",
+            "name": "ReplacementFilterInput",
+            "ofType": null
+          }
+        }
+      ]
+    },
+    "TransitMode": {
+      "name": "TransitMode",
+      "kind": "ENUM",
+      "description": "Transit modes include modes that are used within organized transportation networks\nrun by public transportation authorities, taxi companies etc.\nEquivalent to GTFS route_type or to NeTEx TransportMode.",
+      "enumValues": [
+        {
+          "name": "AIRPLANE",
+          "description": null
+        },
+        {
+          "name": "BUS",
+          "description": null
+        },
+        {
+          "name": "CABLE_CAR",
+          "description": null
+        },
+        {
+          "name": "CARPOOL",
+          "description": "Private car trips shared with others."
+        },
+        {
+          "name": "COACH",
+          "description": null
+        },
+        {
+          "name": "FERRY",
+          "description": null
+        },
+        {
+          "name": "FUNICULAR",
+          "description": null
+        },
+        {
+          "name": "GONDOLA",
+          "description": null
+        },
+        {
+          "name": "MONORAIL",
+          "description": "Railway in which the track consists of a single rail or a beam."
+        },
+        {
+          "name": "RAIL",
+          "description": "This includes long or short distance trains."
+        },
+        {
+          "name": "SNOW_AND_ICE",
+          "description": "Used for off-road snow and ice vehicles"
+        },
+        {
+          "name": "SUBWAY",
+          "description": "Subway or metro, depending on the local terminology."
+        },
+        {
+          "name": "TAXI",
+          "description": "A taxi, possibly operated by a public transport agency."
+        },
+        {
+          "name": "TRAM",
+          "description": null
+        },
+        {
+          "name": "TROLLEYBUS",
+          "description": "Electric buses that draw power from overhead wires using poles."
+        }
+      ],
+      "inputFields": null
+    },
+    "PlanAccessMode": {
+      "name": "PlanAccessMode",
+      "kind": "ENUM",
+      "description": "Street modes that can be used for access to the transit network from origin.",
+      "enumValues": [
+        {
+          "name": "BICYCLE",
+          "description": "Cycling to a stop and boarding a vehicle with the bicycle.\nNote, this can include walking when it's needed to walk the bicycle.\nAccess can use cycling only if the mode used for transfers\nand egress is also `BICYCLE`."
+        },
+        {
+          "name": "BICYCLE_PARKING",
+          "description": "Starting the itinerary with a bicycle and parking the bicycle to\na parking location. Note, this can include walking after parking\nthe bicycle or when it's needed to walk the bicycle."
+        },
+        {
+          "name": "BICYCLE_RENTAL",
+          "description": "Bicycle rental can use either station based systems or \"floating\"\nvehicles which are not linked to a rental station. Note, if there are no\nrental options available, access will include only walking. Also, this\ncan include walking before picking up or after dropping off the\nbicycle or when it's needed to walk the bicycle."
+        },
+        {
+          "name": "CAR",
+          "description": "Driving to a stop and boarding a vehicle with the car.\nAccess can use driving only if the mode used for transfers\nand egress is also `CAR`."
+        },
+        {
+          "name": "CAR_DROP_OFF",
+          "description": "Getting dropped off by a car to a location that is accessible with a car.\nNote, this can include walking after the drop-off."
+        },
+        {
+          "name": "CAR_PARKING",
+          "description": "Starting the itinerary with a car and parking the car to a parking location.\nNote, this can include walking after parking the car."
+        },
+        {
+          "name": "CAR_RENTAL",
+          "description": "Car rental can use either station based systems or \"floating\"\nvehicles which are not linked to a rental station. Note, if there are no\nrental options available, access will include only walking. Also, this\ncan include walking before picking up or after dropping off the\ncar."
+        },
+        {
+          "name": "FLEX",
+          "description": "Flexible transit. This can include different forms of flexible transit that\ncan be defined in GTFS-Flex or in Netex. Note, this can include walking before\nor after the flexible transit leg."
+        },
+        {
+          "name": "SCOOTER_RENTAL",
+          "description": "Scooter rental can use either station based systems or \"floating\"\nvehicles which are not linked to a rental station. Note, if there are no\nrental options available, access will include only walking. Also, this\ncan include walking before picking up or after dropping off the\nscooter."
+        },
+        {
+          "name": "WALK",
+          "description": "Walking to a stop."
+        }
+      ],
+      "inputFields": null
+    },
+    "PlanEgressMode": {
+      "name": "PlanEgressMode",
+      "kind": "ENUM",
+      "description": "Street modes that can be used for egress from the transit network to destination.",
+      "enumValues": [
+        {
+          "name": "BICYCLE",
+          "description": "Cycling from a stop to the destination. Note, this can include walking when\nit's needed to walk the bicycle. Egress can use cycling only if the mode used\nfor access and transfers is also `BICYCLE`."
+        },
+        {
+          "name": "BICYCLE_RENTAL",
+          "description": "Bicycle rental can use either station based systems or \"floating\"\nvehicles which are not linked to a rental station. Note, if there are no\nrental options available, egress will include only walking. Also, this\ncan include walking before picking up or after dropping off the\nbicycle or when it's needed to walk the bicycle."
+        },
+        {
+          "name": "CAR",
+          "description": "Driving from a stop to the destination. Egress can use driving only if the mode\nused for access and transfers is also `CAR`."
+        },
+        {
+          "name": "CAR_PICKUP",
+          "description": "Getting picked up by a car from a location that is accessible with a car.\nNote, this can include walking before the pickup."
+        },
+        {
+          "name": "CAR_RENTAL",
+          "description": "Car rental can use either station based systems or \"floating\"\nvehicles which are not linked to a rental station. Note, if there are no\nrental options available, egress will include only walking. Also, this\ncan include walking before picking up or after dropping off the\ncar."
+        },
+        {
+          "name": "FLEX",
+          "description": "Flexible transit. This can include different forms of flexible transit that\ncan be defined in GTFS-Flex or in Netex. Note, this can include walking before\nor after the flexible transit leg."
+        },
+        {
+          "name": "SCOOTER_RENTAL",
+          "description": "Scooter rental can use either station based systems or \"floating\"\nvehicles which are not linked to a rental station. Note, if there are no\nrental options available, egress will include only walking. Also, this\ncan include walking before picking up or after dropping off the\nscooter."
+        },
+        {
+          "name": "WALK",
+          "description": "Walking from a stop to the destination."
+        }
+      ],
+      "inputFields": null
+    },
+    "PlanTransferMode": {
+      "name": "PlanTransferMode",
+      "kind": "ENUM",
+      "description": null,
+      "enumValues": [
+        {
+          "name": "BICYCLE",
+          "description": "Cycling between transit vehicles (typically between stops). Note, this can\ninclude walking when it's needed to walk the bicycle. Transfers can only use\ncycling if the mode used for access and egress is also `BICYCLE`."
+        },
+        {
+          "name": "CAR",
+          "description": "Driving between transit vehicles. Transfers can only use driving if the mode\nused for access and egress is also `CAR`."
+        },
+        {
+          "name": "WALK",
+          "description": "Walking between transit vehicles (typically between stops)."
+        }
+      ],
+      "inputFields": null
+    },
+    "PlanDirectMode": {
+      "name": "PlanDirectMode",
+      "kind": "ENUM",
+      "description": "Street mode that is used when searching for itineraries that don't use any transit.",
+      "enumValues": [
+        {
+          "name": "BICYCLE",
+          "description": "Cycling from the origin to the destination. Note, this can include walking\nwhen it's needed to walk the bicycle."
+        },
+        {
+          "name": "BICYCLE_PARKING",
+          "description": "Starting the itinerary with a bicycle and parking the bicycle to\na parking location. Note, this can include walking after parking\nthe bicycle or when it's needed to walk the bicycle."
+        },
+        {
+          "name": "BICYCLE_RENTAL",
+          "description": "Bicycle rental can use either station based systems or \"floating\"\nvehicles which are not linked to a rental station. Note, if there are no\nrental options available, itinerary will include only walking.\nAlso, it can include walking before picking up or after dropping off the\nbicycle or when it's needed to walk the bicycle."
+        },
+        {
+          "name": "CAR",
+          "description": "Driving a car from the origin to the destination."
+        },
+        {
+          "name": "CAR_PARKING",
+          "description": "Starting the itinerary with a car and parking the car to a parking location.\nNote, this can include walking after parking the car."
+        },
+        {
+          "name": "CAR_RENTAL",
+          "description": "Car rental can use either station based systems or \"floating\"\nvehicles which are not linked to a rental station. Note, if there are no\nrental options available, itinerary will include only walking. Also, this\ncan include walking before picking up or after dropping off the\ncar."
+        },
+        {
+          "name": "FLEX",
+          "description": "Flexible transit. This can include different forms of flexible transit that\ncan be defined in GTFS-Flex or in Netex. Note, this can include walking before\nor after the flexible transit leg."
+        },
+        {
+          "name": "SCOOTER_RENTAL",
+          "description": "Scooter rental can use either station based systems or \"floating\"\nvehicles which are not linked to a rental station. Note, if there are no\nrental options available, itinerary will include only walking. Also, this\ncan include walking before picking up or after dropping off the\nscooter."
+        },
+        {
+          "name": "WALK",
+          "description": "Walking from the origin to the destination. Note, this can include walking\nwhen it's needed to walk the bicycle."
+        }
+      ],
+      "inputFields": null
+    },
+    "PlanPreferencesInput": {
+      "name": "PlanPreferencesInput",
+      "kind": "INPUT_OBJECT",
+      "description": "Wrapper type for different types of preferences related to plan query.",
+      "enumValues": null,
+      "inputFields": [
+        {
+          "name": "accessibility",
+          "description": "Accessibility preferences that affect both the street and transit routing.",
+          "defaultValue": null,
+          "type": {
+            "kind": "INPUT_OBJECT",
+            "name": "AccessibilityPreferencesInput",
+            "ofType": null
+          }
+        },
+        {
+          "name": "street",
+          "description": "Street routing preferences used for ingress, egress and transfers. These do not directly affect\nthe transit legs but can change how preferable walking or cycling, for example, is compared to\ntransit.",
+          "defaultValue": null,
+          "type": {
+            "kind": "INPUT_OBJECT",
+            "name": "PlanStreetPreferencesInput",
+            "ofType": null
+          }
+        },
+        {
+          "name": "transit",
+          "description": "Transit routing preferences used for transit legs.",
+          "defaultValue": null,
+          "type": {
+            "kind": "INPUT_OBJECT",
+            "name": "TransitPreferencesInput",
+            "ofType": null
+          }
+        }
+      ]
+    },
+    "TransitPreferencesInput": {
+      "name": "TransitPreferencesInput",
+      "kind": "INPUT_OBJECT",
+      "description": "Transit routing preferences used for transit legs.",
+      "enumValues": null,
+      "inputFields": [
+        {
+          "name": "alight",
+          "description": "Preferences related to alighting from a transit vehicle.",
+          "defaultValue": null,
+          "type": {
+            "kind": "INPUT_OBJECT",
+            "name": "AlightPreferencesInput",
+            "ofType": null
+          }
+        },
+        {
+          "name": "board",
+          "description": "Preferences related to boarding a transit vehicle. Note, board costs for each street mode\ncan be found under the street mode preferences.",
+          "defaultValue": null,
+          "type": {
+            "kind": "INPUT_OBJECT",
+            "name": "BoardPreferencesInput",
+            "ofType": null
+          }
+        },
+        {
+          "name": "filters",
+          "description": "A list of filters for which trips should be included or excluded. A trip will be considered in the\nresult if it is included by at least one filter and isn't excluded by another one at the same time.\n  \nAn empty list of filters or no value means that all trips should be included.\n  \n**AND/OR Logic**\n  \nSeveral filters can be defined and form an OR-condition.\n  \nThe following example means \"include all trips with `F:route1` _or_ `F:agency1`\":\n  \n```\nfilters: [\n  {\n    include: {\n      routes: [\"F:route1\"]\n    }\n  },\n  { \n    include: {\n      agencies: [\"F:agency1\"]\n    }\n  }\n}]\n```\n  \nThe following example means \"include all trips of `F:agency1` _and_ exclude `F:route1`\":\n  \n```\nfilters: [\n  {\n    include: {\n      agencies: [\"F:agency1\"]\n    },\n    exclude: {\n      routes: [\"F:route1\"]\n    }\n  }\n]\n```\n  \nBe aware of the following pitfalls:\n  - It is easy to construct AND-conditions that can lead to zero results.\n  - OR-conditions that have an element which consists of only an exclude are likely to be\n    unwanted and may lead to unexpected results.\n  \n**Note**: This parameter also interacts with the modes set in `modes.transit` by forming\nan AND-condition.",
+          "defaultValue": null,
+          "type": {
+            "kind": "LIST",
+            "name": null,
+            "ofType": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "kind": "INPUT_OBJECT",
+                "name": "TransitFilterInput",
+                "ofType": null
+              }
+            }
+          }
+        },
+        {
+          "name": "relaxTransitGroupPriority",
+          "description": "Relax generalized-cost when comparing itineraries with a different set of\ntransit-group-priorities. The groups are set server side for routes and\ncan not be configured in the API.\n  \nThis relaxes the comparison inside the routing engine for each stop-arrival. If two\npaths have a different set of transit-group-priorities, then the generalized-cost\ncomparison is relaxed. The final set of paths are filtered through the normal\nitinerary-filters.\n  \nA relax-cost is used to increase the limit when comparing one cost to another cost\nusing a linear function applied to the generalized cost.\nThis is used to include more results into the result. A `coefficient=2.0` means a path (itinerary)\nwith twice as high cost as another one, is accepted. A `constant=300` means a \"fixed\"\nconstant is added to the limit.",
+          "defaultValue": "{constant : 0, coefficient : 1.0}",
+          "type": {
+            "kind": "INPUT_OBJECT",
+            "name": "LinearCostFunctionInput",
+            "ofType": null
+          }
+        },
+        {
+          "name": "timetable",
+          "description": "Preferences related to cancellations and real-time.",
+          "defaultValue": null,
+          "type": {
+            "kind": "INPUT_OBJECT",
+            "name": "TimetablePreferencesInput",
+            "ofType": null
+          }
+        },
+        {
+          "name": "transfer",
+          "description": "Preferences related to transfers between transit vehicles (typically between stops).",
+          "defaultValue": null,
+          "type": {
+            "kind": "INPUT_OBJECT",
+            "name": "TransferPreferencesInput",
+            "ofType": null
+          }
+        }
+      ]
+    },
+    "TransitFilterInput": {
+      "name": "TransitFilterInput",
+      "kind": "INPUT_OBJECT",
+      "description": "A collection of selectors for what routes/agencies should be included in or excluded from the search.\n\nThe `include` is always applied to select the initial set, then `exclude` to remove elements.\nIf only `exclude` is present, the exclude is applied to the existing set of results.\n\nTherefore, if an entity is both included _and_ excluded the exclusion takes precedence.",
+      "enumValues": null,
+      "inputFields": [
+        {
+          "name": "exclude",
+          "description": "A list of selectors for what routes/agencies should be excluded during search.\n  \nIn order to be excluded, a route/agency has to match with at least one selector.\n  \nAn empty list or a list containing `null` is forbidden.",
+          "defaultValue": null,
+          "type": {
+            "kind": "LIST",
+            "name": null,
+            "ofType": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "kind": "INPUT_OBJECT",
+                "name": "TransitFilterSelectInput",
+                "ofType": null
+              }
+            }
+          }
+        },
+        {
+          "name": "include",
+          "description": "A list of selectors for what routes/agencies should be allowed during the search.\n  \nIf route/agency matches with at least one selector it will be included.\n  \nAn empty list or a list containing `null` is forbidden.",
+          "defaultValue": null,
+          "type": {
+            "kind": "LIST",
+            "name": null,
+            "ofType": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "kind": "INPUT_OBJECT",
+                "name": "TransitFilterSelectInput",
+                "ofType": null
+              }
+            }
+          }
+        }
+      ]
+    },
+    "TransitFilterSelectInput": {
+      "name": "TransitFilterSelectInput",
+      "kind": "INPUT_OBJECT",
+      "description": "A list of selectors for including or excluding entities from the routing results. Null\nmeans everything is allowed to be returned and empty lists are not allowed.",
+      "enumValues": null,
+      "inputFields": [
+        {
+          "name": "agencies",
+          "description": "Set of ids for agencies that should be included in/excluded from the search.\n  \nFormat: `FeedId:AgencyId`",
+          "defaultValue": null,
+          "type": {
+            "kind": "LIST",
+            "name": null,
+            "ofType": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              }
+            }
+          }
+        },
+        {
+          "name": "routes",
+          "description": "Set of ids for routes that should be included in/excluded from the search.\n  \nFormat: `FeedId:AgencyId`",
+          "defaultValue": null,
+          "type": {
+            "kind": "LIST",
+            "name": null,
+            "ofType": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              }
+            }
+          }
+        }
+      ]
+    },
+    "PlanLabeledLocationInput": {
+      "name": "PlanLabeledLocationInput",
+      "kind": "INPUT_OBJECT",
+      "description": "Plan location settings. Location must be set. Label is optional\nand used for naming the location.",
+      "enumValues": null,
+      "inputFields": [
+        {
+          "name": "label",
+          "description": "A label that can be attached to the location. This label is then returned with the location\nin the itineraries.",
+          "defaultValue": null,
+          "type": {
+            "kind": "SCALAR",
+            "name": "String",
+            "ofType": null
+          }
+        },
+        {
+          "name": "location",
+          "description": "A location that has to be used in an itinerary.",
+          "defaultValue": null,
+          "type": {
+            "kind": "NON_NULL",
+            "name": null,
+            "ofType": {
+              "kind": "INPUT_OBJECT",
+              "name": "PlanLocationInput",
+              "ofType": null
+            }
+          }
+        }
+      ]
+    },
+    "PlanLocationInput": {
+      "name": "PlanLocationInput",
+      "kind": "INPUT_OBJECT",
+      "description": "Plan location. Either a coordinate or a stop location should be defined.",
+      "enumValues": null,
+      "inputFields": [
+        {
+          "name": "coordinate",
+          "description": "Coordinate of the location. Note, either a coordinate or a stop location should be defined.",
+          "defaultValue": null,
+          "type": {
+            "kind": "INPUT_OBJECT",
+            "name": "PlanCoordinateInput",
+            "ofType": null
+          }
+        },
+        {
+          "name": "stopLocation",
+          "description": "Stop, station, a group of stop places or multimodal stop place that should be used as\na location for the search. The trip doesn't have to use the given stop location for a\ntransit connection as it's possible to start walking to another stop from the given\nlocation. If a station or a group of stop places is provided, a stop that makes the most\nsense for the journey is picked as the location within the station or group of stop places.",
+          "defaultValue": null,
+          "type": {
+            "kind": "INPUT_OBJECT",
+            "name": "PlanStopLocationInput",
+            "ofType": null
+          }
+        }
+      ]
+    },
+    "PlanCoordinateInput": {
+      "name": "PlanCoordinateInput",
+      "kind": "INPUT_OBJECT",
+      "description": "A coordinate used for a location in a plan query.",
+      "enumValues": null,
+      "inputFields": [
+        {
+          "name": "latitude",
+          "description": "Latitude as a WGS84 format number.",
+          "defaultValue": null,
+          "type": {
+            "kind": "NON_NULL",
+            "name": null,
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "CoordinateValue",
+              "ofType": null
+            }
+          }
+        },
+        {
+          "name": "longitude",
+          "description": "Longitude as a WGS84 format number.",
+          "defaultValue": null,
+          "type": {
+            "kind": "NON_NULL",
+            "name": null,
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "CoordinateValue",
+              "ofType": null
+            }
+          }
+        }
+      ]
+    },
+    "PlanDateTimeInput": {
+      "name": "PlanDateTimeInput",
+      "kind": "INPUT_OBJECT",
+      "description": "Plan date time options. Only one of the values should be defined.",
+      "enumValues": null,
+      "inputFields": [
+        {
+          "name": "earliestDeparture",
+          "description": "Earliest departure date time. The returned itineraries should not\ndepart before this instant unless one is using paging to find earlier\nitineraries. Note, it is not currently possible to define both\n`earliestDeparture` and `latestArrival`.",
+          "defaultValue": null,
+          "type": {
+            "kind": "SCALAR",
+            "name": "OffsetDateTime",
+            "ofType": null
+          }
+        },
+        {
+          "name": "latestArrival",
+          "description": "Latest arrival time date time. The returned itineraries should not\narrive to the destination after this instant unless one is using\npaging to find later itineraries. Note, it is not currently possible\nto define both `earliestDeparture` and `latestArrival`.",
+          "defaultValue": null,
+          "type": {
+            "kind": "SCALAR",
+            "name": "OffsetDateTime",
+            "ofType": null
+          }
+        }
+      ]
+    },
+    "PlanStreetPreferencesInput": {
+      "name": "PlanStreetPreferencesInput",
+      "kind": "INPUT_OBJECT",
+      "description": "Street routing preferences used for ingress, egress and transfers. These do not directly affect\nthe transit legs but can change how preferable walking or cycling, for example, is compared to\ntransit.",
+      "enumValues": null,
+      "inputFields": [
+        {
+          "name": "bicycle",
+          "description": "Cycling related preferences.",
+          "defaultValue": null,
+          "type": {
+            "kind": "INPUT_OBJECT",
+            "name": "BicyclePreferencesInput",
+            "ofType": null
+          }
+        },
+        {
+          "name": "car",
+          "description": "Car related preferences. These are not used for car travel as part of transit, such as\ntaxi travel.",
+          "defaultValue": null,
+          "type": {
+            "kind": "INPUT_OBJECT",
+            "name": "CarPreferencesInput",
+            "ofType": null
+          }
+        },
+        {
+          "name": "scooter",
+          "description": "Scooter (kick or electrical) related preferences.",
+          "defaultValue": null,
+          "type": {
+            "kind": "INPUT_OBJECT",
+            "name": "ScooterPreferencesInput",
+            "ofType": null
+          }
+        },
+        {
+          "name": "walk",
+          "description": "Walk related preferences. These are not used when walking a bicycle or a scooter as they\nhave their own preferences.",
+          "defaultValue": null,
+          "type": {
+            "kind": "INPUT_OBJECT",
+            "name": "WalkPreferencesInput",
+            "ofType": null
+          }
+        }
+      ]
+    },
+    "CarPreferencesInput": {
+      "name": "CarPreferencesInput",
+      "kind": "INPUT_OBJECT",
+      "description": "Preferences related to traveling on a car (excluding car travel on transit services such as taxi).",
+      "enumValues": null,
+      "inputFields": [
+        {
+          "name": "boardCost",
+          "description": "Cost of boarding a vehicle with a car.",
+          "defaultValue": "600",
+          "type": {
+            "kind": "SCALAR",
+            "name": "Cost",
+            "ofType": null
+          }
+        },
+        {
+          "name": "parking",
+          "description": "Car parking related preferences.",
+          "defaultValue": null,
+          "type": {
+            "kind": "INPUT_OBJECT",
+            "name": "CarParkingPreferencesInput",
+            "ofType": null
+          }
+        },
+        {
+          "name": "reluctance",
+          "description": "A multiplier for how bad travelling on car is compared to being in transit for equal lengths of time.",
+          "defaultValue": "10.0",
+          "type": {
+            "kind": "SCALAR",
+            "name": "Reluctance",
+            "ofType": null
+          }
+        },
+        {
+          "name": "rental",
+          "description": "Car rental related preferences.",
+          "defaultValue": null,
+          "type": {
+            "kind": "INPUT_OBJECT",
+            "name": "CarRentalPreferencesInput",
+            "ofType": null
+          }
+        }
+      ]
+    },
+    "WalkPreferencesInput": {
+      "name": "WalkPreferencesInput",
+      "kind": "INPUT_OBJECT",
+      "description": "Preferences related to walking (excluding walking a bicycle or a scooter).",
+      "enumValues": null,
+      "inputFields": [
+        {
+          "name": "boardCost",
+          "description": "The cost of boarding a vehicle while walking.",
+          "defaultValue": "600",
+          "type": {
+            "kind": "SCALAR",
+            "name": "Cost",
+            "ofType": null
+          }
+        },
+        {
+          "name": "reluctance",
+          "description": "A multiplier for how bad walking is compared to being in transit for equal lengths of time.",
+          "defaultValue": "4.0",
+          "type": {
+            "kind": "SCALAR",
+            "name": "Reluctance",
+            "ofType": null
+          }
+        },
+        {
+          "name": "safetyFactor",
+          "description": "Factor for how much the walk safety is considered in routing. Value should be between 0 and 1.\nIf the value is set to be 0, safety is ignored.",
+          "defaultValue": "1.0",
+          "type": {
+            "kind": "SCALAR",
+            "name": "Ratio",
+            "ofType": null
+          }
+        },
+        {
+          "name": "speed",
+          "description": "Maximum walk speed on flat ground. Note, this speed is higher than the average speed\nwill be in itineraries as this is the maximum speed but there are\nfactors that slow down walking such as crossings, intersections and elevation changes.",
+          "defaultValue": "1.3",
+          "type": {
+            "kind": "SCALAR",
+            "name": "Speed",
+            "ofType": null
+          }
+        }
+      ]
+    },
+    "TransitModePreferenceCostInput": {
+      "name": "TransitModePreferenceCostInput",
+      "kind": "INPUT_OBJECT",
+      "description": "Costs related to using a transit mode.",
+      "enumValues": null,
+      "inputFields": [
+        {
+          "name": "reluctance",
+          "description": "A cost multiplier of transit leg travel time.",
+          "defaultValue": null,
+          "type": {
+            "kind": "NON_NULL",
+            "name": null,
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "Reluctance",
+              "ofType": null
+            }
+          }
+        }
+      ]
+    },
+    "ReplacementFilterInput": {
+      "name": "ReplacementFilterInput",
+      "kind": "INPUT_OBJECT",
+      "description": "Contains details on how to filter trips based on the replacement feature when considering them for routing.",
+      "enumValues": null,
+      "inputFields": [
+        {
+          "name": "requirement",
+          "description": "One of three choices: must be replacement, cannot be a replacement, can either be or not be a replacement",
+          "defaultValue": null,
+          "type": {
+            "kind": "ENUM",
+            "name": "ReplacementRequirement",
+            "ofType": null
+          }
+        }
+      ]
+    },
+    "PlanItineraryFilterInput": {
+      "name": "PlanItineraryFilterInput",
+      "kind": "INPUT_OBJECT",
+      "description": "Settings that control the behavior of itinerary filtering. **These are advanced settings and\nshould not be set by a user through user preferences.**",
+      "enumValues": null,
+      "inputFields": [
+        {
+          "name": "groupSimilarityKeepOne",
+          "description": "Pick one itinerary from each group after putting itineraries that are `85%` similar together,\nif the given value is `0.85`, for example. Itineraries are grouped together based on relative\nthe distance of transit travel that is identical between the itineraries (access, egress and\ntransfers are ignored). The value must be at least `0.5`.",
+          "defaultValue": "0.85",
+          "type": {
+            "kind": "SCALAR",
+            "name": "Ratio",
+            "ofType": null
+          }
+        },
+        {
+          "name": "groupSimilarityKeepThree",
+          "description": "Pick three itineraries from each group after putting itineraries that are `68%` similar together,\nif the given value is `0.68`, for example. Itineraries are grouped together based on relative\nthe distance of transit travel that is identical between the itineraries (access, egress and\ntransfers are ignored). The value must be at least `0.5`.",
+          "defaultValue": "0.68",
+          "type": {
+            "kind": "SCALAR",
+            "name": "Ratio",
+            "ofType": null
+          }
+        },
+        {
+          "name": "groupedOtherThanSameLegsMaxCostMultiplier",
+          "description": "Of the itineraries grouped to maximum of three itineraries, how much worse can the non-grouped\nlegs be compared to the lowest cost. `2.0` means that they can be double the cost, and any\nitineraries having a higher cost will be filtered away. Use a value lower than `1.0` to turn the\ngrouping off.",
+          "defaultValue": "2.0",
+          "type": {
+            "kind": "SCALAR",
+            "name": "Float",
+            "ofType": null
+          }
+        },
+        {
+          "name": "itineraryFilterDebugProfile",
+          "description": "Itinerary filter debug profile used to control the behaviour of itinerary filters.",
+          "defaultValue": "OFF",
+          "type": {
+            "kind": "ENUM",
+            "name": "ItineraryFilterDebugProfile",
+            "ofType": null
+          }
+        }
+      ]
+    },
+    "PlanViaLocationInput": {
+      "name": "PlanViaLocationInput",
+      "kind": "INPUT_OBJECT",
+      "description": "A via-location is used to specifying a location as an intermediate place the router must\nroute through. The via-location is either a pass-through-location or a visit-via-location.",
+      "enumValues": null,
+      "inputFields": [
+        {
+          "name": "passThrough",
+          "description": "Board, alight or pass-through(on-board) at the stop location.",
+          "defaultValue": null,
+          "type": {
+            "kind": "INPUT_OBJECT",
+            "name": "PlanPassThroughViaLocationInput",
+            "ofType": null
+          }
+        },
+        {
+          "name": "visit",
+          "description": "Board or alight at a stop location or visit a coordinate.",
+          "defaultValue": null,
+          "type": {
+            "kind": "INPUT_OBJECT",
+            "name": "PlanVisitViaLocationInput",
+            "ofType": null
+          }
+        }
+      ]
+    }
+  }
+}

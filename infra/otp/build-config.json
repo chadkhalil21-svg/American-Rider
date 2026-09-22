@@ -1,0 +1,18 @@
+{
+  "transitServiceStart": "-P1M",
+  "transitServiceEnd": "P1Y",
+  "osmDefaults": {
+    "osmTagMapping": "default",
+    "timeZone": "America/New_York"
+  },
+  "osm": [
+    { "source": "south-florida.osm.pbf" }
+  ],
+  "transitFeeds": [
+    { "type": "gtfs", "feedId": "MDT",        "source": "mdt-gtfs.zip" },
+    { "type": "gtfs", "feedId": "BCT",        "source": "bct-gtfs.zip" },
+    { "type": "gtfs", "feedId": "PALMTRAN",   "source": "palmtran-gtfs.zip" },
+    { "type": "gtfs", "feedId": "SFRTA",      "source": "sfrta-gtfs.zip" },
+    { "type": "gtfs", "feedId": "BRIGHTLINE", "source": "brightline-gtfs.zip" }
+  ]
+}

@@ -1,0 +1,693 @@
+{
+  "data": {
+    "planConnection": {
+      "searchDateTime": "2026-09-09T21:46:11-04:00",
+      "routingErrors": [],
+      "edges": [
+        {
+          "node": {
+            "start": "2026-09-09T21:52:40-04:00",
+            "end": "2026-09-09T22:51:41-04:00",
+            "duration": 3541,
+            "numberOfTransfers": 2,
+            "walkDistance": 1883.99,
+            "waitingTime": 740,
+            "legs": [
+              {
+                "mode": "CAR",
+                "transitLeg": false,
+                "duration": 380.0,
+                "distance": 5673.58,
+                "headsign": null,
+                "start": {
+                  "scheduledTime": "2026-09-09T21:52:40-04:00"
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T21:59:00-04:00"
+                },
+                "from": {
+                  "name": "Origin",
+                  "lat": 25.7617,
+                  "lon": -80.1918,
+                  "stop": null
+                },
+                "to": {
+                  "name": "Northwest 12th Avenue",
+                  "lat": 25.7897133,
+                  "lon": -80.2149106,
+                  "stop": null
+                },
+                "route": null,
+                "legGeometry": {
+                  "length": 268,
+                  "points": "qqf|CvmmhNWEIAa@Ik@IqCe@MCOCQEg@I{@OC?[Gg@IEAQCCZALADALCPKp@CXABS|AAHAB?DAHAN?J@tA@F?JK?kDFI?I?yABQ@O@Q?Q@E?Q?U?u@@k@@m@@E?QASAaA@K?I@UHC?C@G?EAGCGAE?A?G@E@A@G?K@I?e@Am@@{ABU@}A@S@eA@S?S@O?OAE?S?_@GICIEGCEEGGEIO_@NeAB]@S?UAQAUAKAMEUGIIEGCGAI?K?a@?sBD[?E@I?@R@bB@`@?d@BpB?D?TCRG`@CRATATEj@@t@?t@IjAGh@EZUtAGb@Id@EVCRCh@C\\?^?`@@f@@h@Dp@?PANCPEPCHELGNILKLQNKHKFKDSFg@PkA\\w@V_AZi@Na@LUDUDQB]B]BY@[?uBEiTXe@B[Bc@Bm@Fa@DcAR[DUFi@J]Hq@Pu@Tg@Ry@ZyAl@uJ|Dq@XuCnAc@`@wBnAe@TkBx@}@\\c@R]PSLULYTKJKLKLKRILM^EPEXEXEVCTATATA^?\\?d@@^@h@Bd@Bd@Ff@Dd@Hj@Hb@Jj@VbAPn@Vr@j@tAPPfAnC`AbCj@fBh@pAxAzDj@fBRj@Lh@VpAX`BDn@Nv@BT?F?FAFADCFCDEDEBKFaB?O?S@yB@C?U?S?k@Ak@?e@AY?eAAm@@o@?I?_@?U?U@"
+                }
+              },
+              {
+                "mode": "WALK",
+                "transitLeg": false,
+                "duration": 60.0,
+                "distance": 0.0,
+                "headsign": null,
+                "start": {
+                  "scheduledTime": "2026-09-09T21:59:00-04:00"
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T22:00:00-04:00"
+                },
+                "from": {
+                  "name": "Northwest 12th Avenue",
+                  "lat": 25.7897133,
+                  "lon": -80.2149106,
+                  "stop": null
+                },
+                "to": {
+                  "name": "UHEALTH JACKSON STATION RAIL NORTHBOUND",
+                  "lat": 25.789712,
+                  "lon": -80.215002,
+                  "stop": {
+                    "gtfsId": "MDT:9507",
+                    "name": "UHEALTH JACKSON STATION RAIL NORTHBOUND"
+                  }
+                },
+                "route": null,
+                "legGeometry": {
+                  "length": 2,
+                  "points": "u`l|Cf~qhN?P"
+                }
+              },
+              {
+                "mode": "RAIL",
+                "transitLeg": true,
+                "duration": 420.0,
+                "distance": 3872.0,
+                "headsign": "EHT - CUL SINGLE TRACK AFTER 8 PM",
+                "start": {
+                  "scheduledTime": "2026-09-09T22:00:00-04:00"
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T22:07:00-04:00"
+                },
+                "from": {
+                  "name": "UHEALTH JACKSON STATION RAIL NORTHBOUND",
+                  "lat": 25.789712,
+                  "lon": -80.215002,
+                  "stop": {
+                    "gtfsId": "MDT:9507",
+                    "name": "UHEALTH JACKSON STATION RAIL NORTHBOUND"
+                  }
+                },
+                "to": {
+                  "name": "EARLINGTON HTS.STAT.RAIL NORTHBOUND",
+                  "lat": 25.812525,
+                  "lon": -80.229946,
+                  "stop": {
+                    "gtfsId": "MDT:9501",
+                    "name": "EARLINGTON HTS.STAT.RAIL NORTHBOUND"
+                  }
+                },
+                "route": {
+                  "gtfsId": "MDT:31009",
+                  "shortName": "2600",
+                  "longName": "REGULAR METRORAIL SERVICE",
+                  "mode": "RAIL"
+                },
+                "legGeometry": {
+                  "length": 41,
+                  "points": "u`l|C~~qhNuDBwTNqILA?aJN}JLoCCsCGcBGeBAeB@mKNuEDaFBqC@iBD_DFA?aGHeAFe@Fm@Lo@Rm@Vm@\\g@^o@p@e@l@_@p@Wf@Wx@Qt@Kf@Kz@Cv@?`AJ`J\\p]LzUBdD"
+                }
+              },
+              {
+                "mode": "RAIL",
+                "transitLeg": true,
+                "duration": 240.0,
+                "distance": 4110.0,
+                "headsign": "ORANGE LINE AIRPORT STATION",
+                "start": {
+                  "scheduledTime": "2026-09-09T22:14:00-04:00"
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T22:18:00-04:00"
+                },
+                "from": {
+                  "name": "EARLINGTON HTS.STAT.RAIL NORTHBOUND",
+                  "lat": 25.812525,
+                  "lon": -80.229946,
+                  "stop": {
+                    "gtfsId": "MDT:9501",
+                    "name": "EARLINGTON HTS.STAT.RAIL NORTHBOUND"
+                  }
+                },
+                "to": {
+                  "name": "MIAMI INTERNATIONAL AIRPORT STATION NORTHBOUND",
+                  "lat": 25.798002,
+                  "lon": -80.258746,
+                  "stop": {
+                    "gtfsId": "MDT:10495",
+                    "name": "MIAMI INTERNATIONAL AIRPORT STATION NORTHBOUND"
+                  }
+                },
+                "route": {
+                  "gtfsId": "MDT:31009",
+                  "shortName": "2600",
+                  "longName": "REGULAR METRORAIL SERVICE",
+                  "mode": "RAIL"
+                },
+                "legGeometry": {
+                  "length": 40,
+                  "points": "wnp|Cp|thNDpIDvGAzD?|N]zAItCA|DCrGA~EDjLBfJNzIH~FDdDHnBf@pAv@|@zAv@j@`Af@zBP`AJ~@?bBDtBP~BRbCh@~BnAbElArBdBdBjBj@hD|@xDj@nFX`F\\vOxArIx@rIt@lA@"
+                }
+              },
+              {
+                "mode": "WALK",
+                "transitLeg": false,
+                "duration": 10.0,
+                "distance": 12.68,
+                "headsign": null,
+                "start": {
+                  "scheduledTime": "2026-09-09T22:18:00-04:00"
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T22:18:10-04:00"
+                },
+                "from": {
+                  "name": "MIAMI INTERNATIONAL AIRPORT STATION NORTHBOUND",
+                  "lat": 25.798002,
+                  "lon": -80.258746,
+                  "stop": {
+                    "gtfsId": "MDT:10495",
+                    "name": "MIAMI INTERNATIONAL AIRPORT STATION NORTHBOUND"
+                  }
+                },
+                "to": {
+                  "name": "AIRPORT STATION",
+                  "lat": 25.798116,
+                  "lon": -80.258748,
+                  "stop": {
+                    "gtfsId": "MDT:10493",
+                    "name": "AIRPORT STATION"
+                  }
+                },
+                "route": null,
+                "legGeometry": {
+                  "length": 4,
+                  "points": "otm|CdpzhN?EU??D"
+                }
+              },
+              {
+                "mode": "TRAM",
+                "transitLeg": true,
+                "duration": 180.0,
+                "distance": 2050.0,
+                "headsign": "MIAMI INTERNATIONA AIRPORT CONCOURSE E",
+                "start": {
+                  "scheduledTime": "2026-09-09T22:23:30-04:00"
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T22:26:30-04:00"
+                },
+                "from": {
+                  "name": "AIRPORT STATION",
+                  "lat": 25.798116,
+                  "lon": -80.258748,
+                  "stop": {
+                    "gtfsId": "MDT:10493",
+                    "name": "AIRPORT STATION"
+                  }
+                },
+                "to": {
+                  "name": "MIAMI INTL AIRPORT GROUND LEVEL",
+                  "lat": 25.795179,
+                  "lon": -80.27803,
+                  "stop": {
+                    "gtfsId": "MDT:56",
+                    "name": "MIAMI INTL AIRPORT GROUND LEVEL"
+                  }
+                },
+                "route": {
+                  "gtfsId": "MDT:14458",
+                  "shortName": "MIA",
+                  "longName": "AIRPORT PEOPLE MOVER",
+                  "mode": "TRAM"
+                },
+                "legGeometry": {
+                  "length": 41,
+                  "points": "_em|CvmzhNX@X?H?NDHFDPHz@MpC?zBA|CAtCAjB]dBg@v@cA~A?tBApBVjCd@xCP~AZbC\\fCAxADlBAjBAnB?bBG~BUjBS`BGzCA`CLpCHrBHv@BvADtG@t@?jA@v@"
+                }
+              },
+              {
+                "mode": "WALK",
+                "transitLeg": false,
+                "duration": 1511.0,
+                "distance": 1871.31,
+                "headsign": null,
+                "start": {
+                  "scheduledTime": "2026-09-09T22:26:30-04:00"
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T22:51:41-04:00"
+                },
+                "from": {
+                  "name": "MIAMI INTL AIRPORT GROUND LEVEL",
+                  "lat": 25.795179,
+                  "lon": -80.27803,
+                  "stop": {
+                    "gtfsId": "MDT:56",
+                    "name": "MIAMI INTL AIRPORT GROUND LEVEL"
+                  }
+                },
+                "to": {
+                  "name": "Destination",
+                  "lat": 25.7959,
+                  "lon": -80.287,
+                  "stop": null
+                },
+                "route": null,
+                "legGeometry": {
+                  "length": 110,
+                  "points": "ybm|Cth~hN?@PA?PFA?D@H?BA?C?A??D?H???@?F?D?D?D?F@J?B_@@m@@W?O@CAC?GCEAAAk@YMIGCCCCECGEGe@aACACACCECISIOCGAC?AAEAu@?MAEAm@CcB?IAg@E{@C{@AWC?[??Im@@W@BfAB`B@`AB~@BbB@`ABtAB~A@lADtBBnCSx@Sn@eBnASn@HnA@t@@b@@jA@`@@pA?FBzABnA?\\@~@@X@v@BxB`@A?XfAC?d@@X@b@@v@?T@p@@\\B?B??IA@A_@@?FT"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "node": {
+            "start": "2026-09-09T22:07:09-04:00",
+            "end": "2026-09-09T23:03:37-04:00",
+            "duration": 3388,
+            "numberOfTransfers": 0,
+            "walkDistance": 2078.87,
+            "waitingTime": 0,
+            "legs": [
+              {
+                "mode": "WALK",
+                "transitLeg": false,
+                "duration": 591.0,
+                "distance": 667.09,
+                "headsign": null,
+                "start": {
+                  "scheduledTime": "2026-09-09T22:07:09-04:00"
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T22:17:00-04:00"
+                },
+                "from": {
+                  "name": "Origin",
+                  "lat": 25.7617,
+                  "lon": -80.1918,
+                  "stop": null
+                },
+                "to": {
+                  "name": "BRICKELL STATION RAIL NORTHBOUND",
+                  "lat": 25.763828,
+                  "lon": -80.19542,
+                  "stop": {
+                    "gtfsId": "MDT:9515",
+                    "name": "BRICKELL STATION RAIL NORTHBOUND"
+                  }
+                },
+                "route": null,
+                "legGeometry": {
+                  "length": 70,
+                  "points": "qqf|CvmmhN@?@^@TSEA?@B@B@B@\\@t@BtA@N?BADABA@C@C@E?EA}AYc@GABAF?DAFA@A@A?A?G@E?C?A??B@HBNCD@B?BBtA@zABtA@pA?BA@A?A@gB@C??F?F@F?@E?A@?B@?H?@??@??D?@??F@ZE?uC@?I"
+                }
+              },
+              {
+                "mode": "RAIL",
+                "transitLeg": true,
+                "duration": 1200.0,
+                "distance": 8317.0,
+                "headsign": "EHT - CUL SINGLE TRACK AFTER 8 PM",
+                "start": {
+                  "scheduledTime": "2026-09-09T22:17:00-04:00"
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T22:37:00-04:00"
+                },
+                "from": {
+                  "name": "BRICKELL STATION RAIL NORTHBOUND",
+                  "lat": 25.763828,
+                  "lon": -80.19542,
+                  "stop": {
+                    "gtfsId": "MDT:9515",
+                    "name": "BRICKELL STATION RAIL NORTHBOUND"
+                  }
+                },
+                "to": {
+                  "name": "EARLINGTON HTS.STAT.RAIL NORTHBOUND",
+                  "lat": 25.812525,
+                  "lon": -80.229946,
+                  "stop": {
+                    "gtfsId": "MDT:9501",
+                    "name": "EARLINGTON HTS.STAT.RAIL NORTHBOUND"
+                  }
+                },
+                "route": {
+                  "gtfsId": "MDT:31009",
+                  "shortName": "2600",
+                  "longName": "REGULAR METRORAIL SERVICE",
+                  "mode": "RAIL"
+                },
+                "legGeometry": {
+                  "length": 105,
+                  "points": "{~f|CtdnhNyF@_BBoBD_DJaINaQRiBH}CPoBJoADqINcCB??aPTyLNC?yEFi@@k@Ds@No@Pm@Vs@^o@d@k@h@a@j@e@v@[v@Ut@Ot@Kt@Gv@Ad@FpGBbB?jCMfFGvE?lAFvED~ATpDP|B@Dp@zIDfABt@Ax@G~@QjAWx@Yz@Wb@cIrLq@x@a@^g@^u@^w@Zy@Rw@Lu@BaGFG?uDBwTNqILA?aJN}JLoCCsCGcBGeBAeB@mKNuEDaFBqC@iBD_DFA?aGHeAFe@Fm@Lo@Rm@Vm@\\g@^o@p@e@l@_@p@Wf@Wx@Qt@Kf@Kz@Cv@?`AJ`J\\p]LzUBdD"
+                }
+              },
+              {
+                "mode": "WALK",
+                "transitLeg": false,
+                "duration": 87.0,
+                "distance": 24.07,
+                "headsign": null,
+                "start": {
+                  "scheduledTime": "2026-09-09T22:37:00-04:00"
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T22:38:27-04:00"
+                },
+                "from": {
+                  "name": "EARLINGTON HTS.STAT.RAIL NORTHBOUND",
+                  "lat": 25.812525,
+                  "lon": -80.229946,
+                  "stop": {
+                    "gtfsId": "MDT:9501",
+                    "name": "EARLINGTON HTS.STAT.RAIL NORTHBOUND"
+                  }
+                },
+                "to": {
+                  "name": "corner of Northwest 41st Street and service road",
+                  "lat": 25.813143,
+                  "lon": -80.229893,
+                  "stop": null
+                },
+                "route": null,
+                "legGeometry": {
+                  "length": 9,
+                  "points": "gop|Cd|thN{AQABADCBEBEAEAEE"
+                }
+              },
+              {
+                "mode": "CAR",
+                "transitLeg": false,
+                "duration": 408.0,
+                "distance": 6030.74,
+                "headsign": null,
+                "start": {
+                  "scheduledTime": "2026-09-09T22:38:27-04:00"
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T22:45:15-04:00"
+                },
+                "from": {
+                  "name": "corner of Northwest 41st Street and service road",
+                  "lat": 25.813143,
+                  "lon": -80.229893,
+                  "stop": null
+                },
+                "to": {
+                  "name": "corner of footbridge and Departures",
+                  "lat": 25.796687,
+                  "lon": -80.2755747,
+                  "stop": null
+                },
+                "route": null,
+                "legGeometry": {
+                  "length": 191,
+                  "points": "csp|Cz{thN@v@@l@?^@v@?f@BdAB~B?d@RAL?`@PJFHHHJHRDRZdDRpCB`ANrCAn@AXClCM`GC|@GzDK`FEtBCz@EvB?|I@pB?xBDjFBfEBdBHfCHrAH~AVhDBLNpA^|Cp@hFbCrRRrATnAVjA`@|A`BrEhBhEVf@Vj@b@z@@BXh@Th@Pj@Pl@Rv@Rx@VbAXjAx@fDJ^Jb@L`@JXL\\Vb@Zd@V\\X\\ZX\\XXRXR^P\\N^NVH\\FXF\\F\\DZBT?\\@VA|EE`AA~@Az@Cv@E`AG|AIpAIXCf@Cd@Ap@Cr@Ad@?bBA~@CrACzBEl@AbAAh@?dCAXJdBHP@P@D?D@B?B@D@D@FDB@DBBBDBFFHFFH@BDHBHBF@F?D@H@H?H@V?P?\\@f@DLHvCD~B@x@DzB?XPbH@b@@h@B|A?N?\\C\\ATAHGh@Il@GTETCDCJI\\O`@c@dA_@v@Q\\MRMNKd@SRQRIHIJILKPGJINGJELEPCXGf@CZARAL?L@XBjA"
+                }
+              },
+              {
+                "mode": "WALK",
+                "transitLeg": false,
+                "duration": 1102.0,
+                "distance": 1387.71,
+                "headsign": null,
+                "start": {
+                  "scheduledTime": "2026-09-09T22:45:15-04:00"
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T23:03:37-04:00"
+                },
+                "from": {
+                  "name": "corner of footbridge and Departures",
+                  "lat": 25.796687,
+                  "lon": -80.2755747,
+                  "stop": null
+                },
+                "to": {
+                  "name": "Destination",
+                  "lat": 25.7959,
+                  "lon": -80.287,
+                  "stop": null
+                },
+                "route": null,
+                "legGeometry": {
+                  "length": 55,
+                  "points": "glm|Cjy}hNC?C?AWC?[??Im@@W@BfAB`B@`AB~@BbB@`ABtAB~A@lADtBBnCSx@Sn@eBnASn@HnA@t@@b@@jA@`@@pA?FBzABnA?\\@~@@X@v@BxB`@A?XfAC?d@@X@b@@v@?T@p@@\\B?B??IA@A_@@?FT"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "node": {
+            "start": "2026-09-09T22:07:09-04:00",
+            "end": "2026-09-09T23:19:41-04:00",
+            "duration": 4352,
+            "numberOfTransfers": 2,
+            "walkDistance": 2551.08,
+            "waitingTime": 620,
+            "legs": [
+              {
+                "mode": "WALK",
+                "transitLeg": false,
+                "duration": 591.0,
+                "distance": 667.09,
+                "headsign": null,
+                "start": {
+                  "scheduledTime": "2026-09-09T22:07:09-04:00"
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T22:17:00-04:00"
+                },
+                "from": {
+                  "name": "Origin",
+                  "lat": 25.7617,
+                  "lon": -80.1918,
+                  "stop": null
+                },
+                "to": {
+                  "name": "BRICKELL STATION RAIL NORTHBOUND",
+                  "lat": 25.763828,
+                  "lon": -80.19542,
+                  "stop": {
+                    "gtfsId": "MDT:9515",
+                    "name": "BRICKELL STATION RAIL NORTHBOUND"
+                  }
+                },
+                "route": null,
+                "legGeometry": {
+                  "length": 70,
+                  "points": "qqf|CvmmhN@?@^@TSEA?@B@B@B@\\@t@BtA@N?BADABA@C@C@E?EA}AYc@GABAF?DAFA@A@A?A?G@E?C?A??B@HBNCD@B?BBtA@zABtA@pA?BA@A?A@gB@C??F?F@F?@E?A@?B@?H?@??@??D?@??F@ZE?uC@?I"
+                }
+              },
+              {
+                "mode": "RAIL",
+                "transitLeg": true,
+                "duration": 1200.0,
+                "distance": 8317.0,
+                "headsign": "EHT - CUL SINGLE TRACK AFTER 8 PM",
+                "start": {
+                  "scheduledTime": "2026-09-09T22:17:00-04:00"
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T22:37:00-04:00"
+                },
+                "from": {
+                  "name": "BRICKELL STATION RAIL NORTHBOUND",
+                  "lat": 25.763828,
+                  "lon": -80.19542,
+                  "stop": {
+                    "gtfsId": "MDT:9515",
+                    "name": "BRICKELL STATION RAIL NORTHBOUND"
+                  }
+                },
+                "to": {
+                  "name": "EARLINGTON HTS.STAT.RAIL NORTHBOUND",
+                  "lat": 25.812525,
+                  "lon": -80.229946,
+                  "stop": {
+                    "gtfsId": "MDT:9501",
+                    "name": "EARLINGTON HTS.STAT.RAIL NORTHBOUND"
+                  }
+                },
+                "route": {
+                  "gtfsId": "MDT:31009",
+                  "shortName": "2600",
+                  "longName": "REGULAR METRORAIL SERVICE",
+                  "mode": "RAIL"
+                },
+                "legGeometry": {
+                  "length": 105,
+                  "points": "{~f|CtdnhNyF@_BBoBD_DJaINaQRiBH}CPoBJoADqINcCB??aPTyLNC?yEFi@@k@Ds@No@Pm@Vs@^o@d@k@h@a@j@e@v@[v@Ut@Ot@Kt@Gv@Ad@FpGBbB?jCMfFGvE?lAFvED~ATpDP|B@Dp@zIDfABt@Ax@G~@QjAWx@Yz@Wb@cIrLq@x@a@^g@^u@^w@Zy@Rw@Lu@BaGFG?uDBwTNqILA?aJN}JLoCCsCGcBGeBAeB@mKNuEDaFBqC@iBD_DFA?aGHeAFe@Fm@Lo@Rm@Vm@\\g@^o@p@e@l@_@p@Wf@Wx@Qt@Kf@Kz@Cv@?`AJ`J\\p]LzUBdD"
+                }
+              },
+              {
+                "mode": "RAIL",
+                "transitLeg": true,
+                "duration": 240.0,
+                "distance": 4110.0,
+                "headsign": "ORANGE LINE AIRPORT STATION",
+                "start": {
+                  "scheduledTime": "2026-09-09T22:44:00-04:00"
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T22:48:00-04:00"
+                },
+                "from": {
+                  "name": "EARLINGTON HTS.STAT.RAIL NORTHBOUND",
+                  "lat": 25.812525,
+                  "lon": -80.229946,
+                  "stop": {
+                    "gtfsId": "MDT:9501",
+                    "name": "EARLINGTON HTS.STAT.RAIL NORTHBOUND"
+                  }
+                },
+                "to": {
+                  "name": "MIAMI INTERNATIONAL AIRPORT STATION NORTHBOUND",
+                  "lat": 25.798002,
+                  "lon": -80.258746,
+                  "stop": {
+                    "gtfsId": "MDT:10495",
+                    "name": "MIAMI INTERNATIONAL AIRPORT STATION NORTHBOUND"
+                  }
+                },
+                "route": {
+                  "gtfsId": "MDT:31009",
+                  "shortName": "2600",
+                  "longName": "REGULAR METRORAIL SERVICE",
+                  "mode": "RAIL"
+                },
+                "legGeometry": {
+                  "length": 40,
+                  "points": "wnp|Cp|thNDpIDvGAzD?|N]zAItCA|DCrGA~EDjLBfJNzIH~FDdDHnBf@pAv@|@zAv@j@`Af@zBP`AJ~@?bBDtBP~BRbCh@~BnAbElArBdBdBjBj@hD|@xDj@nFX`F\\vOxArIx@rIt@lA@"
+                }
+              },
+              {
+                "mode": "WALK",
+                "transitLeg": false,
+                "duration": 10.0,
+                "distance": 12.68,
+                "headsign": null,
+                "start": {
+                  "scheduledTime": "2026-09-09T22:48:00-04:00"
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T22:48:10-04:00"
+                },
+                "from": {
+                  "name": "MIAMI INTERNATIONAL AIRPORT STATION NORTHBOUND",
+                  "lat": 25.798002,
+                  "lon": -80.258746,
+                  "stop": {
+                    "gtfsId": "MDT:10495",
+                    "name": "MIAMI INTERNATIONAL AIRPORT STATION NORTHBOUND"
+                  }
+                },
+                "to": {
+                  "name": "AIRPORT STATION",
+                  "lat": 25.798116,
+                  "lon": -80.258748,
+                  "stop": {
+                    "gtfsId": "MDT:10493",
+                    "name": "AIRPORT STATION"
+                  }
+                },
+                "route": null,
+                "legGeometry": {
+                  "length": 4,
+                  "points": "otm|CdpzhN?EU??D"
+                }
+              },
+              {
+                "mode": "TRAM",
+                "transitLeg": true,
+                "duration": 180.0,
+                "distance": 2050.0,
+                "headsign": "MIAMI INTERNATIONA AIRPORT CONCOURSE E",
+                "start": {
+                  "scheduledTime": "2026-09-09T22:51:30-04:00"
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T22:54:30-04:00"
+                },
+                "from": {
+                  "name": "AIRPORT STATION",
+                  "lat": 25.798116,
+                  "lon": -80.258748,
+                  "stop": {
+                    "gtfsId": "MDT:10493",
+                    "name": "AIRPORT STATION"
+                  }
+                },
+                "to": {
+                  "name": "MIAMI INTL AIRPORT GROUND LEVEL",
+                  "lat": 25.795179,
+                  "lon": -80.27803,
+                  "stop": {
+                    "gtfsId": "MDT:56",
+                    "name": "MIAMI INTL AIRPORT GROUND LEVEL"
+                  }
+                },
+                "route": {
+                  "gtfsId": "MDT:14458",
+                  "shortName": "MIA",
+                  "longName": "AIRPORT PEOPLE MOVER",
+                  "mode": "TRAM"
+                },
+                "legGeometry": {
+                  "length": 41,
+                  "points": "_em|CvmzhNX@X?H?NDHFDPHz@MpC?zBA|CAtCAjB]dBg@v@cA~A?tBApBVjCd@xCP~AZbC\\fCAxADlBAjBAnB?bBG~BUjBS`BGzCA`CLpCHrBHv@BvADtG@t@?jA@v@"
+                }
+              },
+              {
+                "mode": "WALK",
+                "transitLeg": false,
+                "duration": 1511.0,
+                "distance": 1871.31,
+                "headsign": null,
+                "start": {
+                  "scheduledTime": "2026-09-09T22:54:30-04:00"
+                },
+                "end": {
+                  "scheduledTime": "2026-09-09T23:19:41-04:00"
+                },
+                "from": {
+                  "name": "MIAMI INTL AIRPORT GROUND LEVEL",
+                  "lat": 25.795179,
+                  "lon": -80.27803,
+                  "stop": {
+                    "gtfsId": "MDT:56",
+                    "name": "MIAMI INTL AIRPORT GROUND LEVEL"
+                  }
+                },
+                "to": {
+                  "name": "Destination",
+                  "lat": 25.7959,
+                  "lon": -80.287,
+                  "stop": null
+                },
+                "route": null,
+                "legGeometry": {
+                  "length": 110,
+                  "points": "ybm|Cth~hN?@PA?PFA?D@H?BA?C?A??D?H???@?F?D?D?D?F@J?B_@@m@@W?O@CAC?GCEAAAk@YMIGCCCCECGEGe@aACACACCECISIOCGAC?AAEAu@?MAEAm@CcB?IAg@E{@C{@AWC?[??Im@@W@BfAB`B@`AB~@BbB@`ABtAB~A@lADtBBnCSx@Sn@eBnASn@HnA@t@@b@@jA@`@@pA?FBzABnA?\\@~@@X@v@BxB`@A?XfAC?d@@X@b@@v@?T@p@@\\B?B??IA@A_@@?FT"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

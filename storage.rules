@@ -1,0 +1,31 @@
+rules_version = '2';
+
+// American Rider - Firebase Storage security rules.
+//
+// One thing is stored today: the photo attached to a lost item report, so the operator
+// searching a car sees the bag rather than the word "bag".
+//
+// ⚠️ DEPLOY AFTER EDITING, or photo uploads fail and every report files without one:
+//     firebase deploy --only storage
+//
+// The traveler writes only under their own uid, and reads only their own files. Operators
+// will read these through the backend (admin access, which bypasses these rules) rather
+// than being granted a path here - a rule that let any operator read any traveler's photos
+// is a rule that lets any operator read any traveler's photos.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /lost-items/{uid}/{fileName} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if request.auth != null
+                   && request.auth.uid == uid
+                   && request.resource.size < 10 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if false;
+    }
+
+    // Deny by default. Add explicit paths above as new uploads are introduced.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,54 @@
+# Brickell → Miami International Airport, Smart Travel shape: car drop-off → transit → car pick-up.
+# Endpoint: POST http://localhost:8080/otp/gtfs/v1   (OpenTripPlanner 2.10.0, GTFS GraphQL API)
+# Body:     {"query": <this file>, "variables": {"from": {...}, "to": {...}, "when": "2026-09-09T21:41:00-04:00"}}
+# `when` is an OffsetDateTime; omit the dateTime argument entirely to mean "now".
+# OTP 2.10.0 REJECTS access: [CAR_DROP_OFF] or egress: [CAR_PICKUP] on their own with
+# "CAR_PICKUP needs to be combined with WALK mode for the same leg" — WALK must be listed beside
+# the car mode on BOTH ends. So an itinerary may begin or end with a walk instead of a car leg;
+# read legs[0].mode / legs[-1].mode and treat CAR as the leg an Operator drives.
+query PlanSmartTravel($from: PlanCoordinateInput!, $to: PlanCoordinateInput!, $when: OffsetDateTime) {
+  planConnection(
+    origin: { label: "Brickell", location: { coordinate: $from } }
+    destination: { label: "Miami International Airport", location: { coordinate: $to } }
+    dateTime: { earliestDeparture: $when }
+    first: 3
+    modes: {
+      transitOnly: true
+      transit: {
+        access: [CAR_DROP_OFF, WALK]
+        egress: [CAR_PICKUP, WALK]
+        transfer: [WALK]
+        transit: [{ mode: SUBWAY }, { mode: TRAM }, { mode: RAIL }, { mode: BUS }]
+      }
+    }
+  ) {
+    searchDateTime
+    routingErrors { code description inputField }
+    edges {
+      node {
+        start
+        end
+        duration
+        numberOfTransfers
+        walkDistance
+        walkTime
+        waitingTime
+        generalizedCost
+        legs {
+          mode
+          transitLeg
+          duration
+          distance
+          headsign
+          start { scheduledTime estimated { time delay } }
+          end { scheduledTime estimated { time delay } }
+          from { name lat lon stop { gtfsId name } }
+          to { name lat lon stop { gtfsId name } }
+          route { gtfsId shortName longName mode agency { gtfsId name } }
+          trip { gtfsId tripHeadsign }
+          legGeometry { length points }
+        }
+      }
+    }
+  }
+}

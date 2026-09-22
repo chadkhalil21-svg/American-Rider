@@ -1,0 +1,14 @@
+{
+  "server": {
+    "apiProcessingTimeout": "30s"
+  },
+  "routingDefaults": {
+    "walk": { "speed": 1.3, "reluctance": 4.0 },
+    "car": { "reluctance": 10 },
+    "transferSlack": "2m",
+    "transferPenalty": 0
+  },
+  "transit": {
+    "maxNumberOfTransfers": 6
+  }
+}

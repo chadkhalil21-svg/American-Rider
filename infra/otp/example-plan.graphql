@@ -1,0 +1,50 @@
+# Brickell → Miami International Airport, transit with walking access and egress.
+# Endpoint: POST http://localhost:8080/otp/gtfs/v1   (OpenTripPlanner 2.10.0, GTFS GraphQL API)
+# Body:     {"query": <this file>, "variables": {"from": {...}, "to": {...}, "when": "2026-09-09T21:41:00-04:00"}}
+# `when` is an OffsetDateTime; omit the dateTime argument entirely to mean "now".
+query PlanTransit($from: PlanCoordinateInput!, $to: PlanCoordinateInput!, $when: OffsetDateTime) {
+  planConnection(
+    origin: { label: "Brickell", location: { coordinate: $from } }
+    destination: { label: "Miami International Airport", location: { coordinate: $to } }
+    dateTime: { earliestDeparture: $when }
+    first: 3
+    modes: {
+      transitOnly: true
+      transit: {
+        access: [WALK]
+        egress: [WALK]
+        transfer: [WALK]
+        transit: [{ mode: SUBWAY }, { mode: TRAM }, { mode: RAIL }, { mode: BUS }]
+      }
+    }
+  ) {
+    searchDateTime
+    routingErrors { code description inputField }
+    edges {
+      node {
+        start
+        end
+        duration
+        numberOfTransfers
+        walkDistance
+        walkTime
+        waitingTime
+        generalizedCost
+        legs {
+          mode
+          transitLeg
+          duration
+          distance
+          headsign
+          start { scheduledTime estimated { time delay } }
+          end { scheduledTime estimated { time delay } }
+          from { name lat lon stop { gtfsId name } }
+          to { name lat lon stop { gtfsId name } }
+          route { gtfsId shortName longName mode agency { gtfsId name } }
+          trip { gtfsId tripHeadsign }
+          legGeometry { length points }
+        }
+      }
+    }
+  }
+}

@@ -42,10 +42,42 @@ function opsAccounts() {
       .filter((x) => x && x.pw);
   }
   const pw = readKey('OPS_PASSWORD');
-  return pw ? [{ name: 'ops', pw }] : [];
+  const mode = sharedMode();
+  if (!pw || mode === 'off') return [];
+  return [{ name: mode === 'emergency' ? 'ops-shared-emergency' : 'ops-shared-dev', pw }];
 }
+
+/**
+ * Is this a production server? Render sets RENDER=true on every service; a live Stripe key or
+ * NODE_ENV=production says the same. In production the shared password is OFF: an audit trail
+ * that says "ops" cannot say who.
+ */
+function isProduction() {
+  return process.env.NODE_ENV === 'production' || process.env.RENDER === 'true' || /^(sk|rk)_live_/.test(readKey('STRIPE_SECRET_KEY') || '');
+}
+
+/**
+ * How the shared OPS_PASSWORD may be used, when OPS_USERS is not set:
+ *   'dev'        not production — allowed, recorded as "ops-shared-dev"
+ *   'emergency'  production with OPS_ALLOW_SHARED_PASSWORD=emergency — allowed, recorded as
+ *                "ops-shared-emergency", and every page says so. For a lost OPS_USERS only.
+ *   'off'        production otherwise
+ */
+function sharedMode() {
+  if (!isProduction()) return 'dev';
+  return readKey('OPS_ALLOW_SHARED_PASSWORD') === 'emergency' ? 'emergency' : 'off';
+}
+
 const configured = () => opsAccounts().length > 0;
-const shared = () => !readKey('OPS_USERS');
+const shared = () => !readKey('OPS_USERS') && configured();
+
+/** For /health: how /ops is signed in to. */
+function opsAuthMode() {
+  if (readKey('OPS_USERS') && opsAccounts().length) return 'named';
+  if (!readKey('OPS_PASSWORD')) return 'off';
+  const m = sharedMode();
+  return m === 'off' ? 'off (shared password disabled in production)' : `shared-${m}`;
+}
 
 /** A session token for one account. Changing that person's password ends their sessions. */
 const tokenFor = (acct) => crypto.createHash('sha256').update(`ar-ops:${acct.name}:${acct.pw}`).digest('hex');
@@ -133,6 +165,7 @@ const decide = (action, fields, label, extra = '') =>
    </form>`;
 
 const DOC_CODES = /^(document_|insurance_)/;
+const dollars = (x) => Number(String(x).replace(/[^0-9.]/g, '')) || undefined;
 
 /**
  * One operator in the exception queue: every finding that stops them qualifying, and the
@@ -142,15 +175,25 @@ function exceptionCard(u) {
   const q = u.qualification || {};
   const who = u.legalName || u.name || u.email || u.id;
   const blockers = Array.isArray(q.blockers) ? q.blockers : [];
+  const shown = new Set();
   const rows = blockers.map((b) => {
     let actions = '';
-    if (b.item && REQUIRED_DOCS.includes(b.item) && DOC_CODES.test(b.code)) {
+    // One set of actions per document, however many findings it has.
+    if (b.item && REQUIRED_DOCS.includes(b.item) && DOC_CODES.test(b.code) && !shown.has(b.item) && shown.add(b.item)) {
       const d = u.documents?.[b.item] || {};
       const image = d.imageUrl ? `<br><a href="${esc(d.imageUrl)}" target="_blank" rel="noopener">View document</a>` : '';
       const read = d.evidence?.fields ? `<br>Read: ${esc(JSON.stringify(d.evidence.fields))}` : '';
+      const box = (name, label) => `<label style="font-size:13px;margin-right:10px;"><input type="checkbox" name="${name}" value="yes"> ${label}</label>`;
+      // What a person states they read on the policy. The same Florida rules then judge it.
       const insurance = b.item === 'insurance'
-        ? `<label style="font-size:13px;margin-right:8px;"><input type="checkbox" name="commercialUse" value="yes"> Covers passengers for hire</label>` +
-          small('limitDollars', 'Liability limit, $', 'inputmode="numeric"')
+        ? box('commercialUse', 'Covers passengers for hire') + box('tncUse', 'TNC / for-hire use stated') +
+          box('insuredConfirmed', 'Operator is insured or listed') + box('vehicleConfirmed', 'Registered vehicle is listed') + '<br>' +
+          small('limitDollars', 'Ride-period limit, $', 'inputmode="numeric"') +
+          small('loggedOnCombinedDollars', 'Logged-on combined, $', 'inputmode="numeric"') +
+          small('pipDollars', 'PIP, $', 'inputmode="numeric"') +
+          small('effectiveDate', 'Policy start YYYY-MM-DD') +
+          `<select name="uninsuredMotorist" style="padding:8px;border:1px solid ${T.border};border-radius:13px;margin:6px 8px 0 0;">
+             <option value="">UM / UIM…</option><option value="yes">UM / UIM shown</option><option value="rejected_in_writing">UM rejected in writing</option></select>`
         : '';
       actions =
         `<span style="color:${T.faint};font-size:13px;">${esc(d.summary || '')}${image}${read}</span>` +
@@ -275,7 +318,7 @@ ${alarms.length
   <h2>Operator exceptions</h2>
   <p>Operators qualify automatically when every check passes. Only what the checks cannot settle
     — held documents, refusals to reconsider, suspensions — appears here. Every decision is
-    recorded with a note and the name of the person who made it.${shared() ? ' <strong>Signed in with the shared password: decisions are recorded as “ops”, not a named person. Set OPS_USERS.</strong>' : ''}</p>
+    recorded with a note and the name of the person who made it.${shared() ? ` <strong>Signed in with the shared password (${esc(sharedMode())}): decisions are recorded as “${esc(opsAccounts()[0]?.name || 'ops')}”, not a named person. Set OPS_USERS.</strong>` : ''}</p>
   ${pending.length ? pending.map(exceptionCard).join('') : '<p>No operator exceptions.</p>'}
   ${decide('/ops/operators/suspension', { action: 'suspend' }, 'Suspend an operator', small('uid', 'Operator uid', 'required'))}
 </section>
@@ -352,7 +395,7 @@ function mount(app, express, deps = {}) {
       return res
         .status(503)
         .type('html')
-        .send(page('Operations', '<h1>Operations</h1><section><p>Set OPS_USERS (or OPS_PASSWORD) in the environment to use this page.</p></section>'));
+        .send(page('Operations', '<h1>Operations</h1><section><p>Set OPS_USERS ("name:password,name:password") in the environment to use this page. The shared OPS_PASSWORD works only outside production, or with OPS_ALLOW_SHARED_PASSWORD=emergency.</p></section>'));
     }
     if (!signedIn(req)) return res.type('html').send(page('Operations', LOGIN));
     try {
@@ -366,7 +409,7 @@ function mount(app, express, deps = {}) {
   });
 
   app.post('/ops/enter', express.urlencoded({ extended: false }), (req, res) => {
-    const name = shared() ? 'ops' : String(req.body?.name || '').trim();
+    const name = shared() ? opsAccounts()[0].name : String(req.body?.name || '').trim();
     const got = String(req.body?.password || '');
     const acct = opsAccounts().find((x) => x.name === name);
     // Constant time again, and a deliberate pause on failure so the form cannot be run at
@@ -423,7 +466,17 @@ function mount(app, express, deps = {}) {
       note: body.note,
       expiry: String(body.expiry || '').trim() || undefined,
       commercialUse: body.commercialUse,
-      limitDollars: body.limitDollars ? Number(String(body.limitDollars).replace(/[^0-9.]/g, '')) : undefined,
+      limitDollars: body.limitDollars ? dollars(body.limitDollars) : undefined,
+      verified: {
+        insuredConfirmed: body.insuredConfirmed === 'yes',
+        vehicleConfirmed: body.vehicleConfirmed === 'yes',
+        effectiveDate: String(body.effectiveDate || '').trim() || undefined,
+        tncUse: body.tncUse === 'yes' ? 'yes' : undefined,
+        rideCombinedDollars: body.limitDollars ? dollars(body.limitDollars) : undefined,
+        loggedOnCombinedDollars: body.loggedOnCombinedDollars ? dollars(body.loggedOnCombinedDollars) : undefined,
+        pipDollars: body.pipDollars ? dollars(body.pipDollars) : undefined,
+        uninsuredMotorist: body.uninsuredMotorist || undefined,
+      },
     }),
   );
 
@@ -469,4 +522,4 @@ function mount(app, express, deps = {}) {
   });
 }
 
-module.exports = { mount, signedIn, opsAccounts, tokenFor };
+module.exports = { mount, signedIn, opsAccounts, tokenFor, opsAuthMode, sharedMode };

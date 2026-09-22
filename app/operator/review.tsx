@@ -89,8 +89,9 @@ export default function OperatorReview() {
             {/* WAS: "you will be notified the moment you are cleared." Nothing notifies
                 anyone — the app registers for no push notifications. Say where the answer
                 appears instead, which is somewhere they can actually go and look. */}
-            Your qualification is complete. Most operators are commissioned within a few hours;
-            your status appears here.
+            {/* WAS: "Most operators are commissioned within a few hours". No production data
+                supports a processing time, so none is promised. */}
+            {t('traveler.reviewStatusHere')}
           </Text>
         )}
         <View style={{ flex: 1 }} />

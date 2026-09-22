@@ -58,6 +58,9 @@ export default {
   },
 
   operator: {
+    operatingArea: 'Zone d’Opération',
+    chooseOperatingArea: 'Choisissez le comté dans lequel vous opérerez.',
+    marketNotActive: 'American Rider n’opère pas encore dans %{name}. Votre intérêt est enregistré. Choisissez un comté actif pour continuer.',
     ready: 'Prêt à Opérer',
     readySub: 'Vous conservez 99 % de chaque course. Commencez vos opérations pour recevoir des trajets.',
     commence: 'Commencer les Opérations',
@@ -668,6 +671,7 @@ export default {
     underReview: 'En Cours d’Examen',
     travelWhileWaiting: 'Voyagez en tant que voyageur en attendant',
     reviewNotApproved: 'Non Approuvé',
+    reviewStatusHere: 'Votre qualification a été soumise. Votre statut apparaît ici.',
     reviewCheckStatus: 'Vérifier le Statut',
     reviewReturnToQualification: 'Revenir à la Qualification',
     yourTraveler: 'Votre voyageur',

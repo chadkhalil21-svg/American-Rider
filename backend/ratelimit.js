@@ -78,6 +78,21 @@ function perAccount({ name, limit, windowMs }) {
   };
 }
 
+/**
+ * The same, keyed on the caller's address — for the few routes that answer without a sign-in
+ * (quotes, routes, destinations). Looser than perAccount for the reason that comment gives: an
+ * address is shared. It exists so an unauthenticated loop cannot run up routing and database
+ * cost, not to meter a person. Relies on `trust proxy` so req.ip is the client, not Render.
+ */
+function perIp({ name, limit, windowMs }) {
+  return (req, res, next) => {
+    const r = hit(`${name}:ip:${req.ip || 'unknown'}`, limit, windowMs);
+    if (r.ok) return next();
+    res.set('Retry-After', String(r.retryAfterSeconds));
+    return res.status(429).json({ error: 'Too many requests. Try again shortly.', code: 'too_many', retryAfterSeconds: r.retryAfterSeconds });
+  };
+}
+
 /** Count without refusing — for the routes that must never be blocked. */
 function countOnly({ name, limit, windowMs }) {
   return (req, res, next) => {
@@ -94,4 +109,4 @@ function countOnly({ name, limit, windowMs }) {
 /** For tests. */
 function reset() { WINDOWS.clear(); }
 
-module.exports = { perAccount, countOnly, hit, reset };
+module.exports = { perAccount, countOnly, hit, reset, perIp };

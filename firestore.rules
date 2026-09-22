@@ -172,8 +172,15 @@ service cloud.firestore {
     match /messages/{messageId} {
       allow read: if ownsExisting() || drivesExisting();
 
+      // BOUNDED (22 Sept 2026): the fields src/backend/messages.ts writes and nothing else, and
+      // text no longer than the 2,000 characters the app already cuts to — so a client cannot
+      // store an unbounded document per message.
       allow create: if signedIn()
+                    && request.resource.data.keys().hasOnly(['tripNo', 'from', 'travelerUid', 'operatorId', 'lostItemId', 'text', 'createdAt'])
                     && request.resource.data.tripNo is string
+                    && request.resource.data.tripNo.size() <= 24
+                    && request.resource.data.text is string
+                    && request.resource.data.text.size() <= 2000
                     && ((request.resource.data.from == 'traveler'
                          && request.resource.data.travelerUid == request.auth.uid)
                      || (request.resource.data.from == 'operator'

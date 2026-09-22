@@ -17,27 +17,25 @@
 // SINCE 9 SEPT 2026 the definition of "where" is regions.js — one record per service region,
 // national by design (Chad: "think nationally"). This file is the gate and the words; it
 // names no place, because the next region must not need a new sentence.
-const { regionFor, regionForTrip } = require('./regions');
+//
+// SINCE 22 SEPT 2026 the gate is county markets (backend/markets.js): a travel is sold only
+// when both ends are in ACTIVE markets of one region. regions.js still supplies each region's
+// routing, transit and jurisdiction; it no longer decides where travel is sold, because its box
+// also covers counties that are not active (Key Largo is in it).
+const { servesPoint, tripOutsideMarkets } = require('./markets');
 
-/** Is this point somewhere American Rider serves? */
+/** Is this point somewhere American Rider serves — an ACTIVE market? */
 function inMarket(p) {
-  return !!regionFor(p);
+  return servesPoint(p);
 }
 
 /**
- * Which end of a travel falls outside the market, if either.
- * Returns null when both are inside one region, else 'pickup' | 'destination' | 'both'.
+ * Which end of a travel falls outside the active markets, if either.
+ * Returns null when both ends are in active markets of one region, else 'pickup' |
+ * 'destination' | 'both'.
  */
 function outsideMarket(pickup, dest) {
-  const p = !inMarket(pickup);
-  const d = !inMarket(dest);
-  if (p && d) return 'both';
-  if (p) return 'pickup';
-  if (d) return 'destination';
-  // Both ends are served, by two different regions. A travel between regions is not sold,
-  // and from where the traveler stands it is the destination that cannot be reached.
-  if (!regionForTrip(pickup, dest)) return 'destination';
-  return null;
+  return tripOutsideMarkets(pickup, dest);
 }
 
 /** What to tell somebody, in the traveler's own words rather than ours. No place is named. */

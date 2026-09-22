@@ -38,12 +38,29 @@ const { coverageLapsed } = require('./matching');
  */
 const REQUIRED_DOCS = ['license', 'registration', 'insurance'];
 
-// FLORIDA'S LIMIT, as the platform already states it (backend/site.js, Insurance): $1,000,000
-// while carrying a traveler, §627.748(7)(b); $50,000 / $100,000 / $25,000 while available and
-// unmatched, §627.748(7)(c). A single limit of $1,000,000 satisfies both, so the check is that
-// the declarations page shows at least that figure. Lower figures alone are a refusal; no
-// figure that can be read is an exception for a person.
-const FL_CARRYING_LIMIT_DOLLARS = 1000000;
+// FLORIDA TNC INSURANCE, as configured rules the code applies to what the reader extracted.
+// The reader never decides compliance; these numbers do. Figures as the platform already
+// states them (backend/site.js, Insurance) and as §627.748(7) reads — CONFIRM WITH FLORIDA
+// COUNSEL before launch, and change them here, in one place, if counsel differs.
+const FL_TNC_INSURANCE = Object.freeze({
+  statute: 'Fla. Stat. §627.748(7)',
+  // (7)(b): engaged in a prearranged ride — $1,000,000 for death, bodily injury and property
+  // damage. A combined figure is required; split limits alone are not read as meeting it.
+  rideCombinedMinDollars: 1000000,
+  // (7)(c): logged on, not engaged — $50,000 per person, $100,000 per incident, $25,000
+  // property damage; a combined single limit must cover the per-incident and property figures
+  // together ($125,000).
+  loggedOn: { perPerson: 50000, perIncident: 100000, propertyDamage: 25000, combinedSingle: 125000 },
+  // Personal injury protection, §627.736 minimum.
+  pipMinDollars: 10000,
+  // Uninsured / underinsured motorist "as required by s. 627.727", which lets a named insured
+  // reject it in writing. Whether a rejected UM satisfies the TNC rule is a question for counsel:
+  // until INSURANCE_UM_REJECTION_ACCEPTED is set, a rejection is an exception, not a pass.
+  umRejectionAccepted: () => process.env.INSURANCE_UM_REJECTION_ACCEPTED === '1',
+});
+
+// Kept under its old name: the $1,000,000 check the platform has always made.
+const FL_CARRYING_LIMIT_DOLLARS = FL_TNC_INSURANCE.rideCombinedMinDollars;
 
 /** Every dollar figure in a limits string. Bare small numbers ("50/100/25") are not guessed at. */
 function dollarFigures(text) {
@@ -69,15 +86,122 @@ function expiredOn(expiry, now) {
 
 const finding = (gate, kind, code, item, reason) => ({ gate, kind, code, item: item || null, reason: reason || '' });
 
+const top = (text) => Math.max(0, ...dollarFigures(text));
+const surname = (x) => String(x || '').toLowerCase().replace(/[^a-z ]/g, ' ').trim().split(/\s+/).filter(Boolean).pop() || '';
+const plateKey = (x) => String(x || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+const isoDate = (x) => (x && !Number.isNaN(Date.parse(`${x}T00:00:00Z`)) ? String(x) : '');
+
 /**
- * What stands between one document and qualification, or null when nothing does.
+ * The insurance evidence as one normalized record: what the reader extracted, overlaid by what
+ * a person on /ops verified (decision.verified). A person's values are held to the same rules.
+ */
+function insuranceEvidence(d, human) {
+  const ins = d.evidence?.insurance || null;
+  const v = (human && human.verified) || {};
+  const lim = (L) => ({
+    perPerson: top(L?.bodilyInjuryPerPerson),
+    perIncident: top(L?.bodilyInjuryPerIncident),
+    propertyDamage: top(L?.propertyDamage),
+    combinedSingle: top(L?.combinedSingleLimit),
+  });
+  const any = (L) => L.perPerson || L.perIncident || L.propertyDamage || L.combinedSingle;
+  const loggedOnRead = lim(ins?.loggedOnLimits);
+  const general = lim(ins?.generalLimits);
+  return {
+    structured: !!ins || !!human,
+    insureds: [...(ins?.namedInsureds || []), ...(ins?.listedDrivers || [])],
+    insuredConfirmed: v.insuredConfirmed === true,
+    vehicles: ins?.vehicles || [],
+    vehicleConfirmed: v.vehicleConfirmed === true,
+    effective: isoDate(v.effectiveDate) || isoDate(ins?.effectiveDate),
+    expiration: isoDate(ins?.expirationDate),
+    tnc: v.tncUse === 'yes' ? 'yes' : ins?.tncEndorsement === 'yes' || ins?.forHireUse === 'yes' ? 'yes'
+      : ins?.tncEndorsement === 'no' && ins?.forHireUse === 'no' ? 'no' : 'unknown',
+    rideCombined: Number(v.rideCombinedDollars) || top(ins?.rideLimits?.combinedSingleLimit) || general.combinedSingle,
+    loggedOn: Number(v.loggedOnCombinedDollars) ? { perPerson: 0, perIncident: 0, propertyDamage: 0, combinedSingle: Number(v.loggedOnCombinedDollars) }
+      : any(loggedOnRead) ? loggedOnRead : general,
+    pip: v.pipDollars ? { shown: 'yes', amount: Number(v.pipDollars) } : { shown: ins?.pip?.shown || 'not_shown', amount: top(ins?.pip?.amount) },
+    um: v.uninsuredMotorist || ins?.uninsuredMotorist?.shown || 'not_shown',
+  };
+}
+
+/** Every Florida TNC insurance rule, applied in code. Returns findings (possibly none). */
+function insuranceFindings(d, human, ctx, now) {
+  const R = FL_TNC_INSURANCE;
+  const out = [];
+  const F = (k, code, reason) => out.push(finding('qualification', k, code, 'insurance', reason));
+  const e = insuranceEvidence(d, human);
+  if (!e.structured) {
+    F('exception', 'insurance_structured_evidence_missing', 'The policy has not been read in the structured form the Florida rules need.');
+    return out;
+  }
+  // Who is insured: the account holder must be a named insured or listed driver.
+  const who = surname(ctx.user?.legalName || ctx.user?.name);
+  if (!e.insuredConfirmed) {
+    if (!e.insureds.length) F('exception', 'insurance_insured_missing', 'No named insured or listed driver could be read.');
+    else if (!who) F('exception', 'insurance_identity_unverified', 'The account has no name to compare with the policy.');
+    else if (!e.insureds.some((n) => surname(n) === who)) F('exception', 'insurance_insured_mismatch', 'The account holder is not a named insured or listed driver on the policy.');
+  }
+  // Which vehicle: the registered vehicle must be on the policy.
+  if (!e.vehicleConfirmed) {
+    const reg = ctx.user?.documents?.registration?.evidence?.fields || {};
+    const plate = plateKey(reg.plate);
+    const vin = plateKey(reg.vin);
+    if (!e.vehicles.length) F('exception', 'insurance_vehicle_missing', 'No covered vehicle could be read.');
+    else if (!plate && !vin) F('exception', 'insurance_vehicle_unverified', 'The registration gives no plate or VIN to compare.');
+    else if (!e.vehicles.some((x) => (vin && plateKey(x.vin) === vin) || (plate && plateKey(x.plate) === plate))) {
+      F('exception', 'insurance_vehicle_mismatch', 'The registered vehicle is not listed on the policy.');
+    }
+  }
+  // When: in force now.
+  if (!e.effective) F('exception', 'insurance_effective_date_missing', 'The policy start date could not be read.');
+  else if (Date.parse(`${e.effective}T00:00:00Z`) > now) F('incomplete', 'insurance_not_yet_effective', `The policy starts ${e.effective}.`);
+  const exp = (human && human.expiry) || d.expiry;
+  if (e.expiration && exp && e.expiration !== exp) F('exception', 'insurance_dates_inconsistent', 'The policy end date differs between two readings.');
+  // For what: transportation network company or for-hire use must be stated.
+  if (e.tnc === 'no') F('refused', 'insurance_no_tnc_use', 'The policy states no TNC or for-hire coverage.');
+  else if (e.tnc !== 'yes') F('exception', 'insurance_tnc_use_unverified', 'TNC or for-hire coverage is not stated.');
+  // How much, during a prearranged ride.
+  if (!e.rideCombined) F('exception', 'insurance_ride_limit_unreadable', 'The limit during a prearranged ride could not be read.');
+  else if (e.rideCombined < R.rideCombinedMinDollars) F('refused', 'insurance_ride_limit_insufficient', `$${e.rideCombined.toLocaleString('en-US')} during a ride; Florida requires $1,000,000.`);
+  // How much, while logged on and not engaged.
+  const L = e.loggedOn;
+  const split = L.perPerson >= R.loggedOn.perPerson && L.perIncident >= R.loggedOn.perIncident && L.propertyDamage >= R.loggedOn.propertyDamage;
+  const combined = L.combinedSingle >= R.loggedOn.combinedSingle;
+  if (!(L.perPerson || L.perIncident || L.propertyDamage || L.combinedSingle)) {
+    F('exception', 'insurance_logged_on_limits_unreadable', 'The limits while logged on and not on a ride could not be read.');
+  } else if (!split && !combined) {
+    // Readable, but a figure is missing or below. Refused only when every stated figure is read
+    // and one is plainly short; a gap in what was read is a person's to check.
+    const complete = L.combinedSingle || (L.perPerson && L.perIncident && L.propertyDamage);
+    F(complete ? 'refused' : 'exception', complete ? 'insurance_logged_on_limits_insufficient' : 'insurance_logged_on_limits_incomplete',
+      'The limits while logged on do not show $50,000 / $100,000 / $25,000.');
+  }
+  // PIP.
+  if (e.pip.shown === 'no') F('refused', 'insurance_no_pip', 'The policy states no personal injury protection.');
+  else if (e.pip.shown !== 'yes') F('exception', 'insurance_pip_not_shown', 'Personal injury protection is not shown.');
+  else if (!e.pip.amount) F('exception', 'insurance_pip_amount_unreadable', 'The personal injury protection amount could not be read.');
+  else if (e.pip.amount < R.pipMinDollars) F('refused', 'insurance_pip_insufficient', `PIP of $${e.pip.amount.toLocaleString('en-US')}; the minimum is $10,000.`);
+  // Uninsured / underinsured motorist.
+  if (e.um === 'rejected' || e.um === 'rejected_in_writing') {
+    if (!R.umRejectionAccepted()) F('exception', 'insurance_um_rejected', 'Uninsured motorist coverage is rejected on the policy; whether that satisfies the TNC rule is awaiting counsel.');
+  } else if (e.um !== 'yes') {
+    F('exception', 'insurance_um_not_shown', 'Uninsured / underinsured motorist coverage is not shown.');
+  }
+  return out;
+}
+
+/**
+ * What stands between one document and qualification: a list, empty when nothing does.
  *
  * `d` is users/{uid}.documents[kind]: the reader's verdict, reasons and evidence, plus
- * `decision` when a person on /ops has decided it.
+ * `decision` when a person on /ops has decided it. `ctx.user` is the whole account, for the
+ * checks that compare documents (the insured's name, the registered vehicle).
  */
-function documentFinding(kind, d, now) {
-  const Q = (k, code, reason) => finding('qualification', k, code, kind, reason);
+function documentFindings(kind, d, now, ctx = {}) {
+  const Q = (k, code, reason) => [finding('qualification', k, code, kind, reason)];
   if (!d || !d.verdict) return Q('incomplete', 'document_missing', 'Not submitted.');
+  if (d.reuploadRequired && !d.decision) return Q('incomplete', 'document_reupload_required', d.reuploadReason || 'Submit this document again.');
   const human = d.decision && ['accept', 'refuse'].includes(d.decision.verdict) ? d.decision : null;
   const verdict = human ? human.verdict : d.verdict;
   const reasons = (Array.isArray(d.reasons) ? d.reasons : []).join(' ');
@@ -97,6 +221,7 @@ function documentFinding(kind, d, now) {
   if (expiredOn(expiry, now)) return Q('incomplete', 'document_expired', `Expired ${expiry}. Submit a current one.`);
 
   if (kind === 'insurance') {
+    // The checks the platform has always made, unchanged: commercial use, and $1,000,000.
     const use = human ? human.commercialUse : ev.fields?.commercialUse;
     if (use === 'no') return Q('refused', 'insurance_personal_use', 'Personal-use policy; carrying passengers for hire needs commercial, livery or for-hire cover.');
     if (use !== 'yes') return Q('exception', 'insurance_use_unverified', 'Whether the policy covers carrying passengers for hire is not confirmed.');
@@ -105,8 +230,15 @@ function documentFinding(kind, d, now) {
     if (limit < FL_CARRYING_LIMIT_DOLLARS) {
       return Q('refused', 'insurance_limits_insufficient', `Highest limit shown is $${limit.toLocaleString('en-US')}; Florida requires $1,000,000 while carrying a traveler.`);
     }
+    // And the full Florida TNC rule set on the structured reading.
+    return insuranceFindings(d, human, ctx, now);
   }
-  return null;
+  return [];
+}
+
+/** The first finding for one document, or null — kept for callers that want one answer. */
+function documentFinding(kind, d, now, ctx = {}) {
+  return documentFindings(kind, d, now, ctx)[0] || null;
 }
 
 /**
@@ -138,7 +270,7 @@ function assessOperator({ user, fleet = null, context = 'qualify', liveMoney = f
   if (u?.suspension?.active) {
     add(finding('qualification', 'suspended', 'suspended', null, u.suspension.note || 'Suspended.'));
   }
-  if (u) for (const k of REQUIRED_DOCS) add(documentFinding(k, u.documents?.[k], now));
+  if (u) for (const k of REQUIRED_DOCS) documentFindings(k, u.documents?.[k], now, { user: u }).forEach(add);
 
   const s = u?.screening || null;
   if (s?.decision === 'refuse') {
@@ -254,15 +386,30 @@ function auditEntry({ actor, action, uid, item, before, after, note, now }) {
  * expiry when the reading had none, and for insurance confirms commercial use and states the
  * limit they read, which is then held to Florida's figure like any other.
  */
-async function resolveDocument({ db, uid, kind, action, actor, note, expiry, commercialUse, limitDollars, now = Date.now() }) {
+async function resolveDocument({ db, uid, kind, action, actor, note, expiry, commercialUse, limitDollars, verified, now = Date.now() }) {
   if (!REQUIRED_DOCS.includes(kind)) return { ok: false, status: 400, error: 'Unknown document' };
   if (!['accept', 'refuse'].includes(action)) return { ok: false, status: 400, error: 'Unknown action' };
   const why = String(note || '').trim().slice(0, 500);
   if (!why) return { ok: false, status: 400, error: 'A note is required for every decision' };
   if (expiry && !ISO_DATE.test(String(expiry))) return { ok: false, status: 400, error: 'Expiry must be YYYY-MM-DD' };
+  // A PERSON ACCEPTING INSURANCE STATES WHAT THEY READ, field by field, and the same rules then
+  // judge it: they can resolve what the reader could not read, not waive a minimum.
+  let verifiedIns = null;
   if (action === 'accept' && kind === 'insurance') {
+    const v = verified || {};
     if (commercialUse !== 'yes') return { ok: false, status: 400, error: 'Confirm the policy covers carrying passengers for hire' };
     if (!(Number(limitDollars) > 0)) return { ok: false, status: 400, error: 'State the liability limit shown on the policy' };
+    if (v.effectiveDate && !ISO_DATE.test(String(v.effectiveDate))) return { ok: false, status: 400, error: 'Policy start must be YYYY-MM-DD' };
+    verifiedIns = {
+      insuredConfirmed: v.insuredConfirmed === true,
+      vehicleConfirmed: v.vehicleConfirmed === true,
+      ...(v.effectiveDate ? { effectiveDate: String(v.effectiveDate) } : {}),
+      ...(v.tncUse === 'yes' ? { tncUse: 'yes' } : {}),
+      rideCombinedDollars: Number(v.rideCombinedDollars) || Number(limitDollars),
+      ...(Number(v.loggedOnCombinedDollars) > 0 ? { loggedOnCombinedDollars: Number(v.loggedOnCombinedDollars) } : {}),
+      ...(Number(v.pipDollars) > 0 ? { pipDollars: Number(v.pipDollars) } : {}),
+      ...(['yes', 'rejected_in_writing'].includes(v.uninsuredMotorist) ? { uninsuredMotorist: v.uninsuredMotorist } : {}),
+    };
   }
   const userRef = db.collection('users').doc(String(uid));
   const auditRef = db.collection('audit_log').doc();
@@ -276,7 +423,7 @@ async function resolveDocument({ db, uid, kind, action, actor, note, expiry, com
       at: now,
       note: why,
       ...(expiry ? { expiry: String(expiry) } : {}),
-      ...(kind === 'insurance' && action === 'accept' ? { commercialUse: 'yes', limitDollars: Number(limitDollars) } : {}),
+      ...(kind === 'insurance' && action === 'accept' ? { commercialUse: 'yes', limitDollars: Number(limitDollars), verified: verifiedIns } : {}),
     };
     tx.set(userRef, { documents: { [kind]: { decision } } }, { merge: true });
     tx.set(auditRef, auditEntry({ actor, action: `document_${action}`, uid, item: kind, before: d.decision || { readerVerdict: d.verdict }, after: decision, note: why, now }));
@@ -306,8 +453,11 @@ async function setSuspension({ db, uid, active, actor, note, now = Date.now() })
 module.exports = {
   REQUIRED_DOCS,
   FL_CARRYING_LIMIT_DOLLARS,
+  FL_TNC_INSURANCE,
   dollarFigures,
   documentFinding,
+  documentFindings,
+  insuranceFindings,
   assessOperator,
   assessAndRecord,
   resolveDocument,

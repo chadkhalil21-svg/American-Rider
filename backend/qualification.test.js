@@ -73,10 +73,35 @@ const read = (kind, fields = {}) => ({
     fields: { expiry: '2028-01-31', commercialUse: '', limits: '', ...fields },
   },
 });
+// A complete Florida TNC policy, as the structured reader returns it.
+const L = (pp, pi, pd, csl) => ({ bodilyInjuryPerPerson: pp, bodilyInjuryPerIncident: pi, propertyDamage: pd, combinedSingleLimit: csl });
+const fullPolicy = (over = {}) => ({
+  insurer: 'Example Mutual',
+  policyNumber: 'TNC-123',
+  namedInsureds: ['Ana M. Operator'],
+  listedDrivers: [],
+  effectiveDate: '2026-01-01',
+  expirationDate: '2028-01-31',
+  vehicles: [{ description: '2022 Toyota Camry', vin: '4T1B11HK5NU000001', plate: 'KTR 4821' }],
+  useStatements: ['Transportation Network Company endorsement'],
+  tncEndorsement: 'yes',
+  forHireUse: 'not_shown',
+  loggedOnLimits: L('$50,000', '$100,000', '$25,000', ''),
+  rideLimits: L('', '', '', '$1,000,000'),
+  generalLimits: L('', '', '', ''),
+  pip: { shown: 'yes', amount: '$10,000' },
+  uninsuredMotorist: { shown: 'yes', amount: '$50,000/$100,000' },
+  ...over,
+});
+const insuranceRead = (over = {}, fields = {}) => {
+  const d = read('insurance', { commercialUse: 'yes', limits: '$1,000,000 combined single limit', ...fields });
+  d.evidence.insurance = fullPolicy(over);
+  return d;
+};
 const cleanDocs = () => ({
   license: read('license'),
-  registration: read('registration'),
-  insurance: read('insurance', { commercialUse: 'yes', limits: '$1,000,000 combined single limit' }),
+  registration: read('registration', { plate: 'KTR-4821', vin: '4T1B11HK5NU000001' }),
+  insurance: insuranceRead(),
 });
 const cleanUser = (over = {}) => ({
   name: 'Ana Operator',
@@ -135,6 +160,43 @@ const codes = (a) => a.blockers.map((b) => b.code);
     const unsure = cleanUser();
     unsure.documents.insurance.evidence.fields.commercialUse = 'unclear';
     check('4. unconfirmed commercial use is an exception', codes(A(unsure)).includes('insurance_use_unverified'));
+  }
+
+  // ——— 4b. Florida TNC insurance rules, applied in code to the structured reading ————————————
+  {
+    const withPolicy = (over, fields) => { const u = cleanUser(); u.documents.insurance = insuranceRead(over, fields); return u; };
+    const C = (over, fields) => codes(A(withPolicy(over, fields)));
+    check('4b. a complete policy passes every rule', A(withPolicy({})).qualified);
+    check('4b. no structured reading (older reader) → exception', (() => { const u = cleanUser(); delete u.documents.insurance.evidence.insurance; return codes(A(u)).includes('insurance_structured_evidence_missing'); })());
+    check('4b. account holder not insured or listed → exception', C({ namedInsureds: ['Somebody Else'] }).includes('insurance_insured_mismatch'));
+    check('4b. listed driver counts', A(withPolicy({ namedInsureds: ['Somebody Else'], listedDrivers: ['Ana Operator'] })).qualified);
+    check('4b. no insured readable → exception', C({ namedInsureds: [] }).includes('insurance_insured_missing'));
+    check('4b. registered vehicle not on the policy → exception', C({ vehicles: [{ description: 'x', vin: 'OTHER', plate: 'ZZZ 999' }] }).includes('insurance_vehicle_mismatch'));
+    check('4b. no vehicle readable → exception', C({ vehicles: [] }).includes('insurance_vehicle_missing'));
+    check('4b. start date missing → exception', C({ effectiveDate: '' }).includes('insurance_effective_date_missing'));
+    check('4b. starts in the future → not yet', C({ effectiveDate: '2027-01-01' }).includes('insurance_not_yet_effective'));
+    check('4b. two end dates disagree → exception', C({ expirationDate: '2027-06-30' }).includes('insurance_dates_inconsistent'));
+    check('4b. no TNC or for-hire use stated → exception', C({ tncEndorsement: 'not_shown', forHireUse: 'not_shown' }).includes('insurance_tnc_use_unverified'));
+    check('4b. TNC and for-hire use both stated absent → refused', C({ tncEndorsement: 'no', forHireUse: 'no' }).includes('insurance_no_tnc_use'));
+    check('4b. for-hire use alone is enough', A(withPolicy({ tncEndorsement: 'not_shown', forHireUse: 'yes' })).qualified);
+    check('4b. ride-period limit below $1,000,000 → refused', C({ rideLimits: L('', '', '', '$500,000') }).includes('insurance_ride_limit_insufficient'));
+    check('4b. ride-period limit unreadable → exception', C({ rideLimits: L('', '', '', '') }).includes('insurance_ride_limit_unreadable'));
+    check('4b. a general $1,000,000 CSL covers both periods', A(withPolicy({ rideLimits: L('', '', '', ''), loggedOnLimits: L('', '', '', ''), generalLimits: L('', '', '', '$1,000,000 CSL') })).qualified);
+    check('4b. logged-on limits below 50/100/25 → refused', C({ loggedOnLimits: L('$25,000', '$50,000', '$10,000', '') }).includes('insurance_logged_on_limits_insufficient'));
+    check('4b. logged-on limits partly unreadable → exception', C({ loggedOnLimits: L('$50,000', '', '', '') }).includes('insurance_logged_on_limits_incomplete'));
+    check('4b. logged-on limits absent → exception', C({ loggedOnLimits: L('', '', '', '') }).includes('insurance_logged_on_limits_unreadable'));
+    check('4b. PIP not shown → exception', C({ pip: { shown: 'not_shown', amount: '' } }).includes('insurance_pip_not_shown'));
+    check('4b. PIP stated absent → refused', C({ pip: { shown: 'no', amount: '' } }).includes('insurance_no_pip'));
+    check('4b. PIP below $10,000 → refused', C({ pip: { shown: 'yes', amount: '$5,000' } }).includes('insurance_pip_insufficient'));
+    check('4b. PIP amount unreadable → exception', C({ pip: { shown: 'yes', amount: '' } }).includes('insurance_pip_amount_unreadable'));
+    check('4b. UM not shown → exception', C({ uninsuredMotorist: { shown: 'not_shown', amount: '' } }).includes('insurance_um_not_shown'));
+    check('4b. UM rejected → exception until counsel confirms', C({ uninsuredMotorist: { shown: 'rejected', amount: '' } }).includes('insurance_um_rejected'));
+    process.env.INSURANCE_UM_REJECTION_ACCEPTED = '1';
+    check('4b. …and accepted once configured', A(withPolicy({ uninsuredMotorist: { shown: 'rejected', amount: '' } })).qualified);
+    delete process.env.INSURANCE_UM_REJECTION_ACCEPTED;
+    check('4b. the old $1,000,000 check still runs first', C({}, { limits: '$300,000' }).includes('insurance_limits_insufficient'));
+    const src = fs.readFileSync(path.join(__dirname, 'documents.js'), 'utf8');
+    check('4b. the reader is not asked whether the policy complies', !/compliant|complies with|meets florida/i.test(src.slice(src.indexOf('const INSURANCE'), src.indexOf('const SCHEMA'))));
   }
 
   // ——— 5. Checkr screening in production ————————————————————————————————————————————
@@ -298,6 +360,21 @@ const codes = (a) => a.blockers.map((b) => b.code);
     const opsSrc = fs.readFileSync(path.join(__dirname, 'ops.js'), 'utf8');
     check('10. no routine Approve route remains on /ops', !/\/ops\/operators\/commission/.test(opsSrc));
     delete process.env.OPS_USERS;
+
+    // THE SHARED PASSWORD IS NOT A PRODUCTION PATH.
+    process.env.OPS_PASSWORD = 'shared-secret-long';
+    delete process.env.RENDER;
+    check('10b. shared password outside production: allowed, named "ops-shared-dev"', ops.opsAccounts().map((a) => a.name).join() === 'ops-shared-dev');
+    process.env.RENDER = 'true';
+    check('10b. shared password in production: refused', ops.opsAccounts().length === 0 && /disabled/.test(ops.opsAuthMode()));
+    const prodLogin = res();
+    await doc({ headers: { cookie: `ar_ops=${encodeURIComponent('ops-shared-dev.' + ops.tokenFor({ name: 'ops-shared-dev', pw: 'shared-secret-long' }))}` }, body }, prodLogin);
+    check('10b. a dev-mode session does not work in production', prodLogin.code === 401);
+    process.env.OPS_ALLOW_SHARED_PASSWORD = 'emergency';
+    check('10b. production emergency switch: allowed, recorded as "ops-shared-emergency"', ops.opsAccounts().map((a) => a.name).join() === 'ops-shared-emergency' && ops.opsAuthMode() === 'shared-emergency');
+    process.env.OPS_USERS = 'alice:correct-horse-battery';
+    check('10b. named users win over the shared password everywhere', ops.opsAccounts().map((a) => a.name).join() === 'alice' && ops.opsAuthMode() === 'named');
+    for (const k of ['OPS_USERS', 'OPS_PASSWORD', 'OPS_ALLOW_SHARED_PASSWORD', 'RENDER']) delete process.env[k];
   }
 
   // ——— the pieces ————————————————————————————————————————————————————————————————

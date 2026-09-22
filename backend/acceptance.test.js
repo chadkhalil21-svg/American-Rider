@@ -44,9 +44,21 @@ const doc = (fields = {}) => ({
   expiry: '2099-01-01',
   evidence: { isTheRequestedDocument: true, legible: true, fields: { expiry: '2099-01-01', ...fields } },
 });
+const Lm = (pp, pi, pd, csl) => ({ bodilyInjuryPerPerson: pp, bodilyInjuryPerIncident: pi, propertyDamage: pd, combinedSingleLimit: csl });
+const insuranceDoc = () => {
+  const d = doc({ commercialUse: 'yes', limits: '$1,000,000 CSL' });
+  d.evidence.insurance = {
+    namedInsureds: ['Ana Operator'], listedDrivers: [], effectiveDate: '2026-01-01', expirationDate: '2099-01-01',
+    vehicles: [{ description: 'car', vin: '', plate: 'KTR 4821' }], useStatements: [], tncEndorsement: 'yes', forHireUse: 'not_shown',
+    loggedOnLimits: Lm('$50,000', '$100,000', '$25,000', ''), rideLimits: Lm('', '', '', '$1,000,000'), generalLimits: Lm('', '', '', ''),
+    pip: { shown: 'yes', amount: '$10,000' }, uninsuredMotorist: { shown: 'yes', amount: '' },
+  };
+  return d;
+};
 const goodUser = () => ({
+  name: 'Ana Operator',
   insuranceDisclosure: { version: DISCLOSURE_VERSION, at: NOW - 1000 },
-  documents: { license: doc(), registration: doc(), insurance: doc({ commercialUse: 'yes', limits: '$1,000,000 CSL' }) },
+  documents: { license: doc(), registration: doc({ plate: 'KTR4821' }), insurance: insuranceDoc() },
   screening: { decision: 'pass', recheckDue: NOW + 1e10 },
 });
 const OK = { account: { disabled: false }, payouts: { enabled: true } };
@@ -78,7 +90,7 @@ const accept = (db, extra = {}) => acceptOffer({ db, uid: 'op', rideId: 'r1', ex
   check('suspended by a person → refused', has(E({ suspension: { active: true, note: 'x' } }, {}), 'suspended'));
   check('a document refused since → refused', has(E({ documents: { ...goodUser().documents, license: { verdict: 'refuse' } } }, {}), 'document_refused'));
   check('a document held since → refused', has(E({ documents: { ...goodUser().documents, license: { ...doc(), verdict: 'review' } } }, {}), 'document_review'));
-  check('a document missing → refused', has(E({ documents: { license: doc(), insurance: goodUser().documents.insurance } }, {}), 'document_missing'));
+  check('a document missing → refused', has(E({ documents: { license: doc(), insurance: insuranceDoc() } }, {}), 'document_missing'));
   check('a document expired since → refused', has(E({ documents: { ...goodUser().documents, registration: { ...doc(), expiry: '2026-09-01' } } }, {}), 'document_expired'));
   check('documentBlocked on the fleet record → refused', has(E({}, { documentBlocked: true }), 'document_blocked'));
   check('insurance expiry passed (recorded date) → refused', has(E({}, { insuranceExpiry: '2026-09-21' }), 'coverage_expired'));

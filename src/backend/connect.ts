@@ -154,6 +154,45 @@ export async function submitForReview(): Promise<{ ok: boolean; error?: string }
   }
 }
 
+// ---- OPERATING MARKET --------------------------------------------------------------------
+//
+// The county an operator will work in. The server unlocks document reading, screening and
+// payouts only for an ACTIVE county; a waitlist county is recorded and unlocks nothing costly.
+export type Market = { id: string; name: string; status: 'active' | 'waitlist' };
+export type MarketState = { market: Market | null; active: Market[] };
+
+const EMPTY_MARKETS: MarketState = { market: null, active: [] };
+
+/** Never throws. */
+export async function getOperatingMarket(): Promise<MarketState> {
+  try {
+    const res = await fetch(`${PAYMENT_SERVER_URL}/operator/market`, { headers: await authHeaders() });
+    if (!res.ok) return EMPTY_MARKETS;
+    const d = await res.json();
+    return { market: d?.market ?? null, active: Array.isArray(d?.active) ? d.active : [] };
+  } catch {
+    return EMPTY_MARKETS;
+  }
+}
+
+/** Declare a county, or send a position for the server to place. Never throws. */
+export async function setOperatingMarket(
+  arg: { marketId: string } | { lat: number; lng: number },
+): Promise<MarketState> {
+  try {
+    const res = await fetch(`${PAYMENT_SERVER_URL}/operator/market`, {
+      method: 'POST',
+      headers: await authHeaders(),
+      body: JSON.stringify(arg),
+    });
+    if (!res.ok) return EMPTY_MARKETS;
+    const d = await res.json();
+    return { market: d?.market ?? null, active: Array.isArray(d?.active) ? d.active : [] };
+  } catch {
+    return EMPTY_MARKETS;
+  }
+}
+
 /** Stop being matchable. Never throws — going off duty must always be possible. */
 export async function goOffline(): Promise<void> {
   try {

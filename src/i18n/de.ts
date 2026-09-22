@@ -56,6 +56,9 @@ export default {
     language: 'Sprache',
   },
   operator: {
+    operatingArea: 'Einsatzgebiet',
+    chooseOperatingArea: 'Wählen Sie das County, in dem Sie tätig sein werden.',
+    marketNotActive: 'American Rider ist in %{name} noch nicht tätig. Ihr Interesse ist vermerkt. Wählen Sie ein aktives County, um fortzufahren.',
     ready: 'Betriebsbereit',
     readySub: 'Sie behalten 99 % jeder Fahrt. Nehmen Sie den Betrieb auf, um Fahrten zu erhalten.',
     commence: 'Betrieb Aufnehmen',
@@ -662,6 +665,7 @@ export default {
     underReview: 'In Prüfung',
     travelWhileWaiting: 'Fahren Sie währenddessen als Reisender',
     reviewNotApproved: 'Nicht Genehmigt',
+    reviewStatusHere: 'Ihre Qualifikation wurde eingereicht. Ihr Status erscheint hier.',
     reviewCheckStatus: 'Status Prüfen',
     reviewReturnToQualification: 'Zurück zur Qualifikation',
     yourTraveler: 'Ihr Reisender',

@@ -91,6 +91,14 @@ check('only the owner may create there', /allow create: if request\.auth != null
 check('uploads are images of bounded size', /contentType\.matches\('image\/\.\*'\)/.test(docs) && /request\.resource\.size </.test(docs));
 check('nobody may replace or delete the evidence', /allow update, delete: if false;/.test(docs));
 
+// ——— messages are bounded ————————————————————————————————————————————————————————
+const msgs = (rules.match(/match \/messages\/\{messageId\} \{[\s\S]*?\n {4}\}/) || [''])[0];
+check('messages: only the fields the app writes', /keys\(\)\.hasOnly\(\['tripNo', 'from', 'travelerUid', 'operatorId', 'lostItemId', 'text', 'createdAt'\]\)/.test(msgs));
+check('messages: text is bounded to 2,000 characters', /text\.size\(\) <= 2000/.test(msgs));
+const writer = fs.readFileSync(path.join(ROOT, 'src', 'backend', 'messages.ts'), 'utf8');
+check('messages: the app writes no field the rule refuses',
+  ['tripNo', 'from', 'travelerUid', 'operatorId', 'lostItemId', 'text', 'createdAt'].every((k) => new RegExp(`\\b${k}:`).test(writer)));
+
 let bad = 0;
 for (const r of R) { if (!r.ok) bad++; console.log(`${r.ok ? 'PASS' : 'FAIL'}  ${r.l}${r.ok ? '' : '  — ' + (r.d || '')}`); }
 console.log(`\n${R.length - bad}/${R.length} passed`);

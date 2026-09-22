@@ -30,7 +30,8 @@ const {
 } = require('./payments');
 const { readKey } = require('./env');
 const { requireAuth, attachAuth, requireVerifiedEmail } = require('./auth');
-const { perAccount, countOnly } = require('./ratelimit');
+const { perAccount, countOnly, perIp } = require('./ratelimit');
+const { marketFor, servesPoint, listMarkets, markets: allMarkets } = require('./markets');
 
 // ——— WHAT A THROWAWAY ACCOUNT MAY DO, AND HOW OFTEN ————————————————————————————
 // Booking was never the exposure: a travel needs a payment method, and a card is far harder to
@@ -47,6 +48,23 @@ const LIMITS = {
   // Each of these bills us for an SMS and puts a message on somebody's handset. Tight on
   // purpose: a real traveler verifies once, twice if the first is slow.
   verify: perAccount({ name: 'verify', limit: 5, windowMs: 60 * 60 * 1000 }),
+  // COST CONTROLS (22 Sept 2026). Each of these calls something that costs money or reaches a
+  // third party: the document reader (a model call), Checkr, Stripe, Twilio, push notifications,
+  // the routers. The client cannot be trusted to hold back, so the server does. Generous for a
+  // real person — nobody photographs a licence 20 times an hour — and a hard stop for a loop.
+  document: perAccount({ name: 'document', limit: 20, windowMs: 60 * 60 * 1000 }),
+  screening: perAccount({ name: 'screening', limit: 10, windowMs: 60 * 60 * 1000 }),
+  payments: perAccount({ name: 'payments', limit: 60, windowMs: 60 * 60 * 1000 }),
+  connect: perAccount({ name: 'connect', limit: 20, windowMs: 60 * 60 * 1000 }),
+  dispatch: perAccount({ name: 'dispatch', limit: 30, windowMs: 60 * 60 * 1000 }),
+  announce: perAccount({ name: 'announce', limit: 60, windowMs: 60 * 60 * 1000 }),
+  voice: perAccount({ name: 'voice', limit: 30, windowMs: 60 * 60 * 1000 }),
+  market: perAccount({ name: 'market', limit: 20, windowMs: 60 * 60 * 1000 }),
+  // Each status check asks Firebase Auth and Stripe; the review screen polls every 30 seconds.
+  qualification: perAccount({ name: 'qualification', limit: 240, windowMs: 60 * 60 * 1000 }),
+  waitlist: perAccount({ name: 'waitlist', limit: 5, windowMs: 24 * 60 * 60 * 1000 }),
+  quoteIp: perIp({ name: 'quote', limit: 300, windowMs: 60 * 60 * 1000 }),
+  routeIp: perIp({ name: 'route', limit: 300, windowMs: 60 * 60 * 1000 }),
 };
 const { fareCentsFor, fareCentsForCoords, applyTravelClass } = require('./fares');
 const { outsideMarket, outsideMarketMessage } = require('./market');
@@ -92,8 +110,8 @@ const { send, receiptEmail, emailReady: mailReady } = require('./email');
 const {
   ready: verifyReady, startVerification, checkVerification, toE164,
 } = require('./verify');
-const { mount: mountOps } = require('./ops');
-const { readDocument, documentsReady } = require('./documents');
+const { mount: mountOps, opsAuthMode } = require('./ops');
+const { readDocument, documentsReady, READER_VERSION } = require('./documents');
 const { assessOperator, assessAndRecord } = require('./qualification');
 const { page } = require('./shell');
 const {
@@ -104,6 +122,9 @@ const {
 const checkr = require('./checkr');
 
 const app = express();
+// One proxy in front (Render). Makes req.ip the caller rather than the proxy, which the
+// per-address limits in ratelimit.js need.
+app.set('trust proxy', 1);
 app.use(cors()); // let the app (a different origin) call this server
 
 // --- Stripe's webhook. MOUNTED BEFORE express.json(), and that order is load-bearing. -------
@@ -361,6 +382,10 @@ app.get('/health', async (req, res) => {
     // Phone verification. `off` means sign-up cannot check a number, and the app is told so
     // rather than showing a step that answers 503.
     phoneVerification: verifyReady() ? 'on' : 'off',
+    // How /ops is signed in to: 'named' is the production answer.
+    opsAuth: opsAuthMode(),
+    // Where travel is sold and operators are onboarded (backend/markets.js).
+    markets: listMarkets(),
     // Calling between a traveler and their operator over WiFi or data. Reported for the same
     // reason as everything else here: a call button that silently does nothing is worse than
     // no call button, and the only way to know is to ask the server.
@@ -440,7 +465,7 @@ app.get('/follow/:token', async (req, res) => {
 });
 
 // The traveler asks for a link to share. Theirs only, and only while a travel is underway.
-app.post('/travel/follow-link', requireAuth, async (req, res) => {
+app.post('/travel/follow-link', requireAuth, LIMITS.announce, async (req, res) => {
   try {
     const token = await issueFollowToken({
       rideId: String(req.body?.rideId || ''),
@@ -634,7 +659,7 @@ async function operatorRecord(uid) {
 }
 
 // POST /connect/onboard — start or resume Stripe-hosted onboarding for the signed-in operator.
-app.post('/connect/onboard', requireAuth, async (req, res) => {
+app.post('/connect/onboard', requireAuth, LIMITS.connect, requireActiveOperatingMarket, async (req, res) => {
   if (keyMode === 'no-key') return res.status(500).json({ error: 'No Stripe key configured' });
   const db = adminDb();
   if (!db) {
@@ -687,7 +712,7 @@ app.get('/connect/status', requireAuth, async (req, res) => {
 //
 // So the honest place to see and control payouts is Stripe's own dashboard, not a screen of
 // ours pretending to move money we do not hold. Single-use and short-lived.
-app.post('/connect/dashboard', requireAuth, async (req, res) => {
+app.post('/connect/dashboard', requireAuth, LIMITS.connect, async (req, res) => {
   if (keyMode === 'no-key') return res.status(500).json({ error: 'No Stripe key configured' });
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
@@ -863,6 +888,23 @@ app.post('/operator/online', requireAuth, async (req, res) => {
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
       return res.status(400).json({ error: 'A position is required to be dispatchable' });
     }
+    // IN SERVICE ONLY WHERE WE OPERATE. An operator is dispatched from where they are, so this
+    // one reads the position; their declared market must be active too.
+    // An operator qualified before markets existed has declared none; their duty position
+    // declares it, once, and is recorded as such.
+    if (!user?.operatingMarket?.id) {
+      const here = marketFor({ lat, lng });
+      if (here) {
+        const operatingMarket = { id: here.id, via: 'duty-position', at: Date.now() };
+        await db.collection('users').doc(String(req.uid)).set({ operatingMarket }, { merge: true });
+        user = { ...(user || {}), operatingMarket };
+      }
+    }
+    const marketGate = operatingMarketGate(user);
+    if (marketGate) return refuse(marketGate);
+    if (!servesPoint({ lat, lng })) {
+      return refuse({ code: 'outside_active_market', error: 'You are outside the counties American Rider operates in.' });
+    }
     // ABSENT IS NOT EMPTY, and treating it as empty would have been a live defect the moment
     // background presence shipped (5 Sept 2026). A renewal from the locked-phone task carries a
     // position and nothing else — it runs outside React and has no access to the provider's
@@ -1029,7 +1071,7 @@ app.post('/operator/settle-pending', requireAuth, async (req, res) => {
 // a malformed or hostile request cannot empty a card.
 const TIP_CEILING_CENTS = 10000;
 
-app.post('/travel/tip', requireAuth, async (req, res) => {
+app.post('/travel/tip', requireAuth, LIMITS.payments, async (req, res) => {
   if (keyMode === 'no-key') return res.status(500).json({ error: 'No Stripe key configured' });
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
@@ -1117,7 +1159,7 @@ app.post('/travel/tip', requireAuth, async (req, res) => {
 // arrived. The operator app does not report it. A fee we cannot substantiate is a fee we must
 // not take, so the claim is removed from the app and the Terms until arrival is a fact the
 // server holds. See docs/OPEN-DECISIONS.md.
-app.post('/travel/cancel', requireAuth, async (req, res) => {
+app.post('/travel/cancel', requireAuth, LIMITS.payments, async (req, res) => {
   if (keyMode === 'no-key') return res.status(500).json({ error: 'No Stripe key configured' });
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
@@ -1529,7 +1571,7 @@ app.post('/assistant-withdrawn-original', requireAuth, async (req, res) => {
 
 // --- Quote: the money breakdown for a ride. Pure math, no Stripe call. --------------------
 // body: { travelCostCents: 2450 }
-app.post('/quote', (req, res) => {
+app.post('/quote', LIMITS.quoteIp, (req, res) => {
   const cents = Number(req.body?.travelCostCents);
   if (!positiveCents(cents)) {
     return res.status(400).json({ error: 'travelCostCents must be a positive whole number of cents' });
@@ -1543,7 +1585,7 @@ app.post('/quote', (req, res) => {
 // when the trip can't be routed — the app then keeps its straight-line fallback. Like
 // /fare-quote this is unauthenticated (it reveals nothing private), but it only answers inside
 // a served region (regions.js), so it can't be farmed as a free worldwide routing proxy.
-app.post('/route', async (req, res) => {
+app.post('/route', LIMITS.routeIp, async (req, res) => {
   const route = await fetchRoute(req.body?.pickup, req.body?.dest);
   if (!route) return res.status(404).json({ error: 'No route for that trip' });
   res.json(route);
@@ -1557,7 +1599,7 @@ app.post('/route', async (req, res) => {
 //   503 { status: 'unavailable' }     the planner is not answering — the app says so
 // This used to 404 when rail "did not win", and the app read 404 as "do not show". That gate
 // is withdrawn: the server reports; the client decides emphasis.
-app.post('/smart-quote', async (req, res) => {
+app.post('/smart-quote', LIMITS.routeIp, async (req, res) => {
   // OLDER APPS GET THE OLDER ANSWER. TestFlight build 36 reads any 200 as a plan and would
   // render `{ status: 'none' }` as a card reading "Save $NaN", then crash on its legs. An app
   // that does not name the new contract (header X-AR-Smart: 2) is answered the way the old
@@ -1585,7 +1627,7 @@ app.post('/smart-quote', async (req, res) => {
 // AN EMPTY LIST IS A CORRECT ANSWER. Outside every region the answer is nothing, and the
 // screen says we do not operate there yet — which is true, and better than five destinations
 // in a city the traveler is not in.
-app.get('/destinations', (req, res) => {
+app.get('/destinations', LIMITS.quoteIp, (req, res) => {
   const lat = Number(req.query.lat);
   const lng = Number(req.query.lng);
   const limit = Math.min(20, Math.max(1, Number(req.query.limit) || 5));
@@ -1601,7 +1643,7 @@ app.get('/destinations', (req, res) => {
 // any government fee inside that price (name, payee, cents) so a screen can say what it is;
 // `travelerPays` already contains it — nothing is added on top of the number shown.
 // No login needed: this only reveals pricing, and a traveler must see the price before booking.
-app.post('/fare-quote', attachAuth, async (req, res) => {
+app.post('/fare-quote', attachAuth, LIMITS.quoteIp, async (req, res) => {
   const priced = priceRide(req.body);
   if (priced?.outsideMarket) {
     return res.status(409).json({ error: priced.reason, code: 'outside_market', where: priced.outsideMarket });
@@ -1651,7 +1693,7 @@ app.get('/payment-methods', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/payment-methods/setup-intent', requireAuth, async (req, res) => {
+app.post('/payment-methods/setup-intent', requireAuth, LIMITS.payments, async (req, res) => {
   if (keyMode === 'no-key') return res.status(500).json({ error: 'No Stripe secret key configured' });
   try {
     const setup = await createSetupIntent({ uid: req.uid, email: req.email });
@@ -1661,7 +1703,7 @@ app.post('/payment-methods/setup-intent', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/payment-methods/default', requireAuth, async (req, res) => {
+app.post('/payment-methods/default', requireAuth, LIMITS.payments, async (req, res) => {
   if (keyMode === 'no-key') return res.status(500).json({ error: 'No Stripe secret key configured' });
   try {
     const r = await setDefaultPaymentMethod({ uid: req.uid, email: req.email, paymentMethodId: req.body && req.body.paymentMethodId });
@@ -1672,7 +1714,7 @@ app.post('/payment-methods/default', requireAuth, async (req, res) => {
   }
 });
 
-app.delete('/payment-methods/:id', requireAuth, async (req, res) => {
+app.delete('/payment-methods/:id', requireAuth, LIMITS.payments, async (req, res) => {
   if (keyMode === 'no-key') return res.status(500).json({ error: 'No Stripe secret key configured' });
   try {
     const r = await detachPaymentMethod({ uid: req.uid, email: req.email, paymentMethodId: req.params.id });
@@ -1683,7 +1725,7 @@ app.delete('/payment-methods/:id', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/create-payment-intent', requireAuth, async (req, res) => {
+app.post('/create-payment-intent', requireAuth, LIMITS.payments, async (req, res) => {
   if (keyMode === 'no-key') {
     return res.status(500).json({ error: 'No Stripe secret key configured. Add STRIPE_SECRET_KEY to backend/.env' });
   }
@@ -1816,7 +1858,7 @@ app.post('/create-payment-intent', requireAuth, async (req, res) => {
 //
 // Kept, because proving a charge end to end from a terminal is genuinely useful — but only
 // where a test key means no real money can move, and never with a destination the caller named.
-app.post('/charge-ride', requireAuth, async (req, res) => {
+app.post('/charge-ride', requireAuth, LIMITS.payments, async (req, res) => {
   if (keyMode === 'no-key') {
     return res.status(500).json({ error: 'No Stripe secret key configured. Add STRIPE_SECRET_KEY to backend/.env' });
   }
@@ -1951,7 +1993,7 @@ function sweepBody(report, trusted) {
 // information about transactions or experiences between the consumer and the report-maker.
 // Nothing here is looked up about the person — see the header of backend/documents.js for the
 // other edge of that line, which is CFPB Circular 2024-06.
-app.post('/operator/document', requireAuth, async (req, res) => {
+app.post('/operator/document', requireAuth, LIMITS.document, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
 
@@ -1977,6 +2019,19 @@ app.post('/operator/document', requireAuth, async (req, res) => {
     ]);
     const u = userSnap.exists ? userSnap.data() : {};
     const o = opSnap.exists ? opSnap.data() : {};
+
+    // ONLY IN AN ACTIVE MARKET. Reading a document is a paid model call and the start of a
+    // regulated workflow; an operator whose declared operating market is on the waitlist gets
+    // neither. See POST /operator/market.
+    const gate = operatingMarketGate(u);
+    if (gate) return res.status(409).json(gate);
+
+    // THE SAME UPLOAD IS READ ONCE. A retry, a double tap or a loop that re-sends one file gets
+    // the stored reading back instead of another model call.
+    const prior = u.documents?.[kind];
+    if (prior && prior.imageUrl === imageUrl && prior.evidence && prior.readerVersion === READER_VERSION) {
+      return res.json({ verdict: prior.verdict, reasons: prior.reasons || [], summary: prior.summary || '', expiry: prior.expiry || null, repeated: true });
+    }
     const expect = {
       name: u.legalName || u.name || o.name || req.email || '',
       plate: o.plate || '',
@@ -2002,6 +2057,11 @@ app.post('/operator/document', requireAuth, async (req, res) => {
             // code — document type, legibility, and for insurance commercial use and limits —
             // rather than taking the verdict on trust.
             evidence: out.evidence || null,
+            readerVersion: READER_VERSION,
+            // A fresh upload answers any earlier "submit this again".
+            reuploadRequired: false,
+            reuploadReason: null,
+            reuploadCheckedVersion: null,
             // A new document starts a new reading; a person's decision on the old one does
             // not carry over to it.
             decision: null,
@@ -2042,6 +2102,130 @@ app.post('/operator/document', requireAuth, async (req, res) => {
   }
 });
 
+// --- Markets: where travel is sold and operators are onboarded. ----------------------------
+//
+// backend/markets.js holds the counties and their status. Two uses here:
+//   travel     — authorized by the PICKUP (and destination) the traveler asks for, wherever
+//                the traveler happens to be standing. Priced routes check it (market.js); so
+//                does dispatch.
+//   operators  — the costly and regulated steps (document reading, Checkr, Stripe Connect,
+//                going on duty) run only for an operator whose declared operating market is
+//                ACTIVE. The market's CURRENT status is read each time, so switching a county
+//                to WAITLIST stops new work there at once.
+
+/** The operator's declared operating market as it stands now, or null. */
+function operatingMarketOf(user) {
+  const id = user?.operatingMarket?.id;
+  return id ? allMarkets().find((m) => m.id === id) || null : null;
+}
+
+/** null when the operator may proceed; else the refusal body. */
+function operatingMarketGate(user) {
+  const m = operatingMarketOf(user);
+  if (m && m.status === 'active') return null;
+  return {
+    code: 'market_waitlist',
+    error: m
+      ? `American Rider does not operate in ${m.name} yet. Your interest is recorded.`
+      : 'Choose the county you will operate in before continuing.',
+    market: m ? { id: m.id, name: m.name, status: m.status } : null,
+  };
+}
+
+const marketBody = (m) => (m ? { id: m.id, name: m.name, status: m.status, regionId: m.regionId } : null);
+
+/** Express middleware: the signed-in operator's declared operating market must be ACTIVE. */
+async function requireActiveOperatingMarket(req, res, next) {
+  const db = adminDb();
+  if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
+  try {
+    const snap = await db.collection('users').doc(String(req.uid)).get();
+    const gate = operatingMarketGate(snap.exists ? snap.data() : null);
+    if (gate) return res.status(409).json(gate);
+    next();
+  } catch (e) {
+    res.status(502).json({ error: e.message });
+  }
+}
+
+// Public: what is active, for the app's area chooser and the website.
+app.get('/markets', LIMITS.quoteIp, (req, res) => {
+  const lat = Number(req.query?.lat);
+  const lng = Number(req.query?.lng);
+  res.json({
+    active: allMarkets().filter((m) => m.status === 'active').map(marketBody),
+    here: Number.isFinite(lat) && Number.isFinite(lng) ? marketBody(marketFor({ lat, lng })) : null,
+  });
+});
+
+// The operator names the county they will operate in — or sends a position and it is derived.
+// A WAITLIST county is recorded (and joins the waitlist) and unlocks nothing costly.
+app.post('/operator/market', requireAuth, LIMITS.market, async (req, res) => {
+  const db = adminDb();
+  if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
+  const b = req.body || {};
+  let m = null;
+  let via = null;
+  if (b.marketId) {
+    m = allMarkets().find((x) => x.id === String(b.marketId)) || null;
+    via = 'declared';
+    if (!m) return res.status(400).json({ error: 'Unknown market', code: 'unknown_market' });
+  } else if (Number.isFinite(Number(b.lat)) && Number.isFinite(Number(b.lng))) {
+    m = marketFor({ lat: Number(b.lat), lng: Number(b.lng) });
+    via = 'position';
+  } else {
+    return res.status(400).json({ error: 'marketId or a position is required' });
+  }
+  try {
+    const now = Date.now();
+    if (m) {
+      await db.collection('users').doc(String(req.uid)).set({ operatingMarket: { id: m.id, via, at: now } }, { merge: true });
+    }
+    if (!m || m.status !== 'active') {
+      await db.collection('waitlist').doc(String(req.uid)).set(
+        { role: 'operator', marketId: m?.id || null, at: now, ...(via === 'position' && !m ? { lat: Number(b.lat), lng: Number(b.lng) } : {}) },
+        { merge: true },
+      );
+    }
+    res.json({ market: marketBody(m), active: allMarkets().filter((x) => x.status === 'active').map(marketBody) });
+  } catch (e) {
+    res.status(502).json({ error: e.message });
+  }
+});
+
+app.get('/operator/market', requireAuth, async (req, res) => {
+  const db = adminDb();
+  if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
+  try {
+    const snap = await db.collection('users').doc(String(req.uid)).get();
+    res.json({
+      market: marketBody(operatingMarketOf(snap.exists ? snap.data() : null)),
+      active: allMarkets().filter((x) => x.status === 'active').map(marketBody),
+    });
+  } catch (e) {
+    res.status(502).json({ error: e.message });
+  }
+});
+
+// Lightweight interest from anywhere. Nothing costly starts; one record per account.
+app.post('/waitlist', requireAuth, LIMITS.waitlist, async (req, res) => {
+  const db = adminDb();
+  if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
+  const b = req.body || {};
+  const role = b.role === 'operator' ? 'operator' : 'traveler';
+  const m = b.marketId
+    ? allMarkets().find((x) => x.id === String(b.marketId)) || null
+    : Number.isFinite(Number(b.lat)) && Number.isFinite(Number(b.lng))
+      ? marketFor({ lat: Number(b.lat), lng: Number(b.lng) })
+      : null;
+  try {
+    await db.collection('waitlist').doc(String(req.uid)).set({ role, marketId: m?.id || null, at: Date.now() }, { merge: true });
+    res.json({ ok: true, market: marketBody(m) });
+  } catch (e) {
+    res.status(502).json({ error: e.message });
+  }
+});
+
 // --- Qualification: automatic, exception-driven. -------------------------------------------
 //
 // An operator is qualified when every qualification gate in backend/qualification.js passes —
@@ -2062,7 +2246,7 @@ const qualificationBody = (a) => ({
   blockers: a.blockers.filter((x) => x.gate === 'qualification').map(({ code, kind, item, reason }) => ({ code, kind, item, reason })),
 });
 
-app.get('/operator/qualification', requireAuth, async (req, res) => {
+app.get('/operator/qualification', requireAuth, LIMITS.qualification, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   try {
@@ -2074,7 +2258,7 @@ app.get('/operator/qualification', requireAuth, async (req, res) => {
 });
 
 // FOR BUILDS 40 AND EARLIER, whose review screen asks this path. Same assessment, old words.
-app.get('/operator/commission', requireAuth, async (req, res) => {
+app.get('/operator/commission', requireAuth, LIMITS.qualification, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   try {
@@ -2088,7 +2272,7 @@ app.get('/operator/commission', requireAuth, async (req, res) => {
 
 // The operator says they are done. Kept as the app's explicit moment, but it decides nothing a
 // document reading has not already decided: it assesses and reports.
-app.post('/operator/qualification/submit', requireAuth, async (req, res) => {
+app.post('/operator/qualification/submit', requireAuth, LIMITS.qualification, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   try {
@@ -2250,7 +2434,7 @@ app.get('/operator/screening', requireAuth, async (req, res) => {
  * NOTHING IS ACCEPTED ON THIS REQUEST. It records the declaration and opens a case to chase the
  * screening company; the report is only ever adjudicated when it arrives FROM them.
  */
-app.post('/operator/screening/existing', requireAuth, async (req, res) => {
+app.post('/operator/screening/existing', requireAuth, LIMITS.screening, requireActiveOperatingMarket, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
 
@@ -2326,7 +2510,7 @@ app.post('/operator/screening/existing', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/operator/screening/intent', requireAuth, async (req, res) => {
+app.post('/operator/screening/intent', requireAuth, LIMITS.screening, requireActiveOperatingMarket, async (req, res) => {
   if (keyMode === 'no-key') return res.status(500).json({ error: 'No Stripe key configured' });
   try {
     // The operator may be paying the full screening or only the driving history, depending on
@@ -2364,7 +2548,7 @@ app.post('/operator/screening/intent', requireAuth, async (req, res) => {
  * codebase could contain, so the absent case is 'awaiting_provider' — which is not a pass, is
  * not dispatchable, and is visible on /ops until a key exists.
  */
-app.post('/operator/screening/order', requireAuth, async (req, res) => {
+app.post('/operator/screening/order', requireAuth, LIMITS.screening, requireActiveOperatingMarket, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   const paymentIntentId = String(req.body?.paymentIntentId || '');
@@ -2454,7 +2638,7 @@ app.post('/operator/screening/order', requireAuth, async (req, res) => {
  * expired email a kept fee, which it is not. No new payment, same candidate, fresh
  * invitation. Only reachable from the states where it is true — paid, and not completed.
  */
-app.post('/operator/screening/reinvite', requireAuth, async (req, res) => {
+app.post('/operator/screening/reinvite', requireAuth, LIMITS.screening, requireActiveOperatingMarket, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   if (!screeningReady()) return res.status(503).json({ error: 'Screening is not live yet' });
@@ -2535,7 +2719,7 @@ app.post('/scheduled/sweep', runSweep);
 // The match now happens here, once, against the fleet read with admin access, through the same
 // matchOperator every other caller uses — so a gate added to that function protects every path
 // at once, which is the whole reason it is a function.
-app.post('/travel/dispatch', requireAuth, async (req, res) => {
+app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
 
@@ -2546,6 +2730,11 @@ app.post('/travel/dispatch', requireAuth, async (req, res) => {
   }
   const tripNo = String(b.tripNo || '').slice(0, 24);
   if (!tripNo) return res.status(400).json({ error: 'A Travel Number is required.' });
+  // THE PICKUP MUST BE IN AN ACTIVE MARKET — checked here as well as at pricing, because this
+  // is where an operator is actually sent.
+  if (!servesPoint(pickup)) {
+    return res.status(409).json({ error: outsideMarketMessage('pickup'), code: 'outside_market', where: 'pickup' });
+  }
 
   let fleet;
   try {
@@ -2673,7 +2862,7 @@ app.post('/travel/dispatch', requireAuth, async (req, res) => {
 // other — the lost-item path is how somebody reaches an operator afterwards, and it goes
 // through us. A call channel that outlives the journey is a way to contact a stranger whose
 // car you once sat in, which is not a feature.
-app.post('/voice/token', requireAuth, async (req, res) => {
+app.post('/voice/token', requireAuth, LIMITS.voice, async (req, res) => {
   if (!voiceReady()) return res.status(503).json({ error: voiceReason(), code: 'voice_not_configured' });
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
@@ -2765,7 +2954,7 @@ app.post('/travel/accept', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/travel/return-operator', requireAuth, async (req, res) => {
+app.post('/travel/return-operator', requireAuth, LIMITS.dispatch, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
 
@@ -2878,7 +3067,7 @@ app.post('/verify/check', requireAuth, LIMITS.verify, async (req, res) => {
   res.json({ ok: true, phone: out.to });
 });
 
-app.post('/travel/announce', requireAuth, async (req, res) => {
+app.post('/travel/announce', requireAuth, LIMITS.announce, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
 

@@ -65,6 +65,9 @@ export default {
   // is deliberate and it translates as vocabulary, not as description — "Commence Operations"
   // becomes the equivalent formal undertaking in each language, never "start working".
   operator: {
+    operatingArea: 'Operating Area',
+    chooseOperatingArea: 'Choose the county you will operate in.',
+    marketNotActive: 'American Rider does not operate in %{name} yet. Your interest is recorded. Choose an active county to continue.',
     ready: 'Ready to Operate',
     readySub: 'You retain 99% of every fare. Commence operations to receive travel.',
     commence: 'Commence Operations',
@@ -679,6 +682,7 @@ export default {
     underReview: 'Under Review',
     travelWhileWaiting: 'Travel as a Traveler while you wait',
     reviewNotApproved: 'Not Approved',
+    reviewStatusHere: 'Your qualification has been submitted. Your status appears here.',
     reviewCheckStatus: 'Check Status',
     reviewReturnToQualification: 'Return to Qualification',
     yourTraveler: 'Your traveler',

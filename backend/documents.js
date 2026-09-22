@@ -64,9 +64,81 @@ const KINDS = {
       'whether it covers commercial, livery or for-hire use',
       'bodily injury and property damage limits',
       'the vehicle it applies to',
+      // Florida TNC evidence, extracted into the `insurance` object and judged in code by
+      // backend/qualification.js — never judged here.
+      'every named insured and listed driver',
+      'every covered vehicle with its VIN and plate',
+      'whether a transportation network company (ride-hailing) endorsement or for-hire use is stated',
+      'liability limits stated for the period when the driver is logged on but not on a ride',
+      'liability limits stated for the period of a prearranged ride',
+      'personal injury protection (PIP) and its amount',
+      'uninsured / underinsured motorist coverage, or a stated rejection of it',
     ],
     mustNotBeExpired: true,
   },
+};
+
+// THE READER'S VERSION. Stored with every reading; a reading from an older version is re-read
+// by infra/migrate-documents.js rather than trusted. Bump it when the schema or prompt changes
+// what is extracted.
+const READER_VERSION = 2;
+
+// The limits the document states for one period, as written. '' when not stated.
+const LIMITS = {
+  type: 'object',
+  properties: {
+    bodilyInjuryPerPerson: { type: 'string' },
+    bodilyInjuryPerIncident: { type: 'string' },
+    propertyDamage: { type: 'string' },
+    combinedSingleLimit: { type: 'string' },
+  },
+  required: ['bodilyInjuryPerPerson', 'bodilyInjuryPerIncident', 'propertyDamage', 'combinedSingleLimit'],
+  additionalProperties: false,
+};
+const SHOWN = { type: 'string', enum: ['yes', 'no', 'not_shown'] };
+
+// INSURANCE EVIDENCE. What the policy SAYS, field by field. No field here asks the model whether
+// the policy complies with anything: that is backend/qualification.js, in code, against
+// configured rules. Every field is required and '' / [] / 'not_shown' when absent, so absence
+// is recorded rather than guessed.
+const INSURANCE = {
+  type: 'object',
+  properties: {
+    insurer: { type: 'string' },
+    policyNumber: { type: 'string' },
+    namedInsureds: { type: 'array', items: { type: 'string' } },
+    listedDrivers: { type: 'array', items: { type: 'string' } },
+    effectiveDate: { type: 'string' }, // YYYY-MM-DD or ''
+    expirationDate: { type: 'string' }, // YYYY-MM-DD or ''
+    vehicles: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { description: { type: 'string' }, vin: { type: 'string' }, plate: { type: 'string' } },
+        required: ['description', 'vin', 'plate'],
+        additionalProperties: false,
+      },
+    },
+    // Phrases the document uses about how the vehicle may be used, verbatim.
+    useStatements: { type: 'array', items: { type: 'string' } },
+    tncEndorsement: SHOWN, // a transportation network company / ride-hailing endorsement is stated
+    forHireUse: SHOWN, // for-hire, livery or carrying passengers for compensation is stated as covered
+    loggedOnLimits: LIMITS, // stated for "logged on, not engaged in a prearranged ride"
+    rideLimits: LIMITS, // stated for "engaged in a prearranged ride"
+    generalLimits: LIMITS, // stated without distinguishing the two periods
+    pip: { type: 'object', properties: { shown: SHOWN, amount: { type: 'string' } }, required: ['shown', 'amount'], additionalProperties: false },
+    uninsuredMotorist: {
+      type: 'object',
+      properties: { shown: { type: 'string', enum: ['yes', 'rejected', 'no', 'not_shown'] }, amount: { type: 'string' } },
+      required: ['shown', 'amount'],
+      additionalProperties: false,
+    },
+  },
+  required: [
+    'insurer', 'policyNumber', 'namedInsureds', 'listedDrivers', 'effectiveDate', 'expirationDate', 'vehicles',
+    'useStatements', 'tncEndorsement', 'forHireUse', 'loggedOnLimits', 'rideLimits', 'generalLimits', 'pip', 'uninsuredMotorist',
+  ],
+  additionalProperties: false,
 };
 
 const SCHEMA = {
@@ -85,17 +157,20 @@ const SCHEMA = {
         expiry: { type: 'string' }, // YYYY-MM-DD, or '' when not shown
         state: { type: 'string' },
         vehicle: { type: 'string' },
+        vin: { type: 'string' },
         plate: { type: 'string' },
         commercialUse: { type: 'string' }, // 'yes' | 'no' | 'unclear' | ''
         limits: { type: 'string' },
       },
-      required: ['name', 'number', 'expiry', 'state', 'vehicle', 'plate', 'commercialUse', 'limits'],
+      required: ['name', 'number', 'expiry', 'state', 'vehicle', 'vin', 'plate', 'commercialUse', 'limits'],
       additionalProperties: false,
     },
+    // Filled for an insurance document; for any other, every field empty / 'not_shown'.
+    insurance: INSURANCE,
     concerns: { type: 'array', items: { type: 'string' } },
     summary: { type: 'string' },
   },
-  required: ['documentType', 'isTheRequestedDocument', 'legible', 'fields', 'concerns', 'summary'],
+  required: ['documentType', 'isTheRequestedDocument', 'legible', 'fields', 'insurance', 'concerns', 'summary'],
   additionalProperties: false,
 };
 
@@ -116,6 +191,13 @@ Report what the document SHOWS. Do not infer, complete or improve it.
   screen, handwriting on a printed form. One short sentence each. Empty when there are none.
 - "summary" is one plain sentence stating what the document is and its expiry. No reassurance,
   no exclamation marks, no judgement of the person.
+
+- For an insurance document, fill "insurance" with what the policy states: every named insured
+  and listed driver, every vehicle with VIN and plate, the policy dates, the use statements
+  verbatim, and the limits for each period exactly as written ("$1,000,000 CSL",
+  "50,000/100,000/25,000"). Put limits under loggedOnLimits or rideLimits only when the document
+  names that period; otherwise under generalLimits. Do not decide whether the policy meets any
+  law or requirement — that is not your task. For any other document, leave "insurance" empty.
 
 You are reading an image, not verifying it against any authority. You cannot confirm a document
 is genuine — only that it is legible, internally consistent, and says what it appears to say.`;
@@ -287,12 +369,14 @@ function decide({ kind, spec, read, expect, now }) {
       isTheRequestedDocument: read.isTheRequestedDocument === true,
       legible: read.legible === true,
       fields: f,
+      insurance: kind === 'insurance' ? read.insurance || null : null,
       concerns,
     },
+    readerVersion: READER_VERSION,
   };
 }
 
 /** Is document reading available? /health and /ops report it. */
 const documentsReady = () => !!readKey('ANTHROPIC_API_KEY');
 
-module.exports = { readDocument, decide, KINDS, documentsReady, MODEL };
+module.exports = { readDocument, decide, KINDS, documentsReady, MODEL, READER_VERSION, SCHEMA };

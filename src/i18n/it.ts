@@ -55,6 +55,9 @@ export default {
     language: 'Lingua',
   },
   operator: {
+    operatingArea: 'Area Operativa',
+    chooseOperatingArea: 'Scelga la contea in cui opererà.',
+    marketNotActive: 'American Rider non opera ancora in %{name}. Il suo interesse è registrato. Scelga una contea attiva per continuare.',
     ready: 'Pronto a Operare',
     readySub: 'Lei trattiene il 99% di ogni tariffa. Avvii le operazioni per ricevere viaggi.',
     commence: 'Avviare le Operazioni',
@@ -661,6 +664,7 @@ export default {
     underReview: 'In Esame',
     travelWhileWaiting: 'Viaggi come viaggiatore mentre attende',
     reviewNotApproved: 'Non Approvato',
+    reviewStatusHere: 'La sua qualificazione è stata inviata. Il suo stato compare qui.',
     reviewCheckStatus: 'Verifica lo Stato',
     reviewReturnToQualification: 'Torna alla Qualificazione',
     yourTraveler: 'Il suo viaggiatore',

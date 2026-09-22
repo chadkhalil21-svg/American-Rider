@@ -422,6 +422,13 @@ async function sweepSettlements({ now = Date.now(), limit = 25 } = {}) {
     snap.forEach((d) => {
       const x = d.data() || {};
       if (x.transferId) return; // already paid; the flag is cleared below
+      // SETTLEMENT FOLLOWS COMPLETION, here as at /travel/settle (travelmoney.js). The rules let
+      // only the operator set needsPayout, and only with status 'completed' — checked again
+      // rather than trusted.
+      if (x.status !== 'completed') {
+        unsettleable.push({ rideId: d.id, tripNo: x.tripNo || d.id, reason: `status is ${x.status || 'unknown'}, not completed` });
+        return;
+      }
       // A FLAG THAT CANNOT BE ACTED ON MUST NOT BE READ FOREVER. Without a payment or an
       // operator there is nothing this sweep can ever do, so leaving needsPayout set would
       // buy the same futile document read every minute until someone noticed. It goes to a
@@ -434,12 +441,13 @@ async function sweepSettlements({ now = Date.now(), limit = 25 } = {}) {
     });
 
     for (const u of unsettleable) {
-      blocked.push({ tripNo: u.tripNo, reason: 'no payment or operator recorded — needs a person' });
+      const why = u.reason || 'no payment or operator recorded — needs a person';
+      blocked.push({ tripNo: u.tripNo, reason: why });
       await db.collection('rides').doc(u.rideId).set(
         {
           needsPayout: false,
           payoutPending: true,
-          payoutBlockedReason: 'no payment or operator recorded — needs a person',
+          payoutBlockedReason: why,
           payoutCheckedAt: now,
         },
         { merge: true },

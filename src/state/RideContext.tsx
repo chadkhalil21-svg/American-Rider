@@ -31,7 +31,6 @@ import {
   MatchedOp,
   recordTravelReview,
   RideRecord,
-  setRideStatus,
   watchRide,
   type TravelMonitor,
   distanceMiles,
@@ -1004,10 +1003,10 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     setCompletedTrips((prev) => (prev[0]?.no === finished.no ? prev : [finished, ...prev]));
     if (!activeRideId.current) return;
     const ridePaid = activeRideId.current;
-    // Completed and cancelled are distinguishable in the database, which is what the Travel
-    // Log and the status dots read. Writing it again when the operator already did is a
-    // no-op on the same value.
-    setRideStatus(ridePaid, 'completed').finally(() => refreshMyRides());
+    // COMPLETION IS THE OPERATOR'S TO RECORD, not this phone's: firestore.rules no longer lets
+    // a traveler write 'completed' (audit of e26adcb). The operator's app wrote it — that is
+    // how this travel came to finish — so the Travel Log only needs reading again.
+    refreshMyRides();
     // THE 99% IS RELEASED HERE, not when the card was charged. The operator is only known
     // after dispatch matched them, and the traveler's money is only truly ours once it
     // settles. Deliberately silent: the traveler has paid and finished, and our settlement
@@ -1223,10 +1222,10 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       // moved, and this used to write status 'cancelled' and stop — so cancelling left
       // American Rider holding the whole fare for a journey nobody took, silently. The server
       // refunds in full and records it against the travel.
-      cancelTravel({ rideId: cancelled, paymentIntentId: paidIntentRef.current }).finally(() =>
-        refreshMyRides(),
-      );
-      setRideStatus(cancelled, 'cancelled');
+      // THE SERVER CANCELS, and only the server: it records 'cancelled' and refunds from the
+      // travel's own payment. The phone no longer writes 'cancelled' itself (firestore.rules),
+      // which would have bypassed the refund rules.
+      cancelTravel({ rideId: cancelled }).finally(() => refreshMyRides());
       paidIntentRef.current = null;
       settleRideRef.current = null;
       activeRideId.current = null;

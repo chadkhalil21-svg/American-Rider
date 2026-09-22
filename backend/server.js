@@ -96,6 +96,7 @@ const { fileTicket, updateTicketLocation, listTickets } = require('./tickets');
 const { lostItemTicket, stampLostItemCase } = require('./lostitem');
 const { adminDb, adminStatus, accountDisabled } = require('./firebase-admin');
 const { acceptOffer } = require('./eligibility');
+const { payForTravel, cancelTravel: cancelTravelFor, settleTravel: settleTravelFor } = require('./travelmoney');
 const { TERMS_HTML, PRIVACY_HTML, ABOUT_HTML, legalPage, LEGAL_LANGUAGES } = require('./legal');
 const {
   HOME_HTML, OPERATE_HTML, SUPPORT_HTML, TRAVEL_HTML, SAFETY_HTML, SMART_HTML,
@@ -1160,132 +1161,24 @@ app.post('/travel/tip', requireAuth, LIMITS.payments, async (req, res) => {
 // not take, so the claim is removed from the app and the Terms until arrival is a fact the
 // server holds. See docs/OPEN-DECISIONS.md.
 app.post('/travel/cancel', requireAuth, LIMITS.payments, async (req, res) => {
-  if (keyMode === 'no-key') return res.status(500).json({ error: 'No Stripe key configured' });
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
-
-  const rideId = String(req.body?.rideId || '');
-  const paymentIntentId = String(req.body?.paymentIntentId || '');
-  if (!rideId) return res.status(400).json({ error: 'rideId is required' });
-
+  // The refund comes from the travel's OWN payment (backend/travelmoney.js); a paymentIntentId in
+  // the request is ignored. Stages, the $3 arrival fee and its payment to the operator unchanged.
   try {
-    const rideRef = db.collection('rides').doc(rideId);
-    const snap = await rideRef.get();
-    if (!snap.exists) return res.status(404).json({ error: 'No such travel' });
-    const ride = snap.data();
-    if (String(ride.travelerUid) !== String(req.uid)) {
-      return res.status(403).json({ error: 'That travel belongs to another traveler' });
-    }
-    // Already refunded — say so rather than refunding twice.
-    if (ride.refundId) {
-      return res.json({ ok: true, alreadyRefunded: true, refundId: ride.refundId, amountCents: ride.refundedCents || 0 });
-    }
-    // Settled travels are finished journeys; cancelling one is a support matter, not this route.
-    if (ride.transferId) {
-      return res.status(409).json({ error: 'That travel has already been completed and paid out', code: 'already_settled' });
-    }
-
-    // ── THE LOOPHOLE THIS CLOSES ──────────────────────────────────────────────────────────
-    // Cancellation refunded the fare IN FULL at any point before completion. A traveler could
-    // therefore be carried the whole way and cancel a moment before the operator marked the
-    // travel complete: full refund, and the operator drove them for nothing. "Cancel any time
-    // before it is completed, refunded in full" is a free journey with extra steps.
-    //
-    // The operator now reports where the travel actually is — accepted, arrived, onboard — so
-    // this can be answered on facts rather than on trust:
-    //
-    //   before arrival   the operator has driven toward the traveler but nothing has begun
-    //                    → refunded in full
-    //   after arrival    the operator is at the kerb and has spent the journey there
-    //                    → refunded less a $3 arrival fee, which is paid to the operator
-    //   once onboard     the travel is happening; cancelling is not the right control
-    //                    → refused, and directed to Patron Support
-    //
-    // The $3 was removed on 18 August because nothing could substantiate that an operator had
-    // arrived. The operator app reports it now, so the fee is real, earned, and paid to the
-    // person who earned it.
-    const stage = String(ride.status || '');
-    if (stage === 'onboard' || stage === 'completed') {
-      return res.status(409).json({
-        code: 'travel_underway',
-        error:
-          'This travel is already underway and cannot be cancelled. Patron Support can settle ' +
-          'anything that went wrong with it.',
-      });
-    }
-    const ARRIVAL_FEE_CENTS = 300;
-    const arrivalFee = stage === 'arrived' ? ARRIVAL_FEE_CENTS : 0;
-
-    await rideRef.set({ status: 'cancelled', statusAt: Date.now() }, { merge: true });
-
-    // Nothing was charged (the traveler closed the sheet, or cancelled before paying).
-    if (!paymentIntentId) {
-      return res.json({ ok: true, refunded: false, reason: 'no payment was taken' });
-    }
-
-    const { cents: refundable, reason } = await refundableFor({
-      paymentIntentId,
-      expectUid: String(req.uid),
+    const out = await cancelTravelFor({
+      db,
+      uid: req.uid,
+      rideId: req.body?.rideId,
+      stripeConfigured: keyMode !== 'no-key',
+      deps: { refundableFor, refundTravel, transferFixed, operatorPayoutAccount },
     });
-    if (refundable <= 0) return res.json({ ok: true, refunded: false, reason });
-
-    // The arrival fee is withheld from the refund, never charged separately — the traveler has
-    // already paid, so taking it a second time would be a second charge for one cancellation.
-    const withheld = Math.min(arrivalFee, refundable);
-    const out = await refundTravel({
-      paymentIntentId,
-      amountCents: refundable - withheld,
-      expectUid: String(req.uid),
-    });
-    if (!out.ok) {
-      await rideRef.set({ refundPending: true, refundBlockedReason: out.error }, { merge: true });
-      return res.status(502).json({ ok: false, error: out.error });
-    }
-    await rideRef.set(
-      {
-        refundId: out.refundId,
-        refundedCents: out.amountCents,
-        arrivalFeeCents: withheld,
-        refundPending: false,
-        refundedAt: Date.now(),
-      },
-      { merge: true },
-    );
-
-    // Pay the arrival fee to the operator who was standing there. Best effort and never
-    // blocking: the traveler's refund has already gone through, and a fee we cannot forward
-    // yet is recorded as owed rather than quietly kept.
-    if (withheld > 0) {
-      const { accountId } = await operatorPayoutAccount(db, ride.operatorId);
-      if (accountId) {
-        const paid = await transferFixed({
-          paymentIntentId,
-          operatorStripeAccount: accountId,
-          amountCents: withheld,
-          reference: `arrival fee ${ride.tripNo || rideId}`,
-        });
-        await rideRef.set(
-          paid.ok
-            ? { arrivalFeeTransferId: paid.transferId, arrivalFeePaidAt: Date.now() }
-            : { arrivalFeePending: true, arrivalFeeBlockedReason: paid.error },
-          { merge: true },
-        );
-      } else {
-        await rideRef.set({ arrivalFeePending: true, arrivalFeeBlockedReason: 'no payout account' }, { merge: true });
-      }
-    }
-
-    res.json({
-      ok: true,
-      refunded: true,
-      amountCents: out.amountCents,
-      arrivalFeeCents: withheld,
-      status: out.status,
-    });
+    res.status(out.status).json(out.body);
   } catch (e) {
     res.status(502).json({ error: e.message });
   }
 });
+
 
 // GET /operator/me — what the platform believes about the signed-in operator.
 //
@@ -1347,117 +1240,30 @@ app.post('/travel/settle', requireAuth, async (req, res) => {
   if (keyMode === 'no-key') return res.status(500).json({ error: 'No Stripe key configured' });
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
-
-  const rideId = String(req.body?.rideId || '');
-  if (!rideId) return res.status(400).json({ error: 'rideId is required' });
-
+  // Only a COMPLETED travel of the caller's settles, and only out of the travel's OWN payment
+  // (backend/travelmoney.js). A paymentIntentId in the request is ignored.
   try {
-    const rideRef = db.collection('rides').doc(rideId);
-    const snap = await rideRef.get();
-    if (!snap.exists) return res.status(404).json({ error: 'No such travel' });
-    const ride = snap.data();
-
-    // The traveler's app names the payment it made; a SCHEDULED travel was paid for by the
-    // server while nobody was holding the phone, so the app never saw an intent to name. Fall
-    // back to the one stored on the travel itself. Reading it from our own record is not a
-    // loosening: the ownership check below still runs, and transferToOperator re-checks the
-    // uid against Stripe's own metadata before a cent moves.
-    const paymentIntentId = String(req.body?.paymentIntentId || ride.paymentIntentId || '');
-    if (!paymentIntentId) {
-      return res.status(400).json({ error: 'No payment is recorded for this travel' });
-    }
-
-    if (String(ride.travelerUid) !== String(req.uid)) {
-      return res.status(403).json({ error: 'That travel belongs to another traveler' });
-    }
-    if (ride.transferId) {
-      return res.json({ ok: true, alreadySettled: true, transferId: ride.transferId });
-    }
-
-    const { accountId, reason } = await operatorPayoutAccount(db, ride.operatorId);
-    if (!accountId) {
-      // The traveler has paid and the travel happened. We simply cannot forward the 99% yet,
-      // so it stays in the platform balance and is recorded as owed. NOT an error to the
-      // traveler — their part is complete — and never a reason to have refused the booking.
-      await rideRef.set(
-        { payoutPending: true, payoutBlockedReason: reason, payoutCheckedAt: Date.now() },
-        { merge: true },
-      );
-      return res.json({ ok: false, code: 'operator_not_payable', owed: true, reason });
-    }
-
-    const out = await transferToOperator({
-      paymentIntentId,
-      operatorStripeAccount: accountId,
-      expectedUid: req.uid,
-      expectedTripNo: ride.tripNo || null,
-      rideId,
-    });
-
-    if (!out.ok) {
-      await rideRef.set(
-        {
-          payoutPending: true,
-          payoutBlockedReason: out.error || out.code,
-          payoutCheckedAt: Date.now(),
-          // STORED SO A RETRY CAN FIND IT. Settlement was attempted exactly once, at
-          // completion, with the PaymentIntent supplied by the traveler's app. If it failed
-          // there was no way to try again: nothing recorded which payment the travel was owed
-          // out of, so an operator was owed money indefinitely and only a person reading
-          // Firestore would ever know.
-          paymentIntentId,
-          // The payment succeeded even though the transfer did not; what paid is known now.
-          ...(out.paidWith ? { paidWith: out.paidWith } : {}),
+    const out = await settleTravelFor({
+      db,
+      uid: req.uid,
+      rideId: req.body?.rideId,
+      deps: {
+        operatorPayoutAccount,
+        transferToOperator,
+        // THE RECEIPT, BY EMAIL, once. A failure is recorded on the travel and visible on /ops.
+        sendReceipt: async (ride) => {
+          const sent = await send({ to: req.email, ...receiptEmail(ride) });
+          if (!sent.ok) console.log(`[receipt] ${ride.tripNo || req.body?.rideId}: ${sent.reason}`);
+          return sent;
         },
-        { merge: true },
-      );
-      // Retryable means the money is still clearing — that is a wait, not a fault.
-      return res.status(out.retryable ? 202 : 502).json(out);
-    }
-
-    await rideRef.set(
-      {
-        paymentIntentId,
-        transferId: out.transferId,
-        operatorPaidCents: out.amountCents,
-        platformTakeCents: out.platformTake,
-        payoutPending: false,
-        payoutBlockedReason: null,
-        settledAt: Date.now(),
-        // WHAT PAID, as Stripe recorded the charge, so the receipt and the Travel Log can name
-        // the card that was charged rather than the method the phone has selected today.
-        ...(out.paidWith ? { paidWith: out.paidWith } : {}),
       },
-      { merge: true },
-    );
-
-    // THE RECEIPT, BY EMAIL. Until now a traveler completed a journey, was charged, and
-    // received nothing they could keep — the Travel Receipt existed only inside the app, on
-    // the phone that took the journey. Sent once: `receiptSentAt` is checked so a repeated
-    // settle call cannot send a second copy of the same receipt.
-    if (!ride.receiptSentAt) {
-      const mail = receiptEmail({ ...ride, completedAt: Date.now() });
-      const sent = await send({ to: req.email, ...mail });
-      if (sent.ok) {
-        await rideRef.set({ receiptSentAt: Date.now() }, { merge: true });
-      } else {
-        // RECORDED ON THE TRAVEL, not only in a log line nobody reads. This failed on every
-        // travel for weeks — `req.email` was undefined, so send() answered "no address for this
-        // account" and the log scrolled past while /health went on reporting receipts "on".
-        // A receipt that did not send is now visible on the record it belongs to and on /ops.
-        await rideRef.set(
-          { receiptFailed: sent.reason || 'unknown', receiptFailedAt: Date.now() },
-          { merge: true },
-        );
-        console.log(`[receipt] ${ride.tripNo || rideId}: ${sent.reason}`);
-      }
-    }
-
-    res.json(out);
+    });
+    res.status(out.status).json(out.body);
   } catch (e) {
     res.status(502).json({ error: e.message });
   }
 });
+
 
 // --- Lost item: put the report in front of a person. --------------------------------------
 // body: { itemId, tripNo, travels, description, photoUrl, operators }
@@ -1731,6 +1537,8 @@ app.post('/create-payment-intent', requireAuth, LIMITS.payments, async (req, res
   if (keyMode === 'no-key') {
     return res.status(500).json({ error: 'No Stripe secret key configured. Add STRIPE_SECRET_KEY to backend/.env' });
   }
+  // The travel is authorized against the database before anything is charged.
+  if (!adminDb()) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   // Price the ride on the server — by coordinates when we have them, else the fare table.
   // Never from a client-sent amount.
   const priced = priceRide(req.body);
@@ -1778,66 +1586,37 @@ app.post('/create-payment-intent', requireAuth, LIMITS.payments, async (req, res
     }
   }
 
+  // THE TRAVEL IS PROVED BEFORE ANY CHARGE EXISTS (backend/travelmoney.js payForTravel): the
+  // ride must exist, be this traveler's and still be live, or no PaymentIntent is created. The
+  // intent then carries the ride's OWN Travel Number and id — never the request's — and is
+  // recorded on that ride with an update, which cannot create a ride that does not exist.
+  // Written before the app is given the client secret, so a paid travel always names its
+  // payment; that record is what cancellation refunds and settlement pays out of.
   try {
-    const result = await createPaymentIntent({
-      travelCostCents: priced.travelCostCents,
-      journey,
-      // Fenced from the same coordinates as the price, above. Stamped on the intent and the
-      // travel; remittance.js reads it back by the month.
-      governmentFees: priced.governmentFees,
-      // Stamped onto the PaymentIntent so a later refund can prove who paid.
+    const out = await payForTravel({
+      db: adminDb(),
       uid: req.uid,
-      email: req.email,
-      tripNo: req.body?.tripNo || null,
-      // Display only — the PRICE still comes from priceRide above, never from the body. These
-      // two are what put the route on the traveler's receipt and bank statement.
-      //
-      // `departure` and `destination` are the NAMES. Not `req.body.dest`, which is the
-      // destination's coordinates and would have printed "[object Object]" on every receipt.
-      dep: String(req.body?.departure || '').slice(0, 60) || null,
-      dest: String(req.body?.destination || '').slice(0, 60) || null,
+      rideId: req.body?.rideId,
+      create: ({ tripNo, rideId }) =>
+        createPaymentIntent({
+          travelCostCents: priced.travelCostCents,
+          journey,
+          // Fenced from the same coordinates as the price. Stamped on the intent and the travel;
+          // remittance.js reads it back by the month.
+          governmentFees: priced.governmentFees,
+          // Stamped onto the PaymentIntent so a later refund can prove who paid, and for which
+          // travel.
+          uid: req.uid,
+          email: req.email,
+          tripNo,
+          rideId,
+          // Display only — the names that put the route on the receipt and bank statement.
+          dep: String(req.body?.departure || '').slice(0, 60) || null,
+          dest: String(req.body?.destination || '').slice(0, 60) || null,
+        }),
     });
-
-    // WRITE THE PAYMENT ONTO THE TRAVEL, HERE, BEFORE THE TRAVELER IS ASKED FOR A CARD.
-    //
-    // Until 29 Aug 2026 the only record that a travel had been paid for lived in the phone's
-    // memory (RideContext's paidIntentRef) and was posted to /travel/settle at the end. So
-    // settlement depended on one app staying alive from payment to completion. It did not
-    // have to crash: matchedOp going null detaches the status watcher, so 'completed' never
-    // arrived, finishTravel never ran, and trySettle returned silently on a null ref.
-    //
-    // /operator/settle-pending exists to recover exactly this, and could not: it looks for
-    // `paymentIntentId` on the travel, which nothing wrote for an in-app payment. A recovery
-    // path that cannot fire on the only case it was built for.
-    //
-    // AR-2109-MIA is what that costs. The traveler was charged $19.44, Marcus Reyes drove it
-    // and completed it, and there was no transfer and no receipt — the money sat in the
-    // platform balance with nothing left anywhere to connect it to the journey.
-    //
-    // Written by the SERVER because the server is the only party guaranteed to be present.
-    // Never fatal: a traveler must still be able to pay if this write fails, and settlement
-    // has the app's own copy as a second route.
-    const rideId = String(req.body?.rideId || '');
-    if (rideId && result.paymentIntentId) {
-      const db = adminDb();
-      if (db) {
-        try {
-          await db.collection('rides').doc(rideId).set(
-            {
-              paymentIntentId: result.paymentIntentId,
-              paidAt: Date.now(),
-              // What is held for a public body on this travel, and for whom — the record the
-              // monthly remittance ledger (remittance.js) is summed from.
-              governmentFeeCents: result.breakdown.governmentFeeCents,
-              feeLines: result.breakdown.feeLines,
-            },
-            { merge: true },
-          );
-        } catch (e) {
-          console.error('[pay] could not record intent on travel', rideId, e.message);
-        }
-      }
-    }
+    if (out.status !== 200) return res.status(out.status).json(out.body);
+    const result = out.body;
     res.json({ ...result, feeLines: result.breakdown.feeLines, mode: keyMode });
   } catch (e) {
     res.status(502).json({ error: e.message, code: e.raw?.code || e.raw?.type || null });

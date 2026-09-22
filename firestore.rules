@@ -92,12 +92,18 @@ service cloud.firestore {
       // src/ or app/.
       allow create: if false;
 
-      // Outcome and review only. Not the fare, not the operator, not the trip number -
-      // a phone that could rewrite costCents could rewrite what it owes us.
+      // THE TRAVELER'S REVIEW, AND NOTHING ELSE — and only of a travel that is COMPLETED.
+      //
+      // This rule used to let the traveler set status to 'completed' or 'cancelled' directly
+      // (independent audit of e26adcb, 22 Sept 2026). A direct 'cancelled' bypassed
+      // POST /travel/cancel — its refund rules, the arrival fee, the refusal once onboard — and a
+      // traveler is not the party who says a journey was completed: the operator's app is
+      // (below), and settlement pays out only on that. Cancellation now goes through the server
+      // route only; completion comes from the operator only. Not the fare, not the operator,
+      // not the trip number, not the status.
       allow update: if ownsExisting()
-                    && touchesOnly(['status', 'statusAt', 'rating', 'tipCents', 'reviewedAt'])
-                    && (!changes('status')
-                        || request.resource.data.status in ['completed', 'cancelled'])
+                    && resource.data.status == 'completed'
+                    && touchesOnly(['rating', 'tipCents', 'reviewedAt'])
                     && (!changes('rating')
                         || request.resource.data.rating == null
                         || (request.resource.data.rating >= 1 && request.resource.data.rating <= 5));

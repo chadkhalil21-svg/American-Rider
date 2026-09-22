@@ -1,0 +1,189 @@
+// Paying, cancelling and settling are decided by the travel record, not the request.
+// Adversarial regressions for the independent audit of e26adcb. Run: node backend/travelmoney.test.js
+const fs = require('fs');
+const path = require('path');
+const { payForTravel, cancelTravel, settleTravel } = require('./travelmoney');
+
+const R = [];
+const check = (l, c, d) => R.push({ l, ok: !!c, d });
+
+// A Firestore stand-in. `update` throws on a missing document, as Firestore does.
+function fakeDb(seed) {
+  const data = JSON.parse(JSON.stringify(seed));
+  const snap = (c, id) => ({ exists: !!data[c]?.[id], data: () => (data[c]?.[id] ? JSON.parse(JSON.stringify(data[c][id])) : undefined) });
+  return {
+    data,
+    collection: (c) => ({
+      doc: (id) => ({
+        get: async () => snap(c, id),
+        set: async (f, o) => { data[c] = data[c] || {}; data[c][id] = o?.merge ? { ...(data[c][id] || {}), ...f } : { ...f }; },
+        update: async (f) => {
+          if (!data[c]?.[id]) { const e = new Error(`NOT_FOUND: no document ${c}/${id}`); e.code = 5; throw e; }
+          data[c][id] = { ...data[c][id], ...f };
+        },
+      }),
+    }),
+  };
+}
+
+// A Stripe stand-in: two paid intents belonging to the SAME traveler, one per travel.
+function stripe() {
+  const intents = {
+    pi_A: { uid: 'alice', tripNo: 'AR-1-MIA', cents: 1944, refunded: 0 },
+    pi_B: { uid: 'alice', tripNo: 'AR-2-MIA', cents: 5000, refunded: 0 },
+  };
+  const log = { refunds: [], transfers: [], creates: [] };
+  return {
+    intents,
+    log,
+    refundableFor: async ({ paymentIntentId, expectUid }) => {
+      const pi = intents[paymentIntentId];
+      if (!pi || pi.uid !== expectUid) return { cents: 0, reason: 'not yours' };
+      return { cents: pi.cents - pi.refunded, reason: null };
+    },
+    refundTravel: async ({ paymentIntentId, amountCents }) => {
+      intents[paymentIntentId].refunded += amountCents;
+      log.refunds.push({ paymentIntentId, amountCents });
+      return { ok: true, refundId: `re_${paymentIntentId}`, amountCents, status: 'succeeded' };
+    },
+    transferFixed: async (x) => { log.transfers.push({ kind: 'fee', ...x }); return { ok: true, transferId: 'tr_fee' }; },
+    transferToOperator: async (x) => { log.transfers.push({ kind: 'fare', ...x }); return { ok: true, transferId: `tr_${x.paymentIntentId}`, amountCents: 1900, platformTake: 44 }; },
+    operatorPayoutAccount: async () => ({ accountId: 'acct_op' }),
+    create: async (binding) => { log.creates.push(binding); return { paymentIntentId: 'pi_new', clientSecret: 'cs', breakdown: { governmentFeeCents: 0, feeLines: [] } }; },
+  };
+}
+
+const rides = (over = {}) => ({
+  rides: {
+    A: { travelerUid: 'alice', operatorId: 'op1', tripNo: 'AR-1-MIA', status: 'accepted', paymentIntentId: 'pi_A', ...(over.A || {}) },
+    B: { travelerUid: 'alice', operatorId: 'op2', tripNo: 'AR-2-MIA', status: 'accepted', paymentIntentId: 'pi_B', ...(over.B || {}) },
+    C: { travelerUid: 'bob', operatorId: 'op3', tripNo: 'AR-3-MIA', status: 'assigned', ...(over.C || {}) },
+  },
+});
+
+(async () => {
+  // ——— 1. /travel/cancel refunds the travel's OWN payment ———————————————————————————————
+  {
+    const db = fakeDb(rides());
+    const s = stripe();
+    const out = await cancelTravel({ db, uid: 'alice', rideId: 'A', deps: s, paymentIntentId: 'pi_B', body: { paymentIntentId: 'pi_B' } });
+    check('cancel A while naming B\'s payment: A is refunded', out.status === 200 && out.body.refunded === true && s.log.refunds.length === 1 && s.log.refunds[0].paymentIntentId === 'pi_A', JSON.stringify(s.log.refunds));
+    check('…and B is NEVER refunded', s.intents.pi_B.refunded === 0 && !s.log.refunds.some((r) => r.paymentIntentId === 'pi_B'));
+    check('…and B stays live', db.data.rides.B.status === 'accepted' && !db.data.rides.B.refundId);
+    check('the cancel function takes no payment id from its caller at all', !/paymentIntentId\s*[,}]/.test(cancelTravel.toString().split('\n')[0]));
+  }
+  {
+    const db = fakeDb(rides({ A: { paymentIntentId: null } }));
+    const s = stripe();
+    const out = await cancelTravel({ db, uid: 'alice', rideId: 'A', deps: s });
+    check('a travel with no payment of its own refunds nothing — not some other payment', out.body.refunded === false && s.log.refunds.length === 0 && db.data.rides.A.status === 'cancelled');
+  }
+  {
+    const db = fakeDb(rides());
+    const s = stripe();
+    const out = await cancelTravel({ db, uid: 'alice', rideId: 'C', deps: s });
+    check('another traveler\'s travel cannot be cancelled', out.status === 403 && db.data.rides.C.status === 'assigned' && s.log.refunds.length === 0);
+  }
+  {
+    const db = fakeDb(rides({ A: { status: 'arrived' } }));
+    const s = stripe();
+    const out = await cancelTravel({ db, uid: 'alice', rideId: 'A', deps: s });
+    check('after arrival: refunded less the $3 arrival fee, which goes to the operator (unchanged)',
+      out.body.amountCents === 1644 && out.body.arrivalFeeCents === 300 && s.log.transfers.some((t) => t.kind === 'fee' && t.amountCents === 300));
+  }
+  {
+    const db = fakeDb(rides({ A: { status: 'onboard' } }));
+    const out = await cancelTravel({ db, uid: 'alice', rideId: 'A', deps: stripe() });
+    check('onboard: cancellation refused (unchanged)', out.status === 409 && db.data.rides.A.status === 'onboard');
+  }
+
+  // ——— 2. /create-payment-intent proves the ride before anything is charged ——————————————————
+  {
+    const db = fakeDb(rides());
+    const s = stripe();
+    const out = await payForTravel({ db, uid: 'alice', rideId: 'C', create: s.create });
+    check("Traveler A cannot attach a payment to Traveler B's ride", out.status === 403 && !db.data.rides.C.paymentIntentId);
+    check('…and no PaymentIntent is created for it', s.log.creates.length === 0);
+  }
+  {
+    const db = fakeDb(rides());
+    const s = stripe();
+    const out = await payForTravel({ db, uid: 'alice', rideId: 'does-not-exist', create: s.create });
+    check('a nonexistent ride is refused', out.status === 404);
+    check('…no PaymentIntent is created', s.log.creates.length === 0);
+    check('…and no phantom ride appears', !db.data.rides['does-not-exist']);
+  }
+  {
+    const db = fakeDb(rides());
+    const s = stripe();
+    const out = await payForTravel({ db, uid: 'alice', rideId: '', create: s.create });
+    check('no ride id at all is refused, with no charge', out.status === 400 && s.log.creates.length === 0);
+  }
+  {
+    const db = fakeDb(rides({ A: { status: 'cancelled', paymentIntentId: null } }));
+    const s = stripe();
+    const out = await payForTravel({ db, uid: 'alice', rideId: 'A', create: s.create });
+    check('a cancelled travel cannot be paid for', out.status === 409 && s.log.creates.length === 0);
+  }
+  {
+    const db = fakeDb({ rides: { N: { travelerUid: 'alice', operatorId: 'op1', tripNo: 'AR-9-MIA', status: 'assigned' } } });
+    const s = stripe();
+    const out = await payForTravel({ db, uid: 'alice', rideId: 'N', create: s.create, now: 7 });
+    check('the owner pays for their own live ride', out.status === 200 && db.data.rides.N.paymentIntentId === 'pi_new' && db.data.rides.N.paidAt === 7);
+    check('Stripe gets the RIDE\'s Travel Number and id, not the request\'s', s.log.creates[0].tripNo === 'AR-9-MIA' && s.log.creates[0].rideId === 'N');
+  }
+  {
+    const db = fakeDb({ rides: { N: { travelerUid: 'alice', tripNo: 'AR-9-MIA', status: 'assigned', paymentIntentId: 'pi_first' } } });
+    const s = stripe();
+    const out = await payForTravel({ db, uid: 'alice', rideId: 'N', create: s.create });
+    check('a second, different charge for one travel is refused and not recorded', out.status === 409 && db.data.rides.N.paymentIntentId === 'pi_first');
+  }
+
+  // ——— 3. /travel/settle only for a completed travel, out of its own payment ——————————————————
+  for (const st of ['assigned', 'accepted', 'arrived', 'onboard', 'cancelled']) {
+    const db = fakeDb(rides({ A: { status: st } }));
+    const s = stripe();
+    const out = await settleTravel({ db, uid: 'alice', rideId: 'A', deps: s });
+    check(`settlement of a ${st} travel is refused, and nothing is transferred`, out.status === 409 && out.body.code === 'not_completed' && s.log.transfers.length === 0 && !db.data.rides.A.transferId);
+  }
+  {
+    const db = fakeDb(rides({ A: { status: 'completed' } }));
+    const s = stripe();
+    const sent = [];
+    const out = await settleTravel({ db, uid: 'alice', rideId: 'A', deps: { ...s, sendReceipt: async (r) => { sent.push(r); return { ok: true }; } }, now: 9 });
+    check('a completed travel settles normally', out.status === 200 && db.data.rides.A.transferId === 'tr_pi_A' && db.data.rides.A.settledAt === 9);
+    check('…out of its own payment, with its own Travel Number', s.log.transfers[0].paymentIntentId === 'pi_A' && s.log.transfers[0].expectedTripNo === 'AR-1-MIA');
+    check('…and the receipt is sent once', sent.length === 1 && db.data.rides.A.receiptSentAt === 9);
+    const again = await settleTravel({ db, uid: 'alice', rideId: 'A', deps: s });
+    check('settling twice is a no-op', again.body.alreadySettled === true && s.log.transfers.length === 1);
+  }
+  {
+    const db = fakeDb(rides({ A: { status: 'completed' }, B: { status: 'completed' } }));
+    const s = stripe();
+    await settleTravel({ db, uid: 'alice', rideId: 'A', deps: s, body: { paymentIntentId: 'pi_B' } });
+    check('settling A never pays out of B\'s payment', s.log.transfers.every((t) => t.paymentIntentId === 'pi_A'));
+  }
+  {
+    const db = fakeDb(rides({ C: { status: 'completed', paymentIntentId: 'pi_C' } }));
+    const out = await settleTravel({ db, uid: 'alice', rideId: 'C', deps: stripe() });
+    check("another traveler's travel cannot be settled", out.status === 403);
+  }
+
+  // ——— the routes use these, and ignore the request's payment ————————————————————————————
+  const server = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+  const route = (p) => (server.match(new RegExp(`app\\.post\\('${p.replace(/\//g, '\\/')}'[\\s\\S]*?\\n\\}\\);`)) || [''])[0];
+  const cancel = route('/travel/cancel');
+  const settle = route('/travel/settle');
+  const pay = route('/create-payment-intent');
+  check('/travel/cancel calls cancelTravel and never reads req.body.paymentIntentId', /cancelTravelFor\(/.test(cancel) && !/req\.body\?\.paymentIntentId/.test(cancel));
+  check('/travel/settle calls settleTravel and never reads req.body.paymentIntentId', /settleTravelFor\(/.test(settle) && !/req\.body\?\.paymentIntentId/.test(settle));
+  check('/create-payment-intent goes through payForTravel, with no tripNo from the body', /payForTravel\(/.test(pay) && !/req\.body\?\.tripNo/.test(pay));
+  check('/create-payment-intent no longer writes to a ride with set(…, { merge: true })', !/collection\('rides'\)\.doc\(rideId\)\.set\(/.test(pay));
+  const sched = fs.readFileSync(path.join(__dirname, 'scheduler.js'), 'utf8');
+  check('the settlement sweep also requires a completed travel', /x\.status !== 'completed'/.test(sched));
+
+  let bad = 0;
+  for (const r of R) { if (!r.ok) bad++; console.log(`${r.ok ? 'PASS' : 'FAIL'}  ${r.l}${r.ok ? '' : '  — ' + (r.d || '')}`); }
+  console.log(`\n${R.length - bad}/${R.length} passed`);
+  process.exit(bad ? 1 : 0);
+})();

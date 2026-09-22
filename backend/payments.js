@@ -373,7 +373,7 @@ function idempotencyForTravel(kind, uid, tripNo, amountCents) {
   return { idempotencyKey: `ar_${kind}_${uid}_${tripNo}_${amountCents}` };
 }
 
-async function createPaymentIntent({ travelCostCents, uid, email, tripNo, dep, dest, journey, governmentFees }) {
+async function createPaymentIntent({ travelCostCents, uid, email, tripNo, rideId, dep, dest, journey, governmentFees }) {
   const stripe = getStripe();
   const q = quote(travelCostCents, journey, governmentFees);
 
@@ -419,6 +419,8 @@ async function createPaymentIntent({ travelCostCents, uid, email, tripNo, dep, d
       product: 'American Rider travel',
       uid: uid || '',
       tripNo: tripNo || '',
+      // The travel record this pays for, from the server's own lookup (travelmoney.js).
+      rideId: rideId || '',
       travelCostCents: String(travelCostCents),
       // WHAT AMERICAN RIDER ACTUALLY RETAINS on this travel — the 1% commission plus the
       // platform fee. Stamped for the same reason travelCostCents is: a refund issued hours

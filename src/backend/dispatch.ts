@@ -381,34 +381,10 @@ export async function recordTravelReview(
   }
 }
 
-/**
- * Record what became of a travel.
- *
- * THE BUG THIS FIXES: every ride was written with status 'assigned' and nothing ever wrote
- * to it again. Cancelling cleared the screen and left the database saying the journey was
- * still assigned — so the Travel Log listed cancelled travels among the completed ones, and
- * a receipt existed for a journey that never happened. It is also why the status dots on the
- * home screen had nothing to show: one value, on every record, forever.
- *
- * Never throws. Losing the write is bad; taking the app down over it is worse — the traveler
- * has already cancelled and must not be shown a failure for a thing that is done.
- */
-export async function setRideStatus(
-  rideId: string,
-  status: 'assigned' | 'completed' | 'cancelled',
-): Promise<void> {
-  if (!rideId) return;
-  try {
-    await updateDoc(doc(db, 'rides', rideId), {
-      status,
-      statusAt: Date.now(),
-      // The receipt states the travel's total time (Fla. Stat. 627.748(6)); this is its end.
-      ...(status === 'completed' ? { completedAt: Date.now() } : {}),
-    });
-  } catch {
-    // Swallowed deliberately — see above.
-  }
-}
+// setRideStatus WAS HERE: the traveler's phone wrote 'completed' or 'cancelled' onto its travel.
+// Removed (independent audit of e26adcb, 22 Sept 2026): firestore.rules no longer allows it.
+// Cancellation is POST /travel/cancel, which refunds from the travel's own payment; completion
+// is recorded by the operator's app.
 
 /**
  * Follow one travel's status as the OPERATOR moves it along.

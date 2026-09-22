@@ -244,6 +244,7 @@ export async function settleTravel(opts: {
  */
 export async function cancelTravel(opts: {
   rideId: string;
+  /** Ignored by the server, which refunds from the travel's own payment. Kept for older callers. */
   paymentIntentId?: string | null;
 }): Promise<{ ok: boolean; refunded?: boolean; amountCents?: number; reason?: string }> {
   if (!opts.rideId) return { ok: false, reason: 'nothing to cancel' };

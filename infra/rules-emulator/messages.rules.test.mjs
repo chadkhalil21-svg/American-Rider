@@ -1,4 +1,4 @@
-// Adversarial tests of the `messages` rules in firestore.rules, against the real emulator.
+// Adversarial tests of the `messages` and `rides` rules in firestore.rules, against the real emulator.
 // Run: npm --prefix infra/rules-emulator test   (needs Java 11+; downloads the emulator once)
 import fs from 'node:fs';
 import path from 'node:path';
@@ -124,6 +124,38 @@ await check('rides: another operator cannot touch it', () =>
   assertFails(updateDoc(doc(as('opB'), 'rides', 'rideA'), { status: 'arrived', statusAt: 3 })));
 await check('rides: nobody reassigns a travel from a phone', () =>
   assertFails(updateDoc(doc(as('opA'), 'rides', 'rideA'), { operatorId: 'opB' })));
+
+// ——— rides: a traveler cannot declare their travel completed or cancelled ————————————————
+// (independent audit of e26adcb). Cancellation is POST /travel/cancel; completion is the operator's.
+for (const st of ['assigned', 'accepted', 'arrived', 'onboard']) {
+  for (const to of ['completed', 'cancelled']) {
+    await seed({ rideX: { tripNo: 'AR-2000-MIA', travelerUid: 'travA', operatorId: 'opA', status: st } });
+    await check(`rides: the traveler cannot change ${st} to ${to}`, () =>
+      assertFails(updateDoc(doc(as('travA'), 'rides', 'rideX'), { status: to, statusAt: 5 })));
+  }
+}
+await seed();
+await check("rides: the traveler cannot reopen a cancelled travel", () =>
+  assertFails(updateDoc(doc(as('travA'), 'rides', 'rideCancelled'), { status: 'completed', statusAt: 5 })));
+await check('rides: the traveler may rate and tip a COMPLETED travel', () =>
+  assertSucceeds(updateDoc(doc(as('travA'), 'rides', 'rideDone'), { rating: 5, tipCents: 200, reviewedAt: 5 })));
+await check('rides: …but not one that is still under way', () =>
+  assertFails(updateDoc(doc(as('travA'), 'rides', 'rideA'), { rating: 5, reviewedAt: 5 })));
+await check('rides: …nor a cancelled one', () =>
+  assertFails(updateDoc(doc(as('travA'), 'rides', 'rideCancelled'), { rating: 5, reviewedAt: 5 })));
+await check('rides: a rating outside 1–5 is refused', () =>
+  assertFails(updateDoc(doc(as('travA'), 'rides', 'rideDone'), { rating: 9, reviewedAt: 6 })));
+await check('rides: the review cannot carry a status change', () =>
+  assertFails(updateDoc(doc(as('travA'), 'rides', 'rideDone'), { rating: 4, status: 'cancelled' })));
+await check("rides: another traveler cannot review someone else's travel", () =>
+  assertFails(updateDoc(doc(as('travB'), 'rides', 'rideDone'), { rating: 1, reviewedAt: 5 })));
+await check('rides: the operator still records completion from onboard', () =>
+  assertSucceeds(updateDoc(doc(as('opB'), 'rides', 'rideB'), { status: 'completed', statusAt: 6, needsPayout: true })));
+await check('rides: nobody writes payment, refund or payout fields from a phone', async () => {
+  await assertFails(updateDoc(doc(as('travA'), 'rides', 'rideDone'), { paymentIntentId: 'pi_x' }));
+  await assertFails(updateDoc(doc(as('travA'), 'rides', 'rideDone'), { refundId: 're_x' }));
+  await assertFails(updateDoc(doc(as('opA'), 'rides', 'rideDone'), { transferId: 'tr_x' }));
+});
 
 await env.cleanup();
 let bad = 0;

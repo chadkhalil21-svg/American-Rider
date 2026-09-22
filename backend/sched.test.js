@@ -90,8 +90,8 @@ const base = (atMinFromNow, extra = {}) => ({
 // a reason unrelated to what it asserts. Repaired, not loosened — the gate is statutory.
 const { DISCLOSURE_VERSION } = require('./disclosure');
 const FLEET = {
-  opA: { name: 'Nearby N.', lat: 25.7625, lng: -80.1925, available: true, onlineAt: Date.now(), classes: ['Standard'], disclosureVersion: DISCLOSURE_VERSION },
-  opB: { name: 'Far F.', lat: 25.90, lng: -80.30, available: true, onlineAt: Date.now(), classes: ['Standard'], disclosureVersion: DISCLOSURE_VERSION },
+  opA: { name: 'Nearby N.', lat: 25.7625, lng: -80.1925, available: true, onlineAt: Date.now(), classes: ['Standard'], disclosureVersion: DISCLOSURE_VERSION, commissioned: true },
+  opB: { name: 'Far F.', lat: 25.90, lng: -80.30, available: true, onlineAt: Date.now(), classes: ['Standard'], disclosureVersion: DISCLOSURE_VERSION, commissioned: true },
 };
 
 const results = [];

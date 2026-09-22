@@ -96,8 +96,9 @@ function presenceStale(o, now = Date.now()) {
 //   2. must have checked in recently — a flag nobody clears is not presence
 //   3. must not be blocked by screening — and once screening is live, must have PASSED one
 //   4. must have commercial cover that has not lapsed
-//   5. must offer the requested class (Standard = anyone; Pet/Accessible/etc = must opt in)
-//   6. of those, the NEAREST one wins
+//   5. must have agreed to the disclosure in force, and be commissioned by a person
+//   6. must offer the requested class (Standard = anyone; Pet/Accessible/etc = must opt in)
+//   7. of those, the NEAREST one wins
 //
 // WHY RULE 2 LIVES HERE AND NOT ONLY IN THE FLAGS. `available` is written by the operator's
 // own phone — going online is a toggle in their hand. recordDecision() sets available:false
@@ -127,6 +128,9 @@ function matchOperator(operators, pickup, travelClass = 'Standard', { requireScr
     // 5. and the disclosure they agreed to must be the one in force. Same reason as 2 and 4:
     //    a rule every caller has to remember is a rule that gets forgotten.
     .filter(o => !disclosureStale(o))
+    // 6. commissioned by a person, and no document since refused. `commissioned` is stamped
+    //    only by /operator/online after it checks both; absence is not approval.
+    .filter(o => o.commissioned === true && !o.documentBlocked)
     .filter(o => travelClass === 'Standard' || (o.classes || []).includes(travelClass))
     .map(o => ({ op: o, miles: distanceMiles(pickup, o) }))
     .sort((a, b) => a.miles - b.miles);

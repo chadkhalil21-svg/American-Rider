@@ -18,7 +18,7 @@ import React, {
 } from 'react';
 import { accountInitials, accountName } from '../account';
 import { APP_FEE, coordinationFee, fareFromTotal } from '../data';
-import { goOffline, goOnline, settlePendingPayouts } from '../backend/connect';
+import { goOffline, goOnline, settlePendingPayouts, submitForReview } from '../backend/connect';
 import { startBackgroundPresence, stopBackgroundPresence } from '../backend/presence';
 import { startHeartbeat } from '../backend/heartbeat';
 import {
@@ -222,8 +222,12 @@ type OperatorState = {
   verifiedCount: number;
   allVerified: boolean;
   bgCheckedAt: string | null;
-  submitQualification: () => void;
+  /** Ask the server for review. Pending only once the server has accepted the request. */
+  submitQualification: () => Promise<{ ok: boolean; error?: string }>;
+  /** Record the server's approval on this phone. Called only after commissionStatus() says so. */
   commission: () => void;
+  /** Return to the checklist after the server refused the qualification. */
+  resetQualification: () => void;
   // availability + the simulated operation loop
   online: boolean;
   /** False when this device cannot hold presence while locked — the screen must say so. */
@@ -352,7 +356,6 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
   const [msgs, setMsgs] = useState<OpMsg[]>([]);
   const [revenue, setRevenue] = useState<RevenueBlob>(EMPTY_REVENUE);
 
-  const docTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const msgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Mirror of the revenue blob so mutations never nest setState inside an updater
   // (React updaters must stay pure — StrictMode runs them twice).
@@ -409,9 +412,7 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
       })
       .catch(() => {})
       .finally(() => setReady(true));
-    const timers = docTimers.current;
     return () => {
-      Object.values(timers).forEach(clearTimeout);
       if (msgTimer.current) clearTimeout(msgTimer.current);
     };
   }, []);
@@ -429,7 +430,6 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.setItem(K_DOCS, JSON.stringify(clean)).catch(() => {});
   }, []);
 
-  // The shell's exact theater: Add › → Checking… (900ms) → ✓ Verified.
   // What the reader said about each document, so a refusal or a hold shows its reason rather
   // than appearing as a bare unticked box.
   const [docReviews, setDocReviews] = useState<Partial<Record<DocKey, DocReview>>>({});
@@ -483,24 +483,20 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
         if (__DEV__) console.warn(`verifyDoc('${k}') is not a document path — use reviewDoc().`);
         return;
       }
+      // NO TIMER. This used to show 'checking' for 900 milliseconds and then pass, which read
+      // as a review that never happened. These steps have nothing to review, so they are done
+      // when the operator does them, and they say so at once.
       setDocs((prev) => {
-        if (prev[k] === 'ok' || prev[k] === 'checking') return prev;
-        const next = { ...prev, [k]: 'checking' as DocState };
-        if (docTimers.current[k]) clearTimeout(docTimers.current[k]);
-        docTimers.current[k] = setTimeout(() => {
-          setDocs((p) => {
-            const done = { ...p, [k]: 'ok' as DocState };
-            persistDocs(done);
-            return done;
-          });
-          if (k === 'background') {
-            const iso = new Date().toISOString();
-            setBgCheckedAt(iso);
-            AsyncStorage.setItem(K_BGCHECK, iso).catch(() => {});
-          }
-        }, 900);
+        if (prev[k] === 'ok') return prev;
+        const next = { ...prev, [k]: 'ok' as DocState };
+        persistDocs(next);
         return next;
       });
+      if (k === 'background') {
+        const iso = new Date().toISOString();
+        setBgCheckedAt(iso);
+        AsyncStorage.setItem(K_BGCHECK, iso).catch(() => {});
+      }
     },
     [persistDocs],
   );
@@ -531,9 +527,17 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
   );
   const allVerified = verifiedCount === QUAL_DOCS.length;
 
-  const submitQualification = useCallback(() => {
+  const submitQualification = useCallback(async () => {
+    const out = await submitForReview();
+    if (!out.ok) return out;
     setVerification('pending');
     AsyncStorage.setItem(K_VERIFICATION, 'pending').catch(() => {});
+    return out;
+  }, []);
+
+  const resetQualification = useCallback(() => {
+    setVerification('none');
+    AsyncStorage.removeItem(K_VERIFICATION).catch(() => {});
   }, []);
 
   const commission = useCallback(() => {
@@ -1202,6 +1206,7 @@ tr('traveler.gateLocation'),
     allVerified,
     bgCheckedAt,
     submitQualification,
+    resetQualification,
     commission,
     online,
     backgroundPresence,

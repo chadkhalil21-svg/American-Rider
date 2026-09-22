@@ -111,6 +111,47 @@ export async function goOnline(opts: {
   }
 }
 
+// ---- COMMISSIONING -----------------------------------------------------------------------
+//
+// The phone used to commission itself with a Continue button. Now it asks for review, and a
+// person decides on /ops. These two calls are the phone's whole part in that.
+export type CommissionStatus = {
+  status: 'none' | 'pending' | 'approved' | 'refused' | 'unknown';
+  reason: string | null;
+};
+
+/** Never throws. An unreachable server reads as `unknown`, never as approved. */
+export async function commissionStatus(): Promise<CommissionStatus> {
+  try {
+    const res = await fetch(`${PAYMENT_SERVER_URL}/operator/commission`, { headers: await authHeaders() });
+    if (!res.ok) return { status: 'unknown', reason: null };
+    const d = await res.json();
+    const s = d?.status;
+    return {
+      status: s === 'none' || s === 'pending' || s === 'approved' || s === 'refused' ? s : 'unknown',
+      reason: typeof d?.reason === 'string' ? d.reason : null,
+    };
+  } catch {
+    return { status: 'unknown', reason: null };
+  }
+}
+
+/** Ask for review. The server refuses while a document is missing, refused or expired. */
+export async function submitForReview(): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch(`${PAYMENT_SERVER_URL}/operator/qualification/submit`, {
+      method: 'POST',
+      headers: await authHeaders(),
+      body: '{}',
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) return { ok: false, error: d?.error || `Server error ${res.status}` };
+    return { ok: true };
+  } catch {
+    return { ok: false, error: t('traveler.errReachAR') };
+  }
+}
+
 /** Stop being matchable. Never throws — going off duty must always be possible. */
 export async function goOffline(): Promise<void> {
   try {

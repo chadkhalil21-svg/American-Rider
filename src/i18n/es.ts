@@ -62,7 +62,6 @@ export default {
     forgotPassword: '¿Olvidó su contraseña?',
   },
   common: {
-    continue: 'Continuar',
     back: 'Atrás',
     done: 'Listo',
     language: 'Idioma',
@@ -678,7 +677,9 @@ export default {
     dateFormatPh: 'AAAA-MM-DD',
     underReview: 'En Revisión',
     travelWhileWaiting: 'Viaje como viajero mientras espera',
-    reviewSimulated: 'Programa de prueba — la revisión es simulada y se resuelve al momento.',
+    reviewNotApproved: 'No Aprobado',
+    reviewCheckStatus: 'Consultar el Estado',
+    reviewReturnToQualification: 'Volver a la Calificación',
     yourTraveler: 'Su viajero',
     contact: 'Contactar',
     opsTodayRevenue: 'Operaciones de hoy: %{n} · ver ingresos',

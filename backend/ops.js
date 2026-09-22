@@ -20,6 +20,8 @@ const { webhookReady } = require('./webhook');
 const { emailReady } = require('./email');
 const { screeningReady } = require('./screening');
 const { monthlyRemittance } = require('./remittance');
+const { REQUIRED_DOCS, documentsStatus } = require('./commissioning');
+const { disclosureStale } = require('./matching');
 
 const COOKIE = 'ar_ops';
 
@@ -73,6 +75,60 @@ const stat = (k, v, mono) =>
 
 const UNDERWAY = ['assigned', 'accepted', 'arrived', 'onboard'];
 
+const DOC_TITLES = {
+  license: 'Driver licence',
+  registration: 'Vehicle registration',
+  inspection: 'Vehicle inspection',
+  insurance: 'Commercial insurance',
+};
+
+/** A small form that posts one decision. The cookie authorises it; SameSite=Lax keeps it ours. */
+const decide = (action, fields, label, extra = '') =>
+  `<form method="post" action="${action}" style="display:inline-block;margin:6px 8px 0 0;">
+     ${Object.entries(fields).map(([k, v]) => `<input type="hidden" name="${k}" value="${esc(v)}">`).join('')}
+     ${extra}
+     <button type="submit" style="border:1px solid ${T.border};background:#fff;color:${T.ink};
+       border-radius:13px;padding:8px 14px;font-size:14px;cursor:pointer;">${esc(label)}</button>
+   </form>`;
+
+/**
+ * One operator awaiting review: the four documents as the reader saw them, a decision on any
+ * document it held for a person, and the commission decision itself.
+ */
+function reviewCard(u) {
+  const docs = u.documents || {};
+  const state = documentsStatus(docs);
+  const who = u.legalName || u.name || u.email || u.id;
+  const rows = REQUIRED_DOCS.map((k) => {
+    const d = docs[k] || {};
+    const verdict = !d.verdict ? 'missing' : d.verdict === 'accept' ? 'accepted' : d.verdict === 'refuse' ? 'refused' : 'held';
+    const reasons = Array.isArray(d.reasons) && d.reasons.length ? `<br>${d.reasons.map(esc).join('<br>')}` : '';
+    const image = d.imageUrl ? ` · <a href="${esc(d.imageUrl)}" target="_blank" rel="noopener">View document</a>` : '';
+    const actions = d.verdict && d.verdict !== 'accept'
+      ? decide('/ops/operators/document', { uid: u.id, kind: k, action: 'accept' }, 'Accept document') +
+        decide('/ops/operators/document', { uid: u.id, kind: k, action: 'refuse' }, 'Refuse document')
+      : '';
+    return `<div><span class="k">${esc(DOC_TITLES[k])}<br>
+        <span style="color:${T.faint};font-size:13px;">${esc(d.summary || '')}${d.expiry ? ` Expires ${esc(d.expiry)}.` : ''}${reasons}${image}</span>
+        ${actions}</span>
+      <span class="amount">${verdict}</span></div>`;
+  }).join('');
+  const reason = `<input type="text" name="reason" placeholder="Reason given to the operator" required
+      style="padding:8px 12px;border:1px solid ${T.border};border-radius:13px;font-size:14px;margin-right:8px;">`;
+  return `<div class="rows" style="margin-bottom:18px;">
+    <div><span class="k"><strong>${esc(who)}</strong><br>
+      <span style="color:${T.faint};font-size:13px;">Submitted ${ago(u.commission?.submittedAt)}</span></span>
+      <span class="amount">${state.accepted ? 'ready' : 'documents held'}</span></div>
+    ${rows}
+    <div><span class="k">
+      ${state.accepted
+        ? decide('/ops/operators/commission', { uid: u.id, action: 'approve' }, 'Approve and commission')
+        : '<span style="color:' + T.faint + ';font-size:13px;">Approval opens when all four documents are accepted.</span><br>'}
+      ${decide('/ops/operators/commission', { uid: u.id, action: 'refuse' }, 'Refuse', reason)}
+    </span></div>
+  </div>`;
+}
+
 async function board() {
   const db = adminDb();
   if (!db) {
@@ -81,12 +137,16 @@ async function board() {
   }
 
   const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
-  const [ridesSnap, opsSnap, schedSnap, caseSnap] = await Promise.all([
+  const [ridesSnap, opsSnap, schedSnap, caseSnap, pendingSnap] = await Promise.all([
     db.collection('rides').get(),
     db.collection('operators').get(),
     db.collection('scheduled_rides').where('status', '==', 'reserved').get(),
     db.collection('support_tickets').where('status', '==', 'open').get(),
+    db.collection('users').where('commission.status', '==', 'pending').get(),
   ]);
+  const pending = pendingSnap.docs
+    .map((d) => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (a.commission?.submittedAt || 0) - (b.commission?.submittedAt || 0));
 
   const rides = ridesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const operators = opsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -112,6 +172,9 @@ async function board() {
   if (owed.length) alarms.push(`${owed.length} operator payout${owed.length > 1 ? 's' : ''} owed`);
   const noReceipt = rides.filter((r) => r.receiptFailed);
   if (noReceipt.length) alarms.push(`${noReceipt.length} receipt${noReceipt.length > 1 ? 's' : ''} not delivered`);
+  if (pending.length) alarms.push(`${pending.length} operator${pending.length > 1 ? 's' : ''} awaiting review`);
+  // Real operators only — the demonstration stand-ins are never stored.
+  const staleDisclosure = operators.filter((o) => disclosureStale(o));
 
   const rideRow = (r) =>
     `<div>
@@ -162,6 +225,11 @@ ${alarms.length
 </section>
 
 <section>
+  <h2>Awaiting review</h2>
+  ${pending.length ? pending.map(reviewCard).join('') : '<p>No operator is awaiting review.</p>'}
+</section>
+
+<section>
   <h2>On duty</h2>
   ${onDuty.length
     ? `<div class="rows">${onDuty
@@ -170,6 +238,11 @@ ${alarms.length
           <span class="amount">${o.screened === false ? 'NOT SCREENED' : o.payoutsEnabled === false ? 'not payable' : 'available'}</span></div>`)
         .join('')}</div>`
     : '<p>Nobody is on duty.</p>'}
+  ${staleDisclosure.length
+    ? `<p>${staleDisclosure.length} operator record${staleDisclosure.length === 1 ? '' : 's'} carry an
+        insurance disclosure that is not the one in force. Dispatch skips them until the operator
+        reads the current disclosure in the app: ${staleDisclosure.map((o) => esc(o.name || o.id)).join(', ')}.</p>`
+    : ''}
 </section>
 
 <section>
@@ -256,6 +329,81 @@ function mount(app, express) {
       `${COOKIE}=${expectedCookie()}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${60 * 60 * 12}; Secure`,
     );
     res.redirect('/ops');
+  });
+
+  // THE COMMISSION DECISION. The only path to `approved` in the whole system. Approval is
+  // checked against the documents again at the moment of the click, not against the page the
+  // founder loaded: a document refused in another tab must not be approved over.
+  app.post('/ops/operators/commission', express.urlencoded({ extended: false }), async (req, res) => {
+    if (!expectedCookie() || !signedIn(req)) return res.status(401).type('html').send(page('Operations', LOGIN));
+    const db = adminDb();
+    if (!db) return res.status(503).send(adminStatus().reason);
+    const uid = String(req.body?.uid || '');
+    const action = String(req.body?.action || '');
+    const reason = String(req.body?.reason || '').trim().slice(0, 300);
+    if (!uid || !['approve', 'refuse'].includes(action)) return res.status(400).send('uid and action are required');
+    try {
+      const ref = db.collection('users').doc(uid);
+      const snap = await ref.get();
+      if (!snap.exists) return res.status(404).send('No such operator');
+      if (action === 'approve') {
+        const state = documentsStatus(snap.data().documents);
+        if (!state.accepted) {
+          return res.status(409).type('html').send(page('Operations',
+            `<h1>Operations</h1><section><p>Not approved: every document must be accepted and in date first.</p>
+             <a class="more" href="/ops">Back to operations ›</a></section>`));
+        }
+        await ref.set({ commission: { status: 'approved', decidedAt: Date.now(), decidedBy: 'ops', reason: null } }, { merge: true });
+      } else {
+        if (!reason) return res.status(400).send('A reason is required to refuse');
+        await ref.set({ commission: { status: 'refused', decidedAt: Date.now(), decidedBy: 'ops', reason } }, { merge: true });
+        const opRef = db.collection('operators').doc(uid);
+        if ((await opRef.get()).exists) await opRef.set({ available: false, commissioned: false }, { merge: true });
+      }
+      res.redirect(303, '/ops');
+    } catch (e) {
+      res.status(500).send(esc(e.message));
+    }
+  });
+
+  // A PERSON'S DECISION ON ONE DOCUMENT — for the ones the reader held. Recorded beside what
+  // the reader said, never over it, so the record shows both.
+  app.post('/ops/operators/document', express.urlencoded({ extended: false }), async (req, res) => {
+    if (!expectedCookie() || !signedIn(req)) return res.status(401).type('html').send(page('Operations', LOGIN));
+    const db = adminDb();
+    if (!db) return res.status(503).send(adminStatus().reason);
+    const uid = String(req.body?.uid || '');
+    const kind = String(req.body?.kind || '');
+    const action = String(req.body?.action || '');
+    if (!uid || !REQUIRED_DOCS.includes(kind) || !['accept', 'refuse'].includes(action)) {
+      return res.status(400).send('uid, kind and action are required');
+    }
+    try {
+      const ref = db.collection('users').doc(uid);
+      const snap = await ref.get();
+      const d = snap.exists ? snap.data().documents?.[kind] : null;
+      if (!d) return res.status(404).send('No such document');
+      await ref.set(
+        {
+          documents: {
+            [kind]: {
+              verdict: action,
+              readerVerdict: d.readerVerdict || d.verdict,
+              reviewedBy: 'ops',
+              reviewedAt: Date.now(),
+            },
+          },
+        },
+        { merge: true },
+      );
+      if (action === 'refuse') {
+        const opRef = db.collection('operators').doc(uid);
+        if ((await opRef.get()).exists) await opRef.set({ available: false, documentBlocked: true }, { merge: true });
+      }
+      res.redirect(303, '/ops');
+    } catch (e) {
+      res.status(500).send(esc(e.message));
+    }
   });
 
   // THE GOVERNMENT-FEE LEDGER: what is held for each public body for a calendar month, summed

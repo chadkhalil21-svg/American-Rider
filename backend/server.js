@@ -93,6 +93,7 @@ const {
 } = require('./verify');
 const { mount: mountOps } = require('./ops');
 const { readDocument, documentsReady } = require('./documents');
+const { documentsStatus, commissionCurrent, commissionReason } = require('./commissioning');
 const { page } = require('./shell');
 const {
   screeningReady, evaluateExistingReport, screeningCurrent,
@@ -784,14 +785,35 @@ app.post('/operator/online', requireAuth, async (req, res) => {
     // read one screen, and there is no version of "we told them" that is true tomorrow and
     // false today.
     let disclosure = null;
+    let user = null;
     try {
       const snap = await db.collection('users').doc(String(req.uid)).get();
-      disclosure = snap.exists ? snap.data().insuranceDisclosure || null : null;
+      user = snap.exists ? snap.data() : null;
+      disclosure = user?.insuranceDisclosure || null;
     } catch {
-      /* unreadable is not acknowledged */
+      /* unreadable is not acknowledged, and not commissioned */
     }
     if (!disclosureCurrent(disclosure)) {
       return res.status(409).json({ code: 'disclosure_required', error: disclosureReason(disclosure) });
+    }
+
+    // THE COMMISSION. A person approves an operator on /ops, and only after all four documents
+    // were read and accepted — see backend/commissioning.js. It was a Continue button on the
+    // phone. Like the disclosure, this applies in test mode too: approving yourself on /ops
+    // costs a founder one click, and a gate that only exists in live mode is never tested.
+    const commission = user?.commission || null;
+    if (!commissionCurrent(commission)) {
+      return res.status(409).json({ code: 'not_commissioned', error: commissionReason(commission) });
+    }
+    // AND THE DOCUMENTS STILL STAND. A licence refused or expired after approval ends duty
+    // until a new one is read and accepted; the commission itself is not withdrawn.
+    const docState = documentsStatus(user?.documents);
+    if (!docState.accepted) {
+      return res.status(409).json({
+        code: 'documents_required',
+        error: 'A document on file is not accepted or has expired. Submit a current one to continue.',
+        documents: docState,
+      });
     }
 
     const screened = screeningCurrent(screening);
@@ -858,6 +880,10 @@ app.post('/operator/online', requireAuth, async (req, res) => {
         // acknowledgement that was just checked, never from DISCLOSURE_VERSION directly —
         // stamping the current version here would record agreement that was never given.
         disclosureVersion: disclosure?.version || null,
+        // Stamped from the commission and documents checked above, so dispatch can read them
+        // without a second collection. Never written true anywhere else.
+        commissioned: true,
+        documentBlocked: false,
         // Visible on /ops. In test mode an unscreened operator may go on duty; nobody should
         // have to read code to discover that one has.
         screened,
@@ -1952,6 +1978,11 @@ app.post('/operator/document', requireAuth, async (req, res) => {
             expiry: out.expiry,
             imageUrl,
             readAt: Date.now(),
+            // A new document starts a new reading; a person's decision on the old one does
+            // not carry over to it.
+            readerVerdict: null,
+            reviewedBy: null,
+            reviewedAt: null,
           },
         },
       },
@@ -1973,6 +2004,57 @@ app.post('/operator/document', requireAuth, async (req, res) => {
       summary: out.summary,
       expiry: out.expiry,
     });
+  } catch (e) {
+    res.status(502).json({ error: e.message });
+  }
+});
+
+// --- Commissioning: submit for review, and read the decision. ------------------------------
+//
+// The phone used to commission itself. Now it asks to be reviewed, and a person decides on
+// /ops (backend/ops.js). See backend/commissioning.js for the rules both ends share.
+app.get('/operator/commission', requireAuth, async (req, res) => {
+  const db = adminDb();
+  if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
+  try {
+    const snap = await db.collection('users').doc(String(req.uid)).get();
+    const u = snap.exists ? snap.data() : {};
+    const c = u.commission || null;
+    res.json({
+      status: c?.status || 'none',
+      reason: c?.status === 'refused' ? c.reason || null : null,
+      decidedAt: c?.decidedAt || null,
+      documents: documentsStatus(u.documents),
+    });
+  } catch (e) {
+    res.status(502).json({ error: e.message });
+  }
+});
+
+app.post('/operator/qualification/submit', requireAuth, async (req, res) => {
+  const db = adminDb();
+  if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
+  try {
+    const ref = db.collection('users').doc(String(req.uid));
+    const snap = await ref.get();
+    const u = snap.exists ? snap.data() : {};
+    // An approved operator is not sent back to the queue by pressing Submit again.
+    if (commissionCurrent(u.commission)) return res.json({ status: 'approved' });
+    // HELD DOCUMENTS MAY BE SUBMITTED — a hold is a request for a person, and this is how the
+    // person gets asked. Missing, refused or expired ones may not.
+    const docs = documentsStatus(u.documents);
+    if (!docs.reviewable) {
+      return res.status(409).json({
+        code: 'documents_required',
+        error: 'Every document must be submitted, and none refused or expired, before review.',
+        documents: docs,
+      });
+    }
+    await ref.set(
+      { commission: { status: 'pending', submittedAt: Date.now(), reason: null, decidedAt: null } },
+      { merge: true },
+    );
+    res.json({ status: 'pending' });
   } catch (e) {
     res.status(502).json({ error: e.message });
   }
@@ -2073,6 +2155,17 @@ app.post('/operator/disclosure/acknowledge', requireAuth, async (req, res) => {
       },
       { merge: true },
     );
+    // THE FLEET RECORD CARRIES THE VERSION DISPATCH READS (matching.js disclosureStale). An
+    // operator already on duty under an older version stopped receiving travel the moment the
+    // version moved; stamping here returns them to dispatch now, not at their next renewal.
+    // Only an existing record — acknowledging must not invent a fleet entry.
+    try {
+      const opRef = db.collection('operators').doc(String(req.uid));
+      const opSnap = await opRef.get();
+      if (opSnap.exists) await opRef.set({ disclosureVersion: DISCLOSURE_VERSION }, { merge: true });
+    } catch {
+      /* the next renewal through /operator/online stamps it from the record just written */
+    }
     res.json({ ok: true, version: DISCLOSURE_VERSION, lang: shown.lang });
   } catch (e) {
     res.status(502).json({ error: e.message });
@@ -2452,6 +2545,7 @@ app.post('/travel/dispatch', requireAuth, async (req, res) => {
       onlineAt: at,
       screeningCheckedAt: at,
       disclosureVersion: DISCLOSURE_VERSION,
+      commissioned: true,
       demo: true,
     }));
   }

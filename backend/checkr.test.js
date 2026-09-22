@@ -157,8 +157,8 @@ const HERE = { lat: 25.77, lng: -80.19 };
 // disclosureVersion; once dispatch started filtering on it they failed for a reason that had
 // nothing to do with what they assert. A fixture missing a field the chokepoint reads is not a
 // test of that chokepoint. The missing-disclosure case is asserted on its own, below.
-const near = { id: 'op_near', available: true, onlineAt: Date.now(), lat: 25.77, lng: -80.19, disclosureVersion: DISCLOSURE_VERSION };
-const far = { id: 'op_far', available: true, onlineAt: Date.now(), lat: 25.9, lng: -80.3, screeningCheckedAt: Date.now(), disclosureVersion: DISCLOSURE_VERSION };
+const near = { id: 'op_near', available: true, onlineAt: Date.now(), lat: 25.77, lng: -80.19, disclosureVersion: DISCLOSURE_VERSION, commissioned: true };
+const far = { id: 'op_far', available: true, onlineAt: Date.now(), lat: 25.9, lng: -80.3, screeningCheckedAt: Date.now(), disclosureVersion: DISCLOSURE_VERSION, commissioned: true };
 
 check(
   'a screeningBlocked operator is never dispatched, even when nearest and available',
@@ -199,8 +199,8 @@ check('a record with NO onlineAt at all is stale, not present', presenceStale({ 
 check('a zero or nonsense timestamp is stale', presenceStale({ onlineAt: 0 }, T0) && presenceStale({ onlineAt: 'soon' }, T0));
 
 // And the same rule at the chokepoint, which is the part that actually failed.
-const stale = { id: 'op_stale', available: true, onlineAt: T0 - PRESENCE_STALE_MS - 1, lat: 25.77, lng: -80.19, disclosureVersion: DISCLOSURE_VERSION };
-const live = { id: 'op_live', available: true, onlineAt: T0 - 1000, lat: 25.9, lng: -80.3, disclosureVersion: DISCLOSURE_VERSION };
+const stale = { id: 'op_stale', available: true, onlineAt: T0 - PRESENCE_STALE_MS - 1, lat: 25.77, lng: -80.19, disclosureVersion: DISCLOSURE_VERSION, commissioned: true };
+const live = { id: 'op_live', available: true, onlineAt: T0 - 1000, lat: 25.9, lng: -80.3, disclosureVersion: DISCLOSURE_VERSION, commissioned: true };
 check(
   'a NEARER stale operator loses to a FARTHER live one',
   matchOperator([stale, live], HERE, 'Standard', { now: T0 })?.operator.id === 'op_live',
@@ -227,7 +227,7 @@ check(
 // It also broke four cases above, whose fixtures were written before this gate existed and
 // carried no disclosure. They assert things about SCREENING and PRESENCE; a fixture missing a
 // field the chokepoint reads is not a test of that chokepoint. Repaired, not loosened.
-const noDisclosure = { id: 'op_demo', available: true, onlineAt: Date.now(), lat: 25.77, lng: -80.19 };
+const noDisclosure = { id: 'op_demo', available: true, onlineAt: Date.now(), lat: 25.77, lng: -80.19, commissioned: true };
 const oldDisclosure = { ...noDisclosure, id: 'op_old', disclosureVersion: '2026-08-29.1' };
 const okDisclosure = { ...noDisclosure, id: 'op_ok', disclosureVersion: DISCLOSURE_VERSION };
 check(

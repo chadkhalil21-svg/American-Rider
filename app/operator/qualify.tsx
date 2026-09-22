@@ -4,7 +4,7 @@
 // seventh step (Background Check); Commercial Insurance and Background Check open
 // guidance screens, the rest verify inline.
 import { useRouter } from 'expo-router';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../../src/components/AppText';
 import { useGoBack } from '../../src/components/nav';
@@ -28,7 +28,13 @@ export default function OperatorQualification() {
   }, [op.ready, op.verification, router]);
 
   const n = op.verifiedCount;
-  const done = op.allVerified;
+  // A DOCUMENT THE READER HELD MAY GO TO REVIEW. A hold asks for a person, and submitting is
+  // how the person is asked. Without this a held licence was a dead end on this screen.
+  const done = QUAL_DOCS.every(
+    (d) => op.docs[d.key] === 'ok' || op.docReviews[d.key]?.verdict === 'review',
+  );
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   return (
     <Screen>
@@ -106,12 +112,17 @@ export default function OperatorQualification() {
           reverse — it is just the flattering direction to be wrong in. */}
 
       <View style={{ flex: 1 }} />
+      {submitError && <Text style={styles.footnote}>{submitError}</Text>}
       <PrimaryButton
         label={done ? t('traveler.qualSubmitReview') : t('traveler.qualVerifyAll', { total: QUAL_DOCS.length })}
-        disabled={!done}
-        onPress={() => {
-          op.submitQualification();
-          router.replace('/operator/review');
+        disabled={!done || submitting}
+        onPress={async () => {
+          setSubmitting(true);
+          setSubmitError(null);
+          const out = await op.submitQualification();
+          setSubmitting(false);
+          if (out.ok) router.replace('/operator/review');
+          else setSubmitError(out.error || null);
         }}
         style={{ marginTop: 24 }}
       />

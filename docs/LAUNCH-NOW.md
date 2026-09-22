@@ -114,8 +114,8 @@ every previous sweep because the code was there.
 | 1 | **A build.** Nothing installable exists. | None of the above has ever been exercised by a phone. |
 | 2 | **Checkr account.** No `CHECKR_API_KEY`. | Every operator sits at `awaiting_provider` — not a pass, not dispatchable. **Nobody can be commissioned.** |
 | 3 | **Live Stripe keys.** Still `test`. | No real money can move in either direction. |
-| 4 | **Document review is simulated.** `verifyDoc` clears every document on a 900ms timer. | Licence, registration, inspection and insurance are accepted without anybody or anything looking at them. Five screens say so. |
-| 5 | **Commissioning review is simulated.** `app/operator/review.tsx` clears at once. | An operator is commissioned by a timer. |
+| 4 | ~~Document review is simulated.~~ **DONE 22 Sept 2026.** The server reads each document (`backend/documents.js`); a held or refused one is decided by a person on `/ops`. No timer remains. | — |
+| 5 | ~~Commissioning review is simulated.~~ **DONE 22 Sept 2026.** A person approves on `/ops`, only over four accepted documents (`backend/commissioning.js`). `/operator/online` and dispatch refuse an operator without it. | — |
 
 ### Tier 2 — raised by the founders, not built
 
@@ -132,7 +132,7 @@ every previous sweep because the code was there.
 | --- | --- |
 | 10 | **No About page.** The footer link pointed at a 404 and was removed rather than left dead. |
 | 11 | **`account.updated` needs a second Stripe destination** with Connected accounts scope. Without it, an operator Stripe restricts stays on duty. |
-| 12 | **`app/audio.tsx` is orphaned** — unlinked from every screen. Founders' call: link it or delete it. |
+| 12 | ~~`app/audio.tsx` is orphaned.~~ **DONE.** The file is no longer in the tree; nothing refers to it. |
 
 ### Not defects, but real and unbudgeted
 

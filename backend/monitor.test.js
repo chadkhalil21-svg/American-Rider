@@ -280,7 +280,7 @@ const check = (l, c, d) => results.push({ l, ok: !!c, d });
   const freeOperator = {
     op2: { uid: 'op2', name: 'Second', available: true, lat: NEAR.lat, lng: NEAR.lng,
            onlineAt: now, classes: ['Standard'], insuranceExpiry: '2099-01-01',
-           disclosureVersion: DISCLOSURE_VERSION },
+           disclosureVersion: DISCLOSURE_VERSION, commissioned: true },
   };
 
   // 15. Unanswered, and somebody else is free: it moves.

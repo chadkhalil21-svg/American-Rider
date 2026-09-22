@@ -55,7 +55,6 @@ export default {
     forgotPassword: 'Forgot password?',
   },
   common: {
-    continue: 'Continue',
     back: 'Back',
     done: 'Done',
     language: 'Language',
@@ -679,7 +678,9 @@ export default {
     dateFormatPh: 'YYYY-MM-DD',
     underReview: 'Under Review',
     travelWhileWaiting: 'Travel as a Traveler while you wait',
-    reviewSimulated: 'Test program — review is simulated and clears at once.',
+    reviewNotApproved: 'Not Approved',
+    reviewCheckStatus: 'Check Status',
+    reviewReturnToQualification: 'Return to Qualification',
     yourTraveler: 'Your traveler',
     contact: 'Contact',
     opsTodayRevenue: 'Operations today: %{n} · view revenue',

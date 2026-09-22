@@ -1,12 +1,17 @@
-// Under Review — the web demo shell's screen, exactly: the shield, the promise of a
-// same-day commission, Continue (the demo commissions on the spot — labeled as test
-// program), and the traveler escape hatch.
+// Under Review — the web demo shell's screen: the shield, where the answer appears, and the
+// traveler escape hatch.
+//
+// THE DECISION IS THE SERVER'S. This screen had a Continue button that commissioned the
+// operator on the spot, in phone storage ("Test program — review is simulated and clears at
+// once"). A person now approves or refuses on /ops, and this screen reads that answer: on
+// arrival, every thirty seconds while it is open, and when the operator asks.
 import { useRouter } from 'expo-router';
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../../src/components/AppText';
 import Svg, { Path } from 'react-native-svg';
 import { PrimaryButton, Screen } from '../../src/components/UI';
+import { commissionStatus } from '../../src/backend/connect';
 import { useOperator } from '../../src/state/OperatorContext';
 import { useLanguage } from '../../src/state/LanguageContext';
 import { colors } from '../../src/theme';
@@ -31,6 +36,34 @@ export default function OperatorReview() {
     if (op.verification === 'commissioned') router.replace('/operator');
   }, [op.ready, op.verification, router]);
 
+  const [refused, setRefused] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const approvedOnce = useRef(false);
+  const { commission, resetQualification } = op;
+  const check = useCallback(async () => {
+    setBusy(true);
+    const s = await commissionStatus();
+    setBusy(false);
+    if (s.status === 'approved' && !approvedOnce.current) {
+      approvedOnce.current = true;
+      commission();
+      router.replace('/operator/commissioned');
+    } else if (s.status === 'refused') {
+      setRefused(s.reason || '');
+    } else if (s.status === 'none') {
+      // Pending on this phone and never submitted to the server — the old Continue flow left
+      // accounts in this state. Nobody is reviewing them, so waiting here would be forever.
+      resetQualification();
+      router.replace('/operator/qualify');
+    }
+  }, [commission, resetQualification, router]);
+
+  useEffect(() => {
+    check();
+    const id = setInterval(check, 30000);
+    return () => clearInterval(id);
+  }, [check]);
+
   return (
     <Screen scroll={false}>
       <View style={{ flex: 1, alignItems: 'center' }}>
@@ -43,29 +76,41 @@ export default function OperatorReview() {
             strokeLinejoin="round"
           />
         </Svg>
-        <Text style={styles.title}>{t('traveler.underReview')}</Text>
-        <Text style={styles.sub}>
-          {/* WAS: "you will be notified the moment you are cleared." Nothing notifies
-              anyone — the app registers for no push notifications. Say where the answer
-              appears instead, which is somewhere they can actually go and look. */}
-          Your qualification is complete. Most operators are commissioned within a few hours;
-          your status appears here.
+        <Text style={styles.title}>
+          {refused !== null ? t('traveler.reviewNotApproved') : t('traveler.underReview')}
         </Text>
+        {refused !== null ? (
+          <Text style={styles.sub}>{refused}</Text>
+        ) : (
+          <Text style={styles.sub}>
+            {/* WAS: "you will be notified the moment you are cleared." Nothing notifies
+                anyone — the app registers for no push notifications. Say where the answer
+                appears instead, which is somewhere they can actually go and look. */}
+            Your qualification is complete. Most operators are commissioned within a few hours;
+            your status appears here.
+          </Text>
+        )}
         <View style={{ flex: 1 }} />
         <View style={{ alignSelf: 'stretch' }}>
-          <PrimaryButton
-            label={t('common.continue')}
-            color={colors.green}
-            onPress={() => {
-              op.commission();
-              router.replace('/operator/commissioned');
-            }}
-          />
+          {refused !== null ? (
+            <PrimaryButton
+              label={t('traveler.reviewReturnToQualification')}
+              onPress={() => {
+                resetQualification();
+                router.replace('/operator/qualify');
+              }}
+            />
+          ) : (
+            <PrimaryButton
+              label={busy ? t('traveler.busyChecking') : t('traveler.reviewCheckStatus')}
+              disabled={busy}
+              onPress={check}
+            />
+          )}
         </View>
         <Pressable onPress={() => router.dismissTo('/')} hitSlop={10} style={{ marginTop: 16 }}>
           <Text style={styles.link}>{t('traveler.travelWhileWaiting')}</Text>
         </Pressable>
-        <Text style={styles.testNote}>{t('traveler.reviewSimulated')}</Text>
       </View>
     </Screen>
   );
@@ -88,5 +133,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   link: { fontSize: 15, fontWeight: '500', color: colors.ink, textAlign: 'center' },
-  testNote: { fontSize: 11.5, color: colors.faint, marginTop: 18, textAlign: 'center' },
 });

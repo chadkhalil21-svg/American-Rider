@@ -51,7 +51,6 @@ export default {
     forgotPassword: 'Passwort vergessen?',
   },
   common: {
-    continue: 'Weiter',
     back: 'Zurück',
     done: 'Fertig',
     language: 'Sprache',
@@ -662,7 +661,9 @@ export default {
     dateFormatPh: 'JJJJ-MM-TT',
     underReview: 'In Prüfung',
     travelWhileWaiting: 'Fahren Sie währenddessen als Reisender',
-    reviewSimulated: 'Testprogramm — die Prüfung ist simuliert und schließt sofort ab.',
+    reviewNotApproved: 'Nicht Genehmigt',
+    reviewCheckStatus: 'Status Prüfen',
+    reviewReturnToQualification: 'Zurück zur Qualifikation',
     yourTraveler: 'Ihr Reisender',
     contact: 'Kontaktieren',
     opsTodayRevenue: 'Vorgänge heute: %{n} · Erträge ansehen',

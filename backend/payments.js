@@ -470,6 +470,33 @@ async function createPaymentIntent({ travelCostCents, uid, email, tripNo, rideId
 //   travelCostCents        e.g. 2450  ($24.50 travel cost)
 //   operatorStripeAccount  the operator's connected account id (acct_...) — optional
 //   travelerPaymentMethod  a Stripe test payment method (defaults to the test Visa)
+/**
+ * Continue an EXISTING, still-unpaid intent for the same travel and the same price — a retry of
+ * the same payment — without creating a PaymentIntent (travelmoney.js payForTravel checks the
+ * travel's record first; audit of f6ef88d). Returns the same body createPaymentIntent returns,
+ * or null when the intent is paid, cancelled, someone else's, another travel's, or for a
+ * different amount — in which case the caller refuses.
+ */
+const RESUMABLE = ['requires_payment_method', 'requires_confirmation', 'requires_action'];
+async function resumePaymentIntent({ paymentIntentId, uid, rideId, email, travelCostCents, journey, governmentFees }) {
+  const stripe = getStripe();
+  const pi = await stripe.paymentIntents.retrieve(paymentIntentId);
+  if (!pi || pi.metadata?.uid !== String(uid) || pi.metadata?.rideId !== String(rideId)) return null;
+  if (!RESUMABLE.includes(pi.status)) return null;
+  const q = quote(travelCostCents, journey, governmentFees);
+  if (pi.amount !== q.travelerPays) return null;
+  const customer = await customerForTraveler({ uid, email });
+  const ephemeralKey = await stripe.ephemeralKeys.create({ customer: customer.id }, { apiVersion: '2024-06-20' });
+  return {
+    clientSecret: pi.client_secret,
+    paymentIntentId: pi.id,
+    customerId: customer.id,
+    ephemeralKeySecret: ephemeralKey.secret,
+    breakdown: q,
+    resumed: true,
+  };
+}
+
 async function chargeRide({ travelCostCents, operatorStripeAccount, travelerPaymentMethod, uid, tripNo, governmentFees }) {
   const stripe = getStripe();
   const q = quote(travelCostCents, undefined, governmentFees);
@@ -1095,7 +1122,7 @@ async function operatorPayoutAccount(db, operatorId) {
 
 module.exports = {
   operatorPayoutAccount,
-  quote, commissionCents, platformFeeCents, isDomesticCard, defaultCardCountry, journeyFeeCents, createPaymentIntent, chargeRide, refundTravel,
+  quote, commissionCents, platformFeeCents, isDomesticCard, defaultCardCountry, journeyFeeCents, createPaymentIntent, resumePaymentIntent, chargeRide, refundTravel,
   customerForTraveler, connectAccountFor, connectOnboardingLink, connectAccountStatus,
   transferToOperator, paidWithFromIntent, refundableFor, connectDashboardLink, pingStripe, probeNetwork,
   chargeTip, transferFixed, chargeScheduledTravel, createScreeningIntent,

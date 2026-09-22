@@ -21,7 +21,7 @@ require('node:dns').setDefaultResultOrder('ipv4first');
 const express = require('express');
 const cors = require('cors');
 const {
-  quote, createPaymentIntent, chargeRide, refundTravel,
+  quote, createPaymentIntent, resumePaymentIntent, chargeRide, refundTravel,
   connectAccountFor, connectOnboardingLink, connectAccountStatus,
   transferToOperator, refundableFor, connectDashboardLink, pingStripe, probeNetwork,
   chargeTip, transferFixed, createScreeningIntent, operatorPayoutAccount,
@@ -1613,6 +1613,18 @@ app.post('/create-payment-intent', requireAuth, LIMITS.payments, async (req, res
           // Display only — the names that put the route on the receipt and bank statement.
           dep: String(req.body?.departure || '').slice(0, 60) || null,
           dest: String(req.body?.destination || '').slice(0, 60) || null,
+        }),
+      // A retry of the same unpaid payment continues the existing intent — a retrieve, never a
+      // second create. Anything else on an already-paid travel is refused before Stripe is asked.
+      resume: (paymentIntentId) =>
+        resumePaymentIntent({
+          paymentIntentId,
+          uid: req.uid,
+          rideId: String(req.body?.rideId || ''),
+          email: req.email,
+          travelCostCents: priced.travelCostCents,
+          journey,
+          governmentFees: priced.governmentFees,
         }),
     });
     if (out.status !== 200) return res.status(out.status).json(out.body);

@@ -67,6 +67,16 @@ service cloud.firestore {
                  || (ride.status == 'completed' && d.lostItemId is string))));
     }
 
+    // Does this update move the travel INTO `st` (from any other status)?
+    function enteringStatus(st) {
+      return changes('status') && request.resource.data.status == st && resource.data.status != st;
+    }
+    // A status timestamp may be written only as a number, and only in the update that enters its
+    // status — never added or rewritten afterwards.
+    function stampedOnlyEntering(field, st) {
+      return !changes(field) || (enteringStatus(st) && request.resource.data.get(field, null) is number);
+    }
+
     // ---- rides -------------------------------------------------------------
     match /rides/{rideId} {
       // You may read a travel that is yours — as the traveler who booked it, or as the
@@ -147,17 +157,30 @@ service cloud.firestore {
       // of them and writes 'accepted' with admin access. And because a phone that cannot write
       // 'accepted' could otherwise jump straight to 'arrived', every later status now requires
       // the travel to be under way already; 'declined' is only an answer to an open offer.
+      //
+      // THE WRITE THE APP ACTUALLY SENDS (src/backend/rideStatusWrite.ts, audit of f6ef88d):
+      //   arrived    status, statusAt, arrivedAt
+      //   onboard    status, statusAt, onboardAt
+      //   completed  status, statusAt, completedAt, needsPayout: true
+      //   declined   status, statusAt, declinedAt
+      // onboardAt and completedAt were missing from this list, so the moves to 'onboard' and to
+      // 'completed' were refused. Each timestamp — and needsPayout — is now accepted ONLY in the
+      // update that ENTERS its status (enteringStatus below), so none can be rewritten later.
       allow update: if drivesExisting()
-                    && touchesOnly(['status', 'statusAt', 'arrivedAt', 'declinedAt',
+                    && touchesOnly(['status', 'statusAt', 'arrivedAt', 'onboardAt', 'completedAt', 'declinedAt',
                                     'opLat', 'opLng', 'opAt', 'stillSince', 'needsPayout'])
                     && (!changes('status')
                         || (request.resource.data.status in ['arrived', 'onboard', 'completed']
                             && resource.data.status in ['accepted', 'arrived', 'onboard'])
                         || (request.resource.data.status == 'declined'
                             && resource.data.status == 'assigned'))
+                    && stampedOnlyEntering('arrivedAt', 'arrived')
+                    && stampedOnlyEntering('onboardAt', 'onboard')
+                    && stampedOnlyEntering('completedAt', 'completed')
+                    && stampedOnlyEntering('declinedAt', 'declined')
                     && (!changes('needsPayout')
                         || (request.resource.data.needsPayout == true
-                            && request.resource.data.status == 'completed'));
+                            && enteringStatus('completed')));
 
       // A travel record is history. It is never deleted from a phone.
       allow delete: if false;

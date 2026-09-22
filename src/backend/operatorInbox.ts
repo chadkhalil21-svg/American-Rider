@@ -18,6 +18,7 @@ import {
 } from 'firebase/firestore';
 import { fareFromTotal } from '../data';
 import { PAYMENT_SERVER_URL } from '../config';
+import { operatorStatusWrite, type OperatorStatus } from './rideStatusWrite';
 import { auth, db } from '../firebase';
 import { t } from '../i18n';
 
@@ -143,31 +144,12 @@ export function watchAssignedTravel(
  * Returns whether the write landed, and never throws. The caller decides what to tell the
  * operator; it must not claim a travel was accepted if the database refused.
  */
-async function setStatus(
-  rideId: string,
-  status: 'arrived' | 'onboard' | 'completed' | 'declined',
-  stampField?: 'arrivedAt' | 'declinedAt',
-): Promise<boolean> {
+async function setStatus(rideId: string, status: OperatorStatus): Promise<boolean> {
   if (!rideId) return false;
   try {
-    await updateDoc(doc(db, 'rides', rideId), {
-      status,
-      statusAt: Date.now(),
-      ...(stampField ? { [stampField]: Date.now() } : {}),
-      // WHEN THE TRAVEL RAN. Florida's receipt rule (627.748(6)) wants its total time; that
-      // is boarding to completion, and only the operator's app knows both moments.
-      ...(status === 'onboard' ? { onboardAt: Date.now() } : {}),
-      ...(status === 'completed' ? { completedAt: Date.now() } : {}),
-      // A FLAG THE SETTLEMENT SWEEP CAN QUERY, so it reads the travels that owe somebody
-      // money instead of every travel ever completed.
-      //
-      // The sweep first scanned all completed travel, then the newest 200 — which at one
-      // tick a minute is 288,000 document reads a day against a 50,000/day free allowance.
-      // The read bill for finding nothing was about to be the reason to start paying for a
-      // database holding 166 writes. Now the query is `needsPayout == true`, which on a quiet
-      // minute reads nothing at all, and sweepSettlements clears the flag as it pays.
-      ...(status === 'completed' ? { needsPayout: true } : {}),
-    });
+    // The exact write, defined once in rideStatusWrite.ts — the same object the Firestore
+    // emulator tests send (infra/rules-emulator).
+    await updateDoc(doc(db, 'rides', rideId), operatorStatusWrite(status, Date.now()));
     return true;
   } catch (e) {
     // LOUD, because a silent one cost a payout on 2 Sept 2026.
@@ -218,7 +200,7 @@ export async function acceptTravel(
     return { ok: false, error: t('traveler.errReachDispatch') };
   }
 }
-export const declineTravel = (rideId: string) => setStatus(rideId, 'declined', 'declinedAt');
-export const markArrived = (rideId: string) => setStatus(rideId, 'arrived', 'arrivedAt');
+export const declineTravel = (rideId: string) => setStatus(rideId, 'declined');
+export const markArrived = (rideId: string) => setStatus(rideId, 'arrived');
 export const markOnboard = (rideId: string) => setStatus(rideId, 'onboard');
 export const markCompleted = (rideId: string) => setStatus(rideId, 'completed');

@@ -132,11 +132,41 @@ const rides = (over = {}) => ({
     check('the owner pays for their own live ride', out.status === 200 && db.data.rides.N.paymentIntentId === 'pi_new' && db.data.rides.N.paidAt === 7);
     check('Stripe gets the RIDE\'s Travel Number and id, not the request\'s', s.log.creates[0].tripNo === 'AR-9-MIA' && s.log.creates[0].rideId === 'N');
   }
+  // ——— an already-paid travel: NO Stripe creation call at all (audit of f6ef88d) ——————————————
   {
     const db = fakeDb({ rides: { N: { travelerUid: 'alice', tripNo: 'AR-9-MIA', status: 'assigned', paymentIntentId: 'pi_first' } } });
     const s = stripe();
     const out = await payForTravel({ db, uid: 'alice', rideId: 'N', create: s.create });
-    check('a second, different charge for one travel is refused and not recorded', out.status === 409 && db.data.rides.N.paymentIntentId === 'pi_first');
+    check('a travel with a payment on record: refused', out.status === 409 && out.body.code === 'already_paid');
+    check('…and Stripe creates NOTHING — creates.length stays 0', s.log.creates.length === 0, JSON.stringify(s.log.creates));
+    check('…and the record is untouched', db.data.rides.N.paymentIntentId === 'pi_first');
+  }
+  {
+    const db = fakeDb({ rides: { N: { travelerUid: 'alice', tripNo: 'AR-9-MIA', status: 'assigned', paymentIntentId: 'pi_first' } } });
+    const s = stripe();
+    const resumed = [];
+    const out = await payForTravel({
+      db, uid: 'alice', rideId: 'N', create: s.create,
+      resume: async (id) => { resumed.push(id); return { paymentIntentId: id, clientSecret: 'cs_first', resumed: true, breakdown: { feeLines: [] } }; },
+    });
+    check('a retry of the same unpaid payment continues the EXISTING intent', out.status === 200 && out.body.paymentIntentId === 'pi_first' && resumed.join() === 'pi_first');
+    check('…still with creates.length 0', s.log.creates.length === 0);
+  }
+  {
+    const db = fakeDb({ rides: { N: { travelerUid: 'alice', tripNo: 'AR-9-MIA', status: 'assigned', paymentIntentId: 'pi_first' } } });
+    const s = stripe();
+    const out = await payForTravel({ db, uid: 'alice', rideId: 'N', create: s.create, resume: async () => null });
+    check('an intent that cannot be continued (paid, cancelled, other amount): refused, creates.length 0', out.status === 409 && s.log.creates.length === 0);
+  }
+  {
+    const src = fs.readFileSync(path.join(__dirname, 'travelmoney.js'), 'utf8');
+    const body = src.slice(src.indexOf('async function payForTravel'), src.indexOf('async function cancelTravel'));
+    check('payForTravel checks the recorded payment BEFORE calling create()', body.indexOf('if (ride.paymentIntentId)') > 0 && body.indexOf('if (ride.paymentIntentId)') < body.indexOf('await create('));
+    const pay = fs.readFileSync(path.join(__dirname, 'payments.js'), 'utf8');
+    const resume = pay.slice(pay.indexOf('async function resumePaymentIntent'), pay.indexOf('async function chargeRide'));
+    check('resumePaymentIntent retrieves and never creates a PaymentIntent', /paymentIntents\.retrieve\(/.test(resume) && !/paymentIntents\.create\(/.test(resume));
+    check('…and continues only this traveler\'s intent, for this travel, unpaid, at the same amount',
+      /metadata\?\.uid !== String\(uid\)/.test(resume) && /metadata\?\.rideId !== String\(rideId\)/.test(resume) && /RESUMABLE\.includes\(pi\.status\)/.test(resume) && /pi\.amount !== q\.travelerPays/.test(resume));
   }
 
   // ——— 3. /travel/settle only for a completed travel, out of its own payment ——————————————————

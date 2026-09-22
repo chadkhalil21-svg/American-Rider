@@ -42,19 +42,30 @@ async function authorizePaymentRide({ db, uid, rideId }) {
  *
  * `create` is payments.js createPaymentIntent with the price already bound in; it is called with
  * the travel's OWN Travel Number and id, never the request's. Refused before Stripe is asked
- * anything when the ride is not the caller's. The record is an update, which fails rather than
- * creating a ride that does not exist.
+ * anything when the ride is not the caller's, or already has a payment. The record is an update,
+ * which fails rather than creating a ride that does not exist.
+ *
+ * `resume(paymentIntentId)` (optional) returns the body for continuing an EXISTING, still
+ * unpaid intent — a retrieve, never a create — or null when it cannot be resumed.
  */
-async function payForTravel({ db, uid, rideId, create, now = Date.now() }) {
+async function payForTravel({ db, uid, rideId, create, resume = null, now = Date.now() }) {
   const auth = await authorizePaymentRide({ db, uid, rideId });
   if (!auth.ok) return auth;
   const { ride, rideRef } = auth;
-  const result = await create({ tripNo: ride.tripNo || null, rideId: String(rideId) });
-  if (ride.paymentIntentId && result.paymentIntentId && ride.paymentIntentId !== result.paymentIntentId) {
-    // A second, different charge for one travel. Stripe's idempotency key returns the same
-    // intent for a retry of the same payment, so a different one is not a retry.
+  // A TRAVEL THAT ALREADY HAS A PAYMENT GETS NO SECOND ONE — decided from the record, BEFORE
+  // Stripe is asked for anything (audit of f6ef88d). This used to create the intent first and
+  // compare afterwards, so every repeat request made a Stripe call only to learn the travel was
+  // paid. A retry of the same payment (the sheet closed, a card declined) is answered from
+  // `resume`: the existing intent's details, looked up rather than created. With no `resume`
+  // the travel is simply reported as paid.
+  if (ride.paymentIntentId) {
+    if (resume) {
+      const again = await resume(ride.paymentIntentId);
+      if (again) return { status: 200, body: again };
+    }
     return fail(409, 'This travel already has a payment', 'already_paid');
   }
+  const result = await create({ tripNo: ride.tripNo || null, rideId: String(rideId) });
   await rideRef.update({
     paymentIntentId: result.paymentIntentId,
     paidAt: now,

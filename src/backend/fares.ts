@@ -105,7 +105,11 @@ export async function geocodePlace(query: string, near: Coords | null = null): P
 // Ask the server what a trip costs. Pass coordinates when we have them; fall back to a known
 // destination name (the old fixed table) when we don't — e.g. in the web preview.
 /** Somewhere American Rider does not go. Distinct from a quote that failed to arrive. */
-export type Unavailable = { unavailable: string };
+export type Unavailable = {
+  unavailable: string;
+  /** Set when the PICKUP is outside every active market — the one case a waitlist answers. */
+  waitlistAt?: { lat: number; lng: number } | null;
+};
 export const isUnavailable = (q: Quote | Unavailable | null): q is Unavailable =>
   !!q && 'unavailable' in q;
 
@@ -147,7 +151,11 @@ export async function fetchQuote(args: {
     // refusal that arrived here as `null` would have shown "Select the destination again to
     // confirm the amount" — inviting the traveler to keep trying something that will never work.
     if (res.status === 409 && d?.code === 'outside_market') {
-      return { unavailable: String(d.error || t('traveler.errNotServedYet')) };
+      const p = (args as { pickup?: { lat: number; lng: number } | null }).pickup ?? null;
+      return {
+        unavailable: String(d.error || t('traveler.errNotServedYet')),
+        waitlistAt: (d?.where === 'pickup' || d?.where === 'both') && p ? { lat: p.lat, lng: p.lng } : null,
+      };
     }
     // A PLACE WE HOLD NO PERMIT FOR IS THE SAME KIND OF ANSWER as one outside the market, and
     // the traveler is owed the same clarity: this cannot be booked, and it is not their doing.

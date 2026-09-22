@@ -59,6 +59,7 @@ export default function OperatorCommunicate() {
     setDraft('');
     setUnsent(false);
     const stored = await sendTravelMessage({
+      rideId: op.op?.rideId,
       tripNo,
       text: t,
       from: 'operator',

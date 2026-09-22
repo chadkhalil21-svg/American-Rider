@@ -20,7 +20,7 @@ webhook handling and no support cases. The server will boot, serve pages, and do
 | `RESEND_API_KEY` | Email receipts and support alerts | resend.com. Free tier is 3,000/month. |
 | `MAIL_FROM` | Email receipts | e.g. `American Rider <receipts@americanrider.app>` — the domain must be verified in Resend. |
 | `SUPPORT_EMAIL` | Case alerts reaching a person | Wherever you want cases to land. |
-| `OPS_PASSWORD` | `/ops` | Choose a long one. It is the key to every traveler's route and every operator's earnings. |
+| `OPS_USERS` | `/ops` | `name:password,name:password` — one per person, so the audit log names who decided. The shared `OPS_PASSWORD` does not work in production (only with `OPS_ALLOW_SHARED_PASSWORD=emergency`). |
 | `CHECKR_API_KEY` | Operator screening | [checkr.com/pricing](https://checkr.com/pricing). **The account is free** — you pay per report, and the operator pays that. Until this key exists, screening reads `awaiting_provider` — **not** a pass, and not dispatchable. |
 | `CHECKR_WEBHOOK_SECRET` | Screening results returning | Checkr dashboard → Developers → Webhooks. Point the webhook at `https://<server>/checkr/webhook`; the signature is an HMAC over the raw body and the server verifies it. |
 | `CHECKR_PACKAGE` | Which screening bundle a full check orders | Optional. Defaults to `american_rider_operator` — create a package with that slug in Checkr → Packages containing Basic+ **and the MVR add-on** (the $47.49 bundle in screening.js). |

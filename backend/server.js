@@ -1586,6 +1586,8 @@ app.post('/quote', LIMITS.quoteIp, (req, res) => {
 // /fare-quote this is unauthenticated (it reveals nothing private), but it only answers inside
 // a served region (regions.js), so it can't be farmed as a free worldwide routing proxy.
 app.post('/route', LIMITS.routeIp, async (req, res) => {
+  // No routing for a pickup that is not in an active market: nothing can be booked from there.
+  if (!servesPoint(req.body?.pickup)) return res.status(409).json({ error: outsideMarketMessage('pickup'), code: 'outside_market', where: 'pickup' });
   const route = await fetchRoute(req.body?.pickup, req.body?.dest);
   if (!route) return res.status(404).json({ error: 'No route for that trip' });
   res.json(route);

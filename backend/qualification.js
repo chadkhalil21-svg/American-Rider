@@ -39,28 +39,39 @@ const { coverageLapsed } = require('./matching');
 const REQUIRED_DOCS = ['license', 'registration', 'insurance'];
 
 // FLORIDA TNC INSURANCE, as configured rules the code applies to what the reader extracted.
-// The reader never decides compliance; these numbers do. Figures as the platform already
-// states them (backend/site.js, Insurance) and as §627.748(7) reads — CONFIRM WITH FLORIDA
-// COUNSEL before launch, and change them here, in one place, if counsel differs.
+// The reader never decides compliance; these numbers do.
+//
+// SOURCE: Fla. Stat. §627.748(7), as quoted by the founders on 22 Sept 2026 (the statute site
+// could not be reached from the build environment to re-read it). Every field names the
+// subsection it comes from. No alternative formulation is encoded: an earlier version accepted
+// a $125,000 combined single limit for the logged-on period, which no subsection of §627.748
+// authorizes, and it was removed. CONFIRM WITH FLORIDA COUNSEL; change figures here only.
 const FL_TNC_INSURANCE = Object.freeze({
   statute: 'Fla. Stat. §627.748(7)',
-  // (7)(b): engaged in a prearranged ride — $1,000,000 for death, bodily injury and property
-  // damage. A combined figure is required; split limits alone are not read as meeting it.
-  rideCombinedMinDollars: 1000000,
-  // (7)(c): logged on, not engaged — $50,000 per person, $100,000 per incident, $25,000
-  // property damage; a combined single limit must cover the per-incident and property figures
-  // together ($125,000).
-  loggedOn: { perPerson: 50000, perIncident: 100000, propertyDamage: 25000, combinedSingle: 125000 },
-  // Personal injury protection, §627.736 minimum.
+  // §627.748(7)(b): logged on to the digital network, not engaged in a prearranged ride —
+  // bodily injury $50,000 per person and $100,000 per incident, property damage $25,000. Stated
+  // as split limits; a combined figure alone is an exception for a person, not a pass.
+  loggedOn: { subsection: '(7)(b)', perPerson: 50000, perIncident: 100000, propertyDamage: 25000 },
+  // §627.748(7)(c): engaged in a prearranged ride — primary automobile liability of at least
+  // $1,000,000 for death, bodily injury and property damage.
+  ride: { subsection: '(7)(c)', primaryLiabilityMinDollars: 1000000 },
+  // §627.748(7)(b) and (7)(c) both require personal injury protection meeting the no-fault
+  // minimums; the $10,000 figure is the PIP benefit minimum of §627.736(1).
   pipMinDollars: 10000,
-  // Uninsured / underinsured motorist "as required by s. 627.727", which lets a named insured
-  // reject it in writing. Whether a rejected UM satisfies the TNC rule is a question for counsel:
-  // until INSURANCE_UM_REJECTION_ACCEPTED is set, a rejection is an exception, not a pass.
+  // §627.748(7)(b) and (7)(c) both require uninsured / underinsured motorist coverage "as
+  // required by s. 627.727", and §627.727 lets a named insured reject it in writing. Whether a
+  // rejection satisfies the TNC requirement is for counsel: until INSURANCE_UM_REJECTION_ACCEPTED
+  // is set, a rejection is an exception, not a pass.
   umRejectionAccepted: () => process.env.INSURANCE_UM_REJECTION_ACCEPTED === '1',
+  // Carried forward from the platform's own rules, not from §627.748(7): the policy must state
+  // TNC or for-hire use (a personal policy may exclude it), cover the registered vehicle, name the
+  // operator, and be in force. Each is an exception when not shown.
 });
+// Kept for the existing checks: the §627.748(7)(c) figure.
+const FL_TNC_RIDE_MIN = FL_TNC_INSURANCE.ride.primaryLiabilityMinDollars;
 
 // Kept under its old name: the $1,000,000 check the platform has always made.
-const FL_CARRYING_LIMIT_DOLLARS = FL_TNC_INSURANCE.rideCombinedMinDollars;
+const FL_CARRYING_LIMIT_DOLLARS = FL_TNC_RIDE_MIN;
 
 /** Every dollar figure in a limits string. Bare small numbers ("50/100/25") are not guessed at. */
 function dollarFigures(text) {
@@ -118,7 +129,8 @@ function insuranceEvidence(d, human) {
     tnc: v.tncUse === 'yes' ? 'yes' : ins?.tncEndorsement === 'yes' || ins?.forHireUse === 'yes' ? 'yes'
       : ins?.tncEndorsement === 'no' && ins?.forHireUse === 'no' ? 'no' : 'unknown',
     rideCombined: Number(v.rideCombinedDollars) || top(ins?.rideLimits?.combinedSingleLimit) || general.combinedSingle,
-    loggedOn: Number(v.loggedOnCombinedDollars) ? { perPerson: 0, perIncident: 0, propertyDamage: 0, combinedSingle: Number(v.loggedOnCombinedDollars) }
+    loggedOn: Number(v.loggedOnPerPersonDollars) || Number(v.loggedOnPerIncidentDollars) || Number(v.loggedOnPropertyDamageDollars)
+      ? { perPerson: Number(v.loggedOnPerPersonDollars) || 0, perIncident: Number(v.loggedOnPerIncidentDollars) || 0, propertyDamage: Number(v.loggedOnPropertyDamageDollars) || 0, combinedSingle: 0 }
       : any(loggedOnRead) ? loggedOnRead : general,
     pip: v.pipDollars ? { shown: 'yes', amount: Number(v.pipDollars) } : { shown: ins?.pip?.shown || 'not_shown', amount: top(ins?.pip?.amount) },
     um: v.uninsuredMotorist || ins?.uninsuredMotorist?.shown || 'not_shown',
@@ -161,21 +173,24 @@ function insuranceFindings(d, human, ctx, now) {
   // For what: transportation network company or for-hire use must be stated.
   if (e.tnc === 'no') F('refused', 'insurance_no_tnc_use', 'The policy states no TNC or for-hire coverage.');
   else if (e.tnc !== 'yes') F('exception', 'insurance_tnc_use_unverified', 'TNC or for-hire coverage is not stated.');
-  // How much, during a prearranged ride.
-  if (!e.rideCombined) F('exception', 'insurance_ride_limit_unreadable', 'The limit during a prearranged ride could not be read.');
-  else if (e.rideCombined < R.rideCombinedMinDollars) F('refused', 'insurance_ride_limit_insufficient', `$${e.rideCombined.toLocaleString('en-US')} during a ride; Florida requires $1,000,000.`);
-  // How much, while logged on and not engaged.
+  // §627.748(7)(c): during a prearranged ride, at least $1,000,000 primary liability.
+  if (!e.rideCombined) F('exception', 'insurance_ride_limit_unreadable', 'The liability limit during a prearranged ride could not be read.');
+  else if (e.rideCombined < R.ride.primaryLiabilityMinDollars) F('refused', 'insurance_ride_limit_insufficient', `$${e.rideCombined.toLocaleString('en-US')} during a ride; §627.748(7)(c) requires $1,000,000.`);
+  // §627.748(7)(b): logged on, not engaged — 50,000 / 100,000 / 25,000, as split limits.
   const L = e.loggedOn;
-  const split = L.perPerson >= R.loggedOn.perPerson && L.perIncident >= R.loggedOn.perIncident && L.propertyDamage >= R.loggedOn.propertyDamage;
-  const combined = L.combinedSingle >= R.loggedOn.combinedSingle;
-  if (!(L.perPerson || L.perIncident || L.propertyDamage || L.combinedSingle)) {
+  const need = R.loggedOn;
+  const read3 = L.perPerson && L.perIncident && L.propertyDamage;
+  if (read3) {
+    if (L.perPerson < need.perPerson || L.perIncident < need.perIncident || L.propertyDamage < need.propertyDamage) {
+      F('refused', 'insurance_logged_on_limits_insufficient', 'The limits while logged on are below $50,000 / $100,000 / $25,000 (§627.748(7)(b)).');
+    }
+  } else if (L.perPerson || L.perIncident || L.propertyDamage) {
+    F('exception', 'insurance_logged_on_limits_incomplete', 'Not every limit for the logged-on period could be read.');
+  } else if (L.combinedSingle) {
+    // A combined figure is not what §627.748(7)(b) states. A person decides it.
+    F('exception', 'insurance_logged_on_split_limits_not_shown', 'The logged-on period shows only a combined limit; §627.748(7)(b) states split limits.');
+  } else {
     F('exception', 'insurance_logged_on_limits_unreadable', 'The limits while logged on and not on a ride could not be read.');
-  } else if (!split && !combined) {
-    // Readable, but a figure is missing or below. Refused only when every stated figure is read
-    // and one is plainly short; a gap in what was read is a person's to check.
-    const complete = L.combinedSingle || (L.perPerson && L.perIncident && L.propertyDamage);
-    F(complete ? 'refused' : 'exception', complete ? 'insurance_logged_on_limits_insufficient' : 'insurance_logged_on_limits_incomplete',
-      'The limits while logged on do not show $50,000 / $100,000 / $25,000.');
   }
   // PIP.
   if (e.pip.shown === 'no') F('refused', 'insurance_no_pip', 'The policy states no personal injury protection.');
@@ -228,7 +243,7 @@ function documentFindings(kind, d, now, ctx = {}) {
     const limit = human ? Number(human.limitDollars) : Math.max(0, ...dollarFigures(ev.fields?.limits));
     if (!(limit > 0)) return Q('exception', 'insurance_limits_unreadable', 'The coverage limits could not be read.');
     if (limit < FL_CARRYING_LIMIT_DOLLARS) {
-      return Q('refused', 'insurance_limits_insufficient', `Highest limit shown is $${limit.toLocaleString('en-US')}; Florida requires $1,000,000 while carrying a traveler.`);
+      return Q('refused', 'insurance_limits_insufficient', `Highest limit shown is $${limit.toLocaleString('en-US')}; §627.748(7)(c) requires $1,000,000 during a prearranged ride.`);
     }
     // And the full Florida TNC rule set on the structured reading.
     return insuranceFindings(d, human, ctx, now);
@@ -406,7 +421,9 @@ async function resolveDocument({ db, uid, kind, action, actor, note, expiry, com
       ...(v.effectiveDate ? { effectiveDate: String(v.effectiveDate) } : {}),
       ...(v.tncUse === 'yes' ? { tncUse: 'yes' } : {}),
       rideCombinedDollars: Number(v.rideCombinedDollars) || Number(limitDollars),
-      ...(Number(v.loggedOnCombinedDollars) > 0 ? { loggedOnCombinedDollars: Number(v.loggedOnCombinedDollars) } : {}),
+      ...(Number(v.loggedOnPerPersonDollars) > 0 ? { loggedOnPerPersonDollars: Number(v.loggedOnPerPersonDollars) } : {}),
+      ...(Number(v.loggedOnPerIncidentDollars) > 0 ? { loggedOnPerIncidentDollars: Number(v.loggedOnPerIncidentDollars) } : {}),
+      ...(Number(v.loggedOnPropertyDamageDollars) > 0 ? { loggedOnPropertyDamageDollars: Number(v.loggedOnPropertyDamageDollars) } : {}),
       ...(Number(v.pipDollars) > 0 ? { pipDollars: Number(v.pipDollars) } : {}),
       ...(['yes', 'rejected_in_writing'].includes(v.uninsuredMotorist) ? { uninsuredMotorist: v.uninsuredMotorist } : {}),
     };

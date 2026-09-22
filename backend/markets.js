@@ -13,18 +13,33 @@
 //
 // THE PICKUP DECIDES. Authorization reads the requested pickup location, never the device's
 // position: somebody in Chicago may reserve a pickup at Miami International Airport for next
-// week. The destination must also be in an active market, which makes travel between the three
-// active counties ordinary and travel out of them unavailable.
+// week. An active market is where travel ORIGINATES, not where it must end: the destination may
+// be in any county of the pickup's operating region, active or not — Key Largo, Martin County
+// below the region's northern edge, the western Everglades.
+//
+// THE DESTINATION RULE IS THE ONE THAT SHIPPED, UNCHANGED. Before 22 Sept 2026 both ends had to
+// fall inside the region's rectangle (regions.js bbox, 25.05–26.98 N, 80.95–79.95 W), because
+// "a travel between regions is not sold" (market.js) — pinned by market.test.js ("Miami to New
+// York is refused"). That is an existing, tested product rule, so it stands: a destination
+// outside the pickup's region is refused. For one day on this branch destinations were narrowed
+// to the three counties; that narrowing is withdrawn. Lifting the regional limit is one line in
+// tripOutsideMarkets and is the founders' decision.
 //
 // NOT HERE: airport, seaport and other restricted places. Those are fees.js (permitRequired),
 // checked separately and independently of whether the county is active.
 //
 // BOUNDARIES. backend/markets/fl-counties.json, built by infra/markets/build-counties.mjs from
-// Census cartographic boundaries simplified to 1:10,000,000. Coastlines are simplified, so a
-// point within SNAP_KM of exactly one-or-more counties and inside none is given the nearest —
-// that is what keeps Miami Beach and Hillsboro Beach inside their counties. County-to-county
-// lines can be off by a few hundred metres; the build script says how to regenerate them from
-// the 1:500,000 file.
+// the Census Bureau's 1:500,000 cartographic county boundaries (cb_2021_us_county_500k). A point
+// is in the county whose land polygon contains it. Nothing else decides it, with one narrow
+// exception for the shoreline, below.
+//
+// THE SHORELINE ALLOWANCE (SHORE_M). Cartographic boundaries follow a generalized shoreline, so
+// a pickup pinned on beach sand can fall a few tens of metres "in the water" (measured on
+// 22 Sept 2026: Haulover Beach 14 m, Fort Lauderdale beach 65 m, Pompano pier base 93 m). A
+// point is given a county by this allowance ONLY when it lies inside NO county at all, and
+// exactly ONE county lies within SHORE_M. It never moves a point out of the county it is in,
+// and near a county line it refuses rather than chooses. The Card Sound bridge (224 m from
+// Monroe) and the Deerfield pier (139 m) stay outside, as does open water.
 //
 // CONFIGURATION. MARKET_STATUS overrides a status without a code change:
 //   MARKET_STATUS=fl-broward:waitlist            take Broward out of service
@@ -32,11 +47,11 @@
 //                                                  routing, fares and a jurisdiction record
 // A market can be ACTIVE only if it belongs to a configured region (regions.js). A refused
 // override is logged and the market stays WAITLIST.
-const { regionById } = require('./regions');
+const { regionById, regionFor } = require('./regions');
 const { readKey } = require('./env');
 const FL = require('./markets/fl-counties.json');
 
-const SNAP_KM = 1.0;
+const SHORE_M = 100;
 
 /** The counties of each operating region, and their status as shipped. */
 const REGION_COUNTIES = {
@@ -132,17 +147,9 @@ function marketFor(p) {
   const all = markets();
   const hit = all.find((m) => contains(m.geometry, x, y));
   if (hit) return hit;
-  // Off a simplified coastline: the nearest county within SNAP_KM, else nowhere.
-  let near = null;
-  let d = SNAP_KM;
-  for (const m of all) {
-    const k = distanceKm(m.geometry, x, y);
-    if (k <= d) {
-      d = k;
-      near = m;
-    }
-  }
-  return near;
+  // In no county: the shoreline allowance, and only when exactly one county is that close.
+  const near = all.filter((m) => distanceKm(m.geometry, x, y) * 1000 <= SHORE_M);
+  return near.length === 1 ? near[0] : null;
 }
 
 /** 'active' or 'waitlist'. Anywhere without a market record is waitlist. */
@@ -154,18 +161,19 @@ function marketStatus(p) {
 const servesPoint = (p) => marketStatus(p) === 'active';
 
 /**
- * May a travel from `pickup` to `dest` be sold? null when yes, else which end is the problem:
- * 'pickup' | 'destination' | 'both'. Both ends in ACTIVE markets of the same region.
+ * May a travel from `pickup` to `dest` be sold? null when yes, else which end is the problem.
+ * The pickup must be in an ACTIVE market; the destination must be inside that market's
+ * operating region (regions.js), in any county. Restricted places (airports, seaports) are
+ * fees.js's permitRequired, applied separately to both ends.
  */
 function tripOutsideMarkets(pickup, dest) {
-  const a = marketFor(pickup);
-  const b = marketFor(dest);
-  const pa = a?.status === 'active';
-  const da = b?.status === 'active';
-  if (!pa && !da) return 'both';
-  if (!pa) return 'pickup';
-  if (!da) return 'destination';
-  if (a.regionId !== b.regionId) return 'destination';
+  const m = marketFor(pickup);
+  const pickupOk = m?.status === 'active';
+  const destRegion = regionFor(dest);
+  const destOk = !!destRegion && (!pickupOk || destRegion.id === m.regionId);
+  if (!pickupOk && !destOk) return 'both';
+  if (!pickupOk) return 'pickup';
+  if (!destOk) return 'destination';
   return null;
 }
 
@@ -176,4 +184,4 @@ function listMarkets() {
     .map(({ id, name, fips, regionId, status }) => ({ id, name, fips, regionId, status }));
 }
 
-module.exports = { marketFor, marketStatus, servesPoint, tripOutsideMarkets, listMarkets, markets, SNAP_KM };
+module.exports = { marketFor, marketStatus, servesPoint, tripOutsideMarkets, listMarkets, markets, SHORE_M };

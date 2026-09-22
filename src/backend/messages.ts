@@ -48,6 +48,8 @@ export type TravelMessage = {
  * unless this returned true.
  */
 export async function sendTravelMessage(args: {
+  /** The ride record's id. The security rule reads it; the parties come from it. */
+  rideId: string | null | undefined;
   tripNo: string;
   text: string;
   from: 'traveler' | 'operator';
@@ -59,9 +61,12 @@ export async function sendTravelMessage(args: {
 }): Promise<boolean> {
   const uid = auth.currentUser?.uid;
   const text = args.text.trim();
-  if (!uid || !text || !args.tripNo) return false;
+  // THE RIDE IS REQUIRED. firestore.rules reads it to decide who may write here; a message
+  // with no ride is refused there, so it is not sent at all.
+  if (!uid || !text || !args.tripNo || !args.rideId) return false;
   try {
     await addDoc(collection(db, 'messages'), {
+      rideId: args.rideId,
       tripNo: args.tripNo,
       from: args.from,
       // The writer is always themselves; the counterparty comes from the travel record.

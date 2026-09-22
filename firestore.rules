@@ -53,6 +53,20 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys().hasAny([field]);
     }
 
+    // May the signed-in user write this message into this ride's conversation? See messages.
+    function messageFitsRide(ride) {
+      let d = request.resource.data;
+      return ride.tripNo == d.tripNo
+        && d.travelerUid == ride.travelerUid
+        && d.operatorId == ride.operatorId
+        && ((d.from == 'traveler' && ride.travelerUid == request.auth.uid
+             && (ride.status in ['assigned', 'accepted', 'arrived', 'onboard']
+                 || (ride.status == 'completed' && d.lostItemId is string)))
+            || (d.from == 'operator' && ride.operatorId == request.auth.uid
+             && (ride.status in ['accepted', 'arrived', 'onboard']
+                 || (ride.status == 'completed' && d.lostItemId is string))));
+    }
+
     // ---- rides -------------------------------------------------------------
     match /rides/{rideId} {
       // You may read a travel that is yours — as the traveler who booked it, or as the
@@ -172,19 +186,32 @@ service cloud.firestore {
     match /messages/{messageId} {
       allow read: if ownsExisting() || drivesExisting();
 
-      // BOUNDED (22 Sept 2026): the fields src/backend/messages.ts writes and nothing else, and
-      // text no longer than the 2,000 characters the app already cuts to — so a client cannot
-      // store an unbounded document per message.
+      // BOUND TO THE TRAVEL RECORD (22 Sept 2026). This rule used to check only that the writer
+      // was who the message said: `from: 'operator'` with operatorId = the writer. Nothing tied
+      // the message to a travel, so anybody signed in who knew a traveler's uid and Travel
+      // Number could write `travelerUid: <victim>` and land in that traveler's thread — and a
+      // traveler could address any operator the same way.
+      //
+      // Now every message names its ride (rideId), and the rule reads that ride:
+      //   - the Travel Number is the ride's;
+      //   - travelerUid and operatorId are the ride's own parties, not the client's choice;
+      //   - the writer is the ride's traveler (from 'traveler') or its CURRENT operator
+      //     (from 'operator'); an operator the travel was taken from can no longer write;
+      //   - the ride is under way — assigned (traveler only), accepted, arrived, onboard — or
+      //     completed with a lost item report, which is the one conversation that continues.
+      //     Cancelled, declined, expired and ordinary completed travel take no new messages.
+      // Reading stays keyed on the two uids stored on each message, which this rule has just
+      // verified against the ride, so each message is readable by exactly the two parties it
+      // was written between.
       allow create: if signedIn()
-                    && request.resource.data.keys().hasOnly(['tripNo', 'from', 'travelerUid', 'operatorId', 'lostItemId', 'text', 'createdAt'])
+                    && request.resource.data.keys().hasOnly(['rideId', 'tripNo', 'from', 'travelerUid', 'operatorId', 'lostItemId', 'text', 'createdAt'])
+                    && request.resource.data.rideId is string
                     && request.resource.data.tripNo is string
                     && request.resource.data.tripNo.size() <= 24
                     && request.resource.data.text is string
                     && request.resource.data.text.size() <= 2000
-                    && ((request.resource.data.from == 'traveler'
-                         && request.resource.data.travelerUid == request.auth.uid)
-                     || (request.resource.data.from == 'operator'
-                         && request.resource.data.operatorId == request.auth.uid));
+                    && exists(/databases/$(database)/documents/rides/$(request.resource.data.rideId))
+                    && messageFitsRide(get(/databases/$(database)/documents/rides/$(request.resource.data.rideId)).data);
 
       // A conversation is a record. Neither side edits or deletes what was said.
       allow update, delete: if false;

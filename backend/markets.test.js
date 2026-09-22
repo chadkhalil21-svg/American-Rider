@@ -30,6 +30,26 @@ const where = {
 };
 const name = (p) => M.marketFor(p)?.id || null;
 
+// ——— 1:500,000 boundaries: coast, county lines, and what is outside ————————————————————
+const B = (lat, lng) => M.marketFor(P(lat, lng))?.id || null;
+check('500k: Miami Beach, Collins Ave at 41st, is Miami-Dade without any allowance', B(25.8127, -80.1224) === 'fl-miami-dade');
+check('500k: Golden Beach (north edge of Miami-Dade)', B(25.964, -80.12) === 'fl-miami-dade');
+check('500k: Hallandale Beach (south edge of Broward)', B(25.9812, -80.1484) === 'fl-broward');
+check('500k: Deerfield Beach A1A is Broward', B(26.317, -80.077) === 'fl-broward');
+check('500k: Boca Raton is Palm Beach', B(26.3683, -80.1289) === 'fl-palm-beach');
+check('500k: Jupiter Inlet is Palm Beach', B(26.944, -80.073) === 'fl-palm-beach');
+check('500k: Jupiter Island is Martin (waitlist)', B(26.99, -80.108) === 'fl-martin' && !M.servesPoint(P(26.99, -80.108)));
+check('500k: Florida City is Miami-Dade', B(25.4479, -80.4792) === 'fl-miami-dade');
+check('500k: the Card Sound bridge is in no active county', !M.servesPoint(P(25.2888, -80.37)));
+check('500k: PortMiami and Port Everglades are in their counties (restricted-place rules apply separately)', B(25.7781, -80.1794) === 'fl-miami-dade' && B(26.092, -80.121) === 'fl-broward');
+check('shoreline: beach sand 14–93 m off the generalized shore is given its only nearby county',
+  B(25.905, -80.1215) === 'fl-miami-dade' && B(26.1224, -80.103) === 'fl-broward' && B(26.2317, -80.0879) === 'fl-broward');
+check('shoreline: the Deerfield pier, 139 m out, is outside', B(26.317, -80.074) === null);
+check('shoreline: Biscayne Bay and open water are outside', B(25.70, -80.22) === null && B(25.78, -80.08) === null);
+check('shoreline: the allowance is 100 m, not a kilometre', M.SHORE_M === 100);
+const FLc = require('./markets/fl-counties.json');
+check('the boundaries are the Census 1:500,000 file', /500,000/.test(FLc.source) && FLc.counties.length === 67);
+
 check('Miami-Dade is active', M.marketFor(where.mia)?.id === 'fl-miami-dade' && M.marketStatus(where.mia) === 'active');
 check('Broward is active', name(where.fll) === 'fl-broward' && M.servesPoint(where.fll));
 check('Palm Beach is active', name(where.pbi) === 'fl-palm-beach' && M.servesPoint(where.pbi));
@@ -48,14 +68,20 @@ check('malformed point: no market', M.marketFor({ lat: 'x' }) === null && !M.ser
 
 check('cross-county travel among the three: Miami-Dade → Palm Beach', M.tripOutsideMarkets(where.mia, where.pbi) === null);
 check('cross-county travel among the three: Palm Beach → Broward', M.tripOutsideMarkets(where.pbi, where.fll) === null);
-check('pickup in a waitlist county is refused', M.tripOutsideMarkets(where.keyLargo, where.mia) === 'pickup');
-check('destination in a waitlist county is refused', M.tripOutsideMarkets(where.mia, where.keyLargo) === 'destination');
-check('both outside', M.tripOutsideMarkets(where.chicago, where.orlando) === 'both');
+check('a pickup in an active county may go to a waitlist county inside the region (Miami → Key Largo)', M.tripOutsideMarkets(where.mia, where.keyLargo) === null);
+check('…or to the Everglades side of Palm Beach (Belle Glade)', M.tripOutsideMarkets(where.pbi, P(26.6845, -80.6676)) === null);
+check('a destination outside the region stays refused, as it shipped (Palm Beach → Orlando)', M.tripOutsideMarkets(where.pbi, where.orlando) === 'destination');
+check('…and Tequesta → Hobe Sound, above the region\'s northern edge, as it shipped', M.tripOutsideMarkets(where.tequesta, where.hobeSound) === 'destination');
+check('a pickup in a waitlist county is refused (Key Largo → Miami)', M.tripOutsideMarkets(where.keyLargo, where.mia) === 'pickup');
+check('a pickup outside Florida is refused', M.tripOutsideMarkets(where.chicago, where.mia) === 'pickup');
+check('a destination that is not a valid location is refused', M.tripOutsideMarkets(where.mia, { lat: 'x' }) === 'destination');
+check('neither end valid', M.tripOutsideMarkets(null, null) === 'both');
+check('pickup and destination both outside', M.tripOutsideMarkets(where.chicago, where.orlando) === 'both');
 
 process.env.MARKET_STATUS = 'fl-broward:waitlist';
 M = fresh();
 check('a county can be switched off alone: Broward waitlist', !M.servesPoint(where.fll) && M.servesPoint(where.mia) && M.servesPoint(where.pbi));
-check('…and travel into it stops', M.tripOutsideMarkets(where.mia, where.fll) === 'destination');
+check('…and travel from it stops; travel to it continues', M.tripOutsideMarkets(where.fll, where.mia) === 'pickup' && M.tripOutsideMarkets(where.mia, where.fll) === null);
 process.env.MARKET_STATUS = 'fl-monroe:active';
 M = fresh();
 check('a county with no region (routing, fares, jurisdiction) cannot be activated', !M.servesPoint(where.keyLargo));
@@ -68,7 +94,7 @@ check('the shipped active set is exactly the three counties',
 delete require.cache[require.resolve('./market')];
 const market = require('./market');
 check('market.js gate: Key Largo is no longer "in market"', !market.inMarket(where.keyLargo) && market.inMarket(where.mia));
-check('market.js gate: priced routes refuse a waitlist destination', market.outsideMarket(where.mia, where.keyLargo) === 'destination');
+check('market.js gate: priced routes refuse a waitlist PICKUP and accept any destination', market.outsideMarket(where.keyLargo, where.mia) === 'pickup' && market.outsideMarket(where.mia, where.keyLargo) === null);
 
 // ——— wiring ——————————————————————————————————————————————————————————————————
 const server = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
@@ -85,6 +111,7 @@ for (const r of ['existing', 'intent', 'order', 'reinvite']) {
 check('Stripe Connect onboarding: only in an active market', /app\.post\('\/connect\/onboard', requireAuth, LIMITS\.connect, requireActiveOperatingMarket/.test(server));
 check('waitlist is lightweight: one record, rate-limited, nothing started', /app\.post\('\/waitlist', requireAuth, LIMITS\.waitlist/.test(server) && !/checkr|readDocument|connectAccountFor/.test(route("post\\('\\/waitlist'")));
 check('restricted places stay separate from county activation', /permitRequired/.test(server));
+check('routing is not run for a pickup outside the active markets', /servesPoint\(req\.body\?\.pickup\)/.test(route("post\\('\\/route'")));
 
 let bad = 0;
 for (const r of R) { if (!r.ok) bad++; console.log(`${r.ok ? 'PASS' : 'FAIL'}  ${r.l}${r.ok ? '' : '  — ' + (r.d || '')}`); }

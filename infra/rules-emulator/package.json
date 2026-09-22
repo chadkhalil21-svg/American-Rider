@@ -1,0 +1,13 @@
+{
+  "name": "american-rider-rules-emulator",
+  "private": true,
+  "description": "Adversarial tests of firestore.rules against the real Firestore emulator. Needs Java 11+.",
+  "scripts": {
+    "test": "firebase emulators:exec --only firestore --project demo-american-rider --config ../../firebase.json \"node messages.rules.test.mjs\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "5.0.2",
+    "firebase": "12.16.0",
+    "firebase-tools": "15.30.2"
+  }
+}

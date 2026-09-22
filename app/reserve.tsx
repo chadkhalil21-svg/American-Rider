@@ -26,6 +26,7 @@ import { Text } from '../src/components/AppText';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { destinationsNear, type Destination } from '../src/backend/destinations';
 import { fetchQuote, geocodePlace, isUnavailable } from '../src/backend/fares';
+import { joinWaitlist } from '../src/backend/connect';
 import { fetchSmartQuote } from '../src/backend/smart';
 import { useGoBack } from '../src/components/nav';
 import { RouteMap } from '../src/components/RouteMap';
@@ -117,6 +118,10 @@ export default function TravelConfirmation() {
   // Somewhere we do not go. Kept apart from priceFailed because the two need different words:
   // one asks the traveler to try again, the other must not.
   const [unavailable, setUnavailable] = useState<string | null>(null);
+  // WHERE THE WAITLIST WOULD RECORD INTEREST: the pickup, and only when it is the pickup that is
+  // outside the active counties. Recording it starts nothing but one record on the server.
+  const [waitlistAt, setWaitlistAt] = useState<{ lat: number; lng: number } | null>(null);
+  const [waitlisted, setWaitlisted] = useState<'idle' | 'sent' | 'failed'>('idle');
 
   // Only the LATEST quote request may apply its result — without this, the automatic
   // pricing that runs when the screen opens could come back late and overwrite a
@@ -166,6 +171,8 @@ export default function TravelConfirmation() {
 
       if (isUnavailable(quote)) {
         setUnavailable(quote.unavailable);
+        setWaitlistAt(quote.waitlistAt ?? null);
+        setWaitlisted('idle');
         setPriceFailed(false);
       } else if (quote) {
         setUnavailable(null);
@@ -698,6 +705,20 @@ export default function TravelConfirmation() {
               )}
             </Card>
             {unavailable && !pricing && <Text style={styles.stateNote}>{unavailable}</Text>}
+            {unavailable && !pricing && waitlistAt && (
+              waitlisted === 'sent' ? (
+                <Text style={styles.stateNote}>{t('traveler.waitlistRecorded')}</Text>
+              ) : (
+                <Pressable
+                  hitSlop={8}
+                  onPress={async () => setWaitlisted((await joinWaitlist(waitlistAt)) ? 'sent' : 'failed')}
+                >
+                  <Text style={styles.stateNote}>
+                    {waitlisted === 'failed' ? t('traveler.waitlistFailed') : t('traveler.waitlistJoin')} ›
+                  </Text>
+                </Pressable>
+              )
+            )}
             {priceFailed && !unavailable && !pricing && (
               <Text style={styles.stateNote}>{t('traveler.selectDestAgain')}</Text>
             )}

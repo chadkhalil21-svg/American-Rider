@@ -193,6 +193,23 @@ export async function setOperatingMarket(
   }
 }
 
+/**
+ * Register interest in a place American Rider does not serve yet. One record per account on
+ * the server; nothing else starts. Never throws; true when it was recorded.
+ */
+export async function joinWaitlist(at: { lat: number; lng: number }, role: 'traveler' | 'operator' = 'traveler'): Promise<boolean> {
+  try {
+    const res = await fetch(`${PAYMENT_SERVER_URL}/waitlist`, {
+      method: 'POST',
+      headers: await authHeaders(),
+      body: JSON.stringify({ lat: at.lat, lng: at.lng, role }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 /** Stop being matchable. Never throws — going off duty must always be possible. */
 export async function goOffline(): Promise<void> {
   try {

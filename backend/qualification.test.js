@@ -181,7 +181,23 @@ const codes = (a) => a.blockers.map((b) => b.code);
     check('4b. for-hire use alone is enough', A(withPolicy({ tncEndorsement: 'not_shown', forHireUse: 'yes' })).qualified);
     check('4b. ride-period limit below $1,000,000 → refused', C({ rideLimits: L('', '', '', '$500,000') }).includes('insurance_ride_limit_insufficient'));
     check('4b. ride-period limit unreadable → exception', C({ rideLimits: L('', '', '', '') }).includes('insurance_ride_limit_unreadable'));
-    check('4b. a general $1,000,000 CSL covers both periods', A(withPolicy({ rideLimits: L('', '', '', ''), loggedOnLimits: L('', '', '', ''), generalLimits: L('', '', '', '$1,000,000 CSL') })).qualified);
+    check('4b. a general $1,000,000 CSL meets the ride-period rule (7)(c)',
+      !C({ rideLimits: L('', '', '', ''), generalLimits: L('', '', '', '$1,000,000 CSL') }).some((c) => c.startsWith('insurance_ride_limit')));
+    check('4b. a combined limit alone for the logged-on period is an exception, not a pass — no $125,000 formula',
+      C({ rideLimits: L('', '', '', ''), loggedOnLimits: L('', '', '', ''), generalLimits: L('', '', '', '$1,000,000 CSL') }).includes('insurance_logged_on_split_limits_not_shown'));
+    check('4b. …and a $125,000 combined logged-on limit does not pass', !A(withPolicy({ loggedOnLimits: L('', '', '', '$125,000') })).qualified);
+    const { FL_TNC_INSURANCE } = require('./qualification');
+    check('4b. the rule set cites (7)(b) for logged on and (7)(c) for the ride, and has no combined logged-on figure',
+      FL_TNC_INSURANCE.loggedOn.subsection === '(7)(b)' && FL_TNC_INSURANCE.ride.subsection === '(7)(c)' &&
+      FL_TNC_INSURANCE.loggedOn.perPerson === 50000 && FL_TNC_INSURANCE.loggedOn.perIncident === 100000 &&
+      FL_TNC_INSURANCE.loggedOn.propertyDamage === 25000 && FL_TNC_INSURANCE.ride.primaryLiabilityMinDollars === 1000000 &&
+      !('combinedSingle' in FL_TNC_INSURANCE.loggedOn));
+    check('4b. a person can resolve the logged-on limits only with the three split figures, held to the same minimums', (() => {
+      const u = withPolicy({ loggedOnLimits: L('', '', '', ''), generalLimits: L('', '', '', '$1,000,000 CSL') });
+      u.documents.insurance.decision = { verdict: 'accept', commercialUse: 'yes', limitDollars: 1000000,
+        verified: { loggedOnPerPersonDollars: 50000, loggedOnPerIncidentDollars: 100000, loggedOnPropertyDamageDollars: 20000 } };
+      return codes(A(u)).includes('insurance_logged_on_limits_insufficient');
+    })());
     check('4b. logged-on limits below 50/100/25 → refused', C({ loggedOnLimits: L('$25,000', '$50,000', '$10,000', '') }).includes('insurance_logged_on_limits_insufficient'));
     check('4b. logged-on limits partly unreadable → exception', C({ loggedOnLimits: L('$50,000', '', '', '') }).includes('insurance_logged_on_limits_incomplete'));
     check('4b. logged-on limits absent → exception', C({ loggedOnLimits: L('', '', '', '') }).includes('insurance_logged_on_limits_unreadable'));
@@ -370,6 +386,12 @@ const codes = (a) => a.blockers.map((b) => b.code);
     const prodLogin = res();
     await doc({ headers: { cookie: `ar_ops=${encodeURIComponent('ops-shared-dev.' + ops.tokenFor({ name: 'ops-shared-dev', pw: 'shared-secret-long' }))}` }, body }, prodLogin);
     check('10b. a dev-mode session does not work in production', prodLogin.code === 401);
+    for (const v of ['true', '1', 'yes', 'on', 'EMERGENCY', 'emergency-please', '']) {
+      process.env.OPS_ALLOW_SHARED_PASSWORD = v;
+      check(`10b. OPS_ALLOW_SHARED_PASSWORD=${JSON.stringify(v)} does not open the shared password in production`, ops.opsAccounts().length === 0);
+    }
+    delete process.env.OPS_ALLOW_SHARED_PASSWORD;
+    check('10b. unset (the default) keeps it closed in production', ops.opsAccounts().length === 0 && ops.sharedMode() === 'off');
     process.env.OPS_ALLOW_SHARED_PASSWORD = 'emergency';
     check('10b. production emergency switch: allowed, recorded as "ops-shared-emergency"', ops.opsAccounts().map((a) => a.name).join() === 'ops-shared-emergency' && ops.opsAuthMode() === 'shared-emergency');
     process.env.OPS_USERS = 'alice:correct-horse-battery';

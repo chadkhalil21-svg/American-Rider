@@ -18,10 +18,10 @@
 // national by design (Chad: "think nationally"). This file is the gate and the words; it
 // names no place, because the next region must not need a new sentence.
 //
-// SINCE 22 SEPT 2026 the gate is county markets (backend/markets.js): a travel is sold only
-// when both ends are in ACTIVE markets of one region. regions.js still supplies each region's
-// routing, transit and jurisdiction; it no longer decides where travel is sold, because its box
-// also covers counties that are not active (Key Largo is in it).
+// SINCE 22 SEPT 2026 the PICKUP is gated by county markets (backend/markets.js): it must be in
+// an ACTIVE county, not merely inside the region's rectangle (which also takes in Key Largo).
+// The DESTINATION rule is unchanged: anywhere inside the pickup's region — a travel between
+// regions is not sold.
 const { servesPoint, tripOutsideMarkets } = require('./markets');
 
 /** Is this point somewhere American Rider serves — an ACTIVE market? */
@@ -30,9 +30,8 @@ function inMarket(p) {
 }
 
 /**
- * Which end of a travel falls outside the active markets, if either.
- * Returns null when both ends are in active markets of one region, else 'pickup' |
- * 'destination' | 'both'.
+ * Which end of a travel stops it being sold, if either. null when the pickup is in an active
+ * market and the destination is inside its region; else 'pickup' | 'destination' | 'both'.
  */
 function outsideMarket(pickup, dest) {
   return tripOutsideMarkets(pickup, dest);

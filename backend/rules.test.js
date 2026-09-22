@@ -93,11 +93,12 @@ check('nobody may replace or delete the evidence', /allow update, delete: if fal
 
 // ——— messages are bounded ————————————————————————————————————————————————————————
 const msgs = (rules.match(/match \/messages\/\{messageId\} \{[\s\S]*?\n {4}\}/) || [''])[0];
-check('messages: only the fields the app writes', /keys\(\)\.hasOnly\(\['tripNo', 'from', 'travelerUid', 'operatorId', 'lostItemId', 'text', 'createdAt'\]\)/.test(msgs));
+check('messages: only the fields the app writes', /keys\(\)\.hasOnly\(\['rideId', 'tripNo', 'from', 'travelerUid', 'operatorId', 'lostItemId', 'text', 'createdAt'\]\)/.test(msgs));
+check('messages: bound to the ride record the rule reads', /messageFitsRide\(get\(\/databases\/\$\(database\)\/documents\/rides\/\$\(request\.resource\.data\.rideId\)\)\.data\)/.test(msgs));
 check('messages: text is bounded to 2,000 characters', /text\.size\(\) <= 2000/.test(msgs));
 const writer = fs.readFileSync(path.join(ROOT, 'src', 'backend', 'messages.ts'), 'utf8');
 check('messages: the app writes no field the rule refuses',
-  ['tripNo', 'from', 'travelerUid', 'operatorId', 'lostItemId', 'text', 'createdAt'].every((k) => new RegExp(`\\b${k}:`).test(writer)));
+  ['rideId', 'tripNo', 'from', 'travelerUid', 'operatorId', 'lostItemId', 'text', 'createdAt'].every((k) => new RegExp(`\\b${k}:`).test(writer)));
 
 let bad = 0;
 for (const r of R) { if (!r.ok) bad++; console.log(`${r.ok ? 'PASS' : 'FAIL'}  ${r.l}${r.ok ? '' : '  — ' + (r.d || '')}`); }

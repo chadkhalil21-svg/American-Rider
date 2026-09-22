@@ -189,7 +189,9 @@ function exceptionCard(u) {
         ? box('commercialUse', 'Covers passengers for hire') + box('tncUse', 'TNC / for-hire use stated') +
           box('insuredConfirmed', 'Operator is insured or listed') + box('vehicleConfirmed', 'Registered vehicle is listed') + '<br>' +
           small('limitDollars', 'Ride-period limit, $', 'inputmode="numeric"') +
-          small('loggedOnCombinedDollars', 'Logged-on combined, $', 'inputmode="numeric"') +
+          small('loggedOnPerPersonDollars', 'Logged-on BI per person, $', 'inputmode="numeric"') +
+          small('loggedOnPerIncidentDollars', 'Logged-on BI per incident, $', 'inputmode="numeric"') +
+          small('loggedOnPropertyDamageDollars', 'Logged-on property damage, $', 'inputmode="numeric"') +
           small('pipDollars', 'PIP, $', 'inputmode="numeric"') +
           small('effectiveDate', 'Policy start YYYY-MM-DD') +
           `<select name="uninsuredMotorist" style="padding:8px;border:1px solid ${T.border};border-radius:13px;margin:6px 8px 0 0;">
@@ -473,7 +475,9 @@ function mount(app, express, deps = {}) {
         effectiveDate: String(body.effectiveDate || '').trim() || undefined,
         tncUse: body.tncUse === 'yes' ? 'yes' : undefined,
         rideCombinedDollars: body.limitDollars ? dollars(body.limitDollars) : undefined,
-        loggedOnCombinedDollars: body.loggedOnCombinedDollars ? dollars(body.loggedOnCombinedDollars) : undefined,
+        loggedOnPerPersonDollars: body.loggedOnPerPersonDollars ? dollars(body.loggedOnPerPersonDollars) : undefined,
+        loggedOnPerIncidentDollars: body.loggedOnPerIncidentDollars ? dollars(body.loggedOnPerIncidentDollars) : undefined,
+        loggedOnPropertyDamageDollars: body.loggedOnPropertyDamageDollars ? dollars(body.loggedOnPropertyDamageDollars) : undefined,
         pipDollars: body.pipDollars ? dollars(body.pipDollars) : undefined,
         uninsuredMotorist: body.uninsuredMotorist || undefined,
       },

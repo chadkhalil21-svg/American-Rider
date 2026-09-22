@@ -477,6 +477,9 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   //
   // A travel is watched until it ENDS, not until its operator changes.
   const [watchedRideId, setWatchedRideId] = useState<string | null>(null);
+  // Read by sendMsgTo, which must not re-create itself every time the watched ride changes.
+  const watchedRideIdRef = useRef<string | null>(null);
+  watchedRideIdRef.current = watchedRideId;
   // The travel that just finished, so its rating and tip can be written to the same record.
   const reviewedRideId = useRef<string | null>(null);
   // The PaymentIntent this travel was charged on. Held so the operator's 99% can be released
@@ -1243,6 +1246,8 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       // The operator on this travel, so the rule lets them read what was just written.
       const onTravel = myRidesRef.current?.find((r) => r.tripNo === tripNo);
       sendTravelMessage({
+        // The ride record, which the security rule reads to confirm who is on this travel.
+        rideId: onTravel?.id ?? (tripNo === lastTripRef.current.no ? watchedRideIdRef.current : null),
         tripNo,
         text: t,
         from: 'traveler',

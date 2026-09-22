@@ -2155,17 +2155,11 @@ app.post('/operator/disclosure/acknowledge', requireAuth, async (req, res) => {
       },
       { merge: true },
     );
-    // THE FLEET RECORD CARRIES THE VERSION DISPATCH READS (matching.js disclosureStale). An
-    // operator already on duty under an older version stopped receiving travel the moment the
-    // version moved; stamping here returns them to dispatch now, not at their next renewal.
-    // Only an existing record — acknowledging must not invent a fleet entry.
-    try {
-      const opRef = db.collection('operators').doc(String(req.uid));
-      const opSnap = await opRef.get();
-      if (opSnap.exists) await opRef.set({ disclosureVersion: DISCLOSURE_VERSION }, { merge: true });
-    } catch {
-      /* the next renewal through /operator/online stamps it from the record just written */
-    }
+    // NOT STAMPED ON THE FLEET RECORD HERE. A renewal refused for a stale disclosure takes the
+    // operator off duty on the phone, but the server record stays `available` until presence
+    // goes stale. Stamping now would make that record dispatchable while the phone says off
+    // duty. The operator goes back on duty through /operator/online, which stamps the version
+    // from this acknowledgement.
     res.json({ ok: true, version: DISCLOSURE_VERSION, lang: shown.lang });
   } catch (e) {
     res.status(502).json({ error: e.message });

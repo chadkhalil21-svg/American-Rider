@@ -57,7 +57,8 @@ check('approval re-checks the documents at the moment of the click', /documentsS
 const app = fs.readFileSync(path.join(__dirname, '..', 'app', 'operator', 'review.tsx'), 'utf8');
 check('the review screen no longer commissions on a button press', !/onPress=\{\(\) => \{\s*op\.commission\(\)/.test(app));
 const ack = (server.match(/app\.post\('\/operator\/disclosure\/acknowledge'[\s\S]*?\n\}\);/) || [''])[0];
-check('acknowledging the disclosure updates an existing fleet record', /collection\('operators'\)/.test(ack) && /opSnap\.exists/.test(ack));
+check('acknowledging does NOT write the fleet record — only /operator/online puts an operator back in dispatch',
+  ack.length > 0 && !/collection\('operators'\)/.test(ack));
 
 let bad = 0;
 for (const r of R) { if (!r.ok) bad++; console.log(`${r.ok ? 'PASS' : 'FAIL'}  ${r.l}${r.ok ? '' : '  — ' + (r.d || '')}`); }

@@ -24,6 +24,23 @@ service firebase.storage {
     }
 
     // Deny by default. Add explicit paths above as new uploads are introduced.
+    // Operator documents: licence, registration, inspection, insurance.
+    //
+    // THIS PATH HAD NO RULE, so the catch-all below refused every upload and
+    // src/backend/documentUpload.ts could never reach /operator/document. The failure was safe
+    // (a failed upload leaves the document unverified) and total (no operator could qualify).
+    // The owner may write and read their own files; read is needed for getDownloadURL, which
+    // is the URL the server fetches. The server itself uses admin access. No delete: the file
+    // is the evidence behind a verdict.
+    match /operator-documents/{uid}/{fileName} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null
+                    && request.auth.uid == uid
+                    && request.resource.size < 10 * 1024 * 1024
+                    && request.resource.contentType.matches('image/.*');
+      allow update, delete: if false;
+    }
+
     match /{allPaths=**} {
       allow read, write: if false;
     }

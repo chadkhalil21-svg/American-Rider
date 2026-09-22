@@ -88,7 +88,7 @@ American Rider rather than as a stranger. Email routing on top is free and unlim
 
 ## 4. A build
 
-Nothing since build 19 exists in any installable app. Two routes:
+**Current state (22 Sept 2026):** TestFlight build 40 exists (see CURRENT_HANDOFF.md); the fixes since then are in no build. A new build is needed. Two routes:
 
 - **Free** — `npx expo run:ios` on Adrian's Mac builds and installs to a connected iPhone.
   Good for proving the whole loop with real money before anyone else sees it.
@@ -111,26 +111,26 @@ every previous sweep because the code was there.
 
 | # | Missing | Consequence |
 | --- | --- | --- |
-| 1 | **A build.** Nothing installable exists. | None of the above has ever been exercised by a phone. |
+| 1 | **A new build.** Build 40 predates the current fixes. | The current code has not run on a phone. |
 | 2 | **Checkr account.** No `CHECKR_API_KEY`. | Every operator sits at `awaiting_provider` — not a pass, not dispatchable. **Nobody can be commissioned.** |
 | 3 | **Live Stripe keys.** Still `test`. | No real money can move in either direction. |
-| 4 | ~~Document review is simulated.~~ **DONE 22 Sept 2026.** The server reads each document (`backend/documents.js`); a held or refused one is decided by a person on `/ops`. No timer remains. | — |
+| 4 | ~~Document review is simulated.~~ **REPLACED before 22 Sept 2026** by `src/backend/documentUpload.ts` → `POST /operator/document` → `backend/documents.js`; only an `accept` verdict marks a document verified. 22 Sept: `storage.rules` gained the missing `operator-documents/` rule (every upload was refused), and a person decides held documents on `/ops`. | — |
 | 5 | ~~Commissioning review is simulated.~~ **DONE 22 Sept 2026.** A person approves on `/ops`, only over four accepted documents (`backend/commissioning.js`). `/operator/online` and dispatch refuse an operator without it. | — |
 
 ### Tier 2 — raised by the founders, not built
 
 | # | Missing | Where it stands |
 | --- | --- | --- |
-| 6 | **The AI planner** — "Plan in your own words". AGENTS.md records it as an explicit founders' keep. | `askAssistant()` is written, `POST /assistant` works, `ANTHROPIC_API_KEY` is live — **and no screen calls it.** The feature is absent from the app entirely. |
-| 7 | **Operator ↔ traveler messaging.** | The traveler's messages are written to Firestore. The operator app reads a local array and says so on screen. Half a loop. |
-| 8 | **Live Activity / Dynamic Island.** | Blocked on item 1 — ActivityKit cannot run without a build. |
-| 9 | **The §627.748(8)(a) written insurance disclosure to operators.** | Discussed at length; exists in code comments; **no screen presents it.** |
+| 6 | ~~The AI planner.~~ **WITHDRAWN** by the founders on 4 Sept 2026 (AGENTS.md). Not a launch item. `/health` reports `assistant: withdrawn`. | — |
+| 7 | ~~Operator ↔ traveler messaging.~~ **BUILT.** Both sides read and write the `messages` collection (`src/backend/messages.ts`, `app/operator/communicate.tsx`). Needs a two-phone test. | — |
+| 8 | ~~Live Activity / Dynamic Island.~~ **BUILT** with `expo-widgets` (`app.json`, `src/widgets/TravelActivity.tsx`, started/updated/ended in `RideContext`). Needs a test on a real device. | — |
+| 9 | ~~§627.748(8)(a) disclosure screen.~~ **BUILT.** `app/operator/disclosure.tsx`; `/operator/online` refuses without the current version and dispatch (`matching.js disclosureStale`) skips a stale one. | — |
 
 ### Tier 3 — smaller, and each one a decision
 
 | # | Missing |
 | --- | --- |
-| 10 | **No About page.** The footer link pointed at a 404 and was removed rather than left dead. |
+| 10 | ~~No About page.~~ **BUILT.** `GET /about` in `backend/server.js`; `legal/about/`. |
 | 11 | **`account.updated` needs a second Stripe destination** with Connected accounts scope. Without it, an operator Stripe restricts stays on duty. |
 | 12 | ~~`app/audio.tsx` is orphaned.~~ **DONE.** The file is no longer in the tree; nothing refers to it. |
 
@@ -141,6 +141,8 @@ every previous sweep because the code was there.
 - **App Store review** — days, not hours, and a first submission for a transportation app that takes payments and reads location gets read closely.
 
 ## 6. Live Activity — the actual process
+
+> **Superseded.** The Live Activity is built with `expo-widgets`, not `expo-live-activity` (deprecated — see AGENTS.md). The steps below are kept as history only.
 
 The moving card on the lock screen and in the Dynamic Island. It is Apple's **ActivityKit**,
 and it is not JavaScript: it is a separate native widget target written in SwiftUI, compiled

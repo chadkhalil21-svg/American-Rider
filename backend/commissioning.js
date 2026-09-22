@@ -9,14 +9,21 @@
 //   1. Each document is READ (backend/documents.js): accept, hold or refuse. A hold is the
 //      reader saying "a person must look at this", so /ops can accept or refuse a held
 //      document by hand. The reader never accepts anything on its own authority beyond that.
-//   2. The operator as a whole is COMMISSIONED by a person, on /ops, and only when all four
-//      documents stand accepted and in date. That is the only path to `approved`.
+//   2. The operator as a whole is COMMISSIONED by a person, on /ops, and only when every required
+//      document stands accepted and in date. That is the only path to `approved`.
 //
 // Pure functions only. The routes live in server.js and ops.js; these are what they share, so
 // the submit gate, the approval gate and the go-on-duty gate cannot drift apart.
 
-/** The four documents a person must see before an operator carries anybody. */
-const REQUIRED_DOCS = ['license', 'registration', 'inspection', 'insurance'];
+/**
+ * The documents that gate an operator: the three the app asks for (app/operator/documents.tsx).
+ *
+ * NOT INSPECTION. This list named it, and the app does not ask for one — the founders removed
+ * it on 30 Aug 2026 because §627.748 requires none. So submission was refused for a document
+ * nobody could provide, and no operator could qualify at all. An inspection filed anyway is
+ * still read (documents.js) and gates nothing.
+ */
+const REQUIRED_DOCS = ['license', 'registration', 'insurance'];
 
 /** Has a document's own expiry date passed? No date on file is not expired — the reader refuses those. */
 function docExpired(d, now = Date.now()) {
@@ -26,7 +33,7 @@ function docExpired(d, now = Date.now()) {
 }
 
 /**
- * Where the four documents stand.
+ * Where the required documents stand.
  *
  *   accepted  every one accepted and in date — the condition for approval and for duty
  *   reviewable no document missing or refused, but one or more held for a person

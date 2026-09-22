@@ -17,6 +17,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { fareFromTotal } from '../data';
+import { PAYMENT_SERVER_URL } from '../config';
 import { auth, db } from '../firebase';
 import { t } from '../i18n';
 
@@ -144,8 +145,8 @@ export function watchAssignedTravel(
  */
 async function setStatus(
   rideId: string,
-  status: 'accepted' | 'arrived' | 'onboard' | 'completed' | 'declined',
-  stampField?: 'acceptedAt' | 'arrivedAt' | 'declinedAt',
+  status: 'arrived' | 'onboard' | 'completed' | 'declined',
+  stampField?: 'arrivedAt' | 'declinedAt',
 ): Promise<boolean> {
   if (!rideId) return false;
   try {
@@ -187,7 +188,36 @@ async function setStatus(
   }
 }
 
-export const acceptTravel = (rideId: string) => setStatus(rideId, 'accepted', 'acceptedAt');
+/**
+ * Accept the travel offered to this operator — through the server, never a direct write.
+ *
+ * firestore.rules refuses 'accepted' from a phone. POST /travel/accept re-checks, at the moment
+ * of acceptance, everything that made the operator eligible when the travel was offered: the
+ * insurance disclosure version, approval, documents, insurance, screening, the account and
+ * Stripe payouts. A refusal comes back with a code, and the travel goes to somebody else.
+ * Never throws; an unreachable server is a refusal, not an acceptance.
+ */
+export async function acceptTravel(
+  rideId: string,
+): Promise<{ ok: true } | { ok: false; error: string; code?: string }> {
+  if (!rideId) return { ok: false, error: 'No travel' };
+  try {
+    const token = await auth.currentUser?.getIdToken().catch(() => null);
+    const res = await fetch(`${PAYMENT_SERVER_URL}/travel/accept`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ rideId }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) return { ok: false, error: d?.error || `Server error ${res.status}`, code: d?.code };
+    return { ok: true };
+  } catch {
+    return { ok: false, error: t('traveler.errReachDispatch') };
+  }
+}
 export const declineTravel = (rideId: string) => setStatus(rideId, 'declined', 'declinedAt');
 export const markArrived = (rideId: string) => setStatus(rideId, 'arrived', 'arrivedAt');
 export const markOnboard = (rideId: string) => setStatus(rideId, 'onboard');

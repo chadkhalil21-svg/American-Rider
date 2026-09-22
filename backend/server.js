@@ -76,7 +76,8 @@ const { resolveIssue, supportMessage, replySender, MAX_OUT_OF_POCKET_CENTS } = r
 const { resolveOperatorIssue } = require('./operatorsupport');
 const { fileTicket, updateTicketLocation, listTickets } = require('./tickets');
 const { lostItemTicket, stampLostItemCase } = require('./lostitem');
-const { adminDb, adminStatus } = require('./firebase-admin');
+const { adminDb, adminStatus, accountDisabled } = require('./firebase-admin');
+const { acceptOffer } = require('./eligibility');
 const { TERMS_HTML, PRIVACY_HTML, ABOUT_HTML, legalPage, LEGAL_LANGUAGES } = require('./legal');
 const {
   HOME_HTML, OPERATE_HTML, SUPPORT_HTML, TRAVEL_HTML, SAFETY_HTML, SMART_HTML,
@@ -731,11 +732,34 @@ app.get('/connect/done', (req, res) =>
 app.post('/operator/online', requireAuth, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
+
+  // A REFUSAL TAKES THE OPERATOR OUT OF DISPATCH NOW. This route is also the 90-second renewal,
+  // and a refused renewal used to leave the fleet record `available` until presence went stale
+  // five minutes later. Dispatch reads only that record, so for those minutes an operator whose
+  // document had expired, or whose account had been disabled, could still be sent travel.
+  // Only an existing record: a first attempt that fails must not invent a fleet entry.
+  const refuse = async (body) => {
+    try {
+      const ref = db.collection('operators').doc(String(req.uid));
+      if ((await ref.get()).exists) {
+        await ref.set({ available: false, offDutyReason: body.code, offDutyAt: Date.now() }, { merge: true });
+      }
+    } catch {
+      /* the presence timeout still applies */
+    }
+    return res.status(409).json(body);
+  };
+
   try {
+    // A DISABLED ACCOUNT KEEPS A VALID SIGN-IN FOR UP TO AN HOUR (requireAuth checks the token
+    // locally), so Firebase is asked directly. "Cannot tell" is not "enabled".
+    if ((await accountDisabled(req.uid)) !== false) {
+      return refuse({ code: 'account_disabled', error: 'This account cannot accept travel.' });
+    }
     const rec = (await operatorRecord(req.uid)) || {};
     const status = await connectAccountStatus(rec.stripeAccountId || null);
     if (!status.payoutsEnabled) {
-      return res.status(409).json({
+      return refuse({
         code: 'payouts_not_ready',
         error:
           'Stripe has not cleared this account for payouts yet, so travel cannot be assigned. ' +
@@ -794,22 +818,22 @@ app.post('/operator/online', requireAuth, async (req, res) => {
       /* unreadable is not acknowledged, and not commissioned */
     }
     if (!disclosureCurrent(disclosure)) {
-      return res.status(409).json({ code: 'disclosure_required', error: disclosureReason(disclosure) });
+      return refuse({ code: 'disclosure_required', error: disclosureReason(disclosure) });
     }
 
-    // THE COMMISSION. A person approves an operator on /ops, and only after all four documents
-    // were read and accepted — see backend/commissioning.js. It was a Continue button on the
+    // THE COMMISSION. A person approves an operator on /ops, and only after every required document was
+    // read and accepted — see backend/commissioning.js. It was a Continue button on the
     // phone. Like the disclosure, this applies in test mode too: approving yourself on /ops
     // costs a founder one click, and a gate that only exists in live mode is never tested.
     const commission = user?.commission || null;
     if (!commissionCurrent(commission)) {
-      return res.status(409).json({ code: 'not_commissioned', error: commissionReason(commission) });
+      return refuse({ code: 'not_commissioned', error: commissionReason(commission) });
     }
     // AND THE DOCUMENTS STILL STAND. A licence refused or expired after approval ends duty
     // until a new one is read and accepted; the commission itself is not withdrawn.
     const docState = documentsStatus(user?.documents);
     if (!docState.accepted) {
-      return res.status(409).json({
+      return refuse({
         code: 'documents_required',
         error: 'A document on file is not accepted or has expired. Submit a current one to continue.',
         documents: docState,
@@ -823,19 +847,19 @@ app.post('/operator/online', requireAuth, async (req, res) => {
         : screening.decision === 'pass'
           ? 'Your background screening is more than three years old and must be repeated.'
           : screening.summary || 'Your background screening is not complete.';
-      return res.status(409).json({ code: 'not_screened', error: why });
+      return refuse({ code: 'not_screened', error: why });
     }
 
     const expiry = String(b.insuranceExpiry || '').trim();
     const expiryMs = expiry ? Date.parse(`${expiry}T23:59:59Z`) : NaN;
     if (!expiry || Number.isNaN(expiryMs)) {
-      return res.status(409).json({
+      return refuse({
         code: 'no_coverage_on_file',
         error: 'Record the expiry date of your commercial policy before going available.',
       });
     }
     if (expiryMs < Date.now()) {
-      return res.status(409).json({
+      return refuse({
         code: 'coverage_expired',
         error:
           'Your commercial coverage expired on ' + expiry + '. Travel cannot be assigned ' +
@@ -887,7 +911,12 @@ app.post('/operator/online', requireAuth, async (req, res) => {
         // Visible on /ops. In test mode an unscreened operator may go on duty; nobody should
         // have to read code to discover that one has.
         screened,
-        screeningCheckedAt: Date.now(),
+        // ONLY A CURRENT SCREENING IS STAMPED. This wrote Date.now() for everybody, and
+        // matchOperator's requireScreening reads this field as "passed a screening" — so with a
+        // provider configured, every operator who went on duty in test mode passed that gate
+        // without one. Cleared, not left, when not screened: a marker from a screening that has
+        // since expired must not keep passing it either.
+        screeningCheckedAt: screened ? Date.now() : null,
         lat,
         lng,
         available: b.available !== false,
@@ -2676,6 +2705,57 @@ app.post('/voice/connect', (req, res) => {
   const m = /^(?:client:)?ar_(.+)_(traveler|operator)$/.exec(from);
   if (!m) return res.type('text/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>');
   return res.type('text/xml').send(connectTwiml({ tripNo: m[1], side: m[2] }));
+});
+
+// POST /travel/accept { rideId } — the operator accepts the travel offered to them.
+//
+// THE DEFECT THIS CLOSES. Acceptance was a Firestore write from the phone: `status: 'accepted'`,
+// allowed by the rules for the operator on the record and checked against nothing else. The
+// gates ran when the operator went on duty and when dispatch chose them, and never at the
+// moment they took the travel. An operator whose disclosure version, approval, documents,
+// insurance, screening, account or payouts had stopped standing after the offer could still
+// accept it. firestore.rules no longer lets a phone write 'accepted'; this route is the only way.
+//
+// ORDER. The two checks that need the network (Firebase account, Stripe) run first. Then one
+// transaction re-reads the travel, the operator's fleet record and their account record, runs
+// operatorEligibility on what it read, and commits — so nothing it checked can change between
+// the check and the write.
+//
+// A REFUSAL RELEASES THE TRAVEL. It stays `assigned`, marked `releasedAt`, and the operator is
+// taken out of service; sweepAssignments re-offers it to somebody else on its next pass
+// without waiting out the answer window. The traveler's payment and travel number stand.
+app.post('/travel/accept', requireAuth, async (req, res) => {
+  const db = adminDb();
+  if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
+  const rideId = String(req.body?.rideId || '');
+  if (!rideId) return res.status(400).json({ error: 'rideId is required' });
+  const uid = String(req.uid);
+  const userRef = db.collection('users').doc(uid);
+
+  // Checked before the transaction because they are network calls. Neither can become true
+  // again inside the next second in a way that matters; both can only have become false.
+  let refusal = null;
+  const disabled = await accountDisabled(uid);
+  if (disabled !== false) {
+    refusal = { code: 'account_disabled', reason: 'This account cannot accept travel.' };
+  } else {
+    try {
+      const u = (await userRef.get()).data() || {};
+      const stripe = await connectAccountStatus(u.stripeAccountId || null);
+      if (!stripe.payoutsEnabled) {
+        refusal = { code: 'payouts_not_ready', reason: 'Stripe has not cleared this account for payouts.' };
+      }
+    } catch (e) {
+      return res.status(502).json({ error: e.message });
+    }
+  }
+
+  try {
+    const out = await acceptOffer({ db, uid, rideId, refusal, liveMoney: keyMode === 'live' });
+    res.status(out.status).json(out.body);
+  } catch (e) {
+    res.status(502).json({ error: e.message });
+  }
 });
 
 app.post('/travel/return-operator', requireAuth, async (req, res) => {

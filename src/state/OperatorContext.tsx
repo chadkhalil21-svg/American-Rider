@@ -269,7 +269,8 @@ type OperatorState = {
   /** The platform's outstanding question about the travel underway, or null. */
   checkIn: string | null;
   respondToCheckIn: (text: string) => Promise<boolean>;
-  acceptRequest: (r: SimRequest) => void;
+  /** Resolves true only once the server has accepted the travel for this operator. */
+  acceptRequest: (r: SimRequest) => Promise<boolean>;
   confirmArrival: () => void;
   cancelOp: () => void;
   completeOp: () => void;
@@ -644,15 +645,24 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
   evaluateOfferRef.current = evaluateOffer;
 
   const acceptRequest = useCallback(
-    (r: SimRequest) => {
+    async (r: SimRequest) => {
+      setIncoming(null);
+      // THE SERVER DECIDES, AND FIRST. This wrote 'accepted' to the travel and moved the
+      // operator on in the same breath, whatever the write's outcome. POST /travel/accept now
+      // re-checks eligibility at this moment, so nothing on this phone changes until it says
+      // yes. A refusal is shown on the operator home with its reason, and when it concerns the
+      // operator rather than the travel, they are out of service — as the server now records.
+      if (r.rideId) {
+        const out = await acceptTravel(r.rideId);
+        if (!out.ok) {
+          setOnlineError(out.error);
+          setOnlineErrorCode(out.code ?? null);
+          if (out.code && out.code !== 'not_offered' && out.code !== 'not_open') setOnlineState(false);
+          return false;
+        }
+      }
       const seq = revRef.current.seq + 1;
       commitRevenue({ ...revRef.current, seq });
-      setIncoming(null);
-      // Tell the database, not just this screen. Without this the traveler's record still
-      // reads 'assigned' after their operator has set off, and nothing downstream — the
-      // traveler's status, the settlement, the Travel Log — can tell the difference between
-      // an operator on the way and one who never answered.
-      if (r.rideId) acceptTravel(r.rideId);
       // THE TRAVEL NUMBER IS THE TRAVEL NUMBER, not the database key it happens to be filed
       // under. This read `r.rideId` — a Firestore document id — and printed it under the
       // label "Travel Number" on the completion screen, so an operator finished a journey and
@@ -664,6 +674,7 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
       setOp({ ...r, no: r.tripNo || r.rideId || `AR-${seq}-MIA`, earn: earnOf(r.fare) });
       setArrived(false);
       setMsgs([]);
+      return true;
     },
     [commitRevenue],
   );

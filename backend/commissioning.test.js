@@ -17,7 +17,7 @@ const all = { license: ok, registration: ok, inspection: ok, insurance: ok };
 check('four accepted, in-date documents are accepted', documentsStatus(all).accepted);
 check('no documents is not accepted — absence is not acceptance', !documentsStatus(undefined).accepted);
 check('no documents is not reviewable either', !documentsStatus({}).reviewable);
-check('a missing document is named', documentsStatus({ ...all, inspection: undefined }).missing.includes('inspection'));
+check('a missing document is named', documentsStatus({ ...all, registration: undefined }).missing.includes('registration'));
 const held = documentsStatus({ ...all, license: { verdict: 'review', expiry: future } });
 check('a held document blocks approval', !held.accepted && held.held.includes('license'));
 check('a held document may still go to a person', held.reviewable);
@@ -26,6 +26,18 @@ check('a refused document blocks approval and review', !refused.accepted && !ref
 const lapsed = documentsStatus({ ...all, registration: { verdict: 'accept', expiry: '2020-01-01' } });
 check('an accepted document that has since expired blocks duty', !lapsed.accepted && lapsed.expired.includes('registration'));
 check('no expiry on file is not expired', !docExpired({ verdict: 'accept' }));
+
+// ——— the required set is what the app actually asks for ————————————————————————————
+const { REQUIRED_DOCS } = require('./commissioning');
+const screen = fs.readFileSync(path.join(__dirname, '..', 'app', 'operator', 'documents.tsx'), 'utf8');
+const asked = [...(screen.match(/const DOCUMENTS[\s\S]*?\n\];/) || [''])[0].matchAll(/key: '(\w+)'/g)].map((m) => m[1]);
+check('the app asks for documents', asked.length > 0, JSON.stringify(asked));
+check('every required document is one the app asks for — nobody can be required to file what they cannot',
+  REQUIRED_DOCS.every((k) => asked.includes(k)), `${REQUIRED_DOCS} vs ${asked}`);
+check('everything the app asks for is required', asked.every((k) => REQUIRED_DOCS.includes(k)));
+check('inspection gates nothing (removed 30 Aug 2026)',
+  documentsStatus({ license: ok, registration: ok, insurance: ok }).accepted &&
+  documentsStatus({ license: ok, registration: ok, insurance: ok, inspection: { verdict: 'refuse' } }).accepted);
 
 // ——— the commission ———————————————————————————————————————————————————————————
 check('only approved counts', commissionCurrent({ status: 'approved' }));

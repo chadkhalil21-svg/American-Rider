@@ -79,4 +79,20 @@ const adminDb = () => admin().db;
 /** Why storage is unavailable, or null when it is available. For /health and for logs. */
 const adminStatus = () => ({ ok: admin().ok, reason: admin().reason });
 
-module.exports = { adminDb, adminStatus };
+/**
+ * Is this Firebase account disabled? A disabled account keeps a valid ID token for up to an
+ * hour, and requireAuth verifies the token locally, so this asks Firebase directly.
+ * Returns true, false, or null when it cannot tell — callers treat null as "do not allow".
+ */
+async function accountDisabled(uid) {
+  if (!admin().ok) return null;
+  try {
+    const { getAuth } = require('firebase-admin/auth');
+    const u = await getAuth().getUser(String(uid));
+    return !!u.disabled;
+  } catch {
+    return null;
+  }
+}
+
+module.exports = { adminDb, adminStatus, accountDisabled };

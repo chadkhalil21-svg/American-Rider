@@ -423,11 +423,12 @@ export default function OperatorHome() {
                   // person's name on a rejection.
                   label={t('operator.acceptTraveler')}
                   color={colors.green}
-                  onPress={() => {
+                  onPress={async () => {
                     const r = request;
                     closeRequest();
-                    op.acceptRequest(r);
-                    router.navigate('/operator/pickup');
+                    // Only once the server has accepted it. A refusal stays on this screen,
+                    // where the reason is shown.
+                    if (await op.acceptRequest(r)) router.navigate('/operator/pickup');
                   }}
                   style={{ flex: 1.6 }}
                 />

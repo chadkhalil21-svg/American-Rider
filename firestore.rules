@@ -119,12 +119,22 @@ service cloud.firestore {
       // the worst an operator can do by setting it is ask to be paid for a travel they were
       // actually assigned — which is what it means. It is constrained to `true`, and only
       // alongside a status of `completed`, so it cannot be used to un-queue a payout either.
+      //
+      // ACCEPTANCE IS NOT HERE ANY MORE (22 Sept 2026). 'accepted' and acceptedAt were on this
+      // list, so the phone accepted a travel with no check of anything but operatorId — an
+      // operator whose disclosure, approval, documents, insurance, screening or payouts had
+      // stopped standing after the offer could still take it. POST /travel/accept re-checks all
+      // of them and writes 'accepted' with admin access. And because a phone that cannot write
+      // 'accepted' could otherwise jump straight to 'arrived', every later status now requires
+      // the travel to be under way already; 'declined' is only an answer to an open offer.
       allow update: if drivesExisting()
-                    && touchesOnly(['status', 'statusAt', 'acceptedAt', 'arrivedAt', 'declinedAt',
+                    && touchesOnly(['status', 'statusAt', 'arrivedAt', 'declinedAt',
                                     'opLat', 'opLng', 'opAt', 'stillSince', 'needsPayout'])
                     && (!changes('status')
-                        || request.resource.data.status in
-                             ['accepted', 'arrived', 'onboard', 'completed', 'declined'])
+                        || (request.resource.data.status in ['arrived', 'onboard', 'completed']
+                            && resource.data.status in ['accepted', 'arrived', 'onboard'])
+                        || (request.resource.data.status == 'declined'
+                            && resource.data.status == 'assigned'))
                     && (!changes('needsPayout')
                         || (request.resource.data.needsPayout == true
                             && request.resource.data.status == 'completed'));

@@ -92,7 +92,7 @@ const decide = (action, fields, label, extra = '') =>
    </form>`;
 
 /**
- * One operator awaiting review: the four documents as the reader saw them, a decision on any
+ * One operator awaiting review: the required documents as the reader saw them, a decision on any
  * document it held for a person, and the commission decision itself.
  */
 function reviewCard(u) {
@@ -123,7 +123,7 @@ function reviewCard(u) {
     <div><span class="k">
       ${state.accepted
         ? decide('/ops/operators/commission', { uid: u.id, action: 'approve' }, 'Approve and commission')
-        : '<span style="color:' + T.faint + ';font-size:13px;">Approval opens when all four documents are accepted.</span><br>'}
+        : '<span style="color:' + T.faint + ';font-size:13px;">Approval opens when every required document is accepted.</span><br>'}
       ${decide('/ops/operators/commission', { uid: u.id, action: 'refuse' }, 'Refuse', reason)}
     </span></div>
   </div>`;

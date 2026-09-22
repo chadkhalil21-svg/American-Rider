@@ -571,7 +571,9 @@ async function sweepAssignments({ now = Date.now() } = {}) {
     const since = age / 1000;
     out.pending++;
 
-    if (!ride.notifiedOperatorAt) {
+    // RELEASED BY POST /travel/accept: the operator it was offered to is no longer eligible.
+    // Neither notified nor given the answer window — it goes straight to somebody else.
+    if (!ride.notifiedOperatorAt && !ride.releasedAt) {
       await notify({
         uid: ride.operatorId,
         kind: 'travel_assigned',
@@ -584,7 +586,7 @@ async function sweepAssignments({ now = Date.now() } = {}) {
       continue; // give them the window before anything is taken away
     }
 
-    if (since < ANSWER_WINDOW_SEC) continue;
+    if (since < ANSWER_WINDOW_SEC && !ride.releasedAt) continue;
 
     // Unanswered. Find somebody else, excluding everyone who has already had it.
     const declined = Array.isArray(ride.declinedBy) ? ride.declinedBy : [];
@@ -639,6 +641,8 @@ async function sweepAssignments({ now = Date.now() } = {}) {
       declinedBy: [...declined, ride.operatorId],
       createdAt: now, // restarts the answer window for the new operator
       notifiedOperatorAt: null,
+      releasedAt: null,
+      releasedReason: null,
       reofferedAt: now,
     });
     out.reoffered.push({ rideId: ride.id, to: next.operator.name });

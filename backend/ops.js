@@ -20,29 +20,63 @@ const { webhookReady } = require('./webhook');
 const { emailReady } = require('./email');
 const { screeningReady } = require('./screening');
 const { monthlyRemittance } = require('./remittance');
-const { REQUIRED_DOCS, documentsStatus } = require('./commissioning');
+const { REQUIRED_DOCS, resolveDocument, setSuspension, assessAndRecord } = require('./qualification');
 const { disclosureStale } = require('./matching');
 
 const COOKIE = 'ar_ops';
 
-/** The cookie value for the configured password. Changing the password invalidates sessions. */
-function expectedCookie() {
+// WHO MAY SIGN IN, AND AS WHOM. Every exception decision is audit-logged with the name of the
+// person who made it, so a shared password alone cannot say who that was. OPS_USERS names each
+// person — "alice:long-password,bob:another-long-password" — and each signs in as themselves.
+// OPS_PASSWORD alone still works and signs in as "ops": authenticated, but not attributable to
+// one person, which /ops says on every page.
+function opsAccounts() {
+  const users = readKey('OPS_USERS');
+  if (users) {
+    return users
+      .split(',')
+      .map((pair) => {
+        const i = pair.indexOf(':');
+        return i > 0 ? { name: pair.slice(0, i), pw: pair.slice(i + 1) } : null;
+      })
+      .filter((x) => x && x.pw);
+  }
   const pw = readKey('OPS_PASSWORD');
-  if (!pw) return null;
-  return crypto.createHash('sha256').update(`ar-ops:${pw}`).digest('hex');
+  return pw ? [{ name: 'ops', pw }] : [];
+}
+const configured = () => opsAccounts().length > 0;
+const shared = () => !readKey('OPS_USERS');
+
+/** A session token for one account. Changing that person's password ends their sessions. */
+const tokenFor = (acct) => crypto.createHash('sha256').update(`ar-ops:${acct.name}:${acct.pw}`).digest('hex');
+
+/** The signed-in person's name, or null. */
+function signedIn(req) {
+  const raw = req.headers?.cookie || '';
+  const got = raw.split(';').map((c) => c.trim()).find((c) => c.startsWith(`${COOKIE}=`));
+  if (!got) return null;
+  const value = decodeURIComponent(got.slice(COOKIE.length + 1));
+  const dot = value.lastIndexOf('.');
+  if (dot <= 0) return null;
+  const name = value.slice(0, dot);
+  const acct = opsAccounts().find((x) => x.name === name);
+  if (!acct) return null;
+  // Constant time, so the cookie cannot be guessed a byte at a time.
+  const a = Buffer.from(value.slice(dot + 1));
+  const b = Buffer.from(tokenFor(acct));
+  return a.length === b.length && crypto.timingSafeEqual(a, b) ? acct.name : null;
 }
 
-function signedIn(req) {
-  const want = expectedCookie();
-  if (!want) return false;
-  const raw = req.headers.cookie || '';
-  const got = raw.split(';').map((c) => c.trim()).find((c) => c.startsWith(`${COOKIE}=`));
-  if (!got) return false;
-  const value = got.slice(COOKIE.length + 1);
-  // Constant time, so the cookie cannot be guessed a byte at a time.
-  const a = Buffer.from(value);
-  const b = Buffer.from(want);
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
+/** Who did it, for the audit log. */
+function actorOf(req) {
+  const raw = req.headers?.cookie || '';
+  return {
+    name: signedIn(req),
+    ip: req.ip || req.headers?.['x-forwarded-for'] || null,
+    userAgent: req.headers?.['user-agent'] || null,
+    // A fingerprint of the session, not the session: enough to tell two sessions apart.
+    session: crypto.createHash('sha256').update(raw).digest('hex').slice(0, 12),
+  };
 }
 
 const money = (c) => `$${((Number(c) || 0) / 100).toFixed(2)}`;
@@ -62,6 +96,9 @@ const LOGIN = `
 <p class="lede">Sign in to continue.</p>
 <section>
   <form method="post" action="/ops/enter">
+    <input type="text" name="name" placeholder="Name" autocomplete="username"
+      style="width:100%;padding:13px 14px;border:1px solid ${T.border};border-radius:13px;
+             font-size:16px;background:#fff;color:${T.ink};box-sizing:border-box;margin-bottom:10px;">
     <input type="password" name="password" placeholder="Password" autofocus
       style="width:100%;padding:13px 14px;border:1px solid ${T.border};border-radius:13px;
              font-size:16px;background:#fff;color:${T.ink};box-sizing:border-box;">
@@ -82,50 +119,58 @@ const DOC_TITLES = {
   insurance: 'Commercial insurance',
 };
 
-/** A small form that posts one decision. The cookie authorises it; SameSite=Lax keeps it ours. */
+/** A small form that posts one decision. The session authorises it; SameSite=Lax keeps it ours. */
+const noteInput = `<input type="text" name="note" placeholder="Note for the record (required)" required
+  style="padding:8px 12px;border:1px solid ${T.border};border-radius:13px;font-size:14px;margin:6px 8px 0 0;min-width:220px;">`;
+const small = (name, placeholder, extra = '') => `<input type="text" name="${name}" placeholder="${placeholder}" ${extra}
+  style="padding:8px 12px;border:1px solid ${T.border};border-radius:13px;font-size:14px;margin:6px 8px 0 0;width:150px;">`;
 const decide = (action, fields, label, extra = '') =>
-  `<form method="post" action="${action}" style="display:inline-block;margin:6px 8px 0 0;">
+  `<form method="post" action="${action}" style="margin:6px 0 0 0;">
      ${Object.entries(fields).map(([k, v]) => `<input type="hidden" name="${k}" value="${esc(v)}">`).join('')}
-     ${extra}
+     ${extra}${noteInput}
      <button type="submit" style="border:1px solid ${T.border};background:#fff;color:${T.ink};
-       border-radius:13px;padding:8px 14px;font-size:14px;cursor:pointer;">${esc(label)}</button>
+       border-radius:13px;padding:8px 14px;font-size:14px;cursor:pointer;margin-top:6px;">${esc(label)}</button>
    </form>`;
 
+const DOC_CODES = /^(document_|insurance_)/;
+
 /**
- * One operator awaiting review: the required documents as the reader saw them, a decision on any
- * document it held for a person, and the commission decision itself.
+ * One operator in the exception queue: every finding that stops them qualifying, and the
+ * actions a person may take on it. Everything else about them is already automatic.
  */
-function reviewCard(u) {
-  const docs = u.documents || {};
-  const state = documentsStatus(docs);
+function exceptionCard(u) {
+  const q = u.qualification || {};
   const who = u.legalName || u.name || u.email || u.id;
-  const rows = REQUIRED_DOCS.map((k) => {
-    const d = docs[k] || {};
-    const verdict = !d.verdict ? 'missing' : d.verdict === 'accept' ? 'accepted' : d.verdict === 'refuse' ? 'refused' : 'held';
-    const reasons = Array.isArray(d.reasons) && d.reasons.length ? `<br>${d.reasons.map(esc).join('<br>')}` : '';
-    const image = d.imageUrl ? ` · <a href="${esc(d.imageUrl)}" target="_blank" rel="noopener">View document</a>` : '';
-    const actions = d.verdict && d.verdict !== 'accept'
-      ? decide('/ops/operators/document', { uid: u.id, kind: k, action: 'accept' }, 'Accept document') +
-        decide('/ops/operators/document', { uid: u.id, kind: k, action: 'refuse' }, 'Refuse document')
-      : '';
-    return `<div><span class="k">${esc(DOC_TITLES[k])}<br>
-        <span style="color:${T.faint};font-size:13px;">${esc(d.summary || '')}${d.expiry ? ` Expires ${esc(d.expiry)}.` : ''}${reasons}${image}</span>
-        ${actions}</span>
-      <span class="amount">${verdict}</span></div>`;
+  const blockers = Array.isArray(q.blockers) ? q.blockers : [];
+  const rows = blockers.map((b) => {
+    let actions = '';
+    if (b.item && REQUIRED_DOCS.includes(b.item) && DOC_CODES.test(b.code)) {
+      const d = u.documents?.[b.item] || {};
+      const image = d.imageUrl ? `<br><a href="${esc(d.imageUrl)}" target="_blank" rel="noopener">View document</a>` : '';
+      const read = d.evidence?.fields ? `<br>Read: ${esc(JSON.stringify(d.evidence.fields))}` : '';
+      const insurance = b.item === 'insurance'
+        ? `<label style="font-size:13px;margin-right:8px;"><input type="checkbox" name="commercialUse" value="yes"> Covers passengers for hire</label>` +
+          small('limitDollars', 'Liability limit, $', 'inputmode="numeric"')
+        : '';
+      actions =
+        `<span style="color:${T.faint};font-size:13px;">${esc(d.summary || '')}${image}${read}</span>` +
+        decide('/ops/operators/document', { uid: u.id, kind: b.item, action: 'accept' }, 'Accept document',
+          small('expiry', 'Expiry YYYY-MM-DD') + insurance) +
+        decide('/ops/operators/document', { uid: u.id, kind: b.item, action: 'refuse' }, 'Refuse document');
+    } else if (b.item === 'screening') {
+      actions = `<span style="color:${T.faint};font-size:13px;">Decided through the screening company's adjudication, not here.</span>`;
+    }
+    return `<div><span class="k">${esc(b.reason)}<br>
+        <span class="mono" style="color:${T.faint};font-size:12px;">${esc(b.code)}${b.item ? ` · ${esc(b.item)}` : ''}</span><br>${actions}</span>
+      <span class="amount">${esc(b.kind)}</span></div>`;
   }).join('');
-  const reason = `<input type="text" name="reason" placeholder="Reason given to the operator" required
-      style="padding:8px 12px;border:1px solid ${T.border};border-radius:13px;font-size:14px;margin-right:8px;">`;
+  const suspended = !!u.suspension?.active;
   return `<div class="rows" style="margin-bottom:18px;">
     <div><span class="k"><strong>${esc(who)}</strong><br>
-      <span style="color:${T.faint};font-size:13px;">Submitted ${ago(u.commission?.submittedAt)}</span></span>
-      <span class="amount">${state.accepted ? 'ready' : 'documents held'}</span></div>
+      <span class="mono" style="color:${T.faint};font-size:12px;">${esc(u.id)} · assessed ${ago(q.evaluatedAt)}</span></span>
+      <span class="amount">${esc(q.status || '—')}</span></div>
     ${rows}
-    <div><span class="k">
-      ${state.accepted
-        ? decide('/ops/operators/commission', { uid: u.id, action: 'approve' }, 'Approve and commission')
-        : '<span style="color:' + T.faint + ';font-size:13px;">Approval opens when every required document is accepted.</span><br>'}
-      ${decide('/ops/operators/commission', { uid: u.id, action: 'refuse' }, 'Refuse', reason)}
-    </span></div>
+    <div><span class="k">${decide('/ops/operators/suspension', { uid: u.id, action: suspended ? 'reinstate' : 'suspend' }, suspended ? 'Reinstate' : 'Suspend')}</span></div>
   </div>`;
 }
 
@@ -142,11 +187,12 @@ async function board() {
     db.collection('operators').get(),
     db.collection('scheduled_rides').where('status', '==', 'reserved').get(),
     db.collection('support_tickets').where('status', '==', 'open').get(),
-    db.collection('users').where('commission.status', '==', 'pending').get(),
+    // THE EXCEPTION QUEUE. The snapshot is only an index for this query; every gate re-assesses.
+    db.collection('users').where('qualification.status', 'in', ['exception', 'refused', 'suspended']).get(),
   ]);
   const pending = pendingSnap.docs
     .map((d) => ({ id: d.id, ...d.data() }))
-    .sort((a, b) => (a.commission?.submittedAt || 0) - (b.commission?.submittedAt || 0));
+    .sort((a, b) => (a.qualification?.evaluatedAt || 0) - (b.qualification?.evaluatedAt || 0));
 
   const rides = ridesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const operators = opsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -172,7 +218,8 @@ async function board() {
   if (owed.length) alarms.push(`${owed.length} operator payout${owed.length > 1 ? 's' : ''} owed`);
   const noReceipt = rides.filter((r) => r.receiptFailed);
   if (noReceipt.length) alarms.push(`${noReceipt.length} receipt${noReceipt.length > 1 ? 's' : ''} not delivered`);
-  if (pending.length) alarms.push(`${pending.length} operator${pending.length > 1 ? 's' : ''} awaiting review`);
+  const waiting = pending.filter((u) => u.qualification?.status === 'exception');
+  if (waiting.length) alarms.push(`${waiting.length} operator exception${waiting.length > 1 ? 's' : ''} to decide`);
   // Real operators only — the demonstration stand-ins are never stored.
   const staleDisclosure = operators.filter((o) => disclosureStale(o));
 
@@ -225,8 +272,12 @@ ${alarms.length
 </section>
 
 <section>
-  <h2>Awaiting review</h2>
-  ${pending.length ? pending.map(reviewCard).join('') : '<p>No operator is awaiting review.</p>'}
+  <h2>Operator exceptions</h2>
+  <p>Operators qualify automatically when every check passes. Only what the checks cannot settle
+    — held documents, refusals to reconsider, suspensions — appears here. Every decision is
+    recorded with a note and the name of the person who made it.${shared() ? ' <strong>Signed in with the shared password: decisions are recorded as “ops”, not a named person. Set OPS_USERS.</strong>' : ''}</p>
+  ${pending.length ? pending.map(exceptionCard).join('') : '<p>No operator exceptions.</p>'}
+  ${decide('/ops/operators/suspension', { action: 'suspend' }, 'Suspend an operator', small('uid', 'Operator uid', 'required'))}
 </section>
 
 <section>
@@ -286,13 +337,22 @@ ${alarms.length
 </section>`;
 }
 
-function mount(app, express) {
+/**
+ * @param deps.db        () => Firestore, or null. Injected for tests.
+ * @param deps.checks    the network half of an assessment (server.js qualificationChecks)
+ * @param deps.liveMoney () => boolean, whether the Stripe key is live
+ */
+function mount(app, express, deps = {}) {
+  const dbOf = deps.db || adminDb;
+  const liveMoney = deps.liveMoney || (() => false);
+  const checks = deps.checks || (async () => ({ account: { disabled: null }, payouts: { enabled: false } }));
+
   app.get('/ops', async (req, res) => {
-    if (!expectedCookie()) {
+    if (!configured()) {
       return res
         .status(503)
         .type('html')
-        .send(page('Operations', '<h1>Operations</h1><section><p>Set OPS_PASSWORD in the environment to use this page.</p></section>'));
+        .send(page('Operations', '<h1>Operations</h1><section><p>Set OPS_USERS (or OPS_PASSWORD) in the environment to use this page.</p></section>'));
     }
     if (!signedIn(req)) return res.type('html').send(page('Operations', LOGIN));
     try {
@@ -306,103 +366,86 @@ function mount(app, express) {
   });
 
   app.post('/ops/enter', express.urlencoded({ extended: false }), (req, res) => {
-    const want = readKey('OPS_PASSWORD');
+    const name = shared() ? 'ops' : String(req.body?.name || '').trim();
     const got = String(req.body?.password || '');
+    const acct = opsAccounts().find((x) => x.name === name);
     // Constant time again, and a deliberate pause on failure so the form cannot be run at
     // speed against a short password.
     const ok =
-      want &&
-      got.length === want.length &&
-      crypto.timingSafeEqual(Buffer.from(got), Buffer.from(want));
+      acct &&
+      got.length === acct.pw.length &&
+      crypto.timingSafeEqual(Buffer.from(got), Buffer.from(acct.pw));
     if (!ok) {
       return setTimeout(
         () =>
           res
             .status(401)
             .type('html')
-            .send(page('Operations', `<h1>Operations</h1><p class="lede">That password is not right.</p><section>${LOGIN.split('<section>')[1]}`)),
+            .send(page('Operations', `<h1>Operations</h1><p class="lede">That name or password is not right.</p><section>${LOGIN.split('<section>')[1]}`)),
         700,
       );
     }
     res.setHeader(
       'Set-Cookie',
-      `${COOKIE}=${expectedCookie()}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${60 * 60 * 12}; Secure`,
+      `${COOKIE}=${encodeURIComponent(`${acct.name}.${tokenFor(acct)}`)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${60 * 60 * 12}; Secure`,
     );
     res.redirect('/ops');
   });
 
-  // THE COMMISSION DECISION. The only path to `approved` in the whole system. Approval is
-  // checked against the documents again at the moment of the click, not against the page the
-  // founder loaded: a document refused in another tab must not be approved over.
-  app.post('/ops/operators/commission', express.urlencoded({ extended: false }), async (req, res) => {
-    if (!expectedCookie() || !signedIn(req)) return res.status(401).type('html').send(page('Operations', LOGIN));
-    const db = adminDb();
-    if (!db) return res.status(503).send(adminStatus().reason);
-    const uid = String(req.body?.uid || '');
-    const action = String(req.body?.action || '');
-    const reason = String(req.body?.reason || '').trim().slice(0, 300);
-    if (!uid || !['approve', 'refuse'].includes(action)) return res.status(400).send('uid and action are required');
-    try {
-      const ref = db.collection('users').doc(uid);
-      const snap = await ref.get();
-      if (!snap.exists) return res.status(404).send('No such operator');
-      if (action === 'approve') {
-        const state = documentsStatus(snap.data().documents);
-        if (!state.accepted) {
-          return res.status(409).type('html').send(page('Operations',
-            `<h1>Operations</h1><section><p>Not approved: every document must be accepted and in date first.</p>
-             <a class="more" href="/ops">Back to operations ›</a></section>`));
-        }
-        await ref.set({ commission: { status: 'approved', decidedAt: Date.now(), decidedBy: 'ops', reason: null } }, { merge: true });
-      } else {
-        if (!reason) return res.status(400).send('A reason is required to refuse');
-        await ref.set({ commission: { status: 'refused', decidedAt: Date.now(), decidedBy: 'ops', reason } }, { merge: true });
-        const opRef = db.collection('operators').doc(uid);
-        if ((await opRef.get()).exists) await opRef.set({ available: false, commissioned: false }, { merge: true });
+  // THE EXCEPTION ACTIONS. Each one: authenticated here, validated and audit-logged in the same
+  // transaction as the change (backend/qualification.js), then the operator is re-assessed —
+  // so resolving the last held item qualifies them on the spot, with nobody clicking Approve.
+  const exceptionRoute = (path, act) =>
+    app.post(path, express.urlencoded({ extended: false }), async (req, res) => {
+      if (!configured() || !signedIn(req)) return res.status(401).type('html').send(page('Operations', LOGIN));
+      const db = dbOf();
+      if (!db) return res.status(503).send(esc(adminStatus().reason));
+      const uid = String(req.body?.uid || '').trim();
+      if (!uid) return res.status(400).send('uid is required');
+      try {
+        const out = await act({ db, uid, body: req.body || {}, actor: actorOf(req) });
+        if (!out.ok) return res.status(out.status || 400).send(esc(out.error));
+        await assessAndRecord({ db, uid, checks, liveMoney: liveMoney() });
+        res.redirect(303, '/ops');
+      } catch (e) {
+        res.status(500).send(esc(e.message));
       }
-      res.redirect(303, '/ops');
-    } catch (e) {
-      res.status(500).send(esc(e.message));
-    }
+    });
+
+  // A person decides one document: a held one, or reconsiders a refused one.
+  exceptionRoute('/ops/operators/document', ({ db, uid, body, actor }) =>
+    resolveDocument({
+      db,
+      uid,
+      actor,
+      kind: String(body.kind || ''),
+      action: String(body.action || ''),
+      note: body.note,
+      expiry: String(body.expiry || '').trim() || undefined,
+      commercialUse: body.commercialUse,
+      limitDollars: body.limitDollars ? Number(String(body.limitDollars).replace(/[^0-9.]/g, '')) : undefined,
+    }),
+  );
+
+  // Suspend (fraud, safety, administrative) or reinstate.
+  exceptionRoute('/ops/operators/suspension', ({ db, uid, body, actor }) => {
+    const action = String(body.action || '');
+    if (!['suspend', 'reinstate'].includes(action)) return { ok: false, status: 400, error: 'Unknown action' };
+    return setSuspension({ db, uid, active: action === 'suspend', actor, note: body.note });
   });
 
-  // A PERSON'S DECISION ON ONE DOCUMENT — for the ones the reader held. Recorded beside what
-  // the reader said, never over it, so the record shows both.
-  app.post('/ops/operators/document', express.urlencoded({ extended: false }), async (req, res) => {
-    if (!expectedCookie() || !signedIn(req)) return res.status(401).type('html').send(page('Operations', LOGIN));
-    const db = adminDb();
-    if (!db) return res.status(503).send(adminStatus().reason);
-    const uid = String(req.body?.uid || '');
-    const kind = String(req.body?.kind || '');
-    const action = String(req.body?.action || '');
-    if (!uid || !REQUIRED_DOCS.includes(kind) || !['accept', 'refuse'].includes(action)) {
-      return res.status(400).send('uid, kind and action are required');
-    }
+  // The record of every decision about one operator, newest first.
+  app.get('/ops/audit', async (req, res) => {
+    if (!configured() || !signedIn(req)) return res.status(401).json({ error: 'Sign in at /ops first' });
+    const db = dbOf();
+    if (!db) return res.status(503).json({ error: adminStatus().reason });
+    const uid = String(req.query?.uid || '');
+    if (!uid) return res.status(400).json({ error: 'uid is required' });
     try {
-      const ref = db.collection('users').doc(uid);
-      const snap = await ref.get();
-      const d = snap.exists ? snap.data().documents?.[kind] : null;
-      if (!d) return res.status(404).send('No such document');
-      await ref.set(
-        {
-          documents: {
-            [kind]: {
-              verdict: action,
-              readerVerdict: d.readerVerdict || d.verdict,
-              reviewedBy: 'ops',
-              reviewedAt: Date.now(),
-            },
-          },
-        },
-        { merge: true },
-      );
-      if (action === 'refuse') {
-        const opRef = db.collection('operators').doc(uid);
-        if ((await opRef.get()).exists) await opRef.set({ available: false, documentBlocked: true }, { merge: true });
-      }
-      res.redirect(303, '/ops');
+      const snap = await db.collection('audit_log').where('subject', '==', uid).get();
+      res.json(snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => b.at - a.at));
     } catch (e) {
-      res.status(500).send(esc(e.message));
+      res.status(500).json({ error: e.message });
     }
   });
 
@@ -410,8 +453,8 @@ function mount(app, express) {
   // from the rides, as JSON. /ops/remittance?year=2026&month=9 — default, the month just
   // ended. Behind the same cookie as the board. It names no traveler: payees, counts, cents.
   app.get('/ops/remittance', async (req, res) => {
-    if (!expectedCookie() || !signedIn(req)) return res.status(401).json({ error: 'Sign in at /ops first' });
-    const db = adminDb();
+    if (!configured() || !signedIn(req)) return res.status(401).json({ error: 'Sign in at /ops first' });
+    const db = dbOf();
     if (!db) return res.status(503).json({ error: adminStatus().reason || 'Firestore is not configured' });
     const last = new Date();
     last.setUTCDate(1);
@@ -426,4 +469,4 @@ function mount(app, express) {
   });
 }
 
-module.exports = { mount };
+module.exports = { mount, signedIn, opsAccounts, tokenFor };

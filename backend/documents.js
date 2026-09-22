@@ -281,6 +281,14 @@ function decide({ kind, spec, read, expect, now }) {
     fields: f,
     summary: String(read.summary || '').slice(0, 300),
     expiry: f.expiry || null,
+    // The reading itself, stored with the verdict so qualification can re-check it in code.
+    evidence: {
+      documentType: String(read.documentType || ''),
+      isTheRequestedDocument: read.isTheRequestedDocument === true,
+      legible: read.legible === true,
+      fields: f,
+      concerns,
+    },
   };
 }
 

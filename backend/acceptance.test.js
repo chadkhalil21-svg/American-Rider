@@ -6,7 +6,8 @@
 // taps Accept. Before 22 Sept 2026 the phone wrote 'accepted' itself and nothing re-checked.
 const fs = require('fs');
 const path = require('path');
-const { operatorEligibility, acceptOffer } = require('./eligibility');
+const { acceptOffer } = require('./eligibility');
+const { assessOperator } = require('./qualification');
 const { DISCLOSURE_VERSION } = require('./disclosure');
 
 const R = [];
@@ -38,13 +39,17 @@ function fakeDb(seed) {
 }
 
 const NOW = Date.parse('2026-09-22T15:00:00Z');
-const ok = { verdict: 'accept', expiry: '2099-01-01' };
+const doc = (fields = {}) => ({
+  verdict: 'accept',
+  expiry: '2099-01-01',
+  evidence: { isTheRequestedDocument: true, legible: true, fields: { expiry: '2099-01-01', ...fields } },
+});
 const goodUser = () => ({
   insuranceDisclosure: { version: DISCLOSURE_VERSION, at: NOW - 1000 },
-  commission: { status: 'approved' },
-  documents: { license: ok, registration: ok, inspection: ok, insurance: ok },
+  documents: { license: doc(), registration: doc(), insurance: doc({ commercialUse: 'yes', limits: '$1,000,000 CSL' }) },
   screening: { decision: 'pass', recheckDue: NOW + 1e10 },
 });
+const OK = { account: { disabled: false }, payouts: { enabled: true } };
 const goodFleet = () => ({
   available: true, onlineAt: NOW, commissioned: true, disclosureVersion: DISCLOSURE_VERSION,
   insuranceExpiry: '2099-01-01', lat: 25.76, lng: -80.19,
@@ -54,28 +59,38 @@ const seed = (userOver = {}, fleetOver = {}, rideOver = {}) => ({
   operators: { op: { ...goodFleet(), ...fleetOver } },
   users: { op: { ...goodUser(), ...userOver } },
 });
-const accept = (db, extra = {}) => acceptOffer({ db, uid: 'op', rideId: 'r1', now: () => NOW, ...extra });
+const accept = (db, extra = {}) => acceptOffer({ db, uid: 'op', rideId: 'r1', externals: OK, now: () => NOW, ...extra });
 
 (async () => {
-  // ——— the pure rule ——————————————————————————————————————————————————————————
-  const E = (u, f, o = {}) => operatorEligibility({ user: { ...goodUser(), ...u }, fleet: { ...goodFleet(), ...f }, now: NOW, ...o });
-  check('an operator in good standing is eligible', E({}, {}).ok);
-  check('no account record → refused', operatorEligibility({ user: null, fleet: goodFleet(), now: NOW }).code === 'no_account');
-  check('off duty → refused', E({}, { available: false }).code === 'not_on_duty');
-  check('old disclosure version → refused', E({ insuranceDisclosure: { version: '2026-08-29.1', at: 1 } }, {}).code === 'disclosure_required');
-  check('no disclosure → refused', E({ insuranceDisclosure: null }, {}).code === 'disclosure_required');
+  // ——— the rule: backend/qualification.js assessOperator, context 'accept' ————————————————
+  // Every condition this file tested when acceptance had its own function is still tested here,
+  // against the one assessment every gate now shares. Codes are the finer-grained ones it uses.
+  const E = (u, f, o = {}) => assessOperator({ user: { ...goodUser(), ...u }, fleet: { ...goodFleet(), ...f }, context: 'accept', now: NOW, ...OK, ...o });
+  const has = (a, code) => !a.eligible && a.blockers.some((b) => b.code === code);
+  check('an operator in good standing is eligible', E({}, {}).eligible, JSON.stringify(E({}, {}).blockers));
+  check('no account record → refused', has(assessOperator({ user: null, fleet: goodFleet(), context: 'accept', now: NOW, ...OK }), 'no_account'));
+  check('off duty → refused', has(E({}, { available: false }), 'not_on_duty'));
+  check('no fleet record → refused', has(assessOperator({ user: goodUser(), fleet: null, context: 'accept', now: NOW, ...OK }), 'not_on_duty'));
+  check('old disclosure version → refused', has(E({ insuranceDisclosure: { version: '2026-08-29.1', at: 1 } }, {}), 'disclosure_required'));
+  check('no disclosure → refused', has(E({ insuranceDisclosure: null }, {}), 'disclosure_required'));
   check('the FLEET stamp does not count — the account record decides',
-    E({ insuranceDisclosure: { version: 'old', at: 1 } }, { disclosureVersion: DISCLOSURE_VERSION }).code === 'disclosure_required');
-  check('approval withdrawn → refused', E({ commission: { status: 'refused' } }, {}).code === 'not_commissioned');
-  check('a document refused since → refused', E({ documents: { ...goodUser().documents, license: { verdict: 'refuse' } } }, {}).code === 'documents_required');
-  check('a document expired since → refused', E({ documents: { ...goodUser().documents, registration: { verdict: 'accept', expiry: '2026-09-01' } } }, {}).code === 'documents_required');
-  check('documentBlocked on the fleet record → refused', E({}, { documentBlocked: true }).code === 'documents_required');
-  check('insurance expiry passed → refused', E({}, { insuranceExpiry: '2026-09-21' }).code === 'coverage_expired');
-  check('screening blocked → refused', E({}, { screeningBlocked: true }).code === 'screening_blocked');
-  check('live money and no current screening → refused', E({ screening: null }, {}, { liveMoney: true }).code === 'not_screened');
-  check('live money and a lapsed screening → refused', E({ screening: { decision: 'pass', recheckDue: NOW - 1 } }, {}, { liveMoney: true }).code === 'not_screened');
-  check('test money and no screening → allowed, as /operator/online allows it', E({ screening: null }, {}).ok);
-  check('Stripe restricted payouts (webhook) → refused', E({}, { payoutsEnabled: false }).code === 'payouts_not_ready');
+    has(E({ insuranceDisclosure: { version: 'old', at: 1 } }, { disclosureVersion: DISCLOSURE_VERSION }), 'disclosure_required'));
+  check('suspended by a person → refused', has(E({ suspension: { active: true, note: 'x' } }, {}), 'suspended'));
+  check('a document refused since → refused', has(E({ documents: { ...goodUser().documents, license: { verdict: 'refuse' } } }, {}), 'document_refused'));
+  check('a document held since → refused', has(E({ documents: { ...goodUser().documents, license: { ...doc(), verdict: 'review' } } }, {}), 'document_review'));
+  check('a document missing → refused', has(E({ documents: { license: doc(), insurance: goodUser().documents.insurance } }, {}), 'document_missing'));
+  check('a document expired since → refused', has(E({ documents: { ...goodUser().documents, registration: { ...doc(), expiry: '2026-09-01' } } }, {}), 'document_expired'));
+  check('documentBlocked on the fleet record → refused', has(E({}, { documentBlocked: true }), 'document_blocked'));
+  check('insurance expiry passed (recorded date) → refused', has(E({}, { insuranceExpiry: '2026-09-21' }), 'coverage_expired'));
+  check('screening blocked (refusal or hold on the fleet record) → refused', has(E({ screening: null }, { screeningBlocked: true }), 'screening_blocked'));
+  check('screening blocked by the three-year sweep → refused', has(E({}, { screeningBlocked: true }), 'screening_expired'));
+  check('live money and no screening → refused', has(E({ screening: null }, {}, { liveMoney: true }), 'screening_required'));
+  check('live money and a lapsed screening → refused', has(E({ screening: { decision: 'pass', recheckDue: NOW - 1 } }, {}, { liveMoney: true }), 'screening_expired'));
+  check('test money and no screening → allowed, as /operator/online allows it', E({ screening: null }, {}).eligible);
+  check('Stripe restricted payouts (webhook) → refused', has(E({}, { payoutsEnabled: false }), 'payouts_not_ready'));
+  check('Stripe says payouts are not enabled → refused', has(E({}, {}, { payouts: { enabled: false } }), 'payouts_not_ready'));
+  check('account disabled → refused', has(E({}, {}, { account: { disabled: true } }), 'account_disabled'));
+  check('account status unknown → refused', !E({}, {}, { account: { disabled: null } }).eligible);
 
   // ——— the race, end to end through the transaction ——————————————————————————————
   {
@@ -109,13 +124,16 @@ const accept = (db, extra = {}) => acceptOffer({ db, uid: 'op', rideId: 'r1', no
   }
   {
     const db = fakeDb(seed());
-    const out = await accept(db, { refusal: { code: 'payouts_not_ready', reason: 'x' } });
+    const out = await accept(db, { externals: { ...OK, payouts: { enabled: false } } });
     check('a network-check refusal (Stripe / account) releases the travel too', out.body.code === 'payouts_not_ready' && db.data.rides.r1.status === 'assigned' && db.data.rides.r1.releasedAt === NOW);
   }
   {
-    const db = fakeDb(seed({ commission: { status: 'pending' } }));
+    const db = fakeDb(seed({ suspension: { active: true, note: 'x' } }));
     const out = await accept(db);
-    check('approval not in force at acceptance → refused', out.body.code === 'not_commissioned' && db.data.rides.r1.status === 'assigned');
+    check('suspended at acceptance → refused', out.body.code === 'suspended' && db.data.rides.r1.status === 'assigned');
+    const db2 = fakeDb(seed({}, {}, {}));
+    const out2 = await accept(db2, { externals: { ...OK, account: { disabled: true } } });
+    check('account disabled at acceptance → refused and released', out2.body.code === 'account_disabled' && db2.data.rides.r1.releasedAt === NOW);
   }
 
   // ——— the wiring ———————————————————————————————————————————————————————————————
@@ -132,8 +150,9 @@ const accept = (db, extra = {}) => acceptOffer({ db, uid: 'op', rideId: 'r1', no
   const server = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
   const route = (server.match(/app\.post\('\/travel\/accept'[\s\S]*?\n\}\);/) || [''])[0];
   check('POST /travel/accept exists and requires sign-in', /app\.post\('\/travel\/accept', requireAuth/.test(server));
-  check('it checks the Firebase account is not disabled', /accountDisabled\(uid\)/.test(route) && /disabled !== false/.test(route));
-  check('it asks Stripe whether payouts are enabled', /connectAccountStatus\(/.test(route));
+  check('it runs the network checks (Firebase account, Stripe) before the transaction', /qualificationChecks\(uid, u\)/.test(route));
+  const qc = (server.match(/async function qualificationChecks[\s\S]*?\n\}/) || [''])[0];
+  check('…which ask Firebase Auth and Stripe', /accountDisabled\(uid\)/.test(qc) && /connectAccountStatus\(/.test(qc));
   check('it commits through acceptOffer', /acceptOffer\(/.test(route));
 
   const monitor = fs.readFileSync(path.join(__dirname, 'monitor.js'), 'utf8');
@@ -148,6 +167,9 @@ const accept = (db, extra = {}) => acceptOffer({ db, uid: 'op', rideId: 'r1', no
   check('/operator/online: every eligibility refusal goes through refuse(), which takes the operator out of dispatch',
     /const refuse = async/.test(online) && /available: false, offDutyReason: body\.code/.test(online) &&
     (online.match(/return res\.status\(409\)/g) || []).length === 1);
+  check('/operator/online runs the same assessment, context online, and refuses on any blocker',
+    /assessOperator\(\{[\s\S]*?context: 'online'/.test(online) && /if \(!assessment\.eligible\)/.test(online));
+  check('/operator/online no longer reads a stored approval', !/\.commission\b|commissionCurrent/.test(online));
   check('/operator/online: a disabled account is refused at go-on-duty and at every renewal',
     /accountDisabled\(req\.uid\)\) !== false/.test(online) && /code: 'account_disabled'/.test(online));
 

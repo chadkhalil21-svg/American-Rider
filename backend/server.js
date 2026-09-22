@@ -61,7 +61,7 @@ const { presenceStale, coverageLapsed, matchOperator, etaMinutes } = require('./
 // they exercise disclosure.js directly and never call this route. Same shape as the tip path
 // and the screening gate — written at both ends, unwired at the point that consumes it.
 const {
-  DISCLOSURE, DISCLOSURE_VERSION, disclosureFor, disclosureCurrent, disclosureReason,
+  DISCLOSURE, DISCLOSURE_VERSION, disclosureFor, disclosureCurrent,
 } = require('./disclosure');
 const { translationFor, DISCLOSURE_LANGUAGES } = require('./disclosure-i18n');
 const { issueFollowToken, travelForToken, followPage } = require('./follow');
@@ -94,7 +94,7 @@ const {
 } = require('./verify');
 const { mount: mountOps } = require('./ops');
 const { readDocument, documentsReady } = require('./documents');
-const { documentsStatus, commissionCurrent, commissionReason } = require('./commissioning');
+const { assessOperator, assessAndRecord } = require('./qualification');
 const { page } = require('./shell');
 const {
   screeningReady, evaluateExistingReport, screeningCurrent,
@@ -160,7 +160,16 @@ app.post('/checkr/webhook', express.raw({ type: 'application/json' }), async (re
   // duplicates if the 200 waited for it.
   res.json({ received: true, type: event?.type || 'unknown' });
   checkr.handleEvent(event)
-    .then((out) => console.log(`[checkr] ${event?.type}: ${out.action}${out.decision ? ` (${out.decision})` : ''}`))
+    .then(async (out) => {
+      console.log(`[checkr] ${event?.type}: ${out.action}${out.decision ? ` (${out.decision})` : ''}`);
+      // A SCREENING RESULT MOVES QUALIFICATION AT ONCE — a pass can complete it, a hold puts
+      // the operator in the /ops queue, a refusal takes them out of dispatch — without waiting
+      // for the operator to open the app. keyMode is read at call time (declared below).
+      const db = adminDb();
+      if (out?.action === 'decided' && out.uid && db) {
+        await assessAndRecord({ db, uid: out.uid, checks: qualificationChecks, liveMoney: keyMode === 'live' });
+      }
+    })
     .catch((e) => console.log(`[checkr] ${event?.type} failed: ${e.message}`));
 });
 
@@ -794,61 +803,43 @@ app.post('/operator/online', requireAuth, async (req, res) => {
     //
     // The unscreened case is STAMPED either way, so /ops shows who is on duty without a
     // screening rather than letting it pass unrecorded.
-    let screening = null;
-    try {
-      const snap = await db.collection('users').doc(String(req.uid)).get();
-      screening = snap.exists ? snap.data().screening || null : null;
-    } catch {
-      // Unreadable is not the same as absent, and neither is a reason to let somebody drive
-      // in live mode.
-    }
-    // §627.748(8)(a) — "Before a TNC driver is allowed to accept a request for a prearranged
-    // ride... the TNC must disclose in writing". A disclosure nobody read is not a disclosure,
-    // so it is a precondition of going on duty rather than a page in a menu. Unlike the
-    // screening gate this applies in TEST MODE TOO: it costs nothing, blocks nobody who has
-    // read one screen, and there is no version of "we told them" that is true tomorrow and
-    // false today.
-    let disclosure = null;
+    // ---- EVERY OTHER GATE, FROM ONE ASSESSMENT. ------------------------------------------
+    //
+    // backend/qualification.js assessOperator, context 'online': the documents and what code
+    // can check on them (type, legibility, expiry, Florida's insurance limit), background
+    // screening (required from the moment money is live — in test mode the travel is a
+    // demonstration; in live mode a stranger gets into a car), suspension, the account, the
+    // §627.748(8)(a) disclosure (test mode too: "we told them" cannot be true tomorrow and false
+    // today), and Stripe. The same function runs at every travel acceptance.
+    //
+    // Nothing stored is read as approval. This replaced `commission.status === 'approved'`,
+    // which a person set on /ops and which stayed true whatever happened afterwards.
     let user = null;
+    let fleetNow = null;
     try {
-      const snap = await db.collection('users').doc(String(req.uid)).get();
-      user = snap.exists ? snap.data() : null;
-      disclosure = user?.insuranceDisclosure || null;
+      const [uSnap, oSnap] = await Promise.all([
+        db.collection('users').doc(String(req.uid)).get(),
+        db.collection('operators').doc(String(req.uid)).get(),
+      ]);
+      user = uSnap.exists ? uSnap.data() : null;
+      fleetNow = oSnap.exists ? oSnap.data() : null;
     } catch {
-      /* unreadable is not acknowledged, and not commissioned */
+      /* unreadable is not qualified */
     }
-    if (!disclosureCurrent(disclosure)) {
-      return refuse({ code: 'disclosure_required', error: disclosureReason(disclosure) });
+    const assessment = assessOperator({
+      user,
+      fleet: fleetNow,
+      context: 'online',
+      liveMoney: keyMode === 'live',
+      account: { disabled: false }, // checked above
+      payouts: { enabled: true }, // checked above, with Stripe's list of what is still due
+    });
+    if (!assessment.eligible) {
+      const first = assessment.blockers[0];
+      return refuse({ code: first.code, error: first.reason, status: assessment.status, blockers: assessment.blockers });
     }
-
-    // THE COMMISSION. A person approves an operator on /ops, and only after every required document was
-    // read and accepted — see backend/commissioning.js. It was a Continue button on the
-    // phone. Like the disclosure, this applies in test mode too: approving yourself on /ops
-    // costs a founder one click, and a gate that only exists in live mode is never tested.
-    const commission = user?.commission || null;
-    if (!commissionCurrent(commission)) {
-      return refuse({ code: 'not_commissioned', error: commissionReason(commission) });
-    }
-    // AND THE DOCUMENTS STILL STAND. A licence refused or expired after approval ends duty
-    // until a new one is read and accepted; the commission itself is not withdrawn.
-    const docState = documentsStatus(user?.documents);
-    if (!docState.accepted) {
-      return refuse({
-        code: 'documents_required',
-        error: 'A document on file is not accepted or has expired. Submit a current one to continue.',
-        documents: docState,
-      });
-    }
-
-    const screened = screeningCurrent(screening);
-    if (!screened && keyMode === 'live') {
-      const why = !screening
-        ? 'A background screening is required before you can accept travel.'
-        : screening.decision === 'pass'
-          ? 'Your background screening is more than three years old and must be repeated.'
-          : screening.summary || 'Your background screening is not complete.';
-      return refuse({ code: 'not_screened', error: why });
-    }
+    const disclosure = user?.insuranceDisclosure || null;
+    const screened = screeningCurrent(user?.screening || null);
 
     const expiry = String(b.insuranceExpiry || '').trim();
     const expiryMs = expiry ? Date.parse(`${expiry}T23:59:59Z`) : NaN;
@@ -904,7 +895,7 @@ app.post('/operator/online', requireAuth, async (req, res) => {
         // acknowledgement that was just checked, never from DISCLOSURE_VERSION directly —
         // stamping the current version here would record agreement that was never given.
         disclosureVersion: disclosure?.version || null,
-        // Stamped from the commission and documents checked above, so dispatch can read them
+        // Stamped from the assessment above, at every renewal, so dispatch can read it
         // without a second collection. Never written true anywhere else.
         commissioned: true,
         documentBlocked: false,
@@ -2007,11 +1998,13 @@ app.post('/operator/document', requireAuth, async (req, res) => {
             expiry: out.expiry,
             imageUrl,
             readAt: Date.now(),
+            // THE STRUCTURED READING, kept as evidence. backend/qualification.js re-checks it in
+            // code — document type, legibility, and for insurance commercial use and limits —
+            // rather than taking the verdict on trust.
+            evidence: out.evidence || null,
             // A new document starts a new reading; a person's decision on the old one does
             // not carry over to it.
-            readerVerdict: null,
-            reviewedBy: null,
-            reviewedAt: null,
+            decision: null,
           },
         },
       },
@@ -2027,63 +2020,84 @@ app.post('/operator/document', requireAuth, async (req, res) => {
       );
     }
 
+    // QUALIFICATION FOLLOWS FROM THE READING, with no one to click anything. Reported, not
+    // required: a failure here is re-assessed at the next status check and at every gate.
+    let qualification = null;
+    try {
+      const a = await assessAndRecord({ db, uid: req.uid, checks: qualificationChecks, liveMoney: keyMode === 'live' });
+      qualification = { status: a.status, qualified: a.qualified };
+    } catch (e) {
+      console.error('[qualification] after document', e.message);
+    }
+
     res.json({
       verdict: out.verdict,
       reasons: out.reasons,
       summary: out.summary,
       expiry: out.expiry,
+      qualification,
     });
   } catch (e) {
     res.status(502).json({ error: e.message });
   }
 });
 
-// --- Commissioning: submit for review, and read the decision. ------------------------------
+// --- Qualification: automatic, exception-driven. -------------------------------------------
 //
-// The phone used to commission itself. Now it asks to be reviewed, and a person decides on
-// /ops (backend/ops.js). See backend/commissioning.js for the rules both ends share.
+// An operator is qualified when every qualification gate in backend/qualification.js passes —
+// assessed here, on each document reading, and at every go-on-duty and acceptance. No person
+// clicks anything on the normal path; /ops handles only the exceptions.
+
+/** The network half of an assessment: Firebase Auth, and (for duty) Stripe. */
+async function qualificationChecks(uid, user) {
+  const disabled = await accountDisabled(uid);
+  const stripe = await connectAccountStatus(user?.stripeAccountId || null);
+  return { account: { disabled }, payouts: { enabled: !!stripe.payoutsEnabled } };
+}
+
+const qualificationBody = (a) => ({
+  status: a.status,
+  qualified: a.qualified,
+  // What the operator can act on, in their own words. Machine-readable codes alongside.
+  blockers: a.blockers.filter((x) => x.gate === 'qualification').map(({ code, kind, item, reason }) => ({ code, kind, item, reason })),
+});
+
+app.get('/operator/qualification', requireAuth, async (req, res) => {
+  const db = adminDb();
+  if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
+  try {
+    const a = await assessAndRecord({ db, uid: req.uid, checks: qualificationChecks, liveMoney: keyMode === 'live' });
+    res.json(qualificationBody(a));
+  } catch (e) {
+    res.status(502).json({ error: e.message });
+  }
+});
+
+// FOR BUILDS 40 AND EARLIER, whose review screen asks this path. Same assessment, old words.
 app.get('/operator/commission', requireAuth, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   try {
-    const snap = await db.collection('users').doc(String(req.uid)).get();
-    const u = snap.exists ? snap.data() : {};
-    const c = u.commission || null;
-    res.json({
-      status: c?.status || 'none',
-      reason: c?.status === 'refused' ? c.reason || null : null,
-      decidedAt: c?.decidedAt || null,
-      documents: documentsStatus(u.documents),
-    });
+    const a = await assessAndRecord({ db, uid: req.uid, checks: qualificationChecks, liveMoney: keyMode === 'live' });
+    const legacy = { qualified: 'approved', exception: 'pending', refused: 'refused', suspended: 'refused', incomplete: 'none' };
+    res.json({ status: legacy[a.status], reason: a.qualified ? null : a.blockers[0]?.reason || null });
   } catch (e) {
     res.status(502).json({ error: e.message });
   }
 });
 
+// The operator says they are done. Kept as the app's explicit moment, but it decides nothing a
+// document reading has not already decided: it assesses and reports.
 app.post('/operator/qualification/submit', requireAuth, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   try {
-    const ref = db.collection('users').doc(String(req.uid));
-    const snap = await ref.get();
-    const u = snap.exists ? snap.data() : {};
-    // An approved operator is not sent back to the queue by pressing Submit again.
-    if (commissionCurrent(u.commission)) return res.json({ status: 'approved' });
-    // HELD DOCUMENTS MAY BE SUBMITTED — a hold is a request for a person, and this is how the
-    // person gets asked. Missing, refused or expired ones may not.
-    const docs = documentsStatus(u.documents);
-    if (!docs.reviewable) {
-      return res.status(409).json({
-        code: 'documents_required',
-        error: 'Every document must be submitted, and none refused or expired, before review.',
-        documents: docs,
-      });
+    const a = await assessAndRecord({ db, uid: req.uid, checks: qualificationChecks, liveMoney: keyMode === 'live' });
+    if (a.status === 'incomplete') {
+      const first = a.blockers.find((x) => x.gate === 'qualification');
+      return res.status(409).json({ code: first?.code || 'incomplete', error: first?.reason || 'Qualification is not complete.', ...qualificationBody(a) });
     }
-    await ref.set(
-      { commission: { status: 'pending', submittedAt: Date.now(), reason: null, decidedAt: null } },
-      { merge: true },
-    );
-    res.json({ status: 'pending' });
+    res.json(qualificationBody(a));
   } catch (e) {
     res.status(502).json({ error: e.message });
   }
@@ -2484,7 +2498,7 @@ app.post('/operator/screening/reinvite', requireAuth, async (req, res) => {
 // record the decision, handle expired invitations) lives in checkr.js.
 
 // --- The operations view. -----------------------------------------------------------------
-mountOps(app, express);
+mountOps(app, express, { checks: qualificationChecks, liveMoney: () => keyMode === 'live' });
 
 app.get('/scheduled/sweep', runSweep);
 app.post('/scheduled/sweep', runSweep);
@@ -2732,26 +2746,19 @@ app.post('/travel/accept', requireAuth, async (req, res) => {
   const uid = String(req.uid);
   const userRef = db.collection('users').doc(uid);
 
-  // Checked before the transaction because they are network calls. Neither can become true
-  // again inside the next second in a way that matters; both can only have become false.
-  let refusal = null;
-  const disabled = await accountDisabled(uid);
-  if (disabled !== false) {
-    refusal = { code: 'account_disabled', reason: 'This account cannot accept travel.' };
-  } else {
-    try {
-      const u = (await userRef.get()).data() || {};
-      const stripe = await connectAccountStatus(u.stripeAccountId || null);
-      if (!stripe.payoutsEnabled) {
-        refusal = { code: 'payouts_not_ready', reason: 'Stripe has not cleared this account for payouts.' };
-      }
-    } catch (e) {
-      return res.status(502).json({ error: e.message });
-    }
+  // THE NETWORK HALF, checked immediately before the transaction: Firebase Auth (a disabled
+  // account keeps a valid sign-in for up to an hour) and Stripe. Everything else is read inside
+  // the transaction.
+  let externals;
+  try {
+    const u = (await userRef.get()).data() || {};
+    externals = await qualificationChecks(uid, u);
+  } catch (e) {
+    return res.status(502).json({ error: e.message });
   }
 
   try {
-    const out = await acceptOffer({ db, uid, rideId, refusal, liveMoney: keyMode === 'live' });
+    const out = await acceptOffer({ db, uid, rideId, externals, liveMoney: keyMode === 'live' });
     res.status(out.status).json(out.body);
   } catch (e) {
     res.status(502).json({ error: e.message });

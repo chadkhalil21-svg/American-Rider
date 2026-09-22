@@ -115,7 +115,7 @@ every previous sweep because the code was there.
 | 2 | **Checkr account.** No `CHECKR_API_KEY`. | Every operator sits at `awaiting_provider` — not a pass, not dispatchable. **Nobody can be commissioned.** |
 | 3 | **Live Stripe keys.** Still `test`. | No real money can move in either direction. |
 | 4 | ~~Document review is simulated.~~ **REPLACED before 22 Sept 2026** by `src/backend/documentUpload.ts` → `POST /operator/document` → `backend/documents.js`; only an `accept` verdict marks a document verified. 22 Sept: `storage.rules` gained the missing `operator-documents/` rule (every upload was refused), and a person decides held documents on `/ops`. | — |
-| 5 | ~~Commissioning review is simulated.~~ **DONE 22 Sept 2026.** A person approves on `/ops`, only over four accepted documents (`backend/commissioning.js`). `/operator/online` and dispatch refuse an operator without it. | — |
+| 5 | ~~Commissioning review is simulated.~~ **DONE 22 Sept 2026.** Qualification is automatic and derived on every check (`backend/qualification.js`); `/ops` decides only exceptions, with an audit log. | — |
 
 ### Tier 2 — raised by the founders, not built
 

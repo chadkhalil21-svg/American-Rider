@@ -111,32 +111,34 @@ export async function goOnline(opts: {
   }
 }
 
-// ---- COMMISSIONING -----------------------------------------------------------------------
+// ---- QUALIFICATION -----------------------------------------------------------------------
 //
-// The phone used to commission itself with a Continue button. Now it asks for review, and a
-// person decides on /ops. These two calls are the phone's whole part in that.
-export type CommissionStatus = {
-  status: 'none' | 'pending' | 'approved' | 'refused' | 'unknown';
+// The server qualifies an operator automatically when every check passes; a person on /ops
+// decides only the exceptions. The phone reads the result and never decides it.
+export type QualificationStatus = {
+  status: 'qualified' | 'exception' | 'refused' | 'suspended' | 'incomplete' | 'unknown';
+  /** The first thing standing in the way, in words the operator can act on. */
   reason: string | null;
 };
 
-/** Never throws. An unreachable server reads as `unknown`, never as approved. */
-export async function commissionStatus(): Promise<CommissionStatus> {
+/** Never throws. An unreachable server reads as `unknown`, never as qualified. */
+export async function qualificationStatus(): Promise<QualificationStatus> {
   try {
-    const res = await fetch(`${PAYMENT_SERVER_URL}/operator/commission`, { headers: await authHeaders() });
+    const res = await fetch(`${PAYMENT_SERVER_URL}/operator/qualification`, { headers: await authHeaders() });
     if (!res.ok) return { status: 'unknown', reason: null };
     const d = await res.json();
     const s = d?.status;
+    const known = ['qualified', 'exception', 'refused', 'suspended', 'incomplete'];
     return {
-      status: s === 'none' || s === 'pending' || s === 'approved' || s === 'refused' ? s : 'unknown',
-      reason: typeof d?.reason === 'string' ? d.reason : null,
+      status: known.includes(s) ? s : 'unknown',
+      reason: typeof d?.blockers?.[0]?.reason === 'string' ? d.blockers[0].reason : null,
     };
   } catch {
     return { status: 'unknown', reason: null };
   }
 }
 
-/** Ask for review. The server refuses while a document is missing, refused or expired. */
+/** Submit the qualification. The server assesses it at once; incomplete comes back as a refusal. */
 export async function submitForReview(): Promise<{ ok: boolean; error?: string }> {
   try {
     const res = await fetch(`${PAYMENT_SERVER_URL}/operator/qualification/submit`, {

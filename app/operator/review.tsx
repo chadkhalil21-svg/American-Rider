@@ -3,15 +3,16 @@
 //
 // THE DECISION IS THE SERVER'S. This screen had a Continue button that commissioned the
 // operator on the spot, in phone storage ("Test program — review is simulated and clears at
-// once"). A person now approves or refuses on /ops, and this screen reads that answer: on
-// arrival, every thirty seconds while it is open, and when the operator asks.
+// once"). The server now qualifies an operator automatically when every check passes, and a
+// person on /ops decides only what the checks cannot settle. This screen reads that answer:
+// on arrival, every thirty seconds while it is open, and when the operator asks.
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../../src/components/AppText';
 import Svg, { Path } from 'react-native-svg';
 import { PrimaryButton, Screen } from '../../src/components/UI';
-import { commissionStatus } from '../../src/backend/connect';
+import { qualificationStatus } from '../../src/backend/connect';
 import { useOperator } from '../../src/state/OperatorContext';
 import { useLanguage } from '../../src/state/LanguageContext';
 import { colors } from '../../src/theme';
@@ -42,20 +43,22 @@ export default function OperatorReview() {
   const { commission, resetQualification } = op;
   const check = useCallback(async () => {
     setBusy(true);
-    const s = await commissionStatus();
+    const s = await qualificationStatus();
     setBusy(false);
-    if (s.status === 'approved' && !approvedOnce.current) {
+    if (s.status === 'qualified' && !approvedOnce.current) {
       approvedOnce.current = true;
       commission();
       router.replace('/operator/commissioned');
-    } else if (s.status === 'refused') {
+    } else if (s.status === 'refused' || s.status === 'suspended') {
       setRefused(s.reason || '');
-    } else if (s.status === 'none') {
-      // Pending on this phone and never submitted to the server — the old Continue flow left
-      // accounts in this state. Nobody is reviewing them, so waiting here would be forever.
+    } else if (s.status === 'incomplete') {
+      // Something the operator must do — a document missing or expired, a screening to finish.
+      // Nobody is reviewing that, so waiting here would be forever; the checklist shows it.
       resetQualification();
       router.replace('/operator/qualify');
     }
+    // 'exception': a person is deciding one item. 'unknown': the server was not reached.
+    // Either way this screen, which says the answer appears here, is the right place to wait.
   }, [commission, resetQualification, router]);
 
   useEffect(() => {

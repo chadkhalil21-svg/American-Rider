@@ -319,7 +319,7 @@ async function handleEvent(event) {
       // The three-year clock runs from when the check was CONDUCTED.
       issuedAt: Date.parse(report.completed_at || '') || null,
     });
-    return { action: 'decided', decision: decided.decision, recorded: out.ok };
+    return { action: 'decided', uid, decision: decided.decision, recorded: out.ok };
   }
 
   // The operator opened the link and finished Checkr's forms; the report is now running.

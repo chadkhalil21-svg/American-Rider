@@ -1,0 +1,323 @@
+// Automated, exception-driven qualification.
+// Run: node backend/qualification.test.js
+//
+// The ten cases the founders asked for (22 Sept 2026), plus the deterministic checks behind them.
+const fs = require('fs');
+const path = require('path');
+const { assessOperator, assessAndRecord, resolveDocument, dollarFigures, REQUIRED_DOCS } = require('./qualification');
+const { acceptOffer } = require('./eligibility');
+const { DISCLOSURE_VERSION } = require('./disclosure');
+
+const R = [];
+const check = (l, c, d) => R.push({ l, ok: !!c, d });
+
+// ——— a Firestore stand-in: get/set on refs, auto-id docs, queries by one field, transactions ——
+function fakeDb(seed) {
+  const data = JSON.parse(JSON.stringify(seed));
+  let n = 0;
+  const merge = (a, b) => {
+    const out = { ...(a || {}) };
+    for (const [k, v] of Object.entries(b)) {
+      out[k] = v && typeof v === 'object' && !Array.isArray(v) && out[k] && typeof out[k] === 'object' ? merge(out[k], v) : v;
+    }
+    return out;
+  };
+  const snap = (col, id) => {
+    const v = data[col]?.[id];
+    return { exists: !!v, data: () => (v ? JSON.parse(JSON.stringify(v)) : undefined) };
+  };
+  const write = (col, id, f, opts) => {
+    data[col] = data[col] || {};
+    data[col][id] = opts?.merge ? merge(data[col][id], f) : { ...f };
+  };
+  const ref = (col, id) => ({
+    col, id,
+    get: async () => snap(col, id),
+    set: async (f, opts) => write(col, id, f, opts),
+  });
+  return {
+    data,
+    collection: (col) => ({
+      doc: (id) => ref(col, id ?? `auto${++n}`),
+      where: (field, op, val) => ({
+        get: async () => ({
+          docs: Object.entries(data[col] || {})
+            .filter(([, v]) => field.split('.').reduce((o, k) => o?.[k], v) === val)
+            .map(([id]) => ({ id, data: () => snap(col, id).data() })),
+        }),
+      }),
+    }),
+    async runTransaction(fn) {
+      const writes = [];
+      const tx = {
+        get: async (r) => snap(r.col, r.id),
+        update: (r, f) => writes.push(() => write(r.col, r.id, f, { merge: true })),
+        set: (r, f, opts) => writes.push(() => write(r.col, r.id, f, opts)),
+      };
+      const out = await fn(tx);
+      writes.forEach((w) => w());
+      return out;
+    },
+  };
+}
+
+const NOW = Date.parse('2026-09-22T15:00:00Z');
+const read = (kind, fields = {}) => ({
+  verdict: 'accept',
+  reasons: [],
+  expiry: '2028-01-31',
+  evidence: {
+    documentType: kind,
+    isTheRequestedDocument: true,
+    legible: true,
+    fields: { expiry: '2028-01-31', commercialUse: '', limits: '', ...fields },
+  },
+});
+const cleanDocs = () => ({
+  license: read('license'),
+  registration: read('registration'),
+  insurance: read('insurance', { commercialUse: 'yes', limits: '$1,000,000 combined single limit' }),
+});
+const cleanUser = (over = {}) => ({
+  name: 'Ana Operator',
+  documents: cleanDocs(),
+  screening: { decision: 'pass', recheckDue: NOW + 1e10 },
+  insuranceDisclosure: { version: DISCLOSURE_VERSION, at: NOW - 1000 },
+  ...over,
+});
+const OK = { account: { disabled: false }, payouts: { enabled: true } };
+const A = (user, o = {}) => assessOperator({ user, now: NOW, liveMoney: true, ...OK, ...o });
+const codes = (a) => a.blockers.map((b) => b.code);
+
+(async () => {
+  // ——— 1. clean automated qualification ——————————————————————————————————————————
+  {
+    const a = A(cleanUser());
+    check('1. clean operator: qualified with no person involved', a.qualified && a.status === 'qualified', JSON.stringify(a.blockers));
+    const db = fakeDb({ users: { op: cleanUser() }, operators: {} });
+    const r = await assessAndRecord({ db, uid: 'op', checks: async () => OK, liveMoney: true, now: NOW });
+    check('1. …and recorded as qualified with a timestamp', r.qualified && db.data.users.op.qualification.status === 'qualified' && db.data.users.op.qualification.qualifiedAt === NOW);
+  }
+
+  // ——— 2. one document held for review ———————————————————————————————————————————
+  {
+    const u = cleanUser();
+    u.documents.registration = { ...u.documents.registration, verdict: 'review', reasons: ['The plate does not match.'] };
+    const a = A(u);
+    check('2. one review document: not qualified', !a.qualified);
+    check('2. …status exception, only that item queued', a.status === 'exception' && a.blockers.length === 1 && a.blockers[0].item === 'registration' && a.blockers[0].code === 'document_review', JSON.stringify(a.blockers));
+  }
+
+  // ——— 3. one document refused ——————————————————————————————————————————————————
+  {
+    const u = cleanUser();
+    u.documents.license = { ...u.documents.license, verdict: 'refuse', reasons: ['Expired 2025-01-01.'] };
+    const a = A(u);
+    check('3. one refused document: not qualified, machine-readable reason', !a.qualified && a.status === 'refused' && codes(a).includes('document_refused'));
+  }
+
+  // ——— 4. expired insurance ——————————————————————————————————————————————————————
+  {
+    const u = cleanUser();
+    u.documents.insurance = { ...u.documents.insurance, expiry: '2026-09-01' };
+    const a = A(u);
+    check('4. expired insurance: not qualified (document_expired)', !a.qualified && codes(a).includes('document_expired') && a.blockers[0].item === 'insurance');
+    // …and the Florida limit, checked in code, not taken from the verdict
+    const low = cleanUser();
+    low.documents.insurance.evidence.fields.limits = '$50,000 / $100,000 / $25,000';
+    check('4. an "accept" whose limits are below $1,000,000 is refused in code', codes(A(low)).includes('insurance_limits_insufficient'));
+    const unread = cleanUser();
+    unread.documents.insurance.evidence.fields.limits = '50/100/25';
+    check('4. limits that cannot be read as dollars go to a person, not through', codes(A(unread)).includes('insurance_limits_unreadable'));
+    const personal = cleanUser();
+    personal.documents.insurance.evidence.fields.commercialUse = 'no';
+    check('4. personal-use cover is refused', codes(A(personal)).includes('insurance_personal_use'));
+    const unsure = cleanUser();
+    unsure.documents.insurance.evidence.fields.commercialUse = 'unclear';
+    check('4. unconfirmed commercial use is an exception', codes(A(unsure)).includes('insurance_use_unverified'));
+  }
+
+  // ——— 5. Checkr screening in production ————————————————————————————————————————————
+  {
+    check('5. no screening, live money: not qualified', codes(A(cleanUser({ screening: null }))).includes('screening_required'));
+    check('5. screening older than three years, live money: not qualified',
+      codes(A(cleanUser({ screening: { decision: 'pass', recheckDue: NOW - 1 } }))).includes('screening_expired'));
+    check('5. screening refused: not qualified, in any mode',
+      codes(A(cleanUser({ screening: { decision: 'refuse', summary: 'x' } }), { liveMoney: false })).includes('screening_refused'));
+    check('5. screening held for review: exception, in any mode',
+      A(cleanUser({ screening: { decision: 'review' } }), { liveMoney: false }).status === 'exception');
+    check('5. test money and no screening: qualified — the line /operator/online has always drawn',
+      A(cleanUser({ screening: null }), { liveMoney: false }).qualified);
+  }
+
+  // ——— 6. disabled account ———————————————————————————————————————————————————————
+  {
+    check('6. disabled account: not qualified (suspended)', A(cleanUser(), { account: { disabled: true } }).status === 'suspended');
+    check('6. account status unknown: not qualified', !A(cleanUser(), { account: { disabled: null } }).qualified);
+    check('6. account not checked at all: not qualified', !assessOperator({ user: cleanUser(), now: NOW, payouts: OK.payouts }).qualified);
+    check('6. suspended by a person: not qualified', A(cleanUser({ suspension: { active: true, note: 'fraud' } })).status === 'suspended');
+  }
+
+  // ——— 7. resolving the final held item qualifies automatically ——————————————————————
+  {
+    const u = cleanUser();
+    u.documents.insurance = { ...u.documents.insurance, verdict: 'review', reasons: ['Name differs.'] };
+    const db = fakeDb({ users: { op: u }, operators: {} });
+    const before = await assessAndRecord({ db, uid: 'op', checks: async () => OK, liveMoney: true, now: NOW });
+    check('7. held insurance: in the exception queue', before.status === 'exception' && db.data.users.op.qualification.status === 'exception');
+    const out = await resolveDocument({
+      db, uid: 'op', kind: 'insurance', action: 'accept', note: 'Name matches the licence; middle name only.',
+      commercialUse: 'yes', limitDollars: 1000000, actor: { name: 'alice' }, now: NOW,
+    });
+    check('7. a person resolves it', out.ok, JSON.stringify(out));
+    const after = await assessAndRecord({ db, uid: 'op', checks: async () => OK, liveMoney: true, now: NOW });
+    check('7. …and the operator is qualified with no Approve click', after.qualified && db.data.users.op.qualification.status === 'qualified');
+    const expired = cleanUser();
+    expired.documents.license = { ...expired.documents.license, verdict: 'review', expiry: '' };
+    const db2 = fakeDb({ users: { op: expired } });
+    await resolveDocument({ db: db2, uid: 'op', kind: 'license', action: 'accept', note: 'ok', expiry: '2020-01-01', actor: { name: 'alice' }, now: NOW });
+    check('7. a person\'s accept still has to pass the date check', codes(A(db2.data.users.op)).includes('document_expired'));
+    const db3 = fakeDb({ users: { op: cleanUser() } });
+    const low = await resolveDocument({ db: db3, uid: 'op', kind: 'insurance', action: 'accept', note: 'ok', commercialUse: 'yes', limitDollars: 300000, actor: { name: 'alice' }, now: NOW });
+    check('7. …and the Florida limit: a person cannot accept $300,000', low.ok && codes(A(db3.data.users.op)).includes('insurance_limits_insufficient'));
+  }
+
+  // ——— 8. later loss of eligibility prevents acceptance —————————————————————————————
+  {
+    const fleet = { available: true, onlineAt: NOW, commissioned: true, disclosureVersion: DISCLOSURE_VERSION, insuranceExpiry: '2028-01-31', lat: 25.76, lng: -80.19 };
+    const ride = { operatorId: 'op', status: 'assigned', createdAt: NOW - 5000 };
+    const cases = [
+      ['insurance expired after qualifying', (u) => { u.documents.insurance.expiry = '2026-09-21'; }, {}, 'document_expired'],
+      ['insurance invalidated by a person', (u) => { u.documents.insurance.decision = { verdict: 'refuse', note: 'cancelled by insurer' }; }, {}, 'document_refused'],
+      ['screening refused after qualifying', (u) => { u.screening = { decision: 'refuse' }; }, {}, 'screening_refused'],
+      ['account disabled after qualifying', () => {}, { account: { disabled: true } }, 'account_disabled'],
+      ['disclosure version moved on', (u) => { u.insuranceDisclosure = { version: '2026-08-29.1', at: 1 }; }, {}, 'disclosure_required'],
+      ['suspended by a person', (u) => { u.suspension = { active: true, note: 'safety' }; }, {}, 'suspended'],
+      ['payouts restricted by Stripe', () => {}, { payouts: { enabled: false } }, 'payouts_not_ready'],
+    ];
+    for (const [label, mutate, ext, code] of cases) {
+      const u = cleanUser({ qualification: { status: 'qualified', qualified: true } });
+      mutate(u);
+      const db = fakeDb({ users: { op: u }, operators: { op: { ...fleet } }, rides: { r1: { ...ride } } });
+      const out = await acceptOffer({ db, uid: 'op', rideId: 'r1', externals: { ...OK, ...ext }, liveMoney: true, now: () => NOW });
+      check(`8. ${label} → acceptance refused (${code})`, out.status === 409 && out.body.code === code && db.data.rides.r1.status === 'assigned', JSON.stringify(out.body));
+    }
+    const db = fakeDb({ users: { op: cleanUser() }, operators: { op: { ...fleet } }, rides: { r1: { ...ride } } });
+    const out = await acceptOffer({ db, uid: 'op', rideId: 'r1', externals: OK, liveMoney: true, now: () => NOW });
+    check('8. control: the same operator, nothing lost, accepts', out.status === 200 && db.data.rides.r1.status === 'accepted');
+    // Loss is recorded immediately, not at the next renewal.
+    const lost = cleanUser();
+    lost.documents.license.expiry = '2026-09-01';
+    const db2 = fakeDb({ users: { op: lost }, operators: { op: { ...fleet } } });
+    await assessAndRecord({ db: db2, uid: 'op', checks: async () => OK, liveMoney: true, now: NOW });
+    check('8. an assessment that finds a loss takes the operator out of dispatch at once',
+      db2.data.operators.op.available === false && db2.data.operators.op.commissioned === false);
+  }
+
+  // ——— 9. the client cannot grant itself qualification ———————————————————————————————
+  {
+    const forged = cleanUser({
+      documents: {},
+      qualification: { status: 'qualified', qualified: true },
+      commission: { status: 'approved' },
+    });
+    check('9. a stored "qualified" or "approved" is never read as qualification', !A(forged).qualified);
+    const src = fs.readFileSync(path.join(__dirname, 'qualification.js'), 'utf8');
+    const body = src.slice(src.indexOf('function assessOperator'), src.indexOf('async function assessAndRecord'));
+    check('9. assessOperator reads neither user.qualification nor user.commission',
+      !/\.qualification\b/.test(body) && !/\.commission\b/.test(body));
+    const rules = fs.readFileSync(path.join(__dirname, '..', 'firestore.rules'), 'utf8');
+    const own = (rules.match(/function userFieldsAreOwn\(\) \{[\s\S]*?\}/) || [''])[0];
+    check('9. rules: the app may write only its profile and push fields on its record', own.includes("'name', 'mobile', 'email'") && !/qualification|documents|suspension|screening|commission/.test(own));
+    check('9. rules: audit_log has no client rule (deny-all applies)', !/match \/audit_log/.test(rules) && /match \/\{document=\*\*\} \{\s*allow read, write: if false;/.test(rules));
+    const app = ['src/backend/connect.ts', 'app/operator/review.tsx', 'src/state/OperatorContext.tsx'].map((f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8')).join('\n');
+    check('9. the app writes no qualification, documents or suspension field', !/(qualification|suspension|documents)\s*:\s*\{/.test(app.replace(/\/\/.*$/gm, '')));
+  }
+
+  // ——— 10. /ops overrides: authorization and audit log ——————————————————————————————
+  {
+    process.env.OPS_USERS = 'alice:correct-horse-battery,bob:another-long-secret';
+    const ops = require('./ops');
+    const routes = {};
+    const fakeApp = { get: (p, ...h) => (routes[`GET ${p}`] = h[h.length - 1]), post: (p, ...h) => (routes[`POST ${p}`] = h[h.length - 1]) };
+    const u = cleanUser();
+    u.documents.license = { ...u.documents.license, verdict: 'review', reasons: ['Glare over the number.'] };
+    const db = fakeDb({ users: { op: u }, operators: {} });
+    ops.mount(fakeApp, { urlencoded: () => () => {} }, { db: () => db, checks: async () => OK, liveMoney: () => true });
+    const res = () => {
+      const r = { code: 200, body: null, location: null };
+      r.status = (c) => { r.code = c; return r; };
+      r.type = () => r;
+      r.send = (b) => { r.body = b; return r; };
+      r.json = (b) => { r.body = b; return r; };
+      r.redirect = (c, l) => { r.code = typeof c === 'number' ? c : 302; r.location = l || c; return r; };
+      r.setHeader = () => r;
+      return r;
+    };
+    const doc = routes['POST /ops/operators/document'];
+    const body = { uid: 'op', kind: 'license', action: 'accept', note: 'Number legible on the second photo.' };
+
+    const anon = res();
+    await doc({ headers: {}, body }, anon);
+    check('10. no session: refused (401), nothing written', anon.code === 401 && !db.data.audit_log && !db.data.users.op.documents.license.decision);
+
+    const forgedCookie = res();
+    await doc({ headers: { cookie: 'ar_ops=alice.' + 'f'.repeat(64) }, body }, forgedCookie);
+    check('10. a forged session: refused (401)', forgedCookie.code === 401 && !db.data.audit_log);
+
+    const cookie = `ar_ops=${encodeURIComponent('alice.' + ops.tokenFor({ name: 'alice', pw: 'correct-horse-battery' }))}`;
+    const noNote = res();
+    await doc({ headers: { cookie }, body: { ...body, note: '' } }, noNote);
+    check('10. signed in but no note: refused (400), nothing written', noNote.code === 400 && !db.data.audit_log);
+
+    const good = res();
+    await doc({ headers: { cookie, 'user-agent': 'test' }, ip: '203.0.113.9', body }, good);
+    const entries = Object.values(db.data.audit_log || {});
+    check('10. signed in with a note: accepted', good.code === 303, `${good.code} ${good.body}`);
+    check('10. exactly one audit entry, naming the person', entries.length === 1 && entries[0].actor.name === 'alice' && entries[0].actor.ip === '203.0.113.9');
+    check('10. the entry records action, subject, item, before, after and note',
+      entries[0].action === 'document_accept' && entries[0].subject === 'op' && entries[0].item === 'license' &&
+      entries[0].before?.readerVerdict === 'review' && entries[0].after?.verdict === 'accept' && entries[0].note === body.note && entries[0].at > 0);
+    check('10. the reader\'s verdict is kept beside the decision, not overwritten',
+      db.data.users.op.documents.license.verdict === 'review' && db.data.users.op.documents.license.decision.by === 'alice');
+    check('10. resolving the last held item qualified the operator on the spot', db.data.users.op.qualification.status === 'qualified');
+
+    const susp = res();
+    await routes['POST /ops/operators/suspension']({ headers: { cookie }, body: { uid: 'op', action: 'suspend', note: 'Safety report under investigation.' } }, susp);
+    const e2 = Object.values(db.data.audit_log);
+    check('10. suspension is audited and ends qualification', susp.code === 303 && e2.length === 2 && e2[1].action === 'suspend' && db.data.users.op.qualification.status === 'suspended');
+
+    const auditAnon = res();
+    await routes['GET /ops/audit']({ headers: {}, query: { uid: 'op' } }, auditAnon);
+    check('10. the audit log itself needs a session', auditAnon.code === 401);
+    const auditOk = res();
+    await routes['GET /ops/audit']({ headers: { cookie }, query: { uid: 'op' } }, auditOk);
+    check('10. …and returns every decision about the operator',
+      Array.isArray(auditOk.body) && auditOk.body.length === 2 && auditOk.body.map((e) => e.action).sort().join() === 'document_accept,suspend');
+
+    const opsSrc = fs.readFileSync(path.join(__dirname, 'ops.js'), 'utf8');
+    check('10. no routine Approve route remains on /ops', !/\/ops\/operators\/commission/.test(opsSrc));
+    delete process.env.OPS_USERS;
+  }
+
+  // ——— the pieces ————————————————————————————————————————————————————————————————
+  check('dollar figures: $1,000,000 CSL', dollarFigures('$1,000,000 CSL').includes(1000000));
+  check('dollar figures: 1M', dollarFigures('BI 1M combined').includes(1000000));
+  check('dollar figures: $1 million', dollarFigures('$1 million per accident').includes(1000000));
+  check('dollar figures: 50/100/25 is not guessed at', dollarFigures('50/100/25').length === 0);
+  check('the required documents are the three the app asks for', JSON.stringify(REQUIRED_DOCS) === JSON.stringify(['license', 'registration', 'insurance']));
+  const screen = fs.readFileSync(path.join(__dirname, '..', 'app', 'operator', 'documents.tsx'), 'utf8');
+  const asked = [...(screen.match(/const DOCUMENTS[\s\S]*?\n\];/) || [''])[0].matchAll(/key: '(\w+)'/g)].map((m) => m[1]);
+  check('…and they match the documents screen exactly', asked.length === 3 && asked.every((k) => REQUIRED_DOCS.includes(k)), JSON.stringify(asked));
+  const noEvidence = cleanUser();
+  delete noEvidence.documents.license.evidence;
+  check('an "accept" with no stored reading is an exception, not a pass', codes(A(noEvidence)).includes('document_evidence_inconsistent'));
+  const wrongType = cleanUser();
+  wrongType.documents.registration.evidence.isTheRequestedDocument = false;
+  check('an "accept" whose reading says it is the wrong document is an exception', codes(A(wrongType)).includes('document_evidence_inconsistent'));
+
+  let bad = 0;
+  for (const r of R) { if (!r.ok) bad++; console.log(`${r.ok ? 'PASS' : 'FAIL'}  ${r.l}${r.ok ? '' : '  — ' + (r.d || '')}`); }
+  console.log(`\n${R.length - bad}/${R.length} passed`);
+  process.exit(bad ? 1 : 0);
+})();

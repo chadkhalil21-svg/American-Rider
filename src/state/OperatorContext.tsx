@@ -224,7 +224,7 @@ type OperatorState = {
   bgCheckedAt: string | null;
   /** Ask the server for review. Pending only once the server has accepted the request. */
   submitQualification: () => Promise<{ ok: boolean; error?: string }>;
-  /** Record the server's approval on this phone. Called only after commissionStatus() says so. */
+  /** Record the server's qualification on this phone. Called only after qualificationStatus() says so. */
   commission: () => void;
   /** Return to the checklist after the server refused the qualification. */
   resetQualification: () => void;

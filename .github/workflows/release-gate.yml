@@ -18,6 +18,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm ci --prefix backend
       - run: npm run check
 
   firestore-rules:
@@ -34,5 +35,6 @@ jobs:
           distribution: temurin
           java-version: '21'
       - run: npm ci
+      - run: npm ci --prefix backend
       - name: Run Firestore emulator rule suite
         run: npx --yes firebase-tools emulators:exec --only firestore "node backend/firestore.rules.test.js"

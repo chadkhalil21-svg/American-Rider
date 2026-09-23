@@ -20,6 +20,12 @@ jobs:
       - run: npm ci
       - run: npm ci --prefix backend
       - run: npm run check
+      - name: Export Expo web bundle
+        run: npx expo export --platform web --output-dir dist-ci-web
+      - name: Export Expo iOS bundle
+        run: npx expo export --platform ios --output-dir dist-ci-ios
+      - name: Export Expo Android bundle
+        run: npx expo export --platform android --output-dir dist-ci-android
 
   firestore-rules:
     runs-on: ubuntu-latest

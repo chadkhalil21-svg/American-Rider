@@ -49,8 +49,8 @@ const server = read('server.js');
 check("/fare-quote is wrapped in attachAuth",
   /app\.post\('\/fare-quote',\s*attachAuth/.test(server),
   'without it every quote is anonymous, therefore always domestic');
-check('/fare-quote passes the card country into quote()',
-  /quote\(\s*priced\.travelCostCents,\s*undefined,\s*priced\.governmentFees,\s*cardCountry\s*\)/.test(server),
+check('/fare-quote passes the card-country reader into the canonical fare authority',
+  /authoritativeFare\(\{[\s\S]{0,250}?cardCountryFor: defaultCardCountry/.test(server),
   'the country is read and then dropped');
 check('attachAuth never refuses a caller — the price must be visible before sign-in',
   /async function attachAuth[\s\S]{0,900}?next\(\);\s*\n\}/.test(read('auth.js')) &&

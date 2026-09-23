@@ -61,7 +61,7 @@ function reason() {
  * every travel they ever take and would be worth harvesting; this one stops being meaningful
  * the moment the travel ends.
  */
-const identityFor = (tripNo, side) => `ar_${String(tripNo)}_${side === 'operator' ? 'operator' : 'traveler'}`;
+const identityFor = (rideId, side) => `ar_${String(rideId)}_${side === 'operator' ? 'operator' : 'traveler'}`;
 
 /** The other end of a call on this travel. */
 const counterpartOf = (side) => (side === 'operator' ? 'traveler' : 'operator');
@@ -73,9 +73,9 @@ const counterpartOf = (side) => (side === 'operator' ? 'traveler' : 'operator');
  * signed-in uid against the travel record before asking for a token, because a token is
  * permission and permission must be granted where the facts are known.
  */
-function accessToken({ tripNo, side, ttlSeconds = 3600 }) {
+function accessToken({ rideId, side, ttlSeconds = 3600 }) {
   if (!ready()) return { ok: false, error: reason(), code: 'voice_not_configured' };
-  if (!tripNo) return { ok: false, error: 'A travel is required', code: 'no_travel' };
+  if (!rideId) return { ok: false, error: 'A travel is required', code: 'no_travel' };
 
   let jwt;
   try {
@@ -83,7 +83,7 @@ function accessToken({ tripNo, side, ttlSeconds = 3600 }) {
     const { AccessToken } = twilio.jwt;
     const { VoiceGrant } = AccessToken;
     const token = new AccessToken(SID(), API_KEY(), API_SECRET(), {
-      identity: identityFor(tripNo, side),
+      identity: identityFor(rideId, side),
       ttl: Math.min(3600, Math.max(60, ttlSeconds)),
     });
     token.addGrant(new VoiceGrant({ outgoingApplicationSid: TWIML_APP(), incomingAllow: true }));
@@ -91,7 +91,7 @@ function accessToken({ tripNo, side, ttlSeconds = 3600 }) {
   } catch (e) {
     return { ok: false, error: e && e.message ? e.message : String(e), code: 'voice_failed' };
   }
-  return { ok: true, token: jwt, identity: identityFor(tripNo, side) };
+  return { ok: true, token: jwt, identity: identityFor(rideId, side) };
 }
 
 /**
@@ -102,8 +102,8 @@ function accessToken({ tripNo, side, ttlSeconds = 3600 }) {
  * side, so a tampered app cannot dial an arbitrary number through our account — which would be
  * our telephone bill and somebody else's harassment.
  */
-function connectTwiml({ tripNo, side }) {
-  const to = identityFor(tripNo, counterpartOf(side));
+function connectTwiml({ rideId, side }) {
+  const to = identityFor(rideId, counterpartOf(side));
   const esc = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response><Dial answerOnBridge="true" timeout="30"><Client>${esc(to)}</Client></Dial></Response>`;

@@ -251,7 +251,8 @@ service cloud.firestore {
     // this one is a plan and deleting it is what cancelling means.
     match /scheduled_rides/{schedId} {
       allow read: if ownsExisting();
-      allow create: if ownsIncoming();
+      // Created by POST /travel/schedule after the server derives its fare and Travel Number.
+      allow create: if false;
       allow update: if false;
       allow delete: if ownsExisting();
     }

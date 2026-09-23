@@ -10,7 +10,6 @@
 // on file and create the travel, plus the fields the sweep writes back — which is what lets
 // the traveler's screen say what has actually happened rather than what was hoped for.
 import {
-  addDoc,
   collection,
   deleteDoc,
   doc,
@@ -20,6 +19,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { auth, db } from '../firebase';
+import { PAYMENT_SERVER_URL } from '../config';
 
 /** Where a reservation has got to. Written by the sweep, never by the app. */
 export type SchedStatus =
@@ -45,6 +45,8 @@ export type ScheduledRide = {
   dest?: string;
   pickupLat?: number;
   pickupLng?: number;
+  destinationLat?: number;
+  destinationLng?: number;
   /** The operator-facing class, e.g. 'Standard' / 'Large Vehicle' / 'Pet Friendly'. */
   travelClass?: string;
   /** The FARE in cents, before the platform fee. The server re-derives the all-in price from
@@ -80,17 +82,20 @@ export async function saveScheduledRide(
     const clean = Object.fromEntries(
       Object.entries(info).filter(([, v]) => v !== undefined),
     );
-    const ref = await addDoc(collection(db, 'scheduled_rides'), {
-      travelerUid: uid,
-      travelerName: auth.currentUser?.displayName || '',
-      travelerEmail: auth.currentUser?.email || '',
-      ...clean,
-      // THE FIELD THE SWEEP QUERIES ON. Without it the reservation is invisible to the
-      // dispatcher and the traveler is never picked up.
-      status: 'reserved',
-      createdAt: Date.now(),
+    const token = await auth.currentUser?.getIdToken();
+    const res = await fetch(`${PAYMENT_SERVER_URL}/travel/schedule`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        ...clean,
+        travelerName: auth.currentUser?.displayName || '',
+        pickup: { lat: info.pickupLat, lng: info.pickupLng },
+        destinationPoint: { lat: info.destinationLat, lng: info.destinationLng },
+      }),
     });
-    return { id: ref.id, ...info, status: 'reserved' };
+    if (!res.ok) return null;
+    const saved = await res.json();
+    return { ...info, ...saved, cost: typeof saved.costCents === 'number' ? saved.costCents / 100 : info.cost } as ScheduledRide;
   } catch {
     return null;
   }

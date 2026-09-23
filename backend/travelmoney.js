@@ -34,6 +34,10 @@ async function authorizePaymentRide({ db, uid, rideId }) {
   const ride = snap.data();
   if (String(ride.travelerUid) !== String(uid)) return fail(403, 'That travel belongs to another traveler', 'not_yours');
   if (!PAYABLE.includes(String(ride.status))) return fail(409, 'That travel can no longer be paid for', 'not_payable');
+  if (!Number.isInteger(ride.travelCostCents) || ride.travelCostCents <= 0 ||
+      !Number.isInteger(ride.costCents) || ride.costCents <= 0) {
+    return fail(409, 'That travel does not have an authoritative fare', 'fare_untrusted');
+  }
   return { ok: true, ride, rideRef };
 }
 
@@ -60,12 +64,12 @@ async function payForTravel({ db, uid, rideId, create, resume = null, now = Date
   // the travel is simply reported as paid.
   if (ride.paymentIntentId) {
     if (resume) {
-      const again = await resume(ride.paymentIntentId);
+      const again = await resume(ride.paymentIntentId, ride);
       if (again) return { status: 200, body: again };
     }
     return fail(409, 'This travel already has a payment', 'already_paid');
   }
-  const result = await create({ tripNo: ride.tripNo || null, rideId: String(rideId) });
+  const result = await create({ tripNo: ride.tripNo || null, rideId: String(rideId), ride });
   await rideRef.update({
     paymentIntentId: result.paymentIntentId,
     paidAt: now,

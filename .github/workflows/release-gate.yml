@@ -1,0 +1,47 @@
+name: Release Gate
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  application-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm ci --prefix backend
+      - run: npm run check
+      - name: Export Expo web bundle
+        run: npx expo export --platform web --output-dir dist-ci-web
+      - name: Export Expo iOS bundle
+        run: npx expo export --platform ios --output-dir dist-ci-ios
+      - name: Export Expo Android bundle
+        run: npx expo export --platform android --output-dir dist-ci-android
+
+  firestore-rules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci
+      - run: npm ci --prefix backend
+      - run: npm ci --prefix infra/rules-emulator
+      - name: Run Firestore emulator rule suite
+        run: npx --yes firebase-tools emulators:exec --only firestore "node infra/rules-emulator/messages.rules.test.mjs"

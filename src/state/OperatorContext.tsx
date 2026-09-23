@@ -882,11 +882,11 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
 
   // TELL THE TRAVELER, NOT JUST THIS PHONE. Their screen used to advance on a 2.6-second
   // timer regardless of where the operator was; it now follows these writes.
-  const confirmArrival = useCallback(() => {
-    setArrived(true);
+  const confirmArrival = useCallback(async () => {
     const rideId = opRef.current?.rideId;
     if (!rideId) return;
-    markArrived(rideId);
+    if (!(await markArrived(rideId))) return;
+    setArrived(true);
     // The traveler may not be looking at their phone. Being outside is the one moment where
     // that matters most, and it is the notification every rideshare has and we did not.
     announceTravel(rideId, 'arrived');
@@ -906,10 +906,10 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
 
   opRef.current = op;
 
-  const completeOp = useCallback(() => {
+  const completeOp = useCallback(async () => {
     if (!op) return;
     if (op.rideId) {
-      markCompleted(op.rideId);
+      if (!(await markCompleted(op.rideId))) return;
       announceTravel(op.rideId, 'completed');
     }
     const record: CompletedOp = {

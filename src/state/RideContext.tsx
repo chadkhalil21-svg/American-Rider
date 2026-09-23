@@ -746,10 +746,9 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       // traveler whose position we did not know was collected from a place they had never
       // named — so dispatch now refuses instead, and the caller reports it.
       pickup: from,
+      destinationPoint: tripCoords?.dest ?? null,
       dep: departure.short,
       dest: arrival.short,
-      miles: tripMiles(),
-      feeLines: quotedFeeLinesRef.current,
       // THE CLASS THE TRAVELER PAID FOR. This was hardcoded to 'Standard', so the class
       // was priced, charged, and then thrown away on the way to dispatch: a $29.07 Large
       // Vehicle booking matched a four-seat saloon, and an Accessible booking — sold as
@@ -758,11 +757,23 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       cls: operatorClassFor(travelClassRef.current),
       // Nobody is offered the same travel twice.
       excludeIds: declinedByRef.current,
-      tripNo: trip.no,
-      costCents: Math.round(trip.total * 100),
+      journeyNo: smartJourneyRef.current?.stage === 'leg2' ? smartJourneyRef.current.leg1No ?? null : null,
     })
       .then((res) => {
         if (res) {
+          if (res.tripNo) {
+            const authoritativeTrip = { ...lastTripRef.current, no: res.tripNo };
+            lastTripRef.current = authoritativeTrip;
+            setLastTrip(authoritativeTrip);
+            const journey = smartJourneyRef.current;
+            if (journey) {
+              const stamped = journey.stage === 'leg1'
+                ? { ...journey, leg1No: res.tripNo }
+                : { ...journey, leg2No: res.tripNo };
+              smartJourneyRef.current = stamped;
+              setSmartJourney(stamped);
+            }
+          }
           setMatchedOp(res);
           activeRideId.current = res.rideId; // handle for writing the outcome back
           setWatchedRideId(res.rideId);
@@ -1420,18 +1431,9 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
 
       // THE WHOLE JOURNEY GOES ON THE RESERVATION, not just the appointment.
       //
-      // The reservation used to carry a day, a time, a destination and a price — which is
-      // enough to redraw a card and not enough to send anyone. backend/scheduler.js needs the
-      // pickup to match on, the class to match against, the fare to charge, and a Travel
-      // Number to put on the travel it creates. Every one of them is known at this moment and
-      // none of them were being written down.
-      //
-      // The price is fixed HERE, at the hour the traveler agreed to it. A reservation re-priced
-      // at 6:30 AM would be a different promise from the one they accepted at 11pm.
-      const baseCents = quotedFareCents ?? Math.round(arrival.cost * 100);
-      const fareCents = applyClassCents(baseCents, travelClass);
-      const nextSeq = tripSeq + 1;
-      setTripSeq(nextSeq);
+      // The reservation carries the route geometry and class needed by the server. The server
+      // derives and stores the authoritative fare and Travel Number; local quote state is
+      // presentation only and cannot become reservation authority.
 
       saveScheduledRide({
         when: info.when,
@@ -1444,17 +1446,16 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
         dest: arrival.short,
         pickupLat: tripCoords?.pickup?.lat ?? departure.lat,
         pickupLng: tripCoords?.pickup?.lng ?? departure.lng,
+        destinationLat: tripCoords?.dest?.lat ?? arrival.lat,
+        destinationLng: tripCoords?.dest?.lng ?? arrival.lng,
         travelClass: operatorClassFor(travelClass),
-        travelCostCents: fareCents,
-        costCents: Math.round(info.cost * 100),
-        tripNo: `AR-${nextSeq}-MIA`,
       }).then((saved) => {
         schedIdRef.current = saved?.id ?? null;
         setSchedId(saved?.id ?? null);
         setSchedSaved(!!saved);
       });
     },
-    [arrival, departure, quotedFareCents, travelClass, tripCoords, tripSeq],
+    [arrival, departure, travelClass, tripCoords],
   );
 
   const cancelScheduled = useCallback(() => {

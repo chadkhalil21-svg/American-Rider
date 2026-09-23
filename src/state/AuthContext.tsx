@@ -3,19 +3,18 @@
 import { updateProfile,
   createUserWithEmailAndPassword,
   deleteUser,
-  EmailAuthProvider,
   onAuthStateChanged,
-  reauthenticateWithCredential,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut as fbSignOut,
   User,
 } from 'firebase/auth';
-import { collection, deleteDoc, doc, getDocs, query, where } from 'firebase/firestore';
+import { deleteDoc, doc } from 'firebase/firestore';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { auth, db } from '../firebase';
 import { t } from '../i18n';
 import { clearAccountStorage, clearAllStorage } from './accountStorage';
+import { closeOperationalAccount } from '../backend/account';
 
 type AuthState = {
   user: User | null;
@@ -30,11 +29,10 @@ type AuthState = {
   signIn: (email: string, password: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   /**
-   * Permanently deletes the account: the traveler's ride records, their profile
-   * document, everything this app stored on the device, and finally the login itself.
-   * Requires the password because Firebase refuses to delete an account whose sign-in
-   * is more than a few minutes old — and because a permanent act should cost a
-   * deliberate keystroke.
+   * Stops future operational work, deletes the profile and device data, and then deletes the
+   * login. Records that need a retention policy remain server-side.
+   * Requires a fresh credential from the account's linked Password, Apple, or Google
+   * provider because Firebase refuses to delete an account whose sign-in is not recent.
    */
   /**
    * Set the name on this account.
@@ -44,7 +42,7 @@ type AuthState = {
    * owner's email address wherever a name belonged, including to every traveler they drove.
    */
   setDisplayName: (name: string) => Promise<void>;
-  deleteAccount: (password: string) => Promise<void>;
+  deleteAccount: (reauthenticate: () => Promise<void>) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -97,6 +95,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await fn();
     } catch (e: any) {
       setError(friendly(e?.code ?? ''));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Destructive flows must report failure to their caller. The ordinary sign-in helper stores
+  // an error for the front-door screen and resolves; account deletion has its own confirmation
+  // screen, whose try/catch must know whether any step failed before it dismisses itself.
+  const runStrict = async (fn: () => Promise<unknown>) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await fn();
+    } catch (e: any) {
+      setError(friendly(e?.code ?? ''));
+      throw e;
     } finally {
       setBusy(false);
     }
@@ -156,23 +170,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // same instance — so the new name is published deliberately.
         setUser({ ...u, displayName: clean } as User);
       }),
-    deleteAccount: (password) =>
-      run(async () => {
+    deleteAccount: (reauthenticate) =>
+      runStrict(async () => {
         const u = auth.currentUser;
-        if (!u?.email) throw new Error(t('traveler.errNoAccountDelete'));
-        // 1. Prove it's really them (also satisfies Firebase's recent-login rule).
-        await reauthenticateWithCredential(u, EmailAuthProvider.credential(u.email, password));
-        // 2. Their travel records. Best-effort: a failure here must never leave the
-        //    person stuck with an account they asked us to remove.
-        try {
-          const rides = await getDocs(
-            query(collection(db, 'rides'), where('travelerUid', '==', u.uid)),
-          );
-          await Promise.all(rides.docs.map((d) => deleteDoc(d.ref)));
-        } catch {
-          // keep going — the account deletion below is the promise that matters
-        }
-        // 3. Their profile document (name, mobile, email).
+        if (!u) throw new Error(t('traveler.errNoAccountDelete'));
+        // 1. Use the credential provider already linked to this account. Cancellation and a
+        // failed credential both throw, so no operational or destructive step can follow.
+        await reauthenticate();
+        if (auth.currentUser?.uid !== u.uid) throw new Error(t('traveler.errNoAccountDelete'));
+        // 2. Stop future work before removing the login. Fail closed: deleting the login
+        // while a scheduled Travel or an on-duty Operator remains could dispatch or charge
+        // an account that can no longer control that work.
+        await closeOperationalAccount();
+        // 3. Their profile document (name, mobile, email). Transport, payment, safety and
+        // qualification records are not deleted from the phone; their retention needs a
+        // separate policy and privileged server handling.
         try {
           await deleteDoc(doc(db, 'users', u.uid));
         } catch {

@@ -95,7 +95,7 @@ export async function saveScheduledRide(
     });
     if (!res.ok) return null;
     const saved = await res.json();
-    return { ...info, ...saved } as ScheduledRide;
+    return { ...info, ...saved, cost: typeof saved.costCents === 'number' ? saved.costCents / 100 : info.cost } as ScheduledRide;
   } catch {
     return null;
   }

@@ -7,13 +7,72 @@
 // what goes, what stays, and why we keep what we keep.
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Text } from '../src/components/AppText';
 import { useGoBack } from '../src/components/nav';
 import { Card, LetterheadBar, Screen, SectionLabel, Sub, Title } from '../src/components/UI';
 import { useAuth } from '../src/state/AuthContext';
 import { useLanguage } from '../src/state/LanguageContext';
+import {
+  accountAuthProvider,
+  providerResultError,
+  reauthenticateWithPassword,
+} from '../src/state/accountDeletion';
+import { reauthenticateWithApple } from '../src/state/appleSignIn';
+import { googleSignInConfigured, useGoogleSignIn } from '../src/state/googleSignIn';
 import { colors } from '../src/theme';
+
+function GoogleDeleteConfirmation({
+  busy,
+  onCancel,
+  onDelete,
+  t,
+}: {
+  busy: boolean;
+  onCancel: () => void;
+  onDelete: (reauthenticate: () => Promise<void>) => void;
+  t: (key: string) => string;
+}) {
+  const google = useGoogleSignIn();
+  return (
+    <ConfirmationButtons
+      busy={busy}
+      enabled={google.ready}
+      onCancel={onCancel}
+      onDelete={() => onDelete(async () => {
+        const result = await google.reauthenticate();
+        if (!result.ok) throw providerResultError(result);
+      })}
+      t={t}
+    />
+  );
+}
+
+function ConfirmationButtons({ busy, enabled = true, onCancel, onDelete, t }: {
+  busy: boolean;
+  enabled?: boolean;
+  onCancel: () => void;
+  onDelete: () => void;
+  t: (key: string) => string;
+}) {
+  return (
+    <View style={styles.confirmBlock}>
+      <Text style={styles.confirmAsk}>{t('traveler.deleteConfirm')}</Text>
+      <View style={styles.confirmRow}>
+        <Pressable onPress={onCancel} style={({ pressed }) => [styles.keepBtn, pressed && { opacity: 0.86 }]}>
+          <Text style={styles.keepBtnText}>{t('traveler.keepMyAccount')}</Text>
+        </Pressable>
+        <Pressable
+          onPress={onDelete}
+          disabled={busy || !enabled}
+          style={({ pressed }) => [styles.redBtnHalf, (!enabled || busy) && styles.disabled, pressed && enabled && !busy && { opacity: 0.86 }]}
+        >
+          <Text style={styles.confirmDeleteText}>{busy ? t('traveler.deleting') : t('traveler.yesDelete')}</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
 
 export default function DeleteAccount() {
   const { t } = useLanguage();
@@ -23,19 +82,26 @@ export default function DeleteAccount() {
   const [password, setPassword] = useState('');
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const provider = accountAuthProvider(
+    user?.providerData.map((p) => p.providerId) ?? [],
+    { apple: Platform.OS === 'ios', google: googleSignInConfigured },
+  );
+  const deleteDisabled = (provider === 'password' && !password) || provider === 'unsupported';
 
-  const submit = async () => {
-    if (!password || busy) return;
+  const submit = async (reauthenticate: () => Promise<void>) => {
+    if (busy) return;
     setError(null);
     try {
-      await deleteAccount(password);
+      await deleteAccount(reauthenticate);
       // The auth listener drops us back at the front door on success; dismiss any
       // stack we were sitting on so there is nothing to return to.
       router.dismissAll();
     } catch (e: unknown) {
       const code = (e as { code?: string })?.code ?? '';
       setError(
-        code === 'auth/wrong-password' || code === 'auth/invalid-credential'
+        code === 'auth/reauthentication-cancelled'
+          ? t('traveler.errReauthenticationCancelled')
+          : code === 'auth/wrong-password' || code === 'auth/invalid-credential'
           ? t('traveler.errPasswordMismatch')
           : code === 'auth/too-many-requests'
             ? t('traveler.errTooManyAttempts')
@@ -86,21 +152,35 @@ export default function DeleteAccount() {
       </Card>
 
       <SectionLabel style={styles.lbl}>{t('traveler.confirmItIsYou')}</SectionLabel>
-      <Card style={styles.fieldCard}>
-        <View style={styles.fieldWrap}>
-          <Text style={styles.fieldLabel}>{t('auth.passwordLabel')}</Text>
-          <TextInput
-            style={styles.field}
-            placeholder={t('traveler.yourPasswordPh')}
-            placeholderTextColor={colors.faint}
-            secureTextEntry
-            autoCapitalize="none"
-            value={password}
-            onChangeText={setPassword}
-            onSubmitEditing={() => setConfirming(true)}
-          />
-        </View>
-      </Card>
+      {provider === 'password' ? (
+        <Card style={styles.fieldCard}>
+          <View style={styles.fieldWrap}>
+            <Text style={styles.fieldLabel}>{t('auth.passwordLabel')}</Text>
+            <TextInput
+              style={styles.field}
+              placeholder={t('traveler.yourPasswordPh')}
+              placeholderTextColor={colors.faint}
+              secureTextEntry
+              autoCapitalize="none"
+              value={password}
+              onChangeText={setPassword}
+              onSubmitEditing={() => password && setConfirming(true)}
+            />
+          </View>
+        </Card>
+      ) : (
+        <Card style={styles.card}>
+          <View style={styles.block}>
+            <Text style={styles.blockSub}>
+              {provider === 'apple'
+                ? t('traveler.deleteConfirmApple')
+                : provider === 'google'
+                  ? t('traveler.deleteConfirmGoogle')
+                  : t('traveler.errDeleteProvider')}
+            </Text>
+          </View>
+        </Card>
+      )}
       <Text style={styles.note}>{t('traveler.signedInAs', { email: user?.email ?? '' })}</Text>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -108,17 +188,17 @@ export default function DeleteAccount() {
       {!confirming ? (
         <>
           <Pressable
-            onPress={() => password && setConfirming(true)}
-            disabled={!password}
+            onPress={() => setConfirming(true)}
+            disabled={deleteDisabled}
             accessibilityRole="button"
-            accessibilityState={{ disabled: !password }}
+            accessibilityState={{ disabled: deleteDisabled }}
             style={({ pressed }) => [
               styles.redBtn,
-              !password && styles.disabled,
-              pressed && password && { opacity: 0.86 },
+              deleteDisabled && styles.disabled,
+              pressed && !deleteDisabled && { opacity: 0.86 },
             ]}
           >
-            <Text style={[styles.redBtnText, !password && { color: colors.faint }]}>
+            <Text style={[styles.redBtnText, deleteDisabled && { color: colors.faint }]}>
               {t('traveler.deleteAccount')}
             </Text>
           </Pressable>
@@ -130,37 +210,32 @@ export default function DeleteAccount() {
               continue". The control was also only visually disabled: it carried no `disabled`
               prop and no accessibility state, so VoiceOver announced it as an available button
               and a tap was silently swallowed by the `password &&` guard. */}
-          {!password ? (
+          {provider === 'password' && !password ? (
             <Text style={styles.needPassword}>{t('traveler.delNeedPassword')}</Text>
           ) : null}
         </>
+      ) : provider === 'google' ? (
+        <GoogleDeleteConfirmation
+          busy={busy}
+          onCancel={() => setConfirming(false)}
+          onDelete={submit}
+          t={t}
+        />
       ) : (
-        <View style={styles.confirmBlock}>
-          <Text style={styles.confirmAsk}>
-            {t('traveler.deleteConfirm')}
-          </Text>
-          <View style={styles.confirmRow}>
-            <Pressable
-              onPress={() => setConfirming(false)}
-              style={({ pressed }) => [styles.keepBtn, pressed && { opacity: 0.86 }]}
-            >
-              <Text style={styles.keepBtnText}>{t('traveler.keepMyAccount')}</Text>
-            </Pressable>
-            <Pressable
-              onPress={submit}
-              disabled={busy}
-              style={({ pressed }) => [styles.redBtnHalf, pressed && { opacity: 0.86 }]}
-            >
-              {/* THE FINAL CONFIRMATION STAYS PLAIN, and deliberately so. Everything else on
-                  this screen is now institutional; the last irreversible control is the one
-                  place where the plainest possible words are the correct ones. Both were
-                  English literals until now. */}
-              <Text style={styles.confirmDeleteText}>
-                {busy ? t('traveler.deleting') : t('traveler.yesDelete')}
-              </Text>
-            </Pressable>
-          </View>
-        </View>
+        <ConfirmationButtons
+          busy={busy}
+          onCancel={() => setConfirming(false)}
+          onDelete={() => submit(async () => {
+            if (provider === 'password') {
+              if (!user) throw providerResultError({ ok: false });
+              await reauthenticateWithPassword(user, password);
+              return;
+            }
+            const result = await reauthenticateWithApple();
+            if (!result.ok) throw providerResultError(result);
+          })}
+          t={t}
+        />
       )}
     </Screen>
   );

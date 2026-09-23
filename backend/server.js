@@ -95,6 +95,7 @@ const { resolveOperatorIssue } = require('./operatorsupport');
 const { fileTicket, updateTicketLocation, listTickets } = require('./tickets');
 const { lostItemTicket, stampLostItemCase } = require('./lostitem');
 const { adminDb, adminStatus, accountDisabled } = require('./firebase-admin');
+const { closeOperationalAccount } = require('./accountclosure');
 const { acceptOffer } = require('./eligibility');
 const { payForTravel, cancelTravel: cancelTravelFor, settleTravel: settleTravelFor } = require('./travelmoney');
 const { authorizeVoiceTravel, lostItemTravel, authorizeAnnouncement, claimAnnouncement } = require('./trustboundaries');
@@ -393,6 +394,29 @@ app.get('/config', (req, res) => {
     // false means the app must not offer to charge anybody.
     canTakePayment: keyMode !== 'no-key' && !!readKey('STRIPE_PUBLISHABLE_KEY'),
   });
+});
+
+// Stop all future operational work before the phone deletes the Firebase login. This route
+// deliberately does not delete retained transport or payment records: their retention needs a
+// policy. It does cancel scheduled Travel and remove an Operator from service, so account
+// deletion cannot cause a later dispatch or charge under a login that no longer exists.
+app.post('/account/close', requireAuth, async (req, res) => {
+  try {
+    const out = await closeOperationalAccount({ db: adminDb(), uid: req.uid });
+    if (!out.ok) {
+      const status = out.code === 'active_travel' ? 409 : 503;
+      return res.status(status).json({
+        code: out.code,
+        error: out.code === 'active_travel'
+          ? 'Complete or cancel the current Travel before closing this account.'
+          : 'Account closure is not available at this time.',
+      });
+    }
+    return res.json(out);
+  } catch (e) {
+    console.error('[account] close failed:', e.message);
+    return res.status(503).json({ code: 'account_close_failed', error: 'Account closure is not available at this time.' });
+  }
 });
 
 // --- Legal pages: linked from the app's sign-up screen ("By continuing, you agree…"). ------

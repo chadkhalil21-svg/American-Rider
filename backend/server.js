@@ -2612,6 +2612,9 @@ app.post('/travel/schedule', requireAuth, LIMITS.dispatch, async (req, res) => {
   if (!Number.isFinite(pickup.lat) || !Number.isFinite(pickup.lng) || !Number.isFinite(atMs)) {
     return res.status(400).json({ error: 'A pickup position and scheduled time are required' });
   }
+  if (atMs <= Date.now()) {
+    return res.status(400).json({ error: 'Scheduled Travel must be set for a future time.', code: 'scheduled_time_required' });
+  }
   const priced = await authoritativeFare({
     body: { pickup, dest: destinationPoint, destination: b.dest, travelClass: b.travelClass },
     uid: req.uid, email: req.email, db, cardCountryFor: defaultCardCountry,

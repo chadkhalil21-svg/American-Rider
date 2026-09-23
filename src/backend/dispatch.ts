@@ -52,6 +52,7 @@ export type MatchedOp = {
   etaMin: number;
   miles: number;
   rideId: string;
+  tripNo?: string;
   // Where the operator was when matched — the live map animates his approach from here.
   lat: number;
   lng: number;
@@ -109,9 +110,9 @@ let liveMoney: boolean | null = null;
  * the operator it names has passed the same gates as any dispatch.
  */
 export async function returnOperator(args: {
-  operatorId?: string;
-  point: { lat: number; lng: number };
-}): Promise<{ path: 'original-operator' | 'any-operator'; op: Operator; miles?: number } | null> {
+  lostItemId: string;
+  destination: { lat: number; lng: number };
+}): Promise<{ path: 'original-operator' | 'any-operator'; op: Operator; costCents: number } | null> {
   const token = await auth.currentUser?.getIdToken().catch(() => null);
   const res = await fetch(`${PAYMENT_SERVER_URL}/travel/return-operator`, {
     method: 'POST',
@@ -119,12 +120,13 @@ export async function returnOperator(args: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ operatorId: args.operatorId || '', point: args.point }),
+    body: JSON.stringify({ lostItemId: args.lostItemId, destination: args.destination }),
   });
   if (!res.ok) return null;
   const out = (await res.json()) as {
     path: 'original-operator' | 'any-operator' | null;
-    operator: { id: string; name: string; lat: number; lng: number; miles?: number } | null;
+    operator: { id: string; name: string } | null;
+    costCents?: number;
   };
   if (!out.path || !out.operator) return null;
   return {
@@ -134,14 +136,14 @@ export async function returnOperator(args: {
     op: {
       id: out.operator.id,
       name: out.operator.name,
-      lat: out.operator.lat,
-      lng: out.operator.lng,
+      lat: 0,
+      lng: 0,
       available: true,
       classes: ['Standard'],
       car: '',
       plate: '',
     } as Operator,
-    miles: out.operator.miles,
+    costCents: Number(out.costCents) || 0,
   };
 }
 
@@ -173,16 +175,14 @@ export async function returnOperator(args: {
 // this file no longer holds operator records of any kind.
 export async function dispatchRide(opts: {
   pickup: { lat: number; lng: number };
+  destinationPoint?: { lat: number; lng: number } | null;
   dep: string;
   dest: string;
   cls: string;
-  tripNo: string;
-  costCents: number;
   /** The travel's road distance in miles — routed when the map had a route, else the fare
    *  model's estimate. Fla. Stat. 627.748(6) requires the receipt to state it. */
-  miles?: number;
   /** Government fees inside the price (fenced by the server from the same coordinates). */
-  feeLines?: FeeLine[];
+  journeyNo?: string | null;
   /** Operators who have already declined this travel. Never offered it twice. */
   excludeIds?: string[];
 }): Promise<MatchedOp | null> {
@@ -200,13 +200,11 @@ export async function dispatchRide(opts: {
     },
     body: JSON.stringify({
       pickup: opts.pickup,
+      destinationPoint: opts.destinationPoint ?? null,
       dep: opts.dep,
       dest: opts.dest,
       cls: opts.cls,
-      tripNo: opts.tripNo,
-      costCents: opts.costCents,
-      miles: opts.miles ?? null,
-      feeLines: opts.feeLines ?? [],
+      journeyNo: opts.journeyNo ?? null,
       excludeIds: opts.excludeIds ?? [],
       travelerName: auth.currentUser?.displayName || '',
     }),
@@ -228,6 +226,7 @@ export async function dispatchRide(opts: {
 
   const out = (await res.json()) as {
     rideId?: string;
+    tripNo?: string;
     matched: {
       id: string; name: string; car: string; plate: string;
       lat: number; lng: number; etaMin: number; miles: number; demo?: boolean;
@@ -245,6 +244,7 @@ export async function dispatchRide(opts: {
     etaMin: out.matched.etaMin,
     miles: +out.matched.miles.toFixed(2),
     rideId: out.rideId,
+    tripNo: out.tripNo,
     lat: out.matched.lat,
     lng: out.matched.lng,
   };

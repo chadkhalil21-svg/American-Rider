@@ -169,8 +169,9 @@ check('and it reads differently at each end, because they are different refusals
 // The gate must sit with the market gate, ahead of any price — a refusal that falls through to
 // a quote is a booking we cannot honour.
 const serverSrc = require('fs').readFileSync(require('path').join(__dirname, 'server.js'), 'utf8');
-check('priceRide refuses an unpermitted place before it prices anything',
-  serverSrc.indexOf('permitRequired(body?.pickup') < serverSrc.indexOf('fareCentsForCoords(body?.pickup'));
+const authoritySrc = require('fs').readFileSync(require('path').join(__dirname, 'fareauthority.js'), 'utf8');
+check('the canonical fare authority refuses an unpermitted place before it prices anything',
+  authoritySrc.indexOf('permitRequired(body?.pickup') < authoritySrc.indexOf('fareCentsForCoords(body?.pickup'));
 check('/fare-quote answers 409 with a code the app can act on',
   /code: 'permit_required'/.test(serverSrc));
 

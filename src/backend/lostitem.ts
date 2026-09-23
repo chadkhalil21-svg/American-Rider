@@ -224,25 +224,6 @@ export async function fetchMyLostItems(): Promise<LostItem[]> {
   }
 }
 
-/** Ask the server what a travel between two points costs. Null when it cannot price it. */
-async function quoteCents(
-  pickup: { lat: number; lng: number },
-  dest: { lat: number; lng: number },
-): Promise<number | null> {
-  try {
-    const res = await fetch(`${PAYMENT_SERVER_URL}/fare-quote`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pickup, dest }),
-    });
-    if (!res.ok) return null;
-    const d = await res.json();
-    return typeof d?.travelerPays === 'number' ? d.travelerPays : null;
-  } catch {
-    return null;
-  }
-}
-
 export type ArrangeResult =
   | { ok: true; ret: LostItemReturn }
   | { ok: false; reason: 'no-operator' | 'write-failed' | 'signed-out' | 'travel-unknown' };
@@ -281,12 +262,11 @@ export async function arrangeReturn(args: {
   // they have the item; that answer is what names the travel.
   if (!args.item.tripNo) return { ok: false, reason: 'travel-unknown' };
 
-  const originalId = args.item.notifiedOperatorIds[0] || '';
   // ONE QUESTION, ANSWERED ON THE SERVER. This was two calls that each pulled the whole fleet
   // to the phone. The server tries the operator who drove the travel first and falls back to
   // the nearest, holding both to the same gates as any dispatch.
-  const point = args.destination ?? { lat: 25.767, lng: -80.1919 };
-  const found = await returnOperator({ operatorId: originalId, point });
+  if (!args.destination) return { ok: false, reason: 'no-operator' };
+  const found = await returnOperator({ lostItemId: args.item.id, destination: args.destination });
   if (!found) return { ok: false, reason: 'no-operator' };
 
   let ret: LostItemReturn;
@@ -300,15 +280,12 @@ export async function arrangeReturn(args: {
       arrangedAt: Date.now(),
     };
   } else {
-    const cents = args.destination
-      ? await quoteCents({ lat: found.op.lat, lng: found.op.lng }, args.destination)
-      : null;
     ret = {
       path: 'any-operator',
       operatorId: found.op.id,
       operatorName: found.op.name,
-      costCents: cents ?? 0,
-      priced: cents != null,
+      costCents: found.costCents,
+      priced: true,
       arrangedAt: Date.now(),
     };
   }

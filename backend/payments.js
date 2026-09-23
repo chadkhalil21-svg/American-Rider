@@ -373,9 +373,9 @@ function idempotencyForTravel(kind, uid, tripNo, amountCents) {
   return { idempotencyKey: `ar_${kind}_${uid}_${tripNo}_${amountCents}` };
 }
 
-async function createPaymentIntent({ travelCostCents, uid, email, tripNo, rideId, dep, dest, journey, governmentFees }) {
+async function createPaymentIntent({ travelCostCents, uid, email, tripNo, rideId, dep, dest, journey, governmentFees, cardCountry }) {
   const stripe = getStripe();
-  const q = quote(travelCostCents, journey, governmentFees);
+  const q = quote(travelCostCents, journey, governmentFees, cardCountry);
 
   // The PaymentSheet needs all three: a customer, a short-lived key that lets the phone read
   // that customer's saved cards, and the intent itself.
@@ -478,12 +478,12 @@ async function createPaymentIntent({ travelCostCents, uid, email, tripNo, rideId
  * different amount — in which case the caller refuses.
  */
 const RESUMABLE = ['requires_payment_method', 'requires_confirmation', 'requires_action'];
-async function resumePaymentIntent({ paymentIntentId, uid, rideId, email, travelCostCents, journey, governmentFees }) {
+async function resumePaymentIntent({ paymentIntentId, uid, rideId, email, travelCostCents, journey, governmentFees, cardCountry }) {
   const stripe = getStripe();
   const pi = await stripe.paymentIntents.retrieve(paymentIntentId);
   if (!pi || pi.metadata?.uid !== String(uid) || pi.metadata?.rideId !== String(rideId)) return null;
   if (!RESUMABLE.includes(pi.status)) return null;
-  const q = quote(travelCostCents, journey, governmentFees);
+  const q = quote(travelCostCents, journey, governmentFees, cardCountry);
   if (pi.amount !== q.travelerPays) return null;
   const customer = await customerForTraveler({ uid, email });
   const ephemeralKey = await stripe.ephemeralKeys.create({ customer: customer.id }, { apiVersion: '2024-06-20' });
@@ -497,9 +497,9 @@ async function resumePaymentIntent({ paymentIntentId, uid, rideId, email, travel
   };
 }
 
-async function chargeRide({ travelCostCents, operatorStripeAccount, travelerPaymentMethod, uid, tripNo, governmentFees }) {
+async function chargeRide({ travelCostCents, operatorStripeAccount, travelerPaymentMethod, uid, tripNo, governmentFees, cardCountry }) {
   const stripe = getStripe();
-  const q = quote(travelCostCents, undefined, governmentFees);
+  const q = quote(travelCostCents, undefined, governmentFees, cardCountry);
   const params = {
     amount: q.travelerPays,
     currency: 'usd',
@@ -985,9 +985,9 @@ async function probeNetwork() {
  * `travelCostCents` and `uid` back off Stripe's own record hours later, and a scheduled
  * travel must settle through the same path as any other.
  */
-async function chargeScheduledTravel({ travelCostCents, uid, email, tripNo, reservationId, dep, dest, governmentFees }) {
+async function chargeScheduledTravel({ travelCostCents, uid, email, tripNo, reservationId, dep, dest, governmentFees, cardCountry }) {
   const stripe = getStripe();
-  const q = quote(travelCostCents, undefined, governmentFees);
+  const q = quote(travelCostCents, undefined, governmentFees, cardCountry);
   try {
     const customer = await customerForTraveler({ uid, email });
     const pm = await savedPaymentMethodFor(customer);

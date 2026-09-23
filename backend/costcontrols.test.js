@@ -25,6 +25,7 @@ const limited = [
   ["post", "/travel/tip", 'LIMITS.payments'],
   ["post", "/travel/cancel", 'LIMITS.payments'],
   ["post", "/travel/dispatch", 'LIMITS.dispatch'],
+  ["post", "/travel/schedule", 'LIMITS.dispatch'],
   ["post", "/travel/return-operator", 'LIMITS.dispatch'],
   ["post", "/travel/announce", 'LIMITS.announce'],
   ["post", "/travel/follow-link", 'LIMITS.announce'],

@@ -29,7 +29,6 @@ const { matchOperator, etaMinutes, coverageLapsed } = require('./matching');
 const { screeningReady } = require('./screening');
 const { adminDb, adminStatus } = require('./firebase-admin');
 const { chargeScheduledTravel, operatorPayoutAccount } = require('./payments');
-const { governmentFeesFor } = require('./fees');
 const { fileTicket } = require('./tickets');
 const { notify } = require('./push');
 
@@ -188,7 +187,8 @@ async function sweepScheduled({ now = Date.now() } = {}) {
       // The traveler was quoted with the government fee for this pickup; the charge must be
       // the quote. A reservation carries its pickup coordinates and only the NAME of its
       // destination, so a drop-off fee — none exists today — would need destLat/destLng here.
-      governmentFees: governmentFeesFor(pickup, null),
+      governmentFees: Array.isArray(r.feeLines) ? r.feeLines : [],
+      cardCountry: r.cardCountry || null,
     });
 
     if (!paid.ok) {
@@ -228,7 +228,12 @@ async function sweepScheduled({ now = Date.now() } = {}) {
         dep: r.dep || '',
         dest: r.dest || '',
         travelClass: r.travelClass || 'Standard',
-        costCents: Number(r.costCents) || 0,
+        travelCostCents: fareCents,
+        costCents: Number(r.costCents) || paid.chargedCents,
+        miles: Number.isFinite(Number(r.miles)) ? Number(r.miles) : null,
+        governmentFeeCents: Number(r.governmentFeeCents) || 0,
+        feeLines: Array.isArray(r.feeLines) ? r.feeLines : [],
+        cardCountry: r.cardCountry || null,
         status: 'assigned',
         createdAt: Date.now(),
         // What makes it legible as a scheduled travel afterwards, to us and to a reader of the

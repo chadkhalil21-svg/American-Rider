@@ -53,11 +53,12 @@ function stripe() {
   };
 }
 
+const fare = { travelCostCents: 1800, costCents: 1950 };
 const rides = (over = {}) => ({
   rides: {
-    A: { travelerUid: 'alice', operatorId: 'op1', tripNo: 'AR-1-MIA', status: 'accepted', paymentIntentId: 'pi_A', ...(over.A || {}) },
-    B: { travelerUid: 'alice', operatorId: 'op2', tripNo: 'AR-2-MIA', status: 'accepted', paymentIntentId: 'pi_B', ...(over.B || {}) },
-    C: { travelerUid: 'bob', operatorId: 'op3', tripNo: 'AR-3-MIA', status: 'assigned', ...(over.C || {}) },
+    A: { ...fare, travelerUid: 'alice', operatorId: 'op1', tripNo: 'AR-1-MIA', status: 'accepted', paymentIntentId: 'pi_A', ...(over.A || {}) },
+    B: { ...fare, travelerUid: 'alice', operatorId: 'op2', tripNo: 'AR-2-MIA', status: 'accepted', paymentIntentId: 'pi_B', ...(over.B || {}) },
+    C: { ...fare, travelerUid: 'bob', operatorId: 'op3', tripNo: 'AR-3-MIA', status: 'assigned', ...(over.C || {}) },
   },
 });
 
@@ -126,7 +127,7 @@ const rides = (over = {}) => ({
     check('a cancelled travel cannot be paid for', out.status === 409 && s.log.creates.length === 0);
   }
   {
-    const db = fakeDb({ rides: { N: { travelerUid: 'alice', operatorId: 'op1', tripNo: 'AR-9-MIA', status: 'assigned' } } });
+    const db = fakeDb({ rides: { N: { ...fare, travelerUid: 'alice', operatorId: 'op1', tripNo: 'AR-9-MIA', status: 'assigned' } } });
     const s = stripe();
     const out = await payForTravel({ db, uid: 'alice', rideId: 'N', create: s.create, now: 7 });
     check('the owner pays for their own live ride', out.status === 200 && db.data.rides.N.paymentIntentId === 'pi_new' && db.data.rides.N.paidAt === 7);
@@ -134,7 +135,7 @@ const rides = (over = {}) => ({
   }
   // ——— an already-paid travel: NO Stripe creation call at all (audit of f6ef88d) ——————————————
   {
-    const db = fakeDb({ rides: { N: { travelerUid: 'alice', tripNo: 'AR-9-MIA', status: 'assigned', paymentIntentId: 'pi_first' } } });
+    const db = fakeDb({ rides: { N: { ...fare, travelerUid: 'alice', tripNo: 'AR-9-MIA', status: 'assigned', paymentIntentId: 'pi_first' } } });
     const s = stripe();
     const out = await payForTravel({ db, uid: 'alice', rideId: 'N', create: s.create });
     check('a travel with a payment on record: refused', out.status === 409 && out.body.code === 'already_paid');
@@ -142,7 +143,7 @@ const rides = (over = {}) => ({
     check('…and the record is untouched', db.data.rides.N.paymentIntentId === 'pi_first');
   }
   {
-    const db = fakeDb({ rides: { N: { travelerUid: 'alice', tripNo: 'AR-9-MIA', status: 'assigned', paymentIntentId: 'pi_first' } } });
+    const db = fakeDb({ rides: { N: { ...fare, travelerUid: 'alice', tripNo: 'AR-9-MIA', status: 'assigned', paymentIntentId: 'pi_first' } } });
     const s = stripe();
     const resumed = [];
     const out = await payForTravel({
@@ -153,7 +154,7 @@ const rides = (over = {}) => ({
     check('…still with creates.length 0', s.log.creates.length === 0);
   }
   {
-    const db = fakeDb({ rides: { N: { travelerUid: 'alice', tripNo: 'AR-9-MIA', status: 'assigned', paymentIntentId: 'pi_first' } } });
+    const db = fakeDb({ rides: { N: { ...fare, travelerUid: 'alice', tripNo: 'AR-9-MIA', status: 'assigned', paymentIntentId: 'pi_first' } } });
     const s = stripe();
     const out = await payForTravel({ db, uid: 'alice', rideId: 'N', create: s.create, resume: async () => null });
     check('an intent that cannot be continued (paid, cancelled, other amount): refused, creates.length 0', out.status === 409 && s.log.creates.length === 0);

@@ -84,6 +84,9 @@ function fakeDb(seed) {
   const serverSource = require('fs').readFileSync(require('path').join(__dirname, 'server.js'), 'utf8');
   check('committed Travel requires coordinate-derived pricing', /route_geometry_required/.test(serverSource));
   check('Travel Number is derived from authoritative pickup market', /travelNumberFor\(ref\.id, pickup\)/.test(serverSource));
+  check('scheduled Travel rejects a past timestamp', /atMs <= Date\.now\(\)/.test(serverSource) && /scheduled_time_required/.test(serverSource));
+  const fareSource = require('fs').readFileSync(require('path').join(__dirname, 'fareauthority.js'), 'utf8');
+  check('Smart Travel requires the first leg to be completed', /leg\.status !== 'completed'/.test(fareSource));
 
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${results.length - failed.length}/${results.length} passed`);

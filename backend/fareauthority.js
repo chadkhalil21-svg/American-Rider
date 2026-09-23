@@ -38,7 +38,7 @@ async function journeyFor({ db, uid, journeyNo }) {
   const snap = await db.collection('rides')
     .where('travelerUid', '==', String(uid)).where('tripNo', '==', no).limit(1).get();
   const leg = snap.docs[0]?.data();
-  if (!leg || !leg.paymentIntentId || leg.status === 'cancelled' || !(leg.travelCostCents > 0)) return null;
+  if (!leg || !leg.paymentIntentId || leg.status !== 'completed' || !(leg.travelCostCents > 0)) return null;
   return { journeyNo: no, leg1FareCents: Number(leg.travelCostCents) };
 }
 

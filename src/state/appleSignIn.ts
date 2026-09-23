@@ -15,7 +15,12 @@
 // Until 1 and 2 exist the button is offered only where the device says it can serve it, and
 // a failure is reported as what it is rather than as the traveler's mistake.
 import * as AppleAuthentication from 'expo-apple-authentication';
-import { OAuthProvider, signInWithCredential, updateProfile } from 'firebase/auth';
+import {
+  OAuthProvider,
+  reauthenticateWithCredential,
+  signInWithCredential,
+  updateProfile,
+} from 'firebase/auth';
 import { Platform } from 'react-native';
 
 import { auth } from '../firebase';
@@ -35,15 +40,13 @@ export async function appleSignInAvailable(): Promise<boolean> {
 // somebody decided to display it.
 export type AppleResult = { ok: true } | { ok: false; cancelled: boolean; reason?: string };
 
-/**
- * Run the Apple sheet and sign the traveler in to Firebase with what it returns.
- *
- * A cancel is not an error and must not be reported as one — the traveler chose to stop.
- */
-export async function signInWithApple(): Promise<AppleResult> {
-  let credential: AppleAuthentication.AppleAuthenticationCredential;
+async function appleCredential(): Promise<
+  | { ok: true; credential: ReturnType<OAuthProvider['credential']>; apple: AppleAuthentication.AppleAuthenticationCredential }
+  | { ok: false; cancelled: boolean; reason?: string }
+> {
+  let apple: AppleAuthentication.AppleAuthenticationCredential;
   try {
-    credential = await AppleAuthentication.signInAsync({
+    apple = await AppleAuthentication.signInAsync({
       requestedScopes: [
         AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
         AppleAuthentication.AppleAuthenticationScope.EMAIL,
@@ -54,30 +57,53 @@ export async function signInWithApple(): Promise<AppleResult> {
     if (code === 'ERR_REQUEST_CANCELED') return { ok: false, cancelled: true };
     return { ok: false, cancelled: false, reason: (e as Error)?.message };
   }
-
-  if (!credential.identityToken) {
+  if (!apple.identityToken) {
     return { ok: false, cancelled: false, reason: 'no_identity_token' };
   }
+  const provider = new OAuthProvider('apple.com');
+  return {
+    ok: true,
+    apple,
+    credential: provider.credential({ idToken: apple.identityToken }),
+  };
+}
 
+/**
+ * Run the Apple sheet and sign the traveler in to Firebase with what it returns.
+ *
+ * A cancel is not an error and must not be reported as one — the traveler chose to stop.
+ */
+export async function signInWithApple(): Promise<AppleResult> {
+  const authResult = await appleCredential();
+  if (!authResult.ok) return authResult;
   try {
-    const provider = new OAuthProvider('apple.com');
-    const firebaseCredential = provider.credential({
-      idToken: credential.identityToken,
-      // Apple's nonce is inside the identity token; Firebase verifies it there.
-    });
-    const result = await signInWithCredential(auth, firebaseCredential);
+    const result = await signInWithCredential(auth, authResult.credential);
 
     // THE ONE CHANCE AT THE NAME. Apple sends fullName only on the first authorization for
     // this app; on every later sign-in it is null, by design. If we do not record it now it
     // is gone, and a receipt that should say who drove and who rode says nobody.
-    const given = credential.fullName?.givenName?.trim() ?? '';
-    const family = credential.fullName?.familyName?.trim() ?? '';
+    const given = authResult.apple.fullName?.givenName?.trim() ?? '';
+    const family = authResult.apple.fullName?.familyName?.trim() ?? '';
     const full = [given, family].filter(Boolean).join(' ');
     if (full && !result.user.displayName) {
       await updateProfile(result.user, { displayName: full }).catch(() => {
         // The account exists and is signed in; a missing name is recoverable in Profile.
       });
     }
+    return { ok: true };
+  } catch (e: unknown) {
+    return { ok: false, cancelled: false, reason: (e as Error)?.message };
+  }
+}
+
+/** Ask Apple for a fresh credential and apply it to the account that is already signed in. */
+export async function reauthenticateWithApple(): Promise<AppleResult> {
+  const user = auth.currentUser;
+  if (!user) return { ok: false, cancelled: false, reason: 'no_current_user' };
+  const authResult = await appleCredential();
+  if (!authResult.ok) return authResult;
+  try {
+    await reauthenticateWithCredential(user, authResult.credential);
     return { ok: true };
   } catch (e: unknown) {
     return { ok: false, cancelled: false, reason: (e as Error)?.message };

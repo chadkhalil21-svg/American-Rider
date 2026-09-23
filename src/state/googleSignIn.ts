@@ -14,7 +14,7 @@
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
-import { GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
+import { GoogleAuthProvider, reauthenticateWithCredential, signInWithCredential } from 'firebase/auth';
 
 import { auth } from '../firebase';
 
@@ -71,7 +71,10 @@ export function useGoogleSignIn() {
     webClientId: GOOGLE_WEB_CLIENT_ID || undefined,
   });
 
-  const signIn = async (): Promise<GoogleResult> => {
+  const googleCredential = async (): Promise<
+    | { ok: true; credential: ReturnType<typeof GoogleAuthProvider.credential> }
+    | { ok: false; cancelled: boolean; reason?: string }
+  > => {
     if (!googleSignInConfigured) {
       return { ok: false, cancelled: false, reason: 'not_configured' };
     }
@@ -85,12 +88,35 @@ export function useGoogleSignIn() {
       }
       const idToken = result.params?.id_token;
       if (!idToken) return { ok: false, cancelled: false, reason: 'no_identity_token' };
-      await signInWithCredential(auth, GoogleAuthProvider.credential(idToken));
+      return { ok: true, credential: GoogleAuthProvider.credential(idToken) };
+    } catch (e: unknown) {
+      return { ok: false, cancelled: false, reason: (e as Error)?.message };
+    }
+  };
+
+  const signIn = async (): Promise<GoogleResult> => {
+    const result = await googleCredential();
+    if (!result.ok) return result;
+    try {
+      await signInWithCredential(auth, result.credential);
       return { ok: true };
     } catch (e: unknown) {
       return { ok: false, cancelled: false, reason: (e as Error)?.message };
     }
   };
 
-  return { ready: !!request && googleSignInConfigured, signIn, response };
+  const reauthenticate = async (): Promise<GoogleResult> => {
+    const user = auth.currentUser;
+    if (!user) return { ok: false, cancelled: false, reason: 'no_current_user' };
+    const result = await googleCredential();
+    if (!result.ok) return result;
+    try {
+      await reauthenticateWithCredential(user, result.credential);
+      return { ok: true };
+    } catch (e: unknown) {
+      return { ok: false, cancelled: false, reason: (e as Error)?.message };
+    }
+  };
+
+  return { ready: !!request && googleSignInConfigured, signIn, reauthenticate, response };
 }

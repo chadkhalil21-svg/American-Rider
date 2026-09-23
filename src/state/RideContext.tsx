@@ -1431,14 +1431,9 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
 
       // THE WHOLE JOURNEY GOES ON THE RESERVATION, not just the appointment.
       //
-      // The reservation used to carry a day, a time, a destination and a price — which is
-      // enough to redraw a card and not enough to send anyone. backend/scheduler.js needs the
-      // pickup to match on, the class to match against, the fare to charge, and a Travel
-      // Number to put on the travel it creates. Every one of them is known at this moment and
-      // none of them were being written down.
-      //
-      // The server fixes the reservation's authoritative fare and Travel Number from the
-      // submitted route geometry. Local quote state remains presentation only.
+      // The reservation carries the route geometry and class needed by the server. The server
+      // derives and stores the authoritative fare and Travel Number; local quote state is
+      // presentation only and cannot become reservation authority.
 
       saveScheduledRide({
         when: info.when,
@@ -1460,7 +1455,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
         setSchedSaved(!!saved);
       });
     },
-    [arrival, departure, quotedFareCents, travelClass, tripCoords, tripSeq],
+    [arrival, departure, travelClass, tripCoords],
   );
 
   const cancelScheduled = useCallback(() => {

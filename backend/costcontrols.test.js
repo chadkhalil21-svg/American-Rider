@@ -54,7 +54,7 @@ check('req.ip is the caller behind Render\'s proxy', /app\.set\('trust proxy', 1
 // The same document upload is read once.
 const doc = (server.match(/app\.post\('\/operator\/document'[\s\S]*?\n\}\);/) || [''])[0];
 check('document reading: a repeated upload returns the stored reading, no second model call',
-  /prior\.imageUrl === imageUrl && prior\.evidence && prior\.readerVersion === READER_VERSION/.test(doc) && doc.indexOf('repeated: true') < doc.indexOf('readDocument('));
+  /prior\.objectKey === objectKey && prior\.evidence && prior\.readerVersion === READER_VERSION/.test(doc) && doc.indexOf('repeated: true') < doc.indexOf('readDocument('));
 // Stripe charges are idempotent (see idempotency.test.js); screening orders are keyed per payment.
 const payments = fs.readFileSync(path.join(__dirname, 'payments.js'), 'utf8');
 check('screening payment is keyed', /idempotencyKey: `ar_screening_/.test(payments));

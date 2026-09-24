@@ -242,6 +242,7 @@ export default {
     finishWithStripe: 'Mit Stripe Abschließen',
     setUpPayouts: 'Auszahlungen einrichten',
     openOperatorDashboard: 'Betreiber-Dashboard Öffnen',
+    continueQualification: 'Qualifikation Fortsetzen',
     beginOperatorQual: 'Betreiberqualifizierung Beginnen',
     finishOperatorQual: 'Betreiberqualifizierung Abschließen',
     driveHeroSub: 'American Rider arbeitet mit einem Modell, bei dem professionelle Operatoren 99 % des Fahrpreises behalten.',

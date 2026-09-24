@@ -200,7 +200,23 @@ export async function acceptTravel(
     return { ok: false, error: t('traveler.errReachDispatch') };
   }
 }
-export const declineTravel = (rideId: string) => setStatus(rideId, 'declined');
+export async function declineTravel(rideId: string): Promise<boolean> {
+  if (!rideId) return false;
+  try {
+    const token = await auth.currentUser?.getIdToken().catch(() => null);
+    const res = await fetch(`${PAYMENT_SERVER_URL}/travel/decline`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ rideId }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
 export const markArrived = (rideId: string) => setStatus(rideId, 'arrived');
 export const markOnboard = (rideId: string) => setStatus(rideId, 'onboard');
 export const markCompleted = (rideId: string) => setStatus(rideId, 'completed');

@@ -11,6 +11,8 @@ const server = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
 // Every route that costs money or reaches a third party carries a server-side limit.
 const limited = [
   ["post", "/operator/document", 'LIMITS.document'],
+  ["post", "/storage/upload-url", 'LIMITS.document'],
+  ["get", "/storage/object", 'LIMITS.document'],
   ["post", "/operator/screening/existing", 'LIMITS.screening'],
   ["post", "/operator/screening/intent", 'LIMITS.screening'],
   ["post", "/operator/screening/order", 'LIMITS.screening'],

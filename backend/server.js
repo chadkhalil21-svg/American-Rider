@@ -115,6 +115,7 @@ const {
 } = require('./verify');
 const { mount: mountOps, opsAuthMode } = require('./ops');
 const { readDocument, documentsReady, READER_VERSION } = require('./documents');
+const { ready: r2Ready, uploadUrl: r2UploadUrl, readUrl: r2ReadUrl, owns: r2Owns } = require('./r2');
 const { assessOperator, assessAndRecord } = require('./qualification');
 const { page } = require('./shell');
 const {
@@ -1735,6 +1736,29 @@ function sweepBody(report, trusted) {
   return { ok: true, swept: true, passes: ran, detail: 'set SCHEDULER_TOKEN and pass ?token= to read it' };
 }
 
+// --- Private file storage. -----------------------------------------------------------------
+// The mobile app may request a five-minute upload URL only for its own namespace. R2 remains
+// private; credentials never leave this server. Object keys, not public URLs, are persisted.
+app.post('/storage/upload-url', requireAuth, async (req, res) => {
+  if (!r2Ready()) return res.status(503).json({ error: 'Private storage is not configured.', code: 'storage_not_configured' });
+  const purpose = String(req.body?.purpose || '');
+  const kind = String(req.body?.kind || '');
+  const contentType = String(req.body?.contentType || 'image/jpeg').toLowerCase();
+  try {
+    const out = await r2UploadUrl({ uid: req.uid, purpose, kind, contentType, id: require('node:crypto').randomUUID() });
+    if (!out.ok) return res.status(out.code === 'unsupported_type' ? 415 : 400).json({ error: out.code, code: out.code });
+    return res.json({ key: out.key, uploadUrl: out.url });
+  } catch (e) { return res.status(502).json({ error: e.message, code: 'storage_sign_failed' }); }
+});
+
+app.get('/storage/object', requireAuth, async (req, res) => {
+  const key = String(req.query?.key || '');
+  const purpose = String(req.query?.purpose || '');
+  if (!r2Owns(key, req.uid, purpose)) return res.status(403).json({ error: 'That file belongs to another account' });
+  try { return res.json({ url: await r2ReadUrl(key) }); }
+  catch (e) { return res.status(502).json({ error: e.message }); }
+});
+
 // --- Reading an operator's documents. ------------------------------------------------------
 //
 // body: { kind, imageUrl }
@@ -1750,19 +1774,17 @@ app.post('/operator/document', requireAuth, LIMITS.document, async (req, res) =>
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
 
   const kind = String(req.body?.kind || '');
-  const imageUrl = String(req.body?.imageUrl || '');
-  if (!kind || !imageUrl) return res.status(400).json({ error: 'kind and imageUrl are required' });
-  // The upload must be OURS. A caller could otherwise hand us any URL on the internet and have
-  // the server fetch it — and an operator could point at somebody else's licence.
-  if (!/^https:\/\/firebasestorage\.googleapis\.com\//.test(imageUrl)) {
-    return res.status(400).json({ error: 'That document was not uploaded to American Rider' });
-  }
-  if (!imageUrl.includes(`operator-documents%2F${req.uid}%2F`) &&
-      !imageUrl.includes(`operator-documents/${req.uid}/`)) {
+  const objectKey = String(req.body?.objectKey || '');
+  if (!kind || !objectKey) return res.status(400).json({ error: 'kind and objectKey are required' });
+  // Trust an opaque R2 key only after proving it is inside this authenticated operator's
+  // namespace. The reader receives a five-minute signed GET URL generated server-side.
+  if (!r2Owns(objectKey, req.uid, 'operator-document')) {
     return res.status(403).json({ error: 'That document belongs to another account' });
   }
 
   try {
+    const imageUrl = await r2ReadUrl(objectKey);
+    if (!imageUrl) return res.status(503).json({ error: 'Private storage is not configured.' });
     // WHAT WE ALREADY BELIEVE, for cross-checking — all of it first-party, all of it something
     // the operator told us themselves.
     const [userSnap, opSnap] = await Promise.all([
@@ -1781,7 +1803,7 @@ app.post('/operator/document', requireAuth, LIMITS.document, async (req, res) =>
     // THE SAME UPLOAD IS READ ONCE. A retry, a double tap or a loop that re-sends one file gets
     // the stored reading back instead of another model call.
     const prior = u.documents?.[kind];
-    if (prior && prior.imageUrl === imageUrl && prior.evidence && prior.readerVersion === READER_VERSION) {
+    if (prior && prior.objectKey === objectKey && prior.evidence && prior.readerVersion === READER_VERSION) {
       return res.json({ verdict: prior.verdict, reasons: prior.reasons || [], summary: prior.summary || '', expiry: prior.expiry || null, repeated: true });
     }
     const expect = {
@@ -1803,7 +1825,7 @@ app.post('/operator/document', requireAuth, LIMITS.document, async (req, res) =>
             reasons: out.reasons,
             summary: out.summary,
             expiry: out.expiry,
-            imageUrl,
+            objectKey,
             readAt: Date.now(),
             // THE STRUCTURED READING, kept as evidence. backend/qualification.js re-checks it in
             // code — document type, legibility, and for insurance commercial use and limits —

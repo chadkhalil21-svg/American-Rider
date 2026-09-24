@@ -30,6 +30,20 @@ export default function OperatorQualification() {
   }, [op.ready, op.verification, router]);
 
   const n = op.verifiedCount;
+  // The checklist remains visible as a record, but the primary action advances to the first
+  // unmet requirement. The Operator should not have to understand our compliance graph.
+  const nextRequired = QUAL_DOCS.find(
+    (d) => op.docs[d.key] !== 'ok' && op.docReviews[d.key]?.verdict !== 'review',
+  );
+  const continueQualification = () => {
+    if (!nextRequired) return;
+    const k = nextRequired.key;
+    if (k === 'insurance') router.navigate('/operator/insurance');
+    else if (k === 'background') router.navigate('/operator/background');
+    else if (k === 'license' || k === 'registration' || k === 'inspection')
+      router.navigate('/operator/documents');
+    else op.verifyDoc(k);
+  };
   // A DOCUMENT THE READER HELD MAY GO TO REVIEW. A hold asks for a person, and submitting is
   // how the person is asked. Without this a held licence was a dead end on this screen.
   const done = QUAL_DOCS.every(
@@ -173,9 +187,13 @@ export default function OperatorQualification() {
       <View style={{ flex: 1 }} />
       {submitError && <Text style={styles.footnote}>{submitError}</Text>}
       <PrimaryButton
-        label={done ? t('traveler.qualSubmitReview') : t('traveler.qualVerifyAll', { total: QUAL_DOCS.length })}
-        disabled={!done || submitting}
+        label={done ? t('traveler.qualSubmitReview') : t('traveler.continueQualification')}
+        disabled={submitting}
         onPress={async () => {
+          if (!done) {
+            continueQualification();
+            return;
+          }
           setSubmitting(true);
           setSubmitError(null);
           const out = await op.submitQualification();

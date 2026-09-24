@@ -17,6 +17,28 @@ const transit = require('./transit');
 
 const OSRM_TIMEOUT_MS = 6000;
 const TRAFFIC_TIMEOUT_MS = 6000;
+const ROUTE_CACHE_TTL_MS = 60 * 1000;
+const ROUTE_CACHE_MAX = 500;
+const routeCache = new Map();
+
+function routeCacheKey(from, to) {
+  // ~11 m coordinate buckets: enough to collapse repeated quote/refresh calls without
+  // confusing materially different streets.
+  const q = (n) => Number(n).toFixed(4);
+  return `${q(from.lat)},${q(from.lng)}>${q(to.lat)},${q(to.lng)}`;
+}
+function cachedRoute(from, to, now = Date.now()) {
+  const k = routeCacheKey(from, to);
+  const hit = routeCache.get(k);
+  if (!hit || now - hit.at > ROUTE_CACHE_TTL_MS) { if (hit) routeCache.delete(k); return null; }
+  return hit.route;
+}
+function rememberRoute(from, to, route, now = Date.now()) {
+  if (!route) return route;
+  if (routeCache.size >= ROUTE_CACHE_MAX) routeCache.delete(routeCache.keys().next().value);
+  routeCache.set(routeCacheKey(from, to), { at: now, route });
+  return route;
+}
 const REROUTE_MIN_GAIN_SEC = 180;
 const REROUTE_MIN_GAIN_RATIO = 0.15;
 const REROUTE_COOLDOWN_MS = 8 * 60 * 1000;
@@ -109,7 +131,7 @@ async function routeCar(from, to, opts = {}) {
   // alternatives; American Rider consumes the recommended result rather than asking the
   // Traveler to operate a routing engine.
   const traffic = await routeMapboxTraffic(from, to);
-  if (traffic) return traffic;
+  if (traffic) return rememberRoute(from, to, traffic);
 
   const osrm = region.osrmUrl;
   if (osrm) {
@@ -133,4 +155,8 @@ module.exports = {
   REROUTE_MIN_GAIN_SEC,
   REROUTE_MIN_GAIN_RATIO,
   REROUTE_COOLDOWN_MS,
+  ROUTE_CACHE_TTL_MS,
+  routeCacheKey,
+  cachedRoute,
+  rememberRoute,
 };

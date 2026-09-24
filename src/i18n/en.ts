@@ -259,6 +259,7 @@ export default {
     finishWithStripe: 'Finish with Stripe',
     setUpPayouts: 'Set up payouts',
     openOperatorDashboard: 'Enter Operations',
+    continueQualification: 'Continue Qualification',
     beginOperatorQual: 'Begin Operator Qualification',
     finishOperatorQual: 'Finish Operator Qualification',
     driveHeroSub: 'American Rider operates under a 99% travel fare retention model for professional operators.',

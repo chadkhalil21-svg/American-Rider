@@ -17,6 +17,23 @@ const transit = require('./transit');
 
 const OSRM_TIMEOUT_MS = 6000;
 const TRAFFIC_TIMEOUT_MS = 6000;
+const REROUTE_MIN_GAIN_SEC = 180;
+const REROUTE_MIN_GAIN_RATIO = 0.15;
+const REROUTE_COOLDOWN_MS = 8 * 60 * 1000;
+
+/**
+ * Route stability policy. Traffic is observed continuously by callers, but American Rider
+ * changes course only for a consequential improvement: at least three minutes AND 15%, with
+ * an eight-minute cooldown. This prevents route-flapping for marginal gains.
+ */
+function materiallyAdvantageousRoute(currentDurationSec, candidateDurationSec, lastRerouteAt = 0, now = Date.now()) {
+  const current = Number(currentDurationSec);
+  const candidate = Number(candidateDurationSec);
+  if (!Number.isFinite(current) || !Number.isFinite(candidate) || current <= 0 || candidate <= 0) return false;
+  if (lastRerouteAt && now - Number(lastRerouteAt) < REROUTE_COOLDOWN_MS) return false;
+  const gain = current - candidate;
+  return gain >= REROUTE_MIN_GAIN_SEC && gain / current >= REROUTE_MIN_GAIN_RATIO;
+}
 
 // Optional traffic intelligence. MAPBOX_ACCESS_TOKEN enables Mapbox's driving-traffic profile.
 // It is deliberately server-side: the mobile app never receives the token and never becomes
@@ -106,4 +123,14 @@ async function routeCar(from, to, opts = {}) {
   }
 }
 
-module.exports = { routeCar, routeOsrm, routeMapboxTraffic, OSRM_TIMEOUT_MS, TRAFFIC_TIMEOUT_MS };
+module.exports = {
+  routeCar,
+  routeOsrm,
+  routeMapboxTraffic,
+  materiallyAdvantageousRoute,
+  OSRM_TIMEOUT_MS,
+  TRAFFIC_TIMEOUT_MS,
+  REROUTE_MIN_GAIN_SEC,
+  REROUTE_MIN_GAIN_RATIO,
+  REROUTE_COOLDOWN_MS,
+};

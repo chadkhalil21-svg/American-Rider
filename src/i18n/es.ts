@@ -258,6 +258,7 @@ export default {
     finishWithStripe: 'Terminar con Stripe',
     setUpPayouts: 'Configurar los pagos',
     openOperatorDashboard: 'Abrir el Panel del Operador',
+    continueQualification: 'Continuar la Calificación',
     beginOperatorQual: 'Iniciar la Cualificación de Operador',
     finishOperatorQual: 'Terminar la Cualificación de Operador',
     driveHeroSub: 'American Rider opera con un modelo de retención del 99 % de la tarifa del viaje para operadores profesionales.',

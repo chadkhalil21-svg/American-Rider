@@ -6,7 +6,6 @@ import { initializeApp } from 'firebase/app';
 import * as fbAuth from 'firebase/auth';
 import { getAuth, initializeAuth, type Auth, type Persistence } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
@@ -53,8 +52,3 @@ export const auth = createAuth();
 
 // The live Firestore database — operators, rides, etc.
 export const db = getFirestore(app);
-
-// File storage. Used for one thing so far: the photo attached to a lost item report, so the
-// operator searching a car sees the bag rather than the word "bag". A local file:// URI in a
-// Firestore document would be a picture only the traveler's own phone could open.
-export const storage = getStorage(app);

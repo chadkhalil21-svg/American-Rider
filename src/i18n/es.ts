@@ -80,7 +80,7 @@ export default {
     matching: 'Buscando viajeros cercanos…',
     foregroundOnly: 'Mantenga American Rider abierta para permanecer en servicio. Este dispositivo no permite que se le asignen viajes con el teléfono bloqueado — cámbielo en Ajustes › American Rider › Ubicación, eligiendo Siempre.',
 
-    request: 'Solicitud de Operación',
+    request: 'Solicitud de Viaje',
     respondWithin: 'Responda en %{seconds} s',
     estimatedRevenue: 'INGRESO ESTIMADO',
     acceptTraveler: 'Aceptar Viajero',
@@ -393,7 +393,7 @@ export default {
     driveRetain99: 'Retención del 99 % de la Tarifa del Viaje',
     driveInControl: 'Autonomía de Despacho Independiente',
     driveInControlBody: 'Opere cuando quiera y donde quiera. American Rider nunca le asigna una zona ni le penaliza por rechazar un viaje.',
-    drivePayouts: 'Liquidación de Capital',
+    drivePayouts: 'Pagos',
     emgLocationShared: 'Se ha compartido su ubicación.',
     emgNoShareSheet: 'Este dispositivo no pudo abrir ninguna forma de enviar el mensaje.',
     emgNoCalls: 'Este dispositivo no puede realizar llamadas. Use otro teléfono para marcar el 911.',

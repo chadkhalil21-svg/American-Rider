@@ -124,6 +124,12 @@ for (const k of ['OTP_URL', 'OTP_URL_FL_SOUTHEAST', 'OSRM_URL', 'OSRM_URL_FL_SOU
   check('rerouting respects the stability cooldown',
     !S.materiallyAdvantageousRoute(1200, 900, 900_000, 1_000_000));
 
+  check('near-identical route lookups share a stable cache key',
+    S.routeCacheKey(BRICKELL, MIA_KERB) === S.routeCacheKey(
+      { lat: BRICKELL.lat + 0.00001, lng: BRICKELL.lng + 0.00001 },
+      { lat: MIA_KERB.lat + 0.00001, lng: MIA_KERB.lng + 0.00001 },
+    ));
+
   // 1. the region's OSRM, when it is set
   process.env.OSRM_URL_FL_SOUTHEAST = 'http://osrm.test/';
   process.env.OTP_URL = 'http://otp.test:8080';

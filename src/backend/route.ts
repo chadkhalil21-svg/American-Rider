@@ -2,8 +2,9 @@
 // draws and the car follows. Mirrors fares.ts: the phone only ever asks, the server answers,
 // and swapping the routing provider later (Apple Maps Server API) touches zero app code.
 //
-// A null answer is always safe: the map keeps the straight pickup→destination line it drew
-// before routing existed. A ride must never fail because a route lookup did.
+// A null answer is safe: route-aware map surfaces show the endpoints without inventing a
+// drivable path. Travel must not fail because routing is temporarily unavailable, but a
+// straight geometric line must never be represented as a road route.
 import { PAYMENT_SERVER_URL } from '../config';
 import type { Coords } from './fares';
 

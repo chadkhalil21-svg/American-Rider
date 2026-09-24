@@ -79,17 +79,20 @@ check('no client file creates a travel', creates.length === 0, creates.map((c) =
 const readsFleet = appSrc.filter(({ t }) => /collection\(db, 'operators'\)/.test(t));
 check('no client file reads the fleet', readsFleet.length === 0, readsFleet.map((c) => c.f).join(', '));
 
-// ——— storage.rules: the operator document upload path ————————————————————————————
-// It had no rule, so the deny-all refused every document upload (found 22 Sept 2026).
-const storage = fs.readFileSync(path.join(ROOT, 'storage.rules'), 'utf8');
-const docs = (storage.match(/match \/operator-documents\/\{uid\}\/\{fileName\} \{[\s\S]*?\n {4}\}/) || [''])[0];
+// ——— private R2: operator document upload path ————————————————————————————————
+// Files no longer go through Firebase Storage. The app asks the authenticated backend for a
+// five-minute grant, and the backend constructs an owner-scoped R2 object key.
 const uploadPath = fs.readFileSync(path.join(ROOT, 'src', 'backend', 'documentUpload.ts'), 'utf8');
-check('the app uploads documents under operator-documents/{uid}/',
-  /operator-documents\/\$\{uid\}\//.test(uploadPath));
-check('storage.rules has a rule for that path', docs.length > 0);
-check('only the owner may create there', /allow create: if request\.auth != null\s*&& request\.auth\.uid == uid/.test(docs));
-check('uploads are images of bounded size', /contentType\.matches\('image\/\.\*'\)/.test(docs) && /request\.resource\.size </.test(docs));
-check('nobody may replace or delete the evidence', /allow update, delete: if false;/.test(docs));
+const r2 = fs.readFileSync(path.join(ROOT, 'backend', 'r2.js'), 'utf8');
+const serverSource = fs.readFileSync(path.join(ROOT, 'backend', 'server.js'), 'utf8');
+const serverStorage = (serverSource.match(/app\.post\('\/storage\/upload-url'[\s\S]*?\n\}\);/) || [''])[0];
+check('the app asks the authenticated backend for an operator-document upload grant',
+  /purpose: 'operator-document'/.test(uploadPath) && /Authorization: `Bearer \$\{token\}`/.test(uploadPath));
+check('R2 operator documents are namespaced by authenticated uid',
+  /operator-documents\/\$\{owner\}\//.test(r2));
+check('the signing endpoint requires authentication', /requireAuth/.test(serverStorage));
+check('the signing endpoint is rate-limited', /LIMITS\.document/.test(serverStorage));
+check('R2 uploads accept only supported image media types', /allowedType/.test(r2) && /image\\\//.test(r2));
 
 // ——— messages are bounded ————————————————————————————————————————————————————————
 const msgs = (rules.match(/match \/messages\/\{messageId\} \{[\s\S]*?\n {4}\}/) || [''])[0];

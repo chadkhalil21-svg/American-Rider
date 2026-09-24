@@ -24,6 +24,7 @@ import { RideRecord } from '../src/backend/dispatch';
 import {
   arrangeReturn,
   reportLostItem,
+  lostItemPhotoUrl,
   watchLostItem,
   type LostItem,
 } from '../src/backend/lostitem';
@@ -89,6 +90,7 @@ export default function LostItemScreen() {
   const [description, setDescription] = useState('');
   const [place, setPlace] = useState<Place | null>(null);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [remotePhotoUrl, setRemotePhotoUrl] = useState<string | null>(null);
   const [filing, setFiling] = useState(false);
   const [item, setItem] = useState<LostItem | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
@@ -123,6 +125,13 @@ export default function LostItemScreen() {
       else setStep('travel');
     });
   }, [watchId]);
+
+  useEffect(() => {
+    let active = true;
+    if (!item) { setRemotePhotoUrl(null); return; }
+    lostItemPhotoUrl(item).then((url) => { if (active) setRemotePhotoUrl(url); });
+    return () => { active = false; };
+  }, [item?.id, item?.photoObjectKey, item?.photoUrl]);
 
   // Who the broad report actually reaches: the distinct operators of the travels in the
   // window. Three airport travels with one operator are one operator, and the row says so.
@@ -483,8 +492,8 @@ export default function LostItemScreen() {
       <SectionLabel style={styles.lbl}>{t('traveler.whatYouDescribed')}</SectionLabel>
       <Card style={styles.describedCard}>
         <Text style={styles.described}>{item?.description}</Text>
-        {item?.photoUrl ? (
-          <Image source={{ uri: item.photoUrl }} style={[styles.thumb, { marginTop: 12 }]} />
+        {remotePhotoUrl ? (
+          <Image source={{ uri: remotePhotoUrl }} style={[styles.thumb, { marginTop: 12 }]} />
         ) : photoUri ? (
           <>
             <Image source={{ uri: photoUri }} style={[styles.thumb, { marginTop: 12 }]} />

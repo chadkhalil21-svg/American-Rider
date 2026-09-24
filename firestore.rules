@@ -193,7 +193,8 @@ service cloud.firestore {
     // who found it.
     match /lost_items/{itemId} {
       allow read: if ownsExisting();
-      allow create: if ownsIncoming();
+      allow create: if ownsIncoming()
+                    && request.resource.data.keys().hasOnly(['travelerUid', 'tripNo', 'candidateTripNos', 'notifiedOperatorIds', 'notifiedOperatorNames', 'description', 'photoUrl', 'photoObjectKey', 'status', 'createdAt', 'statusAt', 'return']);
       allow update: if ownsExisting()
                     && touchesOnly(['return', 'status', 'statusAt', 'description'])
                     && (!changes('status')

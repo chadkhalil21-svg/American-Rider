@@ -10,8 +10,7 @@
 // three answers — accepted, refused with a reason, or held for a person — and an operator
 // never drives on the third.
 import * as ImagePicker from 'expo-image-picker';
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
-import { auth, storage } from '../firebase';
+import { auth } from '../firebase';
 import { PAYMENT_SERVER_URL } from '../config';
 import { t } from '../i18n';
 
@@ -52,22 +51,25 @@ export async function pickDocument(fromCamera: boolean): Promise<string | null> 
   }
 }
 
-/** Put it where the server can read it. Returns the URL, or null. */
+/** Upload through a short-lived, authenticated R2 URL. Returns the private object key. */
 async function upload(kind: DocKind, uri: string): Promise<string | null> {
-  const uid = auth.currentUser?.uid;
-  if (!uid) return null;
+  const user = auth.currentUser;
+  if (!user) return null;
   try {
-    const res = await fetch(uri);
-    const blob = await res.blob();
-    const dest = ref(storage, `operator-documents/${uid}/${kind}-${Date.now()}.jpg`);
-    // CONTENT TYPE STATED, NOT INFERRED — a Blob from a file:// uri on React Native often
-    // arrives with an empty type, which storage.rules rejects. The lost-item upload learned
-    // this the hard way and every photo failed silently.
-    await uploadBytes(dest, blob, { contentType: blob.type || 'image/jpeg' });
-    return await getDownloadURL(dest);
-  } catch {
-    return null;
-  }
+    const token = await user.getIdToken();
+    const local = await fetch(uri);
+    const blob = await local.blob();
+    const contentType = blob.type || 'image/jpeg';
+    const signed = await fetch(`${PAYMENT_SERVER_URL}/storage/upload-url`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ purpose: 'operator-document', kind, contentType }),
+    });
+    const grant = await signed.json().catch(() => ({}));
+    if (!signed.ok || !grant?.uploadUrl || !grant?.key) return null;
+    const put = await fetch(grant.uploadUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: blob });
+    return put.ok ? String(grant.key) : null;
+  } catch { return null; }
 }
 
 /**
@@ -81,8 +83,8 @@ export async function submitDocument(
   kind: DocKind,
   uri: string,
 ): Promise<DocReview | { error: string } | null> {
-  const url = await upload(kind, uri);
-  if (!url) return null;
+  const objectKey = await upload(kind, uri);
+  if (!objectKey) return null;
   try {
     const token = await auth.currentUser?.getIdToken().catch(() => null);
     const res = await fetch(`${PAYMENT_SERVER_URL}/operator/document`, {
@@ -91,7 +93,7 @@ export async function submitDocument(
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ kind, imageUrl: url }),
+      body: JSON.stringify({ kind, objectKey }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) return { error: data?.error || `Server error ${res.status}` };

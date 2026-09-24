@@ -20,8 +20,7 @@ import {
   updateDoc,
   where,
 } from 'firebase/firestore';
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
-import { auth, db, storage } from '../firebase';
+import { auth, db } from '../firebase';
 import { PAYMENT_SERVER_URL } from '../config';
 import { returnOperator, type RideRecord } from './dispatch';
 
@@ -63,6 +62,8 @@ export type LostItem = {
   notifiedOperatorNames: string[];
   description: string;
   photoUrl: string | null;
+  /** Private R2 object key; access is granted by the authenticated backend. */
+  photoObjectKey?: string | null;
   status: LostItemStatus;
   createdAt: number;
   statusAt: number;
@@ -86,20 +87,23 @@ export const STATUS_LADDER: { key: LostItemStatus; label: string }[] = [
  * the caller files the report without it — a described item still beats no report.
  */
 async function uploadPhoto(uid: string, localUri: string): Promise<string | null> {
+  const user = auth.currentUser;
+  if (!user || user.uid !== uid) return null;
   try {
-    const res = await fetch(localUri);
-    const blob = await res.blob();
-    const key = `lost-items/${uid}/${Date.now()}.jpg`;
-    const dest = ref(storage, key);
-    // CONTENT TYPE STATED, NOT INFERRED. storage.rules only accepts `image/*`, and a Blob
-    // built from a `file://` URI on React Native frequently arrives with an empty `type` —
-    // which fails that rule and rejects every photo, silently, since the caller treats a
-    // failed upload as "file the report without one".
-    await uploadBytes(dest, blob, { contentType: blob.type || 'image/jpeg' });
-    return await getDownloadURL(dest);
-  } catch {
-    return null;
-  }
+    const token = await user.getIdToken();
+    const local = await fetch(localUri);
+    const blob = await local.blob();
+    const contentType = blob.type || 'image/jpeg';
+    const signed = await fetch(`${PAYMENT_SERVER_URL}/storage/upload-url`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ purpose: 'lost-item', contentType }),
+    });
+    const grant = await signed.json().catch(() => ({}));
+    if (!signed.ok || !grant?.uploadUrl || !grant?.key) return null;
+    const put = await fetch(grant.uploadUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: blob });
+    return put.ok ? String(grant.key) : null;
+  } catch { return null; }
 }
 
 /**
@@ -119,7 +123,9 @@ export async function reportLostItem(args: {
   const uid = auth.currentUser?.uid;
   if (!uid) return null;
 
-  const photoUrl = args.photoUri ? await uploadPhoto(uid, args.photoUri) : null;
+  const photoObjectKey = args.photoUri ? await uploadPhoto(uid, args.photoUri) : null;
+  // R2 is private. The durable record stores an object key, never a public bearer URL.
+  const photoUrl: string | null = null;
 
   const operatorIds = Array.from(
     new Set(args.travels.map((t) => t.operatorId).filter(Boolean)),
@@ -137,6 +143,7 @@ export async function reportLostItem(args: {
     notifiedOperatorNames: operatorNames,
     description: args.description.trim().slice(0, 2000),
     photoUrl,
+    ...(photoObjectKey ? { photoObjectKey } : {}),
     // The document naming the operators IS the notification, so the two are written in one
     // step and the status can never run ahead of it. With no operator on the travel record
     // there is nobody to notify and the report stops at `reported`.
@@ -193,6 +200,24 @@ export async function reportLostItem(args: {
   }
 
   return { id: created.id, caseNo, ...record };
+}
+
+
+/** Resolve this traveler's private lost-item image to a short-lived URL for display. */
+export async function lostItemPhotoUrl(item: LostItem): Promise<string | null> {
+  if (item.photoUrl) return item.photoUrl; // compatibility with pre-R2 records
+  if (!item.photoObjectKey) return null;
+  const user = auth.currentUser;
+  if (!user || user.uid !== item.travelerUid) return null;
+  try {
+    const token = await user.getIdToken();
+    const qs = new URLSearchParams({ purpose: 'lost-item', key: item.photoObjectKey }).toString();
+    const res = await fetch(`${PAYMENT_SERVER_URL}/storage/object?${qs}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json().catch(() => ({}));
+    return res.ok && data?.url ? String(data.url) : null;
+  } catch { return null; }
 }
 
 /** Watch one report, so the ladder moves the moment an operator answers. Returns unsubscribe. */

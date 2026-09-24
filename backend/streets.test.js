@@ -94,13 +94,33 @@ const withFetch = async (impl, fn) => {
   try { return await fn(); } finally { global.fetch = realFetch; }
 };
 const env = {};
-for (const k of ['OTP_URL', 'OTP_URL_FL_SOUTHEAST', 'OSRM_URL', 'OSRM_URL_FL_SOUTHEAST', 'OTP_TIMEOUT_MS']) { env[k] = process.env[k]; delete process.env[k]; }
+for (const k of ['OTP_URL', 'OTP_URL_FL_SOUTHEAST', 'OSRM_URL', 'OSRM_URL_FL_SOUTHEAST', 'OTP_TIMEOUT_MS', 'MAPBOX_ACCESS_TOKEN']) { env[k] = process.env[k]; delete process.env[k]; }
 
 (async () => {
+  // 0. traffic intelligence wins when configured, and selects the provider-ranked fastest route
+  process.env.MAPBOX_ACCESS_TOKEN = 'test-token';
+  let f = standIn({ otp: OTP_CAR });
+  f = Object.assign(async (url, init = {}) => {
+    f.calls.push({ url, body: null, headers: init.headers || {} });
+    if (/api\.mapbox\.com/.test(url)) return { ok: true, status: 200, json: async () => ({ routes: [
+      { duration: 900, duration_typical: 780, distance: 13100, geometry: { coordinates: LINE.map((p) => [p.lng, p.lat]) } },
+      { duration: 810, duration_typical: 800, distance: 13400, geometry: { coordinates: LINE.map((p) => [p.lng, p.lat]) } },
+    ] }) };
+    return { ok: false, status: 502, json: async () => ({}) };
+  }, { calls: [] });
+  const traffic = await withFetch(f, () => S.routeCar(BRICKELL, MIA_KERB));
+  check('configured traffic routing is preferred and returns the fastest live route',
+    traffic && traffic.provider === 'mapbox-traffic' && traffic.durationSec === 810 && traffic.typicalDurationSec === 800,
+    JSON.stringify(traffic));
+  check('  requests alternatives through the driving-traffic profile',
+    f.calls.length === 1 && /mapbox\/driving-traffic/.test(f.calls[0].url) && /alternatives=true/.test(f.calls[0].url),
+    f.calls[0] && f.calls[0].url);
+  delete process.env.MAPBOX_ACCESS_TOKEN;
+
   // 1. the region's OSRM, when it is set
   process.env.OSRM_URL_FL_SOUTHEAST = 'http://osrm.test/';
   process.env.OTP_URL = 'http://otp.test:8080';
-  let f = standIn({ osrm: OSRM_OK, otp: OTP_CAR });
+  f = standIn({ osrm: OSRM_OK, otp: OTP_CAR });
   const viaOsrm = await withFetch(f, () => S.routeCar(BRICKELL, MIA_KERB));
   check('with an OSRM set, the route comes from it', viaOsrm && viaOsrm.provider === 'osrm', JSON.stringify(viaOsrm).slice(0, 120));
   check('  asked in OSRM\'s own form, lng,lat;lng,lat, with the full geometry',

@@ -125,7 +125,7 @@ export async function reportLostItem(args: {
 
   const photoObjectKey = args.photoUri ? await uploadPhoto(uid, args.photoUri) : null;
   // R2 is private. The durable record stores an object key, never a public bearer URL.
-  const photoUrl = null;
+  const photoUrl: string | null = null;
 
   const operatorIds = Array.from(
     new Set(args.travels.map((t) => t.operatorId).filter(Boolean)),

@@ -1739,7 +1739,7 @@ function sweepBody(report, trusted) {
 // --- Private file storage. -----------------------------------------------------------------
 // The mobile app may request a five-minute upload URL only for its own namespace. R2 remains
 // private; credentials never leave this server. Object keys, not public URLs, are persisted.
-app.post('/storage/upload-url', requireAuth, async (req, res) => {
+app.post('/storage/upload-url', requireAuth, LIMITS.document, async (req, res) => {
   if (!r2Ready()) return res.status(503).json({ error: 'Private storage is not configured.', code: 'storage_not_configured' });
   const purpose = String(req.body?.purpose || '');
   const kind = String(req.body?.kind || '');
@@ -1751,7 +1751,7 @@ app.post('/storage/upload-url', requireAuth, async (req, res) => {
   } catch (e) { return res.status(502).json({ error: e.message, code: 'storage_sign_failed' }); }
 });
 
-app.get('/storage/object', requireAuth, async (req, res) => {
+app.get('/storage/object', requireAuth, LIMITS.document, async (req, res) => {
   const key = String(req.query?.key || '');
   const purpose = String(req.query?.purpose || '');
   if (!r2Owns(key, req.uid, purpose)) return res.status(403).json({ error: 'That file belongs to another account' });

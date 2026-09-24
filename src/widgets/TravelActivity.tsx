@@ -50,7 +50,7 @@ const mins = (p: TravelActivityProps) =>
 function headline(p: TravelActivityProps): string {
   if (p.stage === 'arrived') return 'Your operator has arrived';
   if (p.stage === 'onboard') return `To ${p.destination}`;
-  return 'Your operator is on the way';
+  return 'Operator en route';
 }
 
 /** The one line beneath it. Never a name with nothing to say, never a bare number. */

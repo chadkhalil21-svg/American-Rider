@@ -70,7 +70,7 @@ export default {
     matching: 'Recherche de voyageurs à proximité…',
     foregroundOnly: 'Gardez American Rider ouverte pour rester en service. Cet appareil ne permet pas l’attribution de trajets lorsque le téléphone est verrouillé — modifiez-le dans Réglages › American Rider › Position, en choisissant Toujours.',
 
-    request: 'Demande d’Opération',
+    request: 'Demande de Voyage',
     respondWithin: 'Répondez sous %{seconds} s',
     estimatedRevenue: 'REVENU ESTIMÉ',
     acceptTraveler: 'Accepter le Voyageur',

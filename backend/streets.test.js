@@ -117,6 +117,13 @@ for (const k of ['OTP_URL', 'OTP_URL_FL_SOUTHEAST', 'OSRM_URL', 'OSRM_URL_FL_SOU
     f.calls[0] && f.calls[0].url);
   delete process.env.MAPBOX_ACCESS_TOKEN;
 
+  check('rerouting ignores marginal improvements',
+    !S.materiallyAdvantageousRoute(1200, 1080, 0, 1_000_000));
+  check('rerouting accepts a consequential improvement',
+    S.materiallyAdvantageousRoute(1200, 960, 0, 1_000_000));
+  check('rerouting respects the stability cooldown',
+    !S.materiallyAdvantageousRoute(1200, 900, 900_000, 1_000_000));
+
   // 1. the region's OSRM, when it is set
   process.env.OSRM_URL_FL_SOUTHEAST = 'http://osrm.test/';
   process.env.OTP_URL = 'http://otp.test:8080';

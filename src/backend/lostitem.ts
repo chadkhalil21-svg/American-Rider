@@ -202,6 +202,24 @@ export async function reportLostItem(args: {
   return { id: created.id, caseNo, ...record };
 }
 
+
+/** Resolve this traveler's private lost-item image to a short-lived URL for display. */
+export async function lostItemPhotoUrl(item: LostItem): Promise<string | null> {
+  if (item.photoUrl) return item.photoUrl; // compatibility with pre-R2 records
+  if (!item.photoObjectKey) return null;
+  const user = auth.currentUser;
+  if (!user || user.uid !== item.travelerUid) return null;
+  try {
+    const token = await user.getIdToken();
+    const qs = new URLSearchParams({ purpose: 'lost-item', key: item.photoObjectKey }).toString();
+    const res = await fetch(`${PAYMENT_SERVER_URL}/storage/object?${qs}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json().catch(() => ({}));
+    return res.ok && data?.url ? String(data.url) : null;
+  } catch { return null; }
+}
+
 /** Watch one report, so the ladder moves the moment an operator answers. Returns unsubscribe. */
 export function watchLostItem(id: string, onChange: (item: LostItem | null) => void): () => void {
   try {

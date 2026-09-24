@@ -84,7 +84,8 @@ check('no client file reads the fleet', readsFleet.length === 0, readsFleet.map(
 // five-minute grant, and the backend constructs an owner-scoped R2 object key.
 const uploadPath = fs.readFileSync(path.join(ROOT, 'src', 'backend', 'documentUpload.ts'), 'utf8');
 const r2 = fs.readFileSync(path.join(ROOT, 'backend', 'r2.js'), 'utf8');
-const serverStorage = (server.match(/app\.post\('\/storage\/upload-url'[\s\S]*?\n\}\);/) || [''])[0];
+const serverSource = fs.readFileSync(path.join(ROOT, 'backend', 'server.js'), 'utf8');
+const serverStorage = (serverSource.match(/app\.post\('\/storage\/upload-url'[\s\S]*?\n\}\);/) || [''])[0];
 check('the app asks the authenticated backend for an operator-document upload grant',
   /purpose: 'operator-document'/.test(uploadPath) && /Authorization: `Bearer \$\{token\}`/.test(uploadPath));
 check('R2 operator documents are namespaced by authenticated uid',

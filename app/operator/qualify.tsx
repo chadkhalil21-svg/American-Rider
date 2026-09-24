@@ -50,6 +50,19 @@ export default function OperatorQualification() {
     (d) => op.docs[d.key] === 'ok' || op.docReviews[d.key]?.verdict === 'review',
   );
   const [submitting, setSubmitting] = useState(false);
+  // Qualification is a guided process, not a filing cabinet. Keep every requirement visible
+  // for institutional transparency, but give one authoritative next action at the foot of the
+  // screen so an Operator never has to decide which department to visit next.
+  const nextRequired = QUAL_DOCS.find(
+    (d) => !(op.docs[d.key] === 'ok' || op.docReviews[d.key]?.verdict === 'review'),
+  ) || null;
+  const openRequirement = (key: string) => {
+    if (key === 'insurance') router.navigate('/operator/insurance');
+    else if (key === 'background') router.navigate('/operator/background');
+    else if (key === 'license' || key === 'registration' || key === 'inspection')
+      router.navigate('/operator/documents');
+    else op.verifyDoc(key as any);
+  };
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   // THE OPERATING AREA. The server reads documents, orders screening and opens payouts only for
@@ -145,17 +158,7 @@ export default function OperatorQualification() {
           return (
             <Pressable
               key={d.key}
-              onPress={() => {
-                // THE FOUR DOCUMENT STEPS GO TO THE SCREEN THAT CAN READ ONE. They used to call
-                // verifyDoc, which ticked them after 900 milliseconds without ever seeing a
-                // document. verifyDoc now refuses those keys, so leaving this would have made
-                // the row do nothing at all — quieter than the timer and no more honest.
-                if (d.key === 'insurance') router.navigate('/operator/insurance');
-                else if (d.key === 'background') router.navigate('/operator/background');
-                else if (d.key === 'license' || d.key === 'registration' || d.key === 'inspection')
-                  router.navigate('/operator/documents');
-                else op.verifyDoc(d.key);
-              }}
+              onPress={() => openRequirement(d.key)}
             >
               <View style={[styles.row, i > 0 && styles.hair]}>
                 <View style={{ flex: 1 }}>

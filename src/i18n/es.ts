@@ -249,7 +249,7 @@ export default {
     busyChecking: 'Comprobando…',
     busyReading: 'Leyendo…',
     busyOpening: 'Abriendo…',
-    busyArranging: 'Organizando…',
+    busyArranging: 'Preparando…',
     busyOpeningStripe: 'Abriendo Stripe…',
     reportTheItem: 'Informar del objeto',
     arrangeTheReturn: 'Organizar la devolución',

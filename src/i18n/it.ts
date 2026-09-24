@@ -66,7 +66,7 @@ export default {
     conclude: 'Concludere le Operazioni',
     matching: 'Ricerca di viaggiatori nelle vicinanze…',
     foregroundOnly: 'Tenga American Rider aperta per restare in servizio. Questo dispositivo non consente l’assegnazione di viaggi con il telefono bloccato — lo modifichi in Impostazioni › American Rider › Posizione, scegliendo Sempre.',
-    request: 'Richiesta di Operazione',
+    request: 'Richiesta di Viaggio',
     respondWithin: 'Risponda entro %{seconds} s',
     estimatedRevenue: 'RICAVO STIMATO',
     acceptTraveler: 'Accettare il Viaggiatore',

@@ -14,7 +14,7 @@
       "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_API_URL": "https://american-rider-server.onrender.com",
-        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "777642740728-dtfqu8vi4scpo35sckd88va6lq78813g.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "623854974930-4muug9hi3jjrml3tokaqh3n2tbd0h2ms.apps.googleusercontent.com",
         "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "777642740728-1aelj70c4guoe2jpnkflv5266t7terua.apps.googleusercontent.com"
       }
     }

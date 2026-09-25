@@ -13,6 +13,13 @@
 
 const Stripe = require('stripe');
 const { readKey, hasInvalidHeaderChars, describeInvalidChars } = require('./env');
+const {
+  MIN_PLATFORM_FEE_CENTS,
+  isDomesticCard,
+  commissionCents,
+  minimumPlatformFeeCents,
+  economicsFor,
+} = require('./economics');
 
 // Create the Stripe client only when a payment actually needs it. This lets the server boot
 // (and serve /health and /quote) even before a secret key is configured — the newer Stripe SDK
@@ -34,87 +41,44 @@ function getStripe() {
   return _stripe;
 }
 
-const APP_FEE_CENTS = 200; // the platform fee's $2.00 minimum (absorbs payment + Connect operating costs)
+// ——— THE PLATFORM FEE: ONE ECONOMIC INVARIANT, NOT A PERCENTAGE TABLE ———————————
+//
+// The server computes the smallest whole-cent fee that covers:
+//   * Stripe card processing on the ENTIRE traveler charge;
+//   * both variable Stripe Connect charges on money sent to the operator;
+//   * a conservative fixed Connect allowance;
+//   * the 25c contingency reserve;
+//   * the audited operating/infrastructure allowance; and
+//   * the minimum platform contribution target.
+//
+// Government fees and toll reimbursements are pass-throughs to their beneficiaries, but they
+// are not free to process. Their induced Stripe/Connect cost is therefore recovered here.
+//
+// US-issued cards use the domestic processing rate. Every other card, INCLUDING UNKNOWN,
+// uses the international-safe rate. A first foreign card is never deliberately under-priced.
+//
+// Launch charges and settlement are USD-only; there is no ordinary Stripe FX branch in this
+// formula. If a future product permits non-USD presentment/settlement, that must add an
+// explicit FX cost before it may be enabled.
+//
+// backend/economics.js is canonical. src/data.ts mirrors the same integer-cent formula only
+// for local display fallback; server quotes remain authoritative.
 
-// ——— THE PLATFORM FEE — TWO SCHEDULES, CHOSEN BY THE CARD'S ISSUING COUNTRY ——————————
-// Chad, 20 Sept 2026: read Stripe's card.country and stop padding the domestic traveler for
-// the cost of an international card. Before this there was ONE rule — the greater of $1.50
-// and 5% — and 5% was the smallest round rate that covered the WORSE of the two cards. Every
-// US traveler above a $30 fare was paying for that headroom.
-//
-//   domestic       (card.country === 'US')   the greater of $2.00 and 3.25% of the fare
-//   international  (anything else)            the greater of $2.00 and 5.5%  of the fare
-//
-// WHY THESE TWO RATES, AND WHY NOT CHAD'S TIER TABLE. His note specified tiers keyed on the
-// TOTAL ($0–60 → $1.50, $60–85 → $2.00, …, above $135 → 2% of total). Run against every fare
-// it has three faults, none of them visible from the two points he spot-checked:
-//
-//   1. IT LOSES MONEY ABOVE $135. 2.0% of the total has to cover 2.9% of the total less the
-//      1% commission on the fare, plus $0.30 — about 1.9% of the total plus $0.30. Those meet
-//      at a $300 total, so EVERY total between $135 and ~$300 is underwater; worst case
-//      −$0.21. The international 3.5% tier fails the same way for the same reason.
-//   2. THE FEE IS AMBIGUOUS AT 492 FARES. A tier keyed on the total, where the total contains
-//      the fee, is a fixed point rather than a lookup. At a $58.00 fare both $1.50 and $2.00
-//      satisfy it, and 30 fares near $132 satisfy NEITHER.
-//   3. IT REINTRODUCES THE PRICE STEP. A fare one cent over a boundary costs the traveler 50
-//      cents more. AGENTS.md records continuity as the reason 5% was chosen over the old
-//      break-even-plus-1%: "no step, no 'the price jumped because you went slightly further'".
-//
-// Keying on the FARE instead removes the circularity, and max($1.50, rate) instead of a table
-// removes the step: 2.5% of $60 is exactly $1.50, and 5% of $30 is exactly $1.50, so each
-// schedule is continuous where its two halves meet. Chad's $60 domestic boundary is preserved
-// exactly; his $34 international boundary moves to $30, which is where continuity puts it.
-// Checked every cent to $500 on both card types: nothing is negative, thinnest is $0.007
-// domestic at a $59.99 fare and $0.10 international at $29.99.
-//
-// WHEN THE CARD IS NOT KNOWN YET the domestic schedule applies. See isDomesticCard().
-//
-// Mirrors src/data.ts platformFee(). THE TWO MUST NEVER DISAGREE, TO THE CENT: the app quotes
-// with one and the server charges with the other, and a traveler who is quoted $64.54 and
-// charged $64.55 has been shown two prices for one journey. payments.test.js checks every cent
-// from $0 to $500 against the app's formula, on BOTH schedules.
-const DOMESTIC_RATE_NUM = 13; // 3.25% = 13/400
-const DOMESTIC_RATE_DEN = 400;
-const INTERNATIONAL_RATE_NUM = 11; // 5.5% = 11/200
-const INTERNATIONAL_RATE_DEN = 200;
-
-/**
- * Which schedule a card falls under. Stripe writes the issuing country on
- * PaymentMethod.card.country as a two-letter code.
- *
- * UNKNOWN COUNTS AS DOMESTIC, AND THAT IS A DELIBERATE COST. The traveler is quoted one price
- * before they have chosen how to pay, and an amount that moves after a card is entered is the
- * defect AGENTS.md calls the most serious there is — "an amount and a doubt about that amount
- * must never render together". So the schedule is fixed at quote time from the traveler's
- * DEFAULT payment method, which Stripe has already told us about for anyone who has paid
- * before. Only a traveler with nothing on file is unknown, only on their first travel, and we
- * absorb the difference on that one travel rather than re-quoting them.
- *
- * Quoting the international schedule to the unknown instead would protect that first travel by
- * overcharging every US traveler's first travel — the larger group, to insure the smaller.
- */
-function isDomesticCard(cardCountry) {
-  if (cardCountry === undefined || cardCountry === null || cardCountry === '') return true;
-  return String(cardCountry).trim().toUpperCase() === 'US';
+function platformFeeCents(
+  travelCostCents,
+  cardCountry,
+  governmentFeeCents = 0,
+  tollCents = 0,
+  transactionCount = 1,
+) {
+  return minimumPlatformFeeCents({
+    travelCostCents,
+    governmentFeeCents,
+    tollCents,
+    cardCountry,
+    transactionCount,
+  });
 }
-
-/** What American Rider adds to the fare, in cents, on the schedule the card falls under. */
-function platformFeeCents(travelCostCents, cardCountry) {
-  // An integer divided by 20 or by 40 is correctly rounded, so ceil() is exact at every cent.
-  // `Math.ceil(travelCostCents * 0.05)` is not (3060 * 0.05 is 153.00000000000003).
-  const domestic = isDomesticCard(cardCountry);
-  const numerator = domestic ? DOMESTIC_RATE_NUM : INTERNATIONAL_RATE_NUM;
-  const denominator = domestic ? DOMESTIC_RATE_DEN : INTERNATIONAL_RATE_DEN;
-  return Math.max(APP_FEE_CENTS, Math.ceil((travelCostCents * numerator) / denominator));
-}
-
-// The 1% commission on the travel cost. NO CAP — matches src/data.ts coordinationFee
-// exactly, and the two must never disagree or the app and the charge diverge.
-// The $1 cap was removed 16 Aug 2026 (Chad): "there is no 1 dollar cap".
-function commissionCents(travelCostCents) {
-  return Math.floor(travelCostCents * 0.01);
-}
-
 
 // ——— CHARGEBACK DEFENCE ————————————————————————————————————————————————————————
 // A disputed card payment costs ~$15 in Stripe fees AND the fare. At ~$1.50 a travel, ONE
@@ -136,13 +100,39 @@ const STATEMENT_DESCRIPTOR = 'AMERICAN RIDER';
 // and pays only the difference between the fee on the COMBINED car fare and the fee leg 1
 // already carried — never below zero. src/state/RideContext.tsx `feeFor` shows the traveler
 // the same arithmetic; the two must never disagree.
-function journeyFeeCents(travelCostCents, journey, cardCountry) {
+function journeyFeeCents(
+  travelCostCents,
+  journey,
+  cardCountry,
+  governmentFeeCents = 0,
+  tollCents = 0,
+) {
   const leg1 = Number(journey?.leg1FareCents);
-  if (!Number.isFinite(leg1) || leg1 <= 0) return platformFeeCents(travelCostCents, cardCountry);
-  return Math.max(
-    0,
-    platformFeeCents(leg1 + travelCostCents, cardCountry) - platformFeeCents(leg1, cardCountry),
+  if (!Number.isFinite(leg1) || leg1 <= 0) {
+    return platformFeeCents(travelCostCents, cardCountry, governmentFeeCents, tollCents, 1);
+  }
+
+  const leg1Government = Math.max(0, Number(journey?.leg1GovernmentFeeCents) || 0);
+  const leg1Toll = Math.max(0, Number(journey?.leg1TollCents) || 0);
+
+  // Smart Travel uses two separately charged car legs. The total journey fee therefore funds
+  // TWO fixed payment/Connect/reserve/overhead units, then leg 2 pays only the amount not
+  // already carried by leg 1.
+  const combined = platformFeeCents(
+    leg1 + travelCostCents,
+    cardCountry,
+    leg1Government + governmentFeeCents,
+    leg1Toll + tollCents,
+    2,
   );
+  const alreadyPaid = platformFeeCents(
+    leg1,
+    cardCountry,
+    leg1Government,
+    leg1Toll,
+    1,
+  );
+  return Math.max(0, combined - alreadyPaid);
 }
 
 // A government fee line as fees.js writes it. Anything else — a negative, a fraction, a line
@@ -161,14 +151,21 @@ const feeLine = (l) =>
  */
 function quote(travelCostCents, journey, governmentFees, cardCountry, tollCents) {
   const commission = commissionCents(travelCostCents);
-  // The fee the traveler actually pays — the rule, not the bare $1.50 minimum.
-  const appFee = journeyFeeCents(travelCostCents, journey, cardCountry);
-  // American Rider keeps BOTH: the 1% taken out of the fare, and the fee added on top.
-  // An earlier edit wrote `commission + (appFee - commission)`, which cancels to appFee and
-  // silently dropped the commission from every total.
-  const platformTake = commission + appFee;
   const feeLines = (Array.isArray(governmentFees) ? governmentFees : []).map(feeLine).filter(Boolean);
   const governmentFeeCents = feeLines.reduce((sum, l) => sum + l.cents, 0);
+  const tolls = Number.isInteger(tollCents) && tollCents > 0 ? tollCents : 0;
+
+  // The platform fee is computed AFTER pass-throughs are known, because Stripe processes the
+  // whole traveler charge and Connect processes the toll reimbursement. A $2 airport fee or
+  // a $5 toll is economically neutral only when its induced transaction cost is funded here.
+  const appFee = journeyFeeCents(
+    travelCostCents,
+    journey,
+    cardCountry,
+    governmentFeeCents,
+    tolls,
+  );
+  const platformTake = commission + appFee;
 
   // ——— TOLLS (Chad, 20 Sept 2026) ———————————————————————————————————————————————
   // A THIRD KIND OF MONEY, and it behaves like neither of the other two.
@@ -186,7 +183,6 @@ function quote(travelCostCents, journey, governmentFees, cardCountry, tollCents)
   // not fare, so no commission is taken on it and it is added to operatorGets whole. The
   // platform's take is identical with tolls and without — which is the test of whether this is
   // a pass-through or a quiet margin.
-  const tolls = Number.isInteger(tollCents) && tollCents > 0 ? tollCents : 0;
   const operatorGets = travelCostCents - commission + tolls; // 99% of the fare, plus the toll back
 
   const travelerPays = travelCostCents + appFee + governmentFeeCents + tolls; // the ONE all-in price
@@ -203,6 +199,16 @@ function quote(travelCostCents, journey, governmentFees, cardCountry, tollCents)
     // through the operator's own transfer, which is why it is counted here but not a fee line.
     passThroughCents: governmentFeeCents + tolls,
     feeLines,
+    // Internal audit data. /fare-quote does not expose this field; tests and Ops can prove the
+    // selected fee still preserves the invariant when any cost constant changes.
+    _economics: economicsFor({
+      travelCostCents,
+      platformFeeCents: appFee,
+      governmentFeeCents,
+      tollCents: tolls,
+      cardCountry,
+      transactionCount: journey && Number(journey.leg1FareCents) > 0 ? 2 : 1,
+    }),
   };
 }
 
@@ -377,9 +383,9 @@ function idempotencyForTravel(kind, uid, tripNo, amountCents) {
   return { idempotencyKey: `ar_${kind}_${uid}_${tripNo}_${amountCents}` };
 }
 
-async function createPaymentIntent({ travelCostCents, uid, email, tripNo, rideId, dep, dest, journey, governmentFees, cardCountry }) {
+async function createPaymentIntent({ travelCostCents, uid, email, tripNo, rideId, dep, dest, journey, governmentFees, cardCountry, tollCents = 0 }) {
   const stripe = getStripe();
-  const q = quote(travelCostCents, journey, governmentFees, cardCountry);
+  const q = quote(travelCostCents, journey, governmentFees, cardCountry, tollCents);
 
   // The PaymentSheet needs all three: a customer, a short-lived key that lets the phone read
   // that customer's saved cards, and the intent itself.
@@ -434,6 +440,7 @@ async function createPaymentIntent({ travelCostCents, uid, email, tripNo, rideId
       platformTake: String(q.platformTake),
       // Held for a public body, not ours. The remittance ledger and a refund both read it here.
       governmentFeeCents: String(q.governmentFeeCents),
+      tollCents: String(q.tollCents),
       // Leg 2 of a Smart Travel journey records leg 1's Travel Number: the reason its fee
       // is not the standard one is then readable on Stripe's own record.
       journeyNo: journey?.journeyNo || '',
@@ -482,12 +489,12 @@ async function createPaymentIntent({ travelCostCents, uid, email, tripNo, rideId
  * different amount — in which case the caller refuses.
  */
 const RESUMABLE = ['requires_payment_method', 'requires_confirmation', 'requires_action'];
-async function resumePaymentIntent({ paymentIntentId, uid, rideId, email, travelCostCents, journey, governmentFees, cardCountry }) {
+async function resumePaymentIntent({ paymentIntentId, uid, rideId, email, travelCostCents, journey, governmentFees, cardCountry, tollCents = 0 }) {
   const stripe = getStripe();
   const pi = await stripe.paymentIntents.retrieve(paymentIntentId);
   if (!pi || pi.metadata?.uid !== String(uid) || pi.metadata?.rideId !== String(rideId)) return null;
   if (!RESUMABLE.includes(pi.status)) return null;
-  const q = quote(travelCostCents, journey, governmentFees, cardCountry);
+  const q = quote(travelCostCents, journey, governmentFees, cardCountry, tollCents);
   if (pi.amount !== q.travelerPays) return null;
   const customer = await customerForTraveler({ uid, email });
   const ephemeralKey = await stripe.ephemeralKeys.create({ customer: customer.id }, { apiVersion: '2024-06-20' });
@@ -501,9 +508,9 @@ async function resumePaymentIntent({ paymentIntentId, uid, rideId, email, travel
   };
 }
 
-async function chargeRide({ travelCostCents, operatorStripeAccount, travelerPaymentMethod, uid, tripNo, governmentFees, cardCountry }) {
+async function chargeRide({ travelCostCents, operatorStripeAccount, travelerPaymentMethod, uid, tripNo, governmentFees, cardCountry, tollCents = 0 }) {
   const stripe = getStripe();
-  const q = quote(travelCostCents, undefined, governmentFees, cardCountry);
+  const q = quote(travelCostCents, undefined, governmentFees, cardCountry, tollCents);
   const params = {
     amount: q.travelerPays,
     currency: 'usd',
@@ -527,6 +534,7 @@ async function chargeRide({ travelCostCents, operatorStripeAccount, travelerPaym
       platformTake: String(q.platformTake),
       // Held for a public body, not ours. The remittance ledger and a refund both read it here.
       governmentFeeCents: String(q.governmentFeeCents),
+      tollCents: String(q.tollCents),
     },
   };
   if (operatorStripeAccount) {
@@ -786,7 +794,8 @@ async function transferToOperator({
   if (!travelCostCents) {
     return { ok: false, code: 'no_fare_on_record', error: 'That payment predates fare stamping', paidWith };
   }
-  const q = quote(travelCostCents);
+  const recordedTollCents = Math.max(0, Number(pi.metadata?.tollCents || 0));
+  const q = quote(travelCostCents, undefined, undefined, 'US', recordedTollCents);
 
   try {
     const transfer = await stripe.transfers.create(
@@ -989,9 +998,9 @@ async function probeNetwork() {
  * `travelCostCents` and `uid` back off Stripe's own record hours later, and a scheduled
  * travel must settle through the same path as any other.
  */
-async function chargeScheduledTravel({ travelCostCents, uid, email, tripNo, reservationId, dep, dest, governmentFees, cardCountry }) {
+async function chargeScheduledTravel({ travelCostCents, uid, email, tripNo, reservationId, dep, dest, governmentFees, cardCountry, tollCents = 0 }) {
   const stripe = getStripe();
-  const q = quote(travelCostCents, undefined, governmentFees, cardCountry);
+  const q = quote(travelCostCents, undefined, governmentFees, cardCountry, tollCents);
   try {
     const customer = await customerForTraveler({ uid, email });
     const pm = await savedPaymentMethodFor(customer);
@@ -1021,6 +1030,7 @@ async function chargeScheduledTravel({ travelCostCents, uid, email, tripNo, rese
           platformTake: String(q.platformTake),
           // Held for a public body, not ours. The remittance ledger and a refund both read it here.
           governmentFeeCents: String(q.governmentFeeCents),
+          tollCents: String(q.tollCents),
           scheduled: 'true',
         },
       },
@@ -1127,6 +1137,7 @@ async function operatorPayoutAccount(db, operatorId) {
 module.exports = {
   operatorPayoutAccount,
   quote, commissionCents, platformFeeCents, isDomesticCard, defaultCardCountry, journeyFeeCents, createPaymentIntent, resumePaymentIntent, chargeRide, refundTravel,
+  MIN_PLATFORM_FEE_CENTS,
   customerForTraveler, connectAccountFor, connectOnboardingLink, connectAccountStatus,
   transferToOperator, paidWithFromIntent, refundableFor, connectDashboardLink, pingStripe, probeNetwork,
   chargeTip, transferFixed, chargeScheduledTravel, createScreeningIntent,

@@ -311,16 +311,18 @@ function adjudicate(report, { now = Date.now() } = {}) {
  *                 it is what the three-year clock runs from, not the day we read it. A report
  *                 conducted two years ago is two years into its life, not starting one.
  */
-async function recordDecision({ uid, decision, reasons, summary, reportId, provider, issuedAt }) {
+async function recordDecision({ uid, decision, reasons, summary, reportId, provider, issuedAt, adverseAction = null }) {
   const db = adminDb();
   if (!db) return { ok: false, reason: 'no database' };
   const now = Date.now();
   const conductedAt = Number(issuedAt) > 0 ? Number(issuedAt) : now;
+  const storedDecision = decision === 'refuse' ? 'pre_adverse' : decision;
   try {
     await db.collection('users').doc(String(uid)).set(
       {
         screening: {
-          decision,
+          decision: storedDecision,
+          proposedDecision: decision === 'refuse' ? 'refuse' : null,
           reasons: reasons || [],
           summary: summary || '',
           reportId: reportId || null,
@@ -329,12 +331,13 @@ async function recordDecision({ uid, decision, reasons, summary, reportId, provi
           conductedAt,
           // §627.748(12)(b), from the date the check was actually conducted.
           recheckDue: conductedAt + RECHECK_MS,
+          ...(adverseAction ? { adverseAction } : {}),
         },
       },
       { merge: true },
     );
     // A refused or held operator must not be dispatchable, whatever else is true of them.
-    if (decision !== 'pass') {
+    if (storedDecision !== 'pass') {
       await db.collection('operators').doc(String(uid)).set(
         { available: false, screeningBlocked: true, screeningReason: summary || '' },
         { merge: true },
@@ -346,24 +349,6 @@ async function recordDecision({ uid, decision, reasons, summary, reportId, provi
       );
     }
 
-    // ADVERSE ACTION IS A PROCESS, NOT A STATUS. Where the FCRA applies, the required notices,
-    // report/rights delivery and dispute opportunity can be workflow-automated; the platform
-    // must not make final adverse action immediate merely because the statutory screen matched.
-    // A ticket remains a fail-safe until that notice workflow is implemented end to end.
-    if (decision === 'refuse') {
-      await fileTicket({
-        uid,
-        kind: 'support',
-        reason: 'Adverse action due — operator screening',
-        description:
-          `Screening refused for operator ${uid}.\n${(reasons || []).join('\n')}\n\n` +
-          `FCRA ADVERSE ACTION IS OWED:\n` +
-          `1. Send the pre-adverse notice with a copy of the report and "A Summary of Your ` +
-          `Rights Under the FCRA".\n2. Wait at least 5 business days for a dispute.\n` +
-          `3. Send the adverse action notice naming the screening company and stating they ` +
-          `did not make the decision.\nReport ${reportId || '—'}.`,
-      });
-    }
     if (decision === 'review') {
       await fileTicket({
         uid,
@@ -375,10 +360,28 @@ async function recordDecision({ uid, decision, reasons, summary, reportId, provi
           `authoritative source is clarified or the exception is resolved.`,
       });
     }
-    return { ok: true, decision };
+    return { ok: true, decision: storedDecision, proposedDecision: decision === 'refuse' ? 'refuse' : null };
   } catch (e) {
     return { ok: false, reason: e.message };
   }
+}
+
+async function recordAdverseState({ uid, state, actionId = null, reportId = null, final = false, note = null }) {
+  const db = adminDb();
+  if (!db) return { ok: false, reason: 'no database' };
+  const now = Date.now();
+  await db.collection('users').doc(String(uid)).set({
+    screening: {
+      adverseAction: { state, actionId, reportId, updatedAt: now, ...(note ? { note } : {}) },
+      ...(final ? { decision: 'refuse', proposedDecision: null, finalizedAt: now } : {}),
+    },
+  }, { merge: true });
+  await db.collection('operators').doc(String(uid)).set({
+    available: false,
+    screeningBlocked: true,
+    screeningReason: note || 'Background screening is not cleared.',
+  }, { merge: true });
+  return { ok: true };
 }
 
 /**
@@ -580,7 +583,7 @@ module.exports = {
   CRIMINAL_ELEMENTS,
   ACCEPT_EXISTING_MAX_AGE_MS,
   REQUIRED_ELEMENTS,
-  recordDecision,
+  recordDecision, recordAdverseState,
   screeningCurrent,
   screeningReady,
   sweepScreening,

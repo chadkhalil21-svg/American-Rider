@@ -72,8 +72,8 @@ if (typeof keyFor === 'function') {
   check('idempotencyForTravel is exported for testing', false, 'not exported');
 }
 
-// The fee rule is unchanged by any of this.
-check('platform fee still $1.50 at a $25 fare', platformFeeCents(2500) === 150);
+// Payment idempotency must not bypass canonical pricing.
+check('the canonical loss-safe fee still prices a $25 unknown-card Travel', platformFeeCents(2500) === 282);
 
 let bad = 0;
 for (const r of R) { if (!r.ok) bad++; console.log(`${r.ok ? 'PASS' : 'FAIL'}  ${r.l}${r.ok ? '' : '  — ' + (r.d || '')}`); }

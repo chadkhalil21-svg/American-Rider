@@ -53,10 +53,17 @@ async function journeyFor({ db, uid, journeyNo }) {
 async function authoritativeFare({ body, uid = null, email = null, db = null, cardCountryFor = null }) {
   const route = priceRoute(body);
   if (!route || route.outsideMarket || route.permitRequired) return route;
+  const requestedJourneyNo = String(body?.journeyNo || '').trim();
   const [cardCountry, journey] = await Promise.all([
     uid && cardCountryFor ? cardCountryFor({ uid, email }) : null,
-    journeyFor({ db, uid, journeyNo: body?.journeyNo }),
+    journeyFor({ db, uid, journeyNo: requestedJourneyNo }),
   ]);
+  // A caller that names a Smart Travel first leg does not get ordinary single-Travel pricing
+  // merely because the reference is invalid. That would let an unpaid/foreign/chained leg
+  // bypass the journey fee. Fail the quote instead.
+  if (requestedJourneyNo && !journey) {
+    return { invalidJourney: true, reason: 'The Smart Travel first leg is not a paid completed Travel on this account.' };
+  }
   const breakdown = quote(
     route.travelCostCents,
     journey,

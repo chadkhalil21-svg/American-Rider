@@ -37,9 +37,6 @@ function normalizeParty(body = {}, booker = {}) {
     };
   }
 
-  // The product does not accept an unaccompanied-minor booking from a non-guardian account.
-  // The declaration is recorded on the Travel and can be audited; do not collect a child's
-  // date of birth merely to make the UI look precise.
   // Launch posture: do not create an unaccompanied-minor transportation product until the
   // insurance carrier, Florida counsel and operating procedure explicitly approve it. A
   // parent may book for another ADULT; a minor must travel with their guardian in the vehicle.

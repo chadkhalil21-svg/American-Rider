@@ -39,6 +39,9 @@ async function journeyFor({ db, uid, journeyNo }) {
     .where('travelerUid', '==', String(uid)).where('tripNo', '==', no).limit(1).get();
   const leg = snap.docs[0]?.data();
   if (!leg || !leg.paymentIntentId || leg.status !== 'completed' || !(leg.travelCostCents > 0)) return null;
+  // Leg 2 may reference only a first car Travel, never another leg 2. This prevents chaining
+  // completed Travels to keep subtracting previously paid platform fees.
+  if (leg.journeyNo) return null;
   return {
     journeyNo: no,
     leg1FareCents: Number(leg.travelCostCents),

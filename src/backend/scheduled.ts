@@ -59,6 +59,7 @@ export type ScheduledRide = {
   tripNo?: string;
   travelerName?: string;
   travelerEmail?: string;
+  party?: { mode: 'self' | 'other_adult' | 'minor'; travelerName?: string; travelerAge?: number; guardianAttestation?: boolean };
 
   // ---- What the sweep writes back. ------------------------------------------------------
   status?: SchedStatus;
@@ -88,7 +89,11 @@ export async function saveScheduledRide(
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({
         ...clean,
-        travelerName: auth.currentUser?.displayName || '',
+        travelerName: info.party?.travelerName || auth.currentUser?.displayName || '',
+        bookerName: auth.currentUser?.displayName || '',
+        partyMode: info.party?.mode || 'self',
+        guardianAttestation: info.party?.guardianAttestation === true,
+        travelerAge: info.party?.travelerAge,
         pickup: { lat: info.pickupLat, lng: info.pickupLng },
         destinationPoint: { lat: info.destinationLat, lng: info.destinationLng },
       }),

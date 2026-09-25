@@ -201,14 +201,29 @@ function quote(travelCostCents, journey, governmentFees, cardCountry, tollCents)
     feeLines,
     // Internal audit data. /fare-quote does not expose this field; tests and Ops can prove the
     // selected fee still preserves the invariant when any cost constant changes.
-    _economics: economicsFor({
-      travelCostCents,
-      platformFeeCents: appFee,
-      governmentFeeCents,
-      tollCents: tolls,
-      cardCountry,
-      transactionCount: journey && Number(journey.leg1FareCents) > 0 ? 2 : 1,
-    }),
+    _economics: journey && Number(journey.leg1FareCents) > 0
+      ? economicsFor({
+          travelCostCents: Number(journey.leg1FareCents) + travelCostCents,
+          platformFeeCents: platformFeeCents(
+            Number(journey.leg1FareCents) + travelCostCents,
+            cardCountry,
+            Math.max(0, Number(journey.leg1GovernmentFeeCents) || 0) + governmentFeeCents,
+            Math.max(0, Number(journey.leg1TollCents) || 0) + tolls,
+            2,
+          ),
+          governmentFeeCents: Math.max(0, Number(journey.leg1GovernmentFeeCents) || 0) + governmentFeeCents,
+          tollCents: Math.max(0, Number(journey.leg1TollCents) || 0) + tolls,
+          cardCountry,
+          transactionCount: 2,
+        })
+      : economicsFor({
+          travelCostCents,
+          platformFeeCents: appFee,
+          governmentFeeCents,
+          tollCents: tolls,
+          cardCountry,
+          transactionCount: 1,
+        }),
   };
 }
 

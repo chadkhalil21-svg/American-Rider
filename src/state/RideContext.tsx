@@ -117,9 +117,9 @@ export type SmartStatus = 'idle' | 'checking' | 'ok' | 'none' | 'unavailable';
 // three legs on a 4.2-second cadence under a made-up Travel Number, and a screen labelled
 // "Total Charged" showed an amount nobody had charged (release review, 6 Sept 2026, P0).
 // Chad's instruction (9 Sept 2026) is to build it real: two dispatched car travels around a
-// transit leg the traveler rides on their own ticket. This is the record that ties them
-// together. The platform fee is charged ONCE for the journey — on the combined car fare —
-// which is why leg 2 has to know leg 1's number (see feeFor).
+// transit leg the traveler rides on their own ticket. This record ties them together. The
+// journey has one combined platform-fee requirement sized for BOTH car PaymentIntents; leg 1
+// carries the ordinary first-leg amount and leg 2 carries only the incremental remainder.
 export type SmartJourney = {
   plan: SmartPlan;
   /** Where the journey began and where it ends — the endpoints leg 2 needs to restore. */

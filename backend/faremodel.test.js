@@ -22,37 +22,32 @@ const HOME = { lat: 25.7689, lng: -80.1935 }; // Brickell City Centre
 // Priced through a router's own numbers, so neither the circuity factor nor the assumed speed
 // can flatter the result. This is the number in Chad's comparison, to the cent.
 const chad = fareCentsForCoords(HOME, { lat: 25.7953, lng: -80.2789 }, { routedMiles: 5.04, routedMinutes: 15 });
-check('the verified route prices at a $7.53 fare — $1.00 + 5.04 miles + 15 minutes',
-  chad.travelCostCents === 753, `got ${usd(chad.travelCostCents)}`);
+check('the audited launch route prices at an $11.05 fare — $1.50 + 5.04 miles + 15 minutes',
+  chad.travelCostCents === 1105, `got ${usd(chad.travelCostCents)}`);
 
-// THE ASSERTION THAT MATTERS, AND THE ONE THIS FILE GOT WRONG FIRST TIME. It compared our FARE
-// to Uber's PRICE and was labelled "undercuts both platforms" while only ever testing against
-// Lyft. Our traveler pays the fare PLUS the platform fee, so that is what has to be compared,
-// and against the CHEAPER of the two competitors, not the dearer.
+// The launch model no longer promises to undercut every instantaneous incumbent quote. It
+// prices road distance and traffic-adjusted operator time, then keeps the platform take small.
+// This route therefore pins our own deterministic arithmetic rather than one historical quote.
 const allIn = chad.travelCostCents + platformFeeCents(chad.travelCostCents, 'US');
-check('what the traveler ACTUALLY PAYS is under UberX $9.15, fee included',
-  allIn < 915, `ours all-in ${usd(allIn)}`);
-check('and under Lyft $11.98 by a wide margin', allIn < 1198, `ours all-in ${usd(allIn)}`);
-// The other half of the promise, on the same trip, from the same fare.
-check('while the operator receives more than an Uber driver would at the TOP of the 55-70% band',
-  chad.travelCostCents - commissionCents(chad.travelCostCents) > 641,
-  `operator ${usd(chad.travelCostCents - commissionCents(chad.travelCostCents))} vs $6.41`);
+check('the traveler total is the fare plus the $2.00 launch platform minimum',
+  allIn === 1305, `ours all-in ${usd(allIn)}`);
+check('the operator receives 99% of the transportation fare',
+  chad.travelCostCents - commissionCents(chad.travelCostCents) === 1094,
+  `operator ${usd(chad.travelCostCents - commissionCents(chad.travelCostCents))}`);
 check('a routed travel is marked as measured, not assumed', chad.timedBy === 'router');
-check('the $1.80-per-mile model would have charged $12.07 — above both. It is gone.',
-  chad.travelCostCents < 1207);
 
 // ---- The time term is real, and it is what the $1.80 model could not do ------------------
 const clear = fareCentsForCoords(HOME, { lat: 25.7953, lng: -80.2789 }, { routedMiles: 5.04, routedMinutes: 15 });
 const stuck = fareCentsForCoords(HOME, { lat: 25.7953, lng: -80.2789 }, { routedMiles: 5.04, routedMinutes: 40 });
 check('the same five miles in forty minutes pays the operator more than in fifteen',
-  stuck.travelCostCents - clear.travelCostCents === 375,
+  stuck.travelCostCents - clear.travelCostCents === 625,
   `${usd(clear.travelCostCents)} vs ${usd(stuck.travelCostCents)}`);
 
 // ---- The stand-in speed, and the one thing it must reproduce -----------------------------
 check('with no router, the calibration route still resolves to 15.0 minutes',
   Math.abs(minutesFor(5.04, null) - 15) < 0.05, `got ${minutesFor(5.04, null).toFixed(2)}`);
 check('and therefore to within a cent of the routed price',
-  Math.abs(fareCentsForCoords(HOME, { lat: 25.7953, lng: -80.2789 }, { routedMiles: 5.04 }).travelCostCents - 753) <= 2);
+  Math.abs(fareCentsForCoords(HOME, { lat: 25.7953, lng: -80.2789 }, { routedMiles: 5.04 }).travelCostCents - 1105) <= 2);
 check('an unrouted travel says so', fareCentsForCoords(HOME, { lat: 25.7826, lng: -80.1341 }).timedBy === 'estimate');
 check('assumed speed rises with distance — a city mile is not a Turnpike mile',
   assumedMph(1) < assumedMph(10) && assumedMph(10) < assumedMph(30));
@@ -66,19 +61,18 @@ let worstJump = 0;
 let prev = null;
 for (let tenths = 1; tenths <= 4000; tenths += 1) {
   const m = tenths / 10;
-  const cents = 100 + Math.round(m * 85) + Math.round(minutesFor(m, null) * 15);
+  const cents = 150 + Math.round(m * 115) + Math.round(minutesFor(m, null) * 25);
   if (prev !== null) worstJump = Math.max(worstJump, cents - prev);
   prev = cents;
 }
-check('a tenth of a mile further never costs more than 20 cents more', worstJump <= 20, `${worstJump}c`);
+check('a tenth of a mile further never costs more than 30 cents more', worstJump <= 30, `${worstJump}c`);
 
 // ---- The floor is on what the traveler pays ---------------------------------------------
 const tiny = fareCentsForCoords(HOME, { lat: 25.769, lng: -80.1936 });
-check('the shortest possible travel costs the traveler exactly $5.00',
+check('the shortest possible travel costs the traveler exactly $6.50',
   tiny.travelCostCents + platformFeeCents(tiny.travelCostCents, 'US') === MIN_TOTAL_CENTS,
   `${usd(tiny.travelCostCents + platformFeeCents(tiny.travelCostCents, 'US'))}`);
-check('which is below both competitors\' Miami minimums (UberX $6.09, Lyft... $3.62 is lower)',
-  MIN_TOTAL_CENTS < 609);
+check('the minimum is pinned at $6.50 rather than inferred from a competitor quote', MIN_TOTAL_CENTS === 650);
 
 // ---- The named table has not been left behind -------------------------------------------
 // It priced every destination under the old model for two months. A table that disagrees with

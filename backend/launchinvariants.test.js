@@ -17,7 +17,7 @@ const party=read('backend/travelparty.js');
 assert.ok(party.includes('unaccompanied_minor_not_supported'));
 assert.ok(server.includes('party: operatorPartyView(party)'));
 assert.ok(server.includes('travelerName: party.travelerName'));
-assert.ok(server.includes('travelerName: scheduledParty') || server.includes('travelerName: party.travelerName'));
+assert.ok((server.match(/travelerName: party\.travelerName/g)||[]).length >= 2, 'immediate and scheduled Travel use normalized Traveler identity');
 
 const smart=read('backend/payments.js');
 assert.ok(smart.includes('transactionCount: 2'));

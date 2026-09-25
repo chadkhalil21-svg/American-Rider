@@ -795,7 +795,13 @@ async function transferToOperator({
     return { ok: false, code: 'no_fare_on_record', error: 'That payment predates fare stamping', paidWith };
   }
   const recordedTollCents = Math.max(0, Number(pi.metadata?.tollCents || 0));
-  const q = quote(travelCostCents, undefined, undefined, 'US', recordedTollCents);
+  // Settlement needs only the operator side. Do NOT re-price the platform fee here: the
+  // issuing-country schedule was fixed at quote/payment time and is stamped on Stripe.
+  const recordedCommission = commissionCents(travelCostCents);
+  const q = {
+    operatorGets: travelCostCents - recordedCommission + recordedTollCents,
+    platformTake: Math.max(0, Number(pi.metadata?.platformTake || 0)),
+  };
 
   try {
     const transfer = await stripe.transfers.create(

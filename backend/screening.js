@@ -21,9 +21,11 @@
 //
 // HOW MOST OF THEM ARE DECIDED IN A SECOND. Checkr returns `clear`, `consider` or `suspended`.
 // `clear` passes instantly with nobody involved. `consider` is put through the statutory
-// standard below, which is deterministic and resolves the great majority on its own. Only a
-// record the rules genuinely cannot place reaches a person, and the model writes the summary
-// they read — it never decides.
+// standard below, which is deterministic and resolves every case the authoritative data can
+// place. American Rider adds no discretionary criminal-history exclusions beyond the launch
+// jurisdiction's rule set. If source data is missing, contradictory or under dispute, the
+// operator remains blocked while the source is clarified; nobody is asked to guess. Human
+// review is the last exception path for a genuine source conflict, not a routine approval step.
 const { readKey } = require('./env');
 const { adminDb } = require('./firebase-admin');
 const { fileTicket } = require('./tickets');
@@ -283,14 +285,14 @@ function adjudicate(report, { now = Date.now() } = {}) {
     return {
       decision: 'review',
       reasons: ['The screening company flagged this report, but its findings could not be read by the standard.'],
-      summary: 'Flagged by the screening company; findings unreadable. A person must decide.',
+      summary: 'Flagged by the screening company; authoritative findings are unavailable. Source clarification is required before qualification can continue.',
     };
   }
   if (unplaceable.length) {
     return {
       decision: 'review',
       reasons: unplaceable.map((r) => `${r.charge || 'record'} — no date on the record.`),
-      summary: 'A record on this report has no date and cannot be placed in a statutory window.',
+      summary: 'A record on this report has no usable date and cannot be placed in a statutory window. Source clarification is required.',
     };
   }
   return { decision: 'pass', reasons: [], summary: 'Meets Florida’s requirements.' };
@@ -344,9 +346,10 @@ async function recordDecision({ uid, decision, reasons, summary, reportId, provi
       );
     }
 
-    // ADVERSE ACTION IS A PROCESS, NOT A STATUS. The FCRA requires a pre-adverse notice with a
-    // copy of the report and a summary of rights, a waiting period, then the adverse notice.
-    // That is a person's job and a deadline, so it is filed as one rather than left implicit.
+    // ADVERSE ACTION IS A PROCESS, NOT A STATUS. Where the FCRA applies, the required notices,
+    // report/rights delivery and dispute opportunity can be workflow-automated; the platform
+    // must not make final adverse action immediate merely because the statutory screen matched.
+    // A ticket remains a fail-safe until that notice workflow is implemented end to end.
     if (decision === 'refuse') {
       await fileTicket({
         uid,
@@ -365,11 +368,11 @@ async function recordDecision({ uid, decision, reasons, summary, reportId, provi
       await fileTicket({
         uid,
         kind: 'support',
-        reason: 'Operator screening needs a decision',
+        reason: 'Operator screening needs source clarification',
         description:
-          `A screening result could not be placed by the standard.\n${summary}\n` +
-          `${(reasons || []).join('\n')}\nReport ${reportId || '—'}. Nobody drives until this ` +
-          `is decided.`,
+          `A screening result could not be placed by the statutory standard.\n${summary}\n` +
+          `${(reasons || []).join('\n')}\nReport ${reportId || '—'}. Nobody drives until the ` +
+          `authoritative source is clarified or the exception is resolved.`,
       });
     }
     return { ok: true, decision };

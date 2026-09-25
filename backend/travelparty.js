@@ -18,9 +18,7 @@ function normalizeParty(body = {}, booker = {}) {
         mode: 'self',
         travelerName: bookerName,
         bookerName,
-        guardian: null,
         bookedForAnother: false,
-        minor: false,
       },
     };
   }
@@ -31,8 +29,8 @@ function normalizeParty(body = {}, booker = {}) {
     return {
       ok: true,
       party: {
-        mode, travelerName, bookerName, guardian: null,
-        bookedForAnother: true, minor: false,
+        mode, travelerName, bookerName,
+        bookedForAnother: true,
       },
     };
   }
@@ -45,8 +43,6 @@ function operatorPartyView(party) {
   return {
     travelerName: clean(p.travelerName || 'Traveler'),
     bookedForAnother: p.bookedForAnother === true,
-    minor: false,
-    guardianName: null,
   };
 }
 

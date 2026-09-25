@@ -29,6 +29,8 @@ assert.ok(server.includes('releaseLease(name'), 'server must release leadership 
 
 assert.ok(scheduled.includes("mode: 'self' | 'other_adult'"), 'scheduled Travel must preserve Booker/Traveler party semantics');
 assert.equal(/guardianAttestation|travelerAge|\| 'minor'/.test(scheduled), false, 'provisional minor product must not remain in scheduled Travel');
+const party=read('backend/travelparty.js');
+assert.equal(/guardian|minor/i.test(party), false, 'provisional minor/guardian product must not remain in server party semantics');
 assert.ok(scheduler.includes('party: r.party || null'), 'scheduled reservation party must reach dispatched Travel');
 
 console.log('✓ one-transfer Stripe architecture');

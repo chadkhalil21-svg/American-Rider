@@ -182,6 +182,7 @@ export default function OperatorHome() {
   useFocusEffect(clearTimers);
 
   const earn = request ? earnOf(request.fare) : 0;
+  const travelerTotal = request ? request.fare + platformFee(request.fare) : 0;
 
   return (
     <OperatorScreen nav="home" note={note}>
@@ -372,6 +373,7 @@ export default function OperatorHome() {
                   <Num size={24} weight="600" color={colors.green} style={{ marginTop: 3 }}>
                     {fmt(earn)}
                   </Num>
+                  <Text style={styles.travelerTotal}>Traveler Total · {fmt(travelerTotal)}</Text>
                 </View>
               </View>
               <View style={styles.routeCard}>
@@ -550,6 +552,7 @@ const styles = StyleSheet.create({
   travelerRow: { flexDirection: 'row', alignItems: 'center', marginTop: 14 },
   travelerName: { fontSize: 16, fontWeight: '600', color: colors.ink },
   travelerRating: { fontSize: 13, color: colors.muted, marginTop: 2 },
+  travelerTotal: { fontSize: 11.5, color: colors.muted, marginTop: 4 },
   estLabel: { fontSize: 9.5, fontWeight: '600', letterSpacing: 1.43, color: colors.muted },
   routeCard: {
     marginTop: 16,

@@ -1552,10 +1552,6 @@ app.post('/charge-ride', requireAuth, LIMITS.payments, async (req, res) => {
   try {
     const result = await chargeRide({
       travelCostCents: priced.travelCostCents,
-      // NOT FROM THE BODY. The destination is never the caller's to name — see above. Left
-      // null: this route proves a charge, and the operator's 99% moves at settlement, from a
-      // destination the server looks up itself (POST /travel/settle).
-      operatorStripeAccount: null,
       travelerPaymentMethod: req.body?.travelerPaymentMethod || null,
       uid: req.uid,
       tripNo: req.body?.tripNo || null,

@@ -414,42 +414,81 @@ export const INSURERS: {
 ];
 
 export const APP_FEE = 2.0;
-export const PROC_ACH = 0.25;
-export const PROC_CARD = 0.74;
 
-// ——— THE PLATFORM FEE (Chad, 9 Sept 2026: "five percent"; relayed by Adrian) ———————————
-//
-// THE RULE. The platform fee is the greater of $1.50 and 5% of the travel fare, rounded UP
-// to the cent. Below a $30 fare it is $1.50 exactly; at $30 the two halves meet, so the price
-// is continuous — no step, no cliff.
-//
-// WHY 5%. Stripe takes 2.9% + $0.30 of the WHOLE charge (fare plus fee), and 4.4% on an
-// international card. The 1% coordination commission already comes out of the fare, so the
-// fee has to cover the rest: 5% is the smallest round rate at which no travel loses money on
-// either kind of card, at any fare. (The previous rule — $1.50 up to a ~$60.87 break-even,
-// then a grossed-up floor plus 1% of the excess — netted $0.02 at a $60 fare and lost on
-// international cards.)
-//
-// WHAT DOES NOT CHANGE. The operator keeps 99% of the travel fare at every price; the fee is
-// added on top and never taken from their share. ONE price for every payment method: the fee
-// is the same whether the traveler pays by bank or card, because the quote is shown before
-// the charge settles and two prices for one journey would contradict the one-all-in-price
-// promise.
-//
-// backend/payments.js platformFeeCents() is the same rule in integer cents. THE TWO MUST
-// NEVER DISAGREE: the app quotes with one and the server charges with the other, and a
-// traveler quoted $64.54 and charged $64.55 has been shown two prices for one journey.
-// backend/payments.test.js proves them equal for every cent from $0 to $500.
+// Internal launch-economics constants. The server remains authoritative; these mirror
+// backend/economics.js so local display fallbacks cannot quote a different amount.
+const CARD_BPS_DOMESTIC = 290;
+const CARD_BPS_INTERNATIONAL = 440;
+const STRIPE_FIXED_CENTS = 30;
+const CONNECT_VARIABLE_BPS = 50;
+const CONNECT_FIXED_ALLOWANCE_CENTS = 16;
+const CONTINGENCY_RESERVE_CENTS = 25;
+const OPERATING_OVERHEAD_ALLOWANCE_CENTS = 25;
+const MIN_PLATFORM_CONTRIBUTION_CENTS = 75;
+
+/** Unknown is intentionally international-safe; first-time foreign cards are not subsidized. */
+export function isDomesticCard(cardCountry?: string | null): boolean {
+  return String(cardCountry || '').trim().toUpperCase() === 'US';
+}
+
+const ceilBps = (cents: number, bps: number) =>
+  cents > 0 && bps > 0 ? Math.ceil((cents * bps) / 10000) : 0;
 
 /**
- * The travel fare inside an all-in total.
+ * The smallest whole-cent fee that preserves the complete launch unit-economic invariant.
  *
- * Deriving it as `total - APP_FEE` is only right while the fee is $1.50, which it stops being
- * above a $30 fare. A receipt built that way would misstate the fare and the operator's share
- * on exactly the travels where the numbers are largest.
+ * This is NOT "$2 or a percentage". It directly funds card processing on the whole charge,
+ * both variable Connect charges, a conservative fixed Connect allowance, 25c contingency,
+ * 25c operating/infrastructure allowance and at least 75c of platform contribution.
  *
- * platformFee() is monotonic in the fare, so this bisects it. Forty iterations resolves far
- * finer than a cent.
+ * Government fees and tolls remain pass-throughs to their beneficiaries. Their induced
+ * payment-processing cost is recovered in this fee instead of being silently subsidized.
+ */
+export function platformFee(
+  travelCost: number,
+  cardCountry?: string | null,
+  governmentFee = 0,
+  toll = 0,
+  transactionCount = 1,
+): number {
+  const fareCents = Math.max(0, Math.round(travelCost * 100));
+  const governmentCents = Math.max(0, Math.round(governmentFee * 100));
+  const tollCents = Math.max(0, Math.round(toll * 100));
+  const units = Math.max(1, Math.trunc(transactionCount || 1));
+  const commission = Math.floor(fareCents * 0.01);
+  const operatorGets = fareCents - commission + tollCents;
+  const bps = isDomesticCard(cardCountry) ? CARD_BPS_DOMESTIC : CARD_BPS_INTERNATIONAL;
+
+  const sufficient = (feeCents: number) => {
+    const travelerPays = fareCents + feeCents + governmentCents + tollCents;
+    const stripe = ceilBps(travelerPays, bps) + STRIPE_FIXED_CENTS * units;
+    const connectVariable = ceilBps(operatorGets, CONNECT_VARIABLE_BPS);
+    const contribution =
+      commission + feeCents -
+      stripe -
+      connectVariable -
+      CONNECT_FIXED_ALLOWANCE_CENTS * units -
+      CONTINGENCY_RESERVE_CENTS * units -
+      OPERATING_OVERHEAD_ALLOWANCE_CENTS * units;
+    return contribution >= MIN_PLATFORM_CONTRIBUTION_CENTS * units;
+  };
+
+  let lo = Math.round(APP_FEE * 100);
+  if (sufficient(lo)) return lo / 100;
+  lo += 1;
+  let hi = Math.max(400, Math.ceil(fareCents * 0.10) + 500);
+  while (!sufficient(hi)) hi *= 2;
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (sufficient(mid)) hi = mid;
+    else lo = mid + 1;
+  }
+  return lo / 100;
+}
+
+/**
+ * Recover the fare from an all-in fare+platform-fee total. Pass-throughs are not part of this
+ * inversion; receipts know them explicitly and must remove them before calling this helper.
  */
 export function fareFromTotal(total: number, cardCountry?: string | null): number {
   if (total <= 0) return 0;
@@ -463,34 +502,10 @@ export function fareFromTotal(total: number, cardCountry?: string | null): numbe
   return Math.round(lo * 100) / 100;
 }
 
-/**
- * Whether a card falls under the domestic schedule. Stripe writes the issuing country on
- * PaymentMethod.card.country. UNKNOWN COUNTS AS DOMESTIC — see backend/payments.js
- * isDomesticCard() for why, in full: the quote must not move once a card is entered.
- */
-export function isDomesticCard(cardCountry?: string | null): boolean {
-  if (cardCountry === undefined || cardCountry === null || cardCountry === '') return true;
-  return String(cardCountry).trim().toUpperCase() === 'US';
-}
-
-/**
- * What American Rider adds to the travel fare, on the schedule the card falls under:
- * the greater of $2.00 and 3.25% of the fare on a US card, or 5.5% on any other, rounded up
- * to the cent. Revised 25 Sept 2026 after the Connect-cost audit: the $2 floor absorbs the
- * $2/month active-account charge and ordinary payout overhead; the proportional rates preserve
- * a 25-cent operating reserve under the model instead of merely breaking even on card processing.
- * The rule remains continuous and monotonic; there are no price steps.
- */
-export function platformFee(travelCost: number, cardCountry?: string | null): number {
-  // Whole cents first; integer rational arithmetic keeps the app and server exact to the cent.
-  const fareCents = Math.round(travelCost * 100);
-  const numerator = isDomesticCard(cardCountry) ? 13 : 11;
-  const denominator = isDomesticCard(cardCountry) ? 400 : 200;
-  return Math.max(APP_FEE, Math.ceil((fareCents * numerator) / denominator) / 100);
-}
-
-export const procFor = (pay: string) => (pay === 'ach' ? PROC_ACH : PROC_CARD);
-// The coordination commission: a flat 1% of the travel fare. NO CAP.
+// Legacy demo-only internal estimates. They are not used to price a live Travel.
+export const PROC_ACH = 0.25;
+export const PROC_CARD = 0.74;
+export const procFor = (pay: string) => (pay === 'ach' ? PROC_ACH : PROC_CARD);// The coordination commission: a flat 1% of the travel fare. NO CAP.
 //
 // This capped at $1 until 16 Aug 2026 — as does the founders' web demo, whose own
 // coord() is Math.min(0.01*c, 1). Chad corrected it: "there is no 1 dollar cap, it is

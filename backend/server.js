@@ -76,7 +76,7 @@ const { presenceStale, coverageLapsed, matchOperator, etaMinutes } = require('./
 // DISCLOSURE IS IMPORTED FOR .statute, and leaving it out is how the acknowledge route below
 // threw `DISCLOSURE is not defined` for a day — every operator who read the disclosure was
 // refused when they said so, and could not go on duty. The 25 disclosure tests all passed:
-// they exercise disclosure.js directly and never call this route. Same shape as the tip path
+// they exercise disclosure.js directly and never call this route. Same class of wiring defect as an orphaned backend path
 // and the screening gate — written at both ends, unwired at the point that consumes it.
 const {
   DISCLOSURE, DISCLOSURE_VERSION, disclosureFor, disclosureCurrent,
@@ -415,7 +415,7 @@ app.post('/account/close', requireAuth, async (req, res) => {
 // Served here so they are real, live web pages with no separate hosting to manage.
 // --- The public website. -------------------------------------------------------------------
 //
-// THE DEFECT THIS CLOSES, and it is the same one as chargeTip. backend/site.js was written,
+// THE DEFECT THIS CLOSES, and it is the same class as an unwired money path. backend/site.js was written,
 // reviewed and committed with six finished pages on it — and nothing ever required the file.
 // Only /terms and /privacy were served, so americanrider.app answered a bare Express 404 while
 // a nine-page site sat in the repo. Written is not shipped.
@@ -806,7 +806,7 @@ app.post('/operator/online', requireAuth, async (req, res) => {
     // decides anything. An operator who had never been screened could carry a passenger
     // provided they had a Stripe account and had typed a date into a box.
     //
-    // Built at both ends and not wired at the gate — the same shape as the tip path, the
+    // Built at both ends and not wired at the gate — the same class as an unwired backend path, the
     // website, and the AI planner. It is why "the code exists" is no longer evidence here.
     //
     // WHY IT IS GATED ON LIVE MODE rather than always. dispatch.ts already draws this line:

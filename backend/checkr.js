@@ -427,7 +427,12 @@ async function handleEvent(event) {
     const decided = adjudicate(mapReport(report, details));
     let adverseAction = null;
     if (decided.decision === 'refuse') {
-      const adverse = await startProviderAdverseAction({ reportId, reasons: decided.reasons, api });
+      // Queue replay/crash recovery may deliver report.completed more than once. Checkr rejects
+      // a second active adverse action, so reuse the provider's durable action when one exists.
+      const active = await activeProviderAdverseActions({ reportId, api }).catch(() => []);
+      const adverse = active[0]
+        ? { ok: true, actionId: active[0].id, status: active[0].status, postNoticeScheduledAt: active[0].post_notice_scheduled_at || null }
+        : await startProviderAdverseAction({ reportId, reasons: decided.reasons, api });
       if (!adverse.ok) {
         const out = await recordDecision({
           uid, decision: 'review',

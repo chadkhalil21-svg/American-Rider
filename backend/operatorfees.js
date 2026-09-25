@@ -11,7 +11,8 @@ const { postPlatformMessage } = require('./platforminbox');
 
 const ACCOUNT_COST_CENTS = 200;
 const WAIVER_TRAVELS = 20;
-const CARD_PCT = 0.029;
+const DOMESTIC_CARD_PCT = 0.029;
+const INTERNATIONAL_CARD_PCT = 0.044;
 const CARD_FIXED_CENTS = 30;
 
 const pad = (n) => String(n).padStart(2, '0');
@@ -27,17 +28,20 @@ function monthBounds(key) {
   const end = Date.UTC(y, mon + 1, 1);
   return { start, end };
 }
-const grossUp = (cost) => Math.ceil((cost + CARD_FIXED_CENTS) / (1 - CARD_PCT));
-function accountFeeQuote(completedTravels, payoutSeen = true) {
+const grossUp = (cost, pct) => Math.ceil((cost + CARD_FIXED_CENTS) / (1 - pct));
+function accountFeeQuote(completedTravels, payoutSeen = true, cardCountry = null) {
   const waived = !payoutSeen || Number(completedTravels || 0) >= WAIVER_TRAVELS;
   const costCents = waived ? 0 : ACCOUNT_COST_CENTS;
-  const totalCents = waived ? 0 : grossUp(costCents);
+  // Unknown card country is international-safe for the same reason Traveler pricing is.
+  const pct = String(cardCountry || '').toUpperCase() === 'US' ? DOMESTIC_CARD_PCT : INTERNATIONAL_CARD_PCT;
+  const totalCents = waived ? 0 : grossUp(costCents, pct);
   return {
     waived,
     threshold: WAIVER_TRAVELS,
     completedTravels: Number(completedTravels || 0),
     costCents,
     processingCents: totalCents - costCents,
+    cardCountry: cardCountry || null,
     totalCents,
   };
 }
@@ -88,14 +92,15 @@ async function sweepOperatorAccountFees({ charge, now = Date.now() } = {}) {
     if (!rec.payoutSeen || rec.feeStatus === 'paid' || rec.feeStatus === 'waived') continue;
     if (rec.feeStatus === 'due' && Number(rec.lastAttemptAt || 0) > now - 24 * 60 * 60 * 1000) continue;
     const count = await completedTravelsInMonth(db, d.id, month);
-    const q = accountFeeQuote(count, true);
+    const user = await db.collection('users').doc(d.id).get();
+    const email = user.exists ? (user.data()?.email || null) : null;
+    const cardCountry = user.exists ? (user.data()?.defaultCardCountry || null) : null;
+    const q = accountFeeQuote(count, true, cardCountry);
     if (q.waived) {
       await d.ref.set({ completedTravels: count, feeStatus: 'waived', feeQuote: q, assessedAt: now }, { merge: true });
       waived++;
       continue;
     }
-    const user = await db.collection('users').doc(d.id).get();
-    const email = user.exists ? (user.data()?.email || null) : null;
     const result = await charge({ uid: d.id, email, month, amountCents: q.totalCents, quote: q });
     if (result?.ok) {
       await d.ref.set({

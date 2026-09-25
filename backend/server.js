@@ -110,7 +110,7 @@ const { sweepMonitor, sweepAssignments } = require('./monitor');
 const { notify } = require('./push');
 const { handleEvent, webhookReady } = require('./webhook');
 const { enqueueProviderEvent, processProviderEvent, sweepProviderEvents } = require('./providerqueue');
-const { acquireLease } = require('./schedulerlease');
+const { acquireLease, renewLease, releaseLease, DEFAULT_LEASE_MS } = require('./schedulerlease');
 const { sweepOperatorAccountFees } = require('./operatorfees');
 const crypto = require('node:crypto');
 const WORKER_ID = crypto.randomUUID();
@@ -1614,10 +1614,25 @@ async function runAllSweeps() {
 }
 
 async function runLeasedSweeps() {
-  const lease = await acquireLease('operations_sweep', { owner: WORKER_ID });
+  const name = 'operations_sweep';
+  const lease = await acquireLease(name, { owner: WORKER_ID, ttlMs: DEFAULT_LEASE_MS });
   if (!lease.ok) return { ok: false, reason: lease.reason || 'scheduler lease unavailable' };
   if (!lease.acquired) return { ok: true, skipped: 'another server owns this sweep', leaseUntil: lease.leaseUntil };
-  return runAllSweeps();
+
+  // Renew well before expiry while provider/network work is still running. If this process
+  // dies, renewal dies with it and another instance can take over after the lease expires.
+  const heartbeat = setInterval(() => {
+    renewLease(name, { owner: WORKER_ID, ttlMs: DEFAULT_LEASE_MS })
+      .then((x) => { if (!x.renewed) console.error('[scheduler] lease renewal lost', x); })
+      .catch((e) => console.error('[scheduler] lease renewal failed', e?.message || e));
+  }, Math.max(15_000, Math.floor(DEFAULT_LEASE_MS / 3)));
+  heartbeat.unref?.();
+  try {
+    return await runAllSweeps();
+  } finally {
+    clearInterval(heartbeat);
+    await releaseLease(name, { owner: WORKER_ID }).catch(() => {});
+  }
 }
 
 async function runSweep(req, res) {

@@ -2587,11 +2587,14 @@ app.post('/travel/schedule', requireAuth, LIMITS.dispatch, async (req, res) => {
   if (priced.pricedBy !== 'distance') {
     return res.status(400).json({ error: 'A valid pickup and destination position are required to create Travel.', code: 'route_geometry_required' });
   }
+  const partyResult = normalizeParty(b, { uid: req.uid, name: req.name || b.bookerName || b.travelerName || '' });
+  if (!partyResult.ok) return res.status(400).json({ error: partyResult.error, code: partyResult.code });
+  const party = partyResult.party;
   try {
     const ref = db.collection('scheduled_rides').doc();
     const tripNo = travelNumberFor(ref.id, pickup);
     const record = {
-      travelerUid: String(req.uid), travelerName: String(b.travelerName || '').slice(0, 60),
+      travelerUid: String(req.uid), travelerName: party.travelerName.slice(0, 60), party,
       travelerEmail: req.email || '', when: String(b.when || '').slice(0, 40),
       time: String(b.time || '').slice(0, 12), period: b.period === 'AM' ? 'AM' : 'PM',
       arr: String(b.arr || '').slice(0, 80), dep: String(b.dep || '').slice(0, 60),

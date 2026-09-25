@@ -123,6 +123,7 @@ const { readDocument, documentsReady, READER_VERSION } = require('./documents');
 const { ready: r2Ready, uploadUrl: r2UploadUrl, readUrl: r2ReadUrl, owns: r2Owns } = require('./r2');
 const { assessOperator, assessAndRecord } = require('./qualification');
 const { normalizeParty, operatorPartyView } = require('./travelparty');
+const { listPlatformMessages, markPlatformMessageRead } = require('./platforminbox');
 const { page } = require('./shell');
 const {
   screeningReady, evaluateExistingReport, screeningCurrent,
@@ -616,6 +617,16 @@ app.get('/support/cases', requireAuth, async (req, res) => {
   } catch (e) {
     return res.status(502).json({ error: 'Your cases could not be read', detail: String(e && e.message || e) });
   }
+});
+
+// --- Platform inbox: durable American Rider -> Operator/account communications. -----------
+app.get('/operator/inbox', requireAuth, async (req, res) => {
+  const out = await listPlatformMessages(req.uid, req.query?.limit);
+  res.status(out.ok ? 200 : 503).json(out);
+});
+app.post('/operator/inbox/:id/read', requireAuth, async (req, res) => {
+  const out = await markPlatformMessageRead(req.uid, req.params.id);
+  res.status(out.ok ? 200 : out.reason === 'not found' ? 404 : 503).json(out);
 });
 
 // --- OPERATOR PAYOUTS: Stripe Connect onboarding. -----------------------------------------

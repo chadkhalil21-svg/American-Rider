@@ -39,7 +39,12 @@ async function journeyFor({ db, uid, journeyNo }) {
     .where('travelerUid', '==', String(uid)).where('tripNo', '==', no).limit(1).get();
   const leg = snap.docs[0]?.data();
   if (!leg || !leg.paymentIntentId || leg.status !== 'completed' || !(leg.travelCostCents > 0)) return null;
-  return { journeyNo: no, leg1FareCents: Number(leg.travelCostCents) };
+  return {
+    journeyNo: no,
+    leg1FareCents: Number(leg.travelCostCents),
+    leg1GovernmentFeeCents: Math.max(0, Number(leg.governmentFeeCents) || 0),
+    leg1TollCents: Math.max(0, Number(leg.tollCents) || 0),
+  };
 }
 
 async function authoritativeFare({ body, uid = null, email = null, db = null, cardCountryFor = null }) {
@@ -49,7 +54,13 @@ async function authoritativeFare({ body, uid = null, email = null, db = null, ca
     uid && cardCountryFor ? cardCountryFor({ uid, email }) : null,
     journeyFor({ db, uid, journeyNo: body?.journeyNo }),
   ]);
-  const breakdown = quote(route.travelCostCents, journey, route.governmentFees, cardCountry);
+  const breakdown = quote(
+    route.travelCostCents,
+    journey,
+    route.governmentFees,
+    cardCountry,
+    route.tollCents || 0,
+  );
   return { ...route, ...breakdown, journey, cardCountry: cardCountry || null };
 }
 

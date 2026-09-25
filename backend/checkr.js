@@ -293,7 +293,7 @@ async function handleEvent(event) {
     const uid = await uidForCandidate(report?.candidate_id || object.candidate_id);
     if (!uid) return { ok: true, action: 'adverse action not mapped to operator' };
 
-    if (type === 'adverse_action.completed') {
+    if (type === 'report.post_adverse_action' || type === 'adverse_action.completed') {
       await recordAdverseState({
         uid, state: 'final', actionId: object.id || null, reportId, final: true,
         note: 'The provider completed the adverse-action notice process.',
@@ -312,7 +312,7 @@ async function handleEvent(event) {
       return { ok: true, action: 'adverse delivery exception', uid };
     }
     const state =
-      type === 'adverse_action.paused' ? 'disputed' :
+      (type === 'adverse_action.paused' || type === 'report.pre_adverse_action') ? 'pre_adverse' :
       type === 'adverse_action.canceled' ? 'canceled' :
       type === 'adverse_action.resumed' ? 'pre_adverse' :
       'pre_adverse';

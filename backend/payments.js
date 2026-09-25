@@ -2,9 +2,9 @@
 // This is the money math + Stripe calls. The HTTP server (server.js) exposes it to the app.
 //
 // The traveler is charged ONE all-in price, split automatically:
-//   99% of the travel cost → the operator's connected account
-//   1% commission (no cap) + the platform fee → American Rider (the fee absorbs Stripe's cut)
-//   The platform fee is the greater of $1.50 and 5% of the travel cost — see platformFeeCents().
+//   Traveler charge → American Rider's platform PaymentIntent.
+//   On completed Travel, an explicit source_transaction transfer sends 99% of fare + tolls
+//   to the Operator. American Rider retains the 1% commission + dynamically sufficient platform fee.
 //   A government fee (fees.js — an airport's or a port's per-pickup charge) is added to what
 //   the traveler pays and held whole for remittance: it is neither the operator's nor ours.
 //
@@ -81,9 +81,8 @@ function platformFeeCents(
 }
 
 // ——— CHARGEBACK DEFENCE ————————————————————————————————————————————————————————
-// A disputed card payment costs ~$15 in Stripe fees AND the fare. At ~$1.50 a travel, ONE
-// dispute erases ten successful ones — which makes this, not the processing rate, the real
-// threat to the margin.
+// A disputed payment can reverse fare and add dispute cost. The per-Travel contingency reserve
+// is therefore an explicit modeled allocation and must be recalibrated from actual loss data.
 //
 // The largest single cause of disputes is not fraud, it is "I do not recognise this
 // charge": a bank statement showing an unfamiliar string weeks after the travel. So every

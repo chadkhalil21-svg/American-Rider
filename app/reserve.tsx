@@ -102,7 +102,6 @@ export default function TravelConfirmation() {
   const [queryDep, setQueryDep] = useState('');
   const [partyOpen, setPartyOpen] = useState(false);
   const [partyName, setPartyName] = useState(ride.travelParty.travelerName || '');
-  const [partyAge, setPartyAge] = useState(ride.travelParty.travelerAge ? String(ride.travelParty.travelerAge) : '');
 
   // navigate() can update params on an already-mounted screen — reopen search then too.
   useEffect(() => {

@@ -390,7 +390,6 @@ export default function TravelConfirmation() {
                       <Text style={[styles.modify,{marginTop:14}]}>{t('traveler.anotherAdult')}</Text>
                     </Pressable>
                     <TextInput value={partyName} onChangeText={(v) => { setPartyName(v); if (ride.travelParty.mode === 'other_adult') ride.setTravelParty({ mode: 'other_adult', travelerName: v }); }} placeholder={t('traveler.travelerName')} placeholderTextColor={colors.muted} style={styles.input} />
-                    <Text style={{fontSize:12.5,color:colors.muted,lineHeight:18,marginTop:14}}>{t('traveler.noUnaccompaniedMinor')}</Text>
                   </View>
                 )}
               </Card>

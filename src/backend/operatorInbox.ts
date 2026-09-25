@@ -30,6 +30,9 @@ export type AssignedTravel = {
   travelerUid: string;
   /** Empty when the traveler has not set a name. Never substituted with an invented one. */
   travelerName: string;
+  bookedForAnother?: boolean;
+  minor?: boolean;
+  guardianName?: string | null;
   tripNo: string;
   dep: string;
   dest: string;
@@ -102,6 +105,9 @@ export function watchAssignedTravel(
               rideId: d.id,
               travelerUid: String(x.travelerUid ?? ''),
               travelerName: String(x.travelerName ?? ''),
+              bookedForAnother: (x.party as any)?.bookedForAnother === true,
+              minor: (x.party as any)?.minor === true,
+              guardianName: typeof (x.party as any)?.guardian?.name === 'string' ? (x.party as any).guardian.name : null,
               tripNo: String(x.tripNo ?? ''),
               dep: String(x.dep ?? ''),
               dest: String(x.dest ?? ''),

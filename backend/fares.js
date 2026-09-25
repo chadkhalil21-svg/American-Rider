@@ -28,12 +28,12 @@ const FARES = {
   // so the busiest destination in the market could not be priced by name at all. Hidden the
   // same way as the last two: the app normally prices by coordinates, so only the web preview
   // and any coordinate-less path ever hit this table. Added 25 Aug 2026.
-  'Miami International Airport': 1020,
-  'MIA Airport': 1020,
-  'Miami Airport': 1020,
-  PortMiami: 401,
-  Wynwood: 494,
-  'South Beach': 744,
+  'Miami International Airport': 1488,
+  'MIA Airport': 1488,
+  'Miami Airport': 1488,
+  PortMiami: 592,
+  Wynwood: 730,
+  'South Beach': 1090,
   'Coral Gables': 1032,
   'Port of Miami': 401,
   'Kaseya Center': 350,

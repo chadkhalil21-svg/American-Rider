@@ -9,7 +9,7 @@ const MAX_NAME = 80;
 const clean = (v, n = MAX_NAME) => String(v || '').trim().replace(/\s+/g, ' ').slice(0, n);
 
 function normalizeParty(body = {}, booker = {}) {
-  const mode = ['self', 'other_adult', 'minor'].includes(body.partyMode) ? body.partyMode : 'self';
+  const mode = ['self', 'other_adult'].includes(body.partyMode) ? body.partyMode : 'self';
   const bookerName = clean(booker.name || body.bookerName || 'Traveler');
   if (mode === 'self') {
     return {
@@ -37,10 +37,6 @@ function normalizeParty(body = {}, booker = {}) {
     };
   }
 
-  // Launch posture: do not create an unaccompanied-minor transportation product until the
-  // insurance carrier, Florida counsel and operating procedure explicitly approve it. A
-  // parent may book for another ADULT; a minor must travel with their guardian in the vehicle.
-  return { ok: false, code: 'unaccompanied_minor_not_supported', error: 'American Rider does not accept unaccompanied-minor Travel.' };
 
 }
 
@@ -49,8 +45,8 @@ function operatorPartyView(party) {
   return {
     travelerName: clean(p.travelerName || 'Traveler'),
     bookedForAnother: p.bookedForAnother === true,
-    minor: p.minor === true,
-    guardianName: p.minor ? clean(p.guardian?.name || p.bookerName || '') : null,
+    minor: false,
+    guardianName: null,
   };
 }
 

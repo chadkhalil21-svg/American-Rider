@@ -389,7 +389,7 @@ export default function TravelConfirmation() {
                     <Pressable onPress={() => ride.setTravelParty({ mode: 'other_adult', travelerName: partyName })}>
                       <Text style={[styles.modify,{marginTop:14}]}>Another adult</Text>
                     </Pressable>
-                    <TextInput value={partyName} onChangeText={(v) => { setPartyName(v); if (ride.travelParty.mode !== 'self') ride.setTravelParty({ ...ride.travelParty, travelerName: v }); }} placeholder="Traveler name" placeholderTextColor={colors.muted} style={styles.input} />
+                    <TextInput value={partyName} onChangeText={(v) => { setPartyName(v); if (ride.travelParty.mode === 'other_adult') ride.setTravelParty({ mode: 'other_adult', travelerName: v }); }} placeholder="Traveler name" placeholderTextColor={colors.muted} style={styles.input} />
                     <Text style={{fontSize:12.5,color:colors.muted,lineHeight:18,marginTop:14}}>American Rider does not accept unaccompanied-minor Travel at launch.</Text>
                   </View>
                 )}

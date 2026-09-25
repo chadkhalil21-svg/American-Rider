@@ -477,7 +477,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   // Read by sendMsgTo, which must not re-create itself every time the watched ride changes.
   const watchedRideIdRef = useRef<string | null>(null);
   watchedRideIdRef.current = watchedRideId;
-  // The travel that just finished, so its rating and tip can be written to the same record.
+  // The travel that just finished, so its rating can be written to the same record.
   const reviewedRideId = useRef<string | null>(null);
   // The PaymentIntent this travel was charged on. Held so the operator's 99% can be released
   // against that exact charge when the travel completes — see settleTravel.
@@ -1020,7 +1020,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     // is not their business to succeed or fail at.
     settleRideRef.current = ridePaid;
     trySettle();
-    // Kept, not cleared: the Travel Complete screen writes the rating and tip against this
+    // Kept, not cleared: the Travel Complete screen writes the rating against this
     // same record a moment later, and it needs the handle to do it.
     reviewedRideId.current = ridePaid;
     activeRideId.current = null;
@@ -1391,7 +1391,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   );
 
   /**
-   * Write the traveler's rating and tip to the travel that just finished.
+   * Write the traveler's rating to the travel that just finished.
    *
    * Returns false when there is nothing to write to — a seeded demo travel, or a record the
    * database never accepted. The screen shows that answer rather than a check mark it has

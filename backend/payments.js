@@ -34,7 +34,7 @@ function getStripe() {
   return _stripe;
 }
 
-const APP_FEE_CENTS = 150; // the platform fee's $1.50 minimum (the fee absorbs Stripe's processing cost)
+const APP_FEE_CENTS = 200; // $2.00 minimum platform charge — pays payment + platform infrastructure
 
 // ——— THE PLATFORM FEE — TWO SCHEDULES, CHOSEN BY THE CARD'S ISSUING COUNTRY ——————————
 // Chad, 20 Sept 2026: read Stripe's card.country and stop padding the domestic traveler for
@@ -73,8 +73,14 @@ const APP_FEE_CENTS = 150; // the platform fee's $1.50 minimum (the fee absorbs 
 // with one and the server charges with the other, and a traveler who is quoted $64.54 and
 // charged $64.55 has been shown two prices for one journey. payments.test.js checks every cent
 // from $0 to $500 against the app's formula, on BOTH schedules.
-const DOMESTIC_DIVISOR = 40; // 2.5% = 1/40
-const INTERNATIONAL_DIVISOR = 20; // 5% = 1/20
+// 25 Sept 2026: the old 2.5% domestic schedule protected card processing alone, not the
+// Connect payout layer or the platform infrastructure that makes the travel possible. The
+// launch schedule is $2.00 minimum, then 5% domestic / 6.5% international. The 1.5-point
+// international difference mirrors Stripe's published additional international-card charge.
+// This remains tiny beside incumbent marketplace takes, but keeps a completed Travel positive
+// after payment, Connect and ordinary technical costs instead of pricing the company at zero.
+const DOMESTIC_BPS = 500; // 5.00%
+const INTERNATIONAL_BPS = 650; // 6.50%
 
 /**
  * Which schedule a card falls under. Stripe writes the issuing country on
@@ -98,10 +104,10 @@ function isDomesticCard(cardCountry) {
 
 /** What American Rider adds to the fare, in cents, on the schedule the card falls under. */
 function platformFeeCents(travelCostCents, cardCountry) {
-  // An integer divided by 20 or by 40 is correctly rounded, so ceil() is exact at every cent.
-  // `Math.ceil(travelCostCents * 0.05)` is not (3060 * 0.05 is 153.00000000000003).
-  const divisor = isDomesticCard(cardCountry) ? DOMESTIC_DIVISOR : INTERNATIONAL_DIVISOR;
-  return Math.max(APP_FEE_CENTS, Math.ceil(travelCostCents / divisor));
+  const bps = isDomesticCard(cardCountry) ? DOMESTIC_BPS : INTERNATIONAL_BPS;
+  // Integer basis points, rounded UP to the cent. Number arithmetic is exact enough throughout
+  // the platform's supported fare range and avoids binary-float percentage drift at boundaries.
+  return Math.max(APP_FEE_CENTS, Math.ceil((travelCostCents * bps) / 10000));
 }
 
 // The 1% commission on the travel cost. NO CAP — matches src/data.ts coordinationFee

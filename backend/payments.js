@@ -36,49 +36,23 @@ function getStripe() {
 
 const APP_FEE_CENTS = 200; // $2.00 minimum platform charge — pays payment + platform infrastructure
 
-// ——— THE PLATFORM FEE — TWO SCHEDULES, CHOSEN BY THE CARD'S ISSUING COUNTRY ——————————
-// Chad, 20 Sept 2026: read Stripe's card.country and stop padding the domestic traveler for
-// the cost of an international card. Before this there was ONE rule — the greater of $1.50
-// and 5% — and 5% was the smallest round rate that covered the WORSE of the two cards. Every
-// US traveler above a $30 fare was paying for that headroom.
+// ——— THE PLATFORM CHARGE — TWO CARD-COST SCHEDULES ———————————————————————————————
+// Founder decision, 25 Sept 2026. American Rider's charge is not merely a reimbursement of
+// Stripe's card fee. It funds the payment layer, Connect, ordinary maps/routing/backend costs,
+// and a positive operating contribution while the Operator still receives 99% of the fare.
 //
-//   domestic       (card.country === 'US')   the greater of $1.50 and 2.5% of the fare
-//   international  (anything else)            the greater of $1.50 and 5%   of the fare
+//   domestic       (card.country === 'US')   max($2.00, 5.00% of fare)
+//   international  (anything else)           max($2.00, 6.50% of fare)
 //
-// WHY THESE TWO RATES, AND WHY NOT CHAD'S TIER TABLE. His note specified tiers keyed on the
-// TOTAL ($0–60 → $1.50, $60–85 → $2.00, …, above $135 → 2% of total). Run against every fare
-// it has three faults, none of them visible from the two points he spot-checked:
+// Each schedule is continuous: the domestic percentage reaches $2 at a $40 fare; the
+// international percentage first exceeds $2 at $30.77. There are no tier cliffs.
 //
-//   1. IT LOSES MONEY ABOVE $135. 2.0% of the total has to cover 2.9% of the total less the
-//      1% commission on the fare, plus $0.30 — about 1.9% of the total plus $0.30. Those meet
-//      at a $300 total, so EVERY total between $135 and ~$300 is underwater; worst case
-//      −$0.21. The international 3.5% tier fails the same way for the same reason.
-//   2. THE FEE IS AMBIGUOUS AT 492 FARES. A tier keyed on the total, where the total contains
-//      the fee, is a fixed point rather than a lookup. At a $58.00 fare both $1.50 and $2.00
-//      satisfy it, and 30 fares near $132 satisfy NEITHER.
-//   3. IT REINTRODUCES THE PRICE STEP. A fare one cent over a boundary costs the traveler 50
-//      cents more. AGENTS.md records continuity as the reason 5% was chosen over the old
-//      break-even-plus-1%: "no step, no 'the price jumped because you went slightly further'".
+// Unknown first-use cards remain on the domestic schedule so a traveler's amount does not move
+// after quotation. Unlike the superseded 2.5% domestic rule, the 5% launch rate has enough
+// headroom to cover ordinary international-card processing as well; issuer country should still
+// be known before final confirmation whenever a PaymentMethod is available.
 //
-// Keying on the FARE instead removes the circularity, and max($1.50, rate) instead of a table
-// removes the step: 2.5% of $60 is exactly $1.50, and 5% of $30 is exactly $1.50, so each
-// schedule is continuous where its two halves meet. Chad's $60 domestic boundary is preserved
-// exactly; his $34 international boundary moves to $30, which is where continuity puts it.
-// Checked every cent to $500 on both card types: nothing is negative, thinnest is $0.007
-// domestic at a $59.99 fare and $0.10 international at $29.99.
-//
-// WHEN THE CARD IS NOT KNOWN YET the domestic schedule applies. See isDomesticCard().
-//
-// Mirrors src/data.ts platformFee(). THE TWO MUST NEVER DISAGREE, TO THE CENT: the app quotes
-// with one and the server charges with the other, and a traveler who is quoted $64.54 and
-// charged $64.55 has been shown two prices for one journey. payments.test.js checks every cent
-// from $0 to $500 against the app's formula, on BOTH schedules.
-// 25 Sept 2026: the old 2.5% domestic schedule protected card processing alone, not the
-// Connect payout layer or the platform infrastructure that makes the travel possible. The
-// launch schedule is $2.00 minimum, then 5% domestic / 6.5% international. The 1.5-point
-// international difference mirrors Stripe's published additional international-card charge.
-// This remains tiny beside incumbent marketplace takes, but keeps a completed Travel positive
-// after payment, Connect and ordinary technical costs instead of pricing the company at zero.
+// Mirrors src/data.ts platformFee(). payments.test.js checks cent-for-cent parity.
 const DOMESTIC_BPS = 500; // 5.00%
 const INTERNATIONAL_BPS = 650; // 6.50%
 

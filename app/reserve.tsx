@@ -368,12 +368,12 @@ export default function TravelConfirmation() {
 
           {!editing && !smartLeg && (
             <>
-              <SectionLabel style={{ marginTop: 20, marginBottom: 10 }}>TRAVELER</SectionLabel>
+              <SectionLabel style={{ marginTop: 20, marginBottom: 10 }}>{t('traveler.travelerLabel')}</SectionLabel>
               <Card style={{ paddingHorizontal: 20, paddingVertical: 4 }}>
                 <Pressable onPress={() => setPartyOpen(!partyOpen)}>
                   <View style={[styles.slotRow]}>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.slotLabel}>Who is traveling?</Text>
+                      <Text style={styles.slotLabel}>{t('traveler.whoIsTraveling')}</Text>
                       <Text style={styles.slotValue}>
                         {ride.travelParty.mode === 'self' ? 'Me' : ride.travelParty.travelerName || 'Another person'}
                       </Text>
@@ -384,13 +384,13 @@ export default function TravelConfirmation() {
                 {partyOpen && (
                   <View style={[styles.slot, styles.hair]}>
                     <Pressable onPress={() => { ride.setTravelParty({ mode: 'self', travelerName: '' }); setPartyOpen(false); }}>
-                      <Text style={styles.modify}>Me</Text>
+                      <Text style={styles.modify}>{t('traveler.me')}</Text>
                     </Pressable>
                     <Pressable onPress={() => ride.setTravelParty({ mode: 'other_adult', travelerName: partyName })}>
-                      <Text style={[styles.modify,{marginTop:14}]}>Another adult</Text>
+                      <Text style={[styles.modify,{marginTop:14}]}>{t('traveler.anotherAdult')}</Text>
                     </Pressable>
-                    <TextInput value={partyName} onChangeText={(v) => { setPartyName(v); if (ride.travelParty.mode === 'other_adult') ride.setTravelParty({ mode: 'other_adult', travelerName: v }); }} placeholder="Traveler name" placeholderTextColor={colors.muted} style={styles.input} />
-                    <Text style={{fontSize:12.5,color:colors.muted,lineHeight:18,marginTop:14}}>American Rider does not accept unaccompanied-minor Travel at launch.</Text>
+                    <TextInput value={partyName} onChangeText={(v) => { setPartyName(v); if (ride.travelParty.mode === 'other_adult') ride.setTravelParty({ mode: 'other_adult', travelerName: v }); }} placeholder={t('traveler.travelerName')} placeholderTextColor={colors.muted} style={styles.input} />
+                    <Text style={{fontSize:12.5,color:colors.muted,lineHeight:18,marginTop:14}}>{t('traveler.noUnaccompaniedMinor')}</Text>
                   </View>
                 )}
               </Card>

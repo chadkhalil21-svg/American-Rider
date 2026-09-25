@@ -113,7 +113,7 @@ service cloud.firestore {
       // not the trip number, not the status.
       allow update: if ownsExisting()
                     && resource.data.status == 'completed'
-                    && touchesOnly(['rating', 'tipCents', 'reviewedAt'])
+                    && touchesOnly(['rating', 'reviewedAt'])
                     && (!changes('rating')
                         || request.resource.data.rating == null
                         || (request.resource.data.rating >= 1 && request.resource.data.rating <= 5));

@@ -15,6 +15,18 @@ import { PAYMENT_SERVER_URL } from '../config';
 import { auth } from '../firebase';
 import { t } from '../i18n';
 
+export type SavedMethod = {
+  id: string;
+  type: string;
+  brand: string;
+  last4: string;
+  expMonth: number | null;
+  expYear: number | null;
+  wallet: string | null;
+  country: string | null;
+  isDefault: boolean;
+};
+
 export type PaymentResult = {
   ok: boolean;
   paymentIntentId?: string;

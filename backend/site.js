@@ -101,8 +101,7 @@ const OPERATE_HTML = page(
 <section>
   <h2>The whole travel</h2>
   <div class="rows">
-    <div><span class="k">Charged to the traveler</span><span class="amount">$26.00</span></div>
-    <div class="split"><span class="k">Travel fare</span><span class="amount">$24.50</span></div>
+    <div><span class="k">Travel fare</span><span class="amount">$24.50</span></div>
     <div><span class="k">Coordination commission (1%)</span><span class="amount">$0.24</span></div>
     <div><span class="k">Operator receives</span><span class="amount">$24.26</span></div>
   </div>
@@ -147,8 +146,11 @@ const OPERATE_HTML = page(
     own underwriting, including on age, and coverage that cannot be obtained is work that
     cannot be commissioned. American Rider sets no age limit of its own beyond eighteen.
   </div>
-  <p style="margin-top:14px">American Rider does not provide automobile insurance. The
-  commercial coverage an operator carries is the only coverage that applies to their travels.</p>
+  <p style="margin-top:14px">Each operator must procure and maintain automobile coverage that
+  satisfies the requirements applicable to that operator and vehicle. American Rider verifies
+  the operator-procured coverage; it does not sell or substitute for that policy. Any coverage
+  American Rider may separately be required by law to maintain does not relieve the operator
+  of this requirement.</p>
   <p>Minimum limits are set state by state. In Florida they are $1,000,000 in liability while
   carrying a traveler, and $50,000 per person, $100,000 per incident and $25,000 property
   damage while available and unmatched.</p>
@@ -167,8 +169,15 @@ const OPERATE_HTML = page(
 
 <section>
   <h2>Qualification</h2>
-  <p>Qualification is completed in the app: license, vehicle, insurance and background check.
-  American Rider verifies commercial coverage and does not sell it.</p>
+  <p>Qualification is completed in the app: driver license, vehicle registration, qualifying
+  insurance and the background screening required in the operator's market. American Rider
+  verifies commercial coverage and does not sell it.</p>
+  <p>In Florida, the screening standard follows Fla. Stat. §627.748. A current check must include
+  the required nationwide criminal-record search with primary-source validation of records, the
+  National Sex Offender Public Website, and a driving-history report. The statutory
+  disqualifications are applied by the same rules to every applicant. A result that does not
+  contain enough reliable information to apply those rules is not guessed at and does not pass;
+  source clarification or dispute resolution is required before qualification can continue.</p>
 </section>
 `,
   '/operate',

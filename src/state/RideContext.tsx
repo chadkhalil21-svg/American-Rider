@@ -712,9 +712,11 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   // memoised and retried from the ride screen — reading state directly would dispatch last
   // booking's class after a retry.
   const travelClassRef = useRef('standard');
+  const travelPartyRef = useRef(travelParty);
   useEffect(() => {
     travelClassRef.current = travelClass;
   }, [travelClass]);
+  useEffect(() => { travelPartyRef.current = travelParty; }, [travelParty]);
 
   // Match the nearest available operator for the ride already staged in lastTripRef.
   // Tracks a real state so the live screen can show progress, a "none available" message,
@@ -757,7 +759,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       // Nobody is offered the same travel twice.
       excludeIds: declinedByRef.current,
       journeyNo: smartJourneyRef.current?.stage === 'leg2' ? smartJourneyRef.current.leg1No ?? null : null,
-      party: travelParty,
+      party: travelPartyRef.current,
     })
       .then((res) => {
         if (res) {

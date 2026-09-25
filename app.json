@@ -65,7 +65,9 @@
         {
           "locationWhenInUsePermission": "American Rider uses your location to set your pickup point and work out the price of your trip.",
           "locationAlwaysAndWhenInUsePermission": "American Rider keeps you in service while your phone is locked, so travel can be assigned to you without the app open. Location is used only while you are in service and stops when you conclude operations.",
-          "isIosBackgroundLocationEnabled": true
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
         }
       ],
       [

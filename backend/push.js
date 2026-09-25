@@ -36,6 +36,7 @@ const KINDS = {
   screening_expired: { pref: null, required: true, channel: 'travel' },
   screening_due: { pref: null, required: true, channel: 'travel' },
   operator_account_fee_due: { pref: null, required: true, channel: 'travel' },
+  platform_message: { pref: null, required: true, channel: 'travel' },
 };
 
 /** The token and preferences for one account, or nulls. */

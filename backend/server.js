@@ -24,7 +24,7 @@ const {
   quote, createPaymentIntent, resumePaymentIntent, chargeRide, refundTravel,
   connectAccountFor, connectOnboardingLink, connectAccountStatus,
   transferToOperator, refundableFor, connectDashboardLink, pingStripe, probeNetwork,
-  chargeTip, transferFixed, createScreeningIntent, operatorPayoutAccount,
+  transferFixed, createScreeningIntent, operatorPayoutAccount,
   listPaymentMethods, createSetupIntent, setDefaultPaymentMethod, detachPaymentMethod,
   defaultCardCountry, chargeOperatorAccountFee,
 } = require('./payments');
@@ -1029,88 +1029,6 @@ app.post('/operator/settle-pending', requireAuth, async (req, res) => {
       }
     }
     res.json({ ok: true, settled, centsPaid, stillOwed });
-  } catch (e) {
-    res.status(502).json({ error: e.message });
-  }
-});
-
-// --- A TIP: charged, and passed to the operator whole. -----------------------------------
-//
-// body: { rideId, tipCents }
-//
-// Travel Complete has always collected a tip and written it to the ride document, where
-// nothing read it. The traveler was not charged and the operator was not paid, under a line
-// reading "The operator keeps 100% of every tip". This is the mechanism that sentence needs.
-//
-// The amount is taken from the REQUEST rather than from a record, because a tip is the one
-// figure the traveler alone decides — so it is bounded here instead of trusted. The ceiling is
-// the greater of $100 or the fare itself: generous for any real gratuity, and low enough that
-// a malformed or hostile request cannot empty a card.
-const TIP_CEILING_CENTS = 10000;
-
-app.post('/travel/tip', requireAuth, LIMITS.payments, async (req, res) => {
-  if (keyMode === 'no-key') return res.status(500).json({ error: 'No Stripe key configured' });
-  const db = adminDb();
-  if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
-
-  const rideId = String(req.body?.rideId || '');
-  const tipCents = Math.floor(Number(req.body?.tipCents || 0));
-  if (!rideId || !(tipCents > 0)) {
-    return res.status(400).json({ error: 'rideId and a positive tipCents are required' });
-  }
-
-  try {
-    const rideRef = db.collection('rides').doc(rideId);
-    const snap = await rideRef.get();
-    if (!snap.exists) return res.status(404).json({ error: 'No such travel' });
-    const ride = snap.data();
-    if (String(ride.travelerUid) !== String(req.uid)) {
-      return res.status(403).json({ error: 'That travel belongs to another traveler' });
-    }
-    if (ride.tipChargedCents) {
-      return res.json({ ok: true, alreadyTipped: true, chargedCents: ride.tipChargedCents });
-    }
-    // A tip belongs to a travel that happened.
-    if (String(ride.status) !== 'completed') {
-      return res.status(409).json({ error: 'That travel is not complete', code: 'not_complete' });
-    }
-    const ceiling = Math.max(TIP_CEILING_CENTS, Number(ride.costCents || 0));
-    if (tipCents > ceiling) {
-      return res.status(400).json({ error: 'That tip exceeds the permitted amount', code: 'tip_too_large' });
-    }
-
-    const { accountId } = await operatorPayoutAccount(db, ride.operatorId);
-    if (!accountId) {
-      // Not charged. Taking a tip we cannot pass on would be American Rider keeping a
-      // gratuity meant for somebody else.
-      return res.status(409).json({
-        ok: false,
-        code: 'operator_not_payable',
-        error: 'That operator cannot receive a tip yet, so nothing has been charged.',
-      });
-    }
-
-    const out = await chargeTip({
-      uid: req.uid,
-      email: req.email,
-      operatorStripeAccount: accountId,
-      amountCents: tipCents,
-      tripNo: ride.tripNo || null,
-    });
-    if (!out.ok) return res.status(402).json(out);
-
-    await rideRef.set(
-      {
-        tipChargedCents: out.chargedCents,
-        tipPaymentIntentId: out.paymentIntentId,
-        tipTransferId: out.transferId,
-        tipPending: !out.forwarded,
-        tipBlockedReason: out.forwardError,
-        tippedAt: Date.now(),
-      },
-      { merge: true },
-    );
-    res.json(out);
   } catch (e) {
     res.status(502).json({ error: e.message });
   }

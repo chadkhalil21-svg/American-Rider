@@ -7,6 +7,7 @@
 // subsidize the pass-through or earn a margin on it.
 const { adminDb, adminStatus } = require('./firebase-admin');
 const { notify } = require('./push');
+const { postPlatformMessage } = require('./platforminbox');
 
 const ACCOUNT_COST_CENTS = 200;
 const WAIVER_TRAVELS = 20;
@@ -115,6 +116,11 @@ async function sweepOperatorAccountFees({ charge, now = Date.now() } = {}) {
         body: `The $2 active-account cost for ${month} remains due. It is waived in months with 20 completed Travels.`,
         data: { screen: '/operator/payouts' },
       });
+      await postPlatformMessage({
+        uid: d.id, category: 'payout', title: 'Operator account cost due',
+        body: `The $2 active-account cost for ${month} remains due. It is waived in months with 20 completed Travels.`,
+        action: { screen: '/operator/payouts' },
+      }).catch(() => {});
     }
   }
   return { ok: true, month, considered: snap.docs.length, charged, waived, due, failed };

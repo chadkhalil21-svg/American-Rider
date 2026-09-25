@@ -9,8 +9,8 @@ const files = [
   'src/state/RideContext.tsx','src/backend/dispatch.ts','app/complete.tsx','firestore.rules',
 ].map(read).join('\n');
 
-assert.equal(/\/travel\/tip\b/.test(files), false, 'no tip HTTP route may remain');
-assert.equal(/\bchargeTip\b|\btipTravel\b|tipCents/.test(files), false, 'no tip charge/client/database authority may remain');
+assert.equal(/\/travel\/tip\b/.test(files), false, 'no gratuity HTTP route may remain');
+assert.equal(/\bchargeTip\b|\btipTravel\b|tipCents/.test(files), false, 'no gratuity charge/client/database authority may remain');
 
 const rules=read('firestore.rules');
 assert.ok(rules.includes("touchesOnly(['rating', 'reviewedAt'])"), 'Traveler review must be rating-only');

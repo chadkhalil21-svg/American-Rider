@@ -19,7 +19,7 @@ async function headers() {
 
 export async function fetchOperatorInbox(): Promise<PlatformMessage[]> {
   const res = await fetch(`${PAYMENT_SERVER_URL}/operator/inbox`, { headers: await headers() });
-  if (!res.ok) throw new Error('American Rider communications could not be read.');
+  if (!res.ok) throw new Error('platform_inbox_unavailable');
   const out = await res.json();
   return Array.isArray(out.messages) ? out.messages : [];
 }

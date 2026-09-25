@@ -105,6 +105,9 @@ const TODO_DOCS: Record<DocKey, DocState> = {
 // far away a pickup is is telling an operator something nobody knows.
 export type SimRequest = {
   traveler: string;
+  bookedForAnother?: boolean;
+  minor?: boolean;
+  guardianName?: string | null;
   tInit: string;
   tRating?: number;
   pickup: string;
@@ -571,6 +574,9 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
       tripNo: t.tripNo,
       travelerUid: t.travelerUid,
       traveler: t.travelerName,
+      bookedForAnother: t.bookedForAnother,
+      minor: t.minor,
+      guardianName: t.guardianName,
       tInit: initialsOf(t.travelerName),
       pickup: t.dep,
       dest: t.dest,
@@ -761,6 +767,9 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
           tripNo: underway.tripNo,
           travelerUid: underway.travelerUid,
           traveler: underway.travelerName,
+          bookedForAnother: underway.bookedForAnother,
+          minor: underway.minor,
+          guardianName: underway.guardianName,
           tInit: initialsOf(underway.travelerName),
           pickup: underway.dep,
           dest: underway.dest,

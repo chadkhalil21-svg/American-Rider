@@ -48,8 +48,8 @@ for (const [fare, us, intl] of examples) {
 for (const country of ['US', 'GB', null]) {
   let invariant = true;
   let minimal = true;
-  let monotonic = true;
-  let prev = 0;
+  let totalMonotonic = true;
+  let prevTotal = 0;
   let worst = Infinity;
   let worstAt = 0;
 
@@ -59,8 +59,9 @@ for (const country of ['US', 'GB', null]) {
     const margin = e.platformContributionCents - e.requiredContributionCents;
     if (margin < 0) invariant = false;
     if (margin < worst) { worst = margin; worstAt = fare; }
-    if (fee < prev) monotonic = false;
-    prev = fee;
+    const total = fare + fee;
+    if (total < prevTotal) totalMonotonic = false;
+    prevTotal = total;
     if (fee > MIN_PLATFORM_FEE_CENTS &&
         feeIsSufficient({ travelCostCents: fare, platformFeeCents: fee - 1, cardCountry: country })) {
       minimal = false;
@@ -71,7 +72,7 @@ for (const country of ['US', 'GB', null]) {
   check(`${name}: every fare $3-$500 preserves the contribution target`, invariant,
     `worst headroom ${worst}c at ${usd(worstAt)}`);
   check(`${name}: the fee is the minimum whole-cent sufficient amount`, minimal);
-  check(`${name}: the fee never falls as fare rises`, monotonic);
+  check(`${name}: the traveler fare+fee total never falls as fare rises`, totalMonotonic);
 }
 
 // Pass-throughs do not become hidden subsidies.

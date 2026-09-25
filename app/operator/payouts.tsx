@@ -98,13 +98,8 @@ export default function OperatorPayouts() {
 
       <SectionLabel style={styles.lbl}>{t('operator.payoutAccount')}</SectionLabel>
       <Card style={styles.card}>
-        <Text style={styles.accountTitle}>Active-account cost</Text>
-        <Text style={styles.accountBody}>
-          Stripe charges a $2 account cost in a month when a payout is sent to your bank account or debit card.
-          American Rider waives that cost when you complete at least 20 Travels in the same month. Below 20,
-          the $2 cost and the unavoidable card-processing cost of collecting it are charged separately; your
-          99% share of each Travel Fare is not reduced.
-        </Text>
+        <Text style={styles.accountTitle}>{t('operator.activeAccountCost')}</Text>
+        <Text style={styles.accountBody}>{t('operator.activeAccountCostBody')}</Text>
       </Card>
       <Card style={styles.card}>
         {status === null ? (

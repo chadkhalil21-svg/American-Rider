@@ -134,17 +134,17 @@ what's deliberately not, open style questions") before it ships.
 ## Architecture
 - `app/` — one file per screen (expo-router): index (home + drawer), reserve (THE ONE SHEET between a destination and a car — Travel Confirmation: destination entry, route map, departure time, vehicle class with prices, the saved cabin environment, Complete Travel Cost, Confirm Travel; Chad, 14 Sept 2026: "it is subpar to have four screens before a car is on its way" — options.tsx and review.tsx were folded into it and deleted), prefs (Cabin Environment, a sub-screen that returns), ride (live status — named `/ride` because Metro's dev server reserves `/status`), complete (rating/tip), message, receipt, issues (Patron Support), account (Menu), profile, wallet, safety (Safe Travels), settings, notifications, invite, schedule, history (Travel Log), drive (operator recruiting), +not-found.
 - `src/state/RideContext.tsx` — single store: booking, live ride progression (2.6s/step demo timer), payments, scheduling, help flows.
-- `src/data.ts` — demo data (Miami market) and the fare model: operator keeps 99% of the travel fare (a flat 1% coordination commission, NO CAP — Chad corrected this 16 Aug 2026; the web demo's own coord() caps at $1 and is wrong), plus a per-travel platform fee that is **the greater of $1.50 and 5% of the travel fare, rounded up to the cent**
-(Chad, 9 Sept 2026 — "five percent", relayed by Adrian). Below a $30 fare it is $1.50 exactly;
-at $30 the two halves meet, so it is continuous — no step, no "the price jumped because you
-went slightly further". It is NOT flat: this line said it was until 4 Sept 2026, and from
-17 Aug to 9 Sept 2026 the rule was $1.50 up to a ~$60.87 break-even plus 1% of the excess,
-which netted $0.02 at a $60 fare and lost on international cards. 5% is the smallest round
-rate at which no travel loses money on a US card (2.9% + $0.30 of the whole charge) or an
-international one (4.4%). `platformFee()` in src/data.ts and `platformFeeCents()` in
-backend/payments.js are the two implementations, and backend/payments.test.js proves they
-agree for every cent from $0 to $500; the Terms (five languages) and the About page state
-the rule. The traveler sees ONE all-in price = fare + that fee; the fee also absorbs our payment processing, so `PROC_ACH`/`PROC_CARD` are internal-cost figures only — never added on top and never shown on traveler screens (no itemized fee lines, no "processing" lettering).
+- `src/data.ts` — demo data and the fare-display fallback. **Live pricing is server-authoritative.**
+  Operator retains 99% of Travel Fare; American Rider receives a 1% uncapped coordination
+  commission. The Traveler Platform Fee is no longer a flat fee or percentage schedule:
+  `backend/economics.js` computes the smallest whole-cent fee that funds card processing,
+  Connect variable/fixed allowances, pass-through processing, a 25c contingency reserve,
+  a 25c operating/infrastructure allowance, and at least 75c modeled contribution per
+  separately charged Travel. Unknown card country is international-safe; launch currency is
+  USD only. `src/data.ts platformFee()` mirrors the integer-cent rule for display fallback,
+  and `backend/payments.test.js` checks app/server parity for every cent from $3 to $500.
+  Government fees and tolls are pass-through amounts whose induced processing cost is recovered
+  by the Platform Fee. The Traveler sees one Total; no payment-processing line is added.
 - `src/backend/dispatch.ts` — real in-app dispatch: upserts the Miami fleet to Firestore, matches the nearest available operator, writes the `rides/{tripNo}` doc, and reads the signed-in traveler's rides back (`fetchMyRides`).
 - `src/firebase.ts` / `src/state/AuthContext.tsx` — live Firebase Auth + Firestore. The web config in `firebase.ts` is NOT secret; real secrets (e.g. `STRIPE_SECRET_KEY`) belong only in a backend `.env`, which is gitignored.
 - `src/components/LiveMap.tsx` — animated route map (SVG bezier + Animated).

@@ -562,7 +562,6 @@ async function chargeRide({ travelCostCents, travelerPaymentMethod, uid, tripNo,
     paymentIntentId: paymentIntent.id,
     status: paymentIntent.status,
     amountCents: paymentIntent.amount,
-    split: false,
     breakdown: q,
   };
 }

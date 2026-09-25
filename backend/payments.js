@@ -1140,13 +1140,48 @@ async function operatorPayoutAccount(db, operatorId) {
   return { accountId: null, reason: 'that operator has no payout account' };
 }
 
+/** Charge the separate monthly Operator active-account cost off-session.
+ * The amount is already grossed up by operatorfees.js so the $2 Stripe Connect cost and only
+ * its collection cost are recovered. This never touches the Operator's 99% Travel Fare. */
+async function chargeOperatorAccountFee({ uid, email, month, amountCents }) {
+  const stripe = getStripe();
+  const customer = await customerForTraveler({ uid, email });
+  const pm = await savedPaymentMethodFor(customer);
+  if (!pm) return { ok: false, code: 'no_payment_method', error: 'No saved payment method for the Operator account fee.' };
+  try {
+    const pi = await stripe.paymentIntents.create({
+      amount: Math.max(0, Math.trunc(Number(amountCents) || 0)),
+      currency: 'usd',
+      customer: customer.id,
+      payment_method: pm.id,
+      confirm: true,
+      off_session: true,
+      statement_descriptor_suffix: STATEMENT_DESCRIPTOR,
+      receipt_email: email || undefined,
+      description: `American Rider · Operator account cost · ${month}`,
+      metadata: {
+        product: 'American Rider operator account cost',
+        uid: String(uid || ''),
+        month: String(month || ''),
+        passThrough: 'true',
+      },
+    }, { idempotencyKey: `ar_operator_account_${uid}_${month}_${amountCents}` });
+    if (pi.status !== 'succeeded') {
+      return { ok: false, code: pi.status, error: `Payment is ${pi.status}`, paymentIntentId: pi.id };
+    }
+    return { ok: true, paymentIntentId: pi.id };
+  } catch (e) {
+    return { ok: false, code: e?.code || 'charge_failed', error: e?.message || String(e) };
+  }
+}
+
 module.exports = {
   operatorPayoutAccount,
   quote, commissionCents, platformFeeCents, isDomesticCard, defaultCardCountry, journeyFeeCents, createPaymentIntent, resumePaymentIntent, chargeRide, refundTravel,
   MIN_PLATFORM_FEE_CENTS,
   customerForTraveler, connectAccountFor, connectOnboardingLink, connectAccountStatus,
   transferToOperator, paidWithFromIntent, refundableFor, connectDashboardLink, pingStripe, probeNetwork,
-  chargeTip, transferFixed, chargeScheduledTravel, createScreeningIntent,
+  chargeTip, transferFixed, chargeScheduledTravel, createScreeningIntent, chargeOperatorAccountFee,
   describePaymentMethod, listPaymentMethods, createSetupIntent, setDefaultPaymentMethod, detachPaymentMethod,
   // Exported under an underscored name for idempotency.test.js only. It is an internal detail
   // of how a charge is keyed, not part of the module's interface.

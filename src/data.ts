@@ -413,7 +413,7 @@ export const INSURERS: {
   },
 ];
 
-export const APP_FEE = 1.5;
+export const APP_FEE = 2.0;
 export const PROC_ACH = 0.25;
 export const PROC_CARD = 0.74;
 
@@ -475,21 +475,18 @@ export function isDomesticCard(cardCountry?: string | null): boolean {
 
 /**
  * What American Rider adds to the travel fare, on the schedule the card falls under:
- * the greater of $1.50 and 2.5% of the fare on a US card, or 5% on any other, rounded up
- * to the cent. Chad, 20 Sept 2026 — before this one 5% rule covered both, which charged the
- * domestic traveler for the international card's cost.
- *
- * Each schedule is continuous where its halves meet: 2.5% of $60 and 5% of $30 are both
- * exactly $1.50, so no fare costs 50 cents more than the fare one cent below it.
+ * the greater of $2.00 and 3.25% of the fare on a US card, or 5.5% on any other, rounded up
+ * to the cent. Revised 25 Sept 2026 after the Connect-cost audit: the $2 floor absorbs the
+ * $2/month active-account charge and ordinary payout overhead; the proportional rates preserve
+ * a 25-cent operating reserve under the model instead of merely breaking even on card processing.
+ * The rule remains continuous and monotonic; there are no price steps.
  */
 export function platformFee(travelCost: number, cardCountry?: string | null): number {
-  // Whole cents first. 2.5% is 1/40 and 5% is 1/20, and an integer divided by either is
-  // correctly rounded, so ceil() is exact at every cent. `Math.ceil(0.05 * fare * 100)` is
-  // not: 0.05 * 30.60 * 100 is 153.00000000000003, which ceils to 154 — a cent the server
-  // would not charge, on 766 of the first 50,001 cent values.
+  // Whole cents first; integer rational arithmetic keeps the app and server exact to the cent.
   const fareCents = Math.round(travelCost * 100);
-  const divisor = isDomesticCard(cardCountry) ? 40 : 20;
-  return Math.max(APP_FEE, Math.ceil(fareCents / divisor) / 100);
+  const numerator = isDomesticCard(cardCountry) ? 13 : 11;
+  const denominator = isDomesticCard(cardCountry) ? 400 : 200;
+  return Math.max(APP_FEE, Math.ceil((fareCents * numerator) / denominator) / 100);
 }
 
 export const procFor = (pay: string) => (pay === 'ach' ? PROC_ACH : PROC_CARD);

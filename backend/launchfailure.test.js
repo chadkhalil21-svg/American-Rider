@@ -23,9 +23,9 @@ check('screening: statutory bar is deterministic',
 for (const country of ['US','GB',null]) {
   let bad = null;
   for (let fare=300; fare<=50000; fare++) {
-    const fee = minimumPlatformFeeCents({ travelFareCents:fare, cardCountry:country });
-    const e = economicsFor({ travelFareCents:fare, platformFeeCents:fee, cardCountry:country });
-    if (e.contributionCents < 75) { bad={fare,fee,contribution:e.contributionCents}; break; }
+    const fee = minimumPlatformFeeCents({ travelCostCents:fare, cardCountry:country });
+    const e = economicsFor({ travelCostCents:fare, platformFeeCents:fee, cardCountry:country });
+    if (e.platformContributionCents < 75) { bad={fare,fee,contribution:e.platformContributionCents}; break; }
   }
   check(`economics: modeled contribution >=75c for ${country || 'unknown'} cards, $3-$500`, !bad, JSON.stringify(bad));
 }

@@ -18,7 +18,8 @@
 const crypto = require('crypto');
 const { readKey } = require('./env');
 const { adminDb } = require('./firebase-admin');
-const { adjudicate, recordDecision } = require('./screening');
+const { adjudicate, recordDecision, recordAdverseState } = require('./screening');
+const { startProviderAdverseAction, activeProviderAdverseActions, cancelProviderAdverseActions } = require('./adverse');
 const { fileTicket } = require('./tickets');
 const { notify } = require('./push');
 
@@ -282,21 +283,118 @@ async function handleEvent(event) {
   const type = String(event?.type || '');
   const object = event?.data?.object || {};
 
-  // A finished (or suspended) report: fetch the findings, adjudicate, record.
-  if (type === 'report.completed' || type === 'report.suspended' || type === 'report.disputed') {
+  // Provider-hosted adverse-action lifecycle. The provider sends the notices; American Rider
+  // records state and keeps the Operator blocked until the process either clears the report or
+  // reaches final adverse action.
+  if (type.startsWith('adverse_action.')) {
+    const reportId = object.report_id || object.reportId || null;
+    let report = null;
+    try { if (reportId && ready()) report = await api('GET', `/reports/${reportId}`); } catch {}
+    const uid = await uidForCandidate(report?.candidate_id || object.candidate_id);
+    if (!uid) return { ok: true, action: 'adverse action not mapped to operator' };
+
+    if (type === 'adverse_action.completed') {
+      await recordAdverseState({
+        uid, state: 'final', actionId: object.id || null, reportId, final: true,
+        note: 'The provider completed the adverse-action notice process.',
+      });
+      return { ok: true, action: 'adverse action finalized', uid, decision: 'refuse' };
+    }
+    if (type === 'adverse_action.notice_not_delivered') {
+      await recordAdverseState({
+        uid, state: 'delivery_exception', actionId: object.id || null, reportId,
+        note: 'The provider could not deliver an adverse-action notice.',
+      });
+      await fileTicket({
+        uid, kind: 'support', reason: 'Adverse-action notice delivery failed',
+        description: `Checkr could not deliver adverse-action notice ${object.id || '—'} for report ${reportId || '—'}. Resolve delivery before final action.`,
+      });
+      return { ok: true, action: 'adverse delivery exception', uid };
+    }
+    const state =
+      type === 'adverse_action.paused' ? 'disputed' :
+      type === 'adverse_action.canceled' ? 'canceled' :
+      type === 'adverse_action.resumed' ? 'pre_adverse' :
+      'pre_adverse';
+    await recordAdverseState({ uid, state, actionId: object.id || null, reportId });
+    return { ok: true, action: `adverse state ${state}`, uid };
+  }
+
+  // A completed dispute is re-adjudicated from fresh provider data. If the corrected report
+  // clears the statutory rules, any pending adverse action is canceled automatically.
+  if (type === 'report.dispute_completed') {
     const reportId = object.id;
-    if (!reportId) return { action: 'ignored', reason: 'no report id' };
+    if (!reportId) return { ok: true, action: 'ignored', reason: 'no report id' };
+    let report, details;
+    try { ({ report, details } = await fetchReportDetails(reportId)); }
+    catch (e) { return { ok: false, action: 'retry', reason: e.message }; }
+    const uid = await uidForCandidate(report.candidate_id || object.candidate_id);
+    if (!uid) return { ok: false, action: 'retry', reason: 'no uid for disputed report' };
+    const decided = adjudicate(mapReport(report, details));
+    if (decided.decision === 'pass') {
+      await cancelProviderAdverseActions({ reportId, api });
+      const out = await recordDecision({
+        uid, ...decided, reportId, provider: 'checkr',
+        issuedAt: Date.parse(report.completed_at || '') || null,
+      });
+      return { ok: out.ok, action: 'dispute cleared operator', uid, decision: 'pass', reason: out.reason };
+    }
+    if (decided.decision === 'refuse') {
+      const active = await activeProviderAdverseActions({ reportId, api });
+      let adverse = active[0] ? { ok: true, actionId: active[0].id, status: active[0].status } : null;
+      if (!adverse) adverse = await startProviderAdverseAction({ reportId, reasons: decided.reasons, api });
+      if (!adverse.ok) {
+        await recordDecision({
+          uid, decision: 'review',
+          reasons: adverse.unmapped || decided.reasons,
+          summary: 'The corrected report still contains a statutory issue, but the provider items could not be mapped automatically.',
+          reportId, provider: 'checkr', issuedAt: Date.parse(report.completed_at || '') || null,
+        });
+        return { ok: true, action: 'dispute requires source mapping', uid, decision: 'review' };
+      }
+      const out = await recordDecision({
+        uid, ...decided, reportId, provider: 'checkr',
+        issuedAt: Date.parse(report.completed_at || '') || null,
+        adverseAction: { state: 'pre_adverse', actionId: adverse.actionId || null, reportId, updatedAt: Date.now() },
+      });
+      return { ok: out.ok, action: 'dispute remains pre-adverse', uid, decision: out.decision, reason: out.reason };
+    }
+    const out = await recordDecision({
+      uid, ...decided, reportId, provider: 'checkr',
+      issuedAt: Date.parse(report.completed_at || '') || null,
+    });
+    return { ok: out.ok, action: 'dispute needs clarification', uid, decision: out.decision, reason: out.reason };
+  }
+
+  // A dispute in progress is a blocked, non-final state. Do not overwrite it with a generic
+  // "review" result merely because the report is temporarily suspended.
+  if (type === 'report.disputed') {
+    const reportId = object.id;
+    let report = object;
+    try { if (ready() && reportId) report = await api('GET', `/reports/${reportId}`); } catch {}
+    const uid = await uidForCandidate(report.candidate_id || object.candidate_id);
+    if (!uid) return { ok: true, action: 'ignored', reason: 'no uid' };
+    const active = reportId ? await activeProviderAdverseActions({ reportId, api }).catch(() => []) : [];
+    await recordAdverseState({
+      uid, state: 'disputed', actionId: active[0]?.id || null, reportId,
+      note: 'The Operator disputed information in the screening report. Qualification remains on hold while the provider investigates.',
+    });
+    return { ok: true, action: 'dispute recorded', uid };
+  }
+
+  // A finished (or suspended) report: fetch the findings, apply American Rider's statutory
+  // rules, then initiate provider-hosted adverse action only when those rules actually refuse.
+  if (type === 'report.completed' || type === 'report.suspended') {
+    const reportId = object.id;
+    if (!reportId) return { ok: true, action: 'ignored', reason: 'no report id' };
 
     let report = object;
     let details = { criminal: [], sexOffender: null, mvr: null };
     if (ready()) {
-      try {
-        ({ report, details } = await fetchReportDetails(reportId));
-      } catch (e) {
-        // Adjudicating the bare webhook body would resurrect the pass-when-unreadable hole.
-        // mapReport with no details + adjudicate()'s consider rule lands on review instead.
+      try { ({ report, details } = await fetchReportDetails(reportId)); }
+      catch (e) {
         console.log(`[checkr] could not fetch report ${reportId}: ${e.message}`);
-        report = object;
+        return { ok: false, action: 'retry', reason: e.message };
       }
     }
 
@@ -305,27 +403,44 @@ async function handleEvent(event) {
       await fileTicket({
         kind: 'support',
         reason: 'Checkr report with no operator',
-        description: `Report ${reportId} (candidate ${report.candidate_id || 'unknown'}) completed but no operator maps to it. Nobody has been passed or refused. Match it by hand in the Checkr dashboard.`,
+        description: `Report ${reportId} (candidate ${report.candidate_id || 'unknown'}) completed but no operator maps to it.`,
       });
-      return { action: 'ticketed', reason: 'no uid for candidate' };
+      return { ok: false, action: 'retry', reason: 'no uid for candidate' };
     }
 
     const decided = adjudicate(mapReport(report, details));
+    let adverseAction = null;
+    if (decided.decision === 'refuse') {
+      const adverse = await startProviderAdverseAction({ reportId, reasons: decided.reasons, api });
+      if (!adverse.ok) {
+        const out = await recordDecision({
+          uid, decision: 'review',
+          reasons: adverse.unmapped || decided.reasons,
+          summary: 'The statutory result could not be mapped confidently to the provider adverse-action items. Qualification remains blocked pending source clarification.',
+          reportId, provider: 'checkr', issuedAt: Date.parse(report.completed_at || '') || null,
+        });
+        return { ok: out.ok, action: 'adverse mapping exception', uid, decision: out.decision, reason: out.reason };
+      }
+      adverseAction = {
+        state: 'pre_adverse',
+        actionId: adverse.actionId || null,
+        reportId,
+        postNoticeScheduledAt: adverse.postNoticeScheduledAt || null,
+        updatedAt: Date.now(),
+      };
+    }
+
     const out = await recordDecision({
-      uid,
-      ...decided,
-      reportId,
-      provider: 'checkr',
-      // The three-year clock runs from when the check was CONDUCTED.
+      uid, ...decided, reportId, provider: 'checkr',
       issuedAt: Date.parse(report.completed_at || '') || null,
+      adverseAction,
     });
-    return { action: 'decided', uid, decision: decided.decision, recorded: out.ok };
+    return { ok: out.ok, action: 'decided', uid, decision: out.decision, recorded: out.ok, reason: out.reason };
   }
 
-  // The operator opened the link and finished Checkr's forms; the report is now running.
   if (type === 'invitation.completed' || type === 'report.created') {
     const uid = await uidForCandidate(object.candidate_id);
-    if (!uid) return { action: 'ignored', reason: 'no uid' };
+    if (!uid) return { ok: true, action: 'ignored', reason: 'no uid' };
     const db = adminDb();
     if (db) {
       await db.collection('users').doc(uid).set(
@@ -333,44 +448,33 @@ async function handleEvent(event) {
         { merge: true },
       );
     }
-    return { action: 'in_progress', uid };
+    return { ok: true, action: 'in_progress', uid };
   }
 
-  // Paid, invited, never finished. The money is already taken — that MUST NOT be a dead end.
   if (type === 'invitation.expired' || type === 'invitation.canceled') {
     const uid = await uidForCandidate(object.candidate_id);
-    if (!uid) return { action: 'ignored', reason: 'no uid' };
+    if (!uid) return { ok: true, action: 'ignored', reason: 'no uid' };
     const db = adminDb();
     if (db) {
       await db.collection('users').doc(uid).set(
-        {
-          screening: {
-            decision: 'expired',
-            summary: 'The background-check link expired before it was finished. Get a new link from the screening screen — there is nothing more to pay.',
-          },
-        },
+        { screening: { decision: 'expired', summary: 'The background-check link expired before it was finished. Get a new link from the screening screen — there is nothing more to pay.' } },
         { merge: true },
       );
     }
     await notify({
-      uid,
-      kind: 'screening_expired',
-      title: 'Your background check link expired',
+      uid, kind: 'screening_expired', title: 'Your background check link expired',
       body: 'Open American Rider to get a new link. You will not be charged again.',
     });
     await fileTicket({
-      uid,
-      kind: 'support',
-      reason: 'Screening invitation expired',
+      uid, kind: 'support', reason: 'Screening invitation expired',
       description:
         `Operator ${uid} paid for a screening but the Checkr invitation ${object.id || ''} expired unfinished.\n` +
-        `They have been told to request a new link (no extra charge — the fee is already held).\n` +
-        `If they never return, the fee is a REFUND OWED, not revenue: refund the PaymentIntent on their screening record.`,
+        'They have been told to request a new link with no extra charge.',
     });
-    return { action: 'expired', uid };
+    return { ok: true, action: 'expired', uid };
   }
 
-  return { action: 'ignored', reason: `unhandled type ${type}` };
+  return { ok: true, action: 'ignored', reason: `unhandled type ${type}` };
 }
 
 module.exports = {
@@ -383,4 +487,5 @@ module.exports = {
   uidForCandidate,
   PACKAGE_FULL,
   PACKAGE_MVR_ONLY,
+  fetchReportDetails,
 };

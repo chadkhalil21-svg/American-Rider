@@ -45,6 +45,10 @@ function normalizeParty(body = {}, booker = {}) {
   // The product does not accept an unaccompanied-minor booking from a non-guardian account.
   // The declaration is recorded on the Travel and can be audited; do not collect a child's
   // date of birth merely to make the UI look precise.
+  const teenAge = Math.trunc(Number(body.travelerAge));
+  if (!(teenAge >= 13 && teenAge <= 17)) {
+    return { ok: false, code: 'minor_age_not_supported', error: 'Unaccompanied minor Travel is available only for ages 13–17.' };
+  }
   if (body.guardianAttestation !== true) {
     return {
       ok: false, code: 'guardian_attestation_required',
@@ -56,7 +60,7 @@ function normalizeParty(body = {}, booker = {}) {
     party: {
       mode, travelerName, bookerName,
       guardian: { uid: String(booker.uid || ''), name: bookerName },
-      bookedForAnother: true, minor: true,
+      bookedForAnother: true, minor: true, teen: true,
     },
   };
 }

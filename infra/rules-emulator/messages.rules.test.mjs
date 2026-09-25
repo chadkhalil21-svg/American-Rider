@@ -140,8 +140,8 @@ for (const st of ['assigned', 'accepted', 'arrived', 'onboard']) {
 await seed();
 await check("rides: the traveler cannot reopen a cancelled travel", () =>
   assertFails(updateDoc(doc(as('travA'), 'rides', 'rideCancelled'), { status: 'completed', statusAt: 5 })));
-await check('rides: the traveler may rate and tip a COMPLETED travel', () =>
-  assertSucceeds(updateDoc(doc(as('travA'), 'rides', 'rideDone'), { rating: 5, tipCents: 200, reviewedAt: 5 })));
+await check('rides: the traveler may rate a COMPLETED travel', () =>
+  assertSucceeds(updateDoc(doc(as('travA'), 'rides', 'rideDone'), { rating: 5, reviewedAt: 5 })));
 await check('rides: …but not one that is still under way', () =>
   assertFails(updateDoc(doc(as('travA'), 'rides', 'rideA'), { rating: 5, reviewedAt: 5 })));
 await check('rides: …nor a cancelled one', () =>

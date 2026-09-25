@@ -1,4 +1,4 @@
-// American Rider — core payment logic (Stripe Connect "destination charge").
+// American Rider — core payment logic. Production Travel payments use separate charges and transfers.
 // This is the money math + Stripe calls. The HTTP server (server.js) exposes it to the app.
 //
 // The traveler is charged ONE all-in price, split automatically:
@@ -552,10 +552,6 @@ async function chargeRide({ travelCostCents, operatorStripeAccount, travelerPaym
       tollCents: String(q.tollCents),
     },
   };
-  if (operatorStripeAccount) {
-    params.application_fee_amount = q.platformTake;
-    params.transfer_data = { destination: operatorStripeAccount };
-  }
   // Keyed for the same reason as createPaymentIntent above. This route is test-mode only
   // (`/charge-ride` refuses a live key), but it confirms immediately — so an unkeyed retry here
   // is a straight double charge rather than an orphaned intent.
@@ -563,13 +559,12 @@ async function chargeRide({ travelCostCents, operatorStripeAccount, travelerPaym
     params,
     idempotencyForTravel('charge', uid, tripNo, params.amount),
   );
-  // Stripe takes its processing fee out of OUR application fee — that's what the platform fee absorbs.
-  // The operator always receives their full 99% of the travel cost, untouched.
+  // Test charges deliberately do not transfer funds. Settlement exercises the same separate-transfer path as production.
   return {
     paymentIntentId: paymentIntent.id,
     status: paymentIntent.status,
     amountCents: paymentIntent.amount,
-    split: !!operatorStripeAccount,
+    split: false,
     breakdown: q,
   };
 }

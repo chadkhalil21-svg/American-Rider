@@ -970,6 +970,21 @@ export default {
     operatorRetainedNote: 'L’Opérateur a conservé 99 % du tarif du trajet.',
     contactPatronSupport: 'Contacter l’Assistance Voyageurs',
     copyEmailed: 'Copie envoyée par e-mail',
+    activeAccountCost: "Coût du compte actif",
+    activeAccountCostBody: "Stripe facture 2 $ pour un mois où un versement est envoyé vers votre compte bancaire ou carte de débit. American Rider renonce à ce coût lorsque vous effectuez au moins 20 Voyages durant le même mois. En dessous de 20, les 2 $ et le coût inévitable du traitement de carte pour les percevoir sont facturés séparément ; votre part de 99 % du Tarif de chaque Voyage n'est pas réduite.",
+    inboxBody: "Qualification, couverture, vérification, versements et avis opérationnels.",
+    communications: "COMMUNICATIONS",
+    noCommunications: "Aucune communication ne requiert votre attention.",
+    newCommunication: "NOUVEAU",
+    guardianTeenTravel: "Voyage d'adolescent autorisé par un tuteur",
+    bookedByAnother: "Voyage demandé par un autre titulaire de compte",
+    travelerLabel: "VOYAGEUR",
+    whoIsTraveling: "Qui voyage ?",
+    me: "Moi",
+    anotherAdult: "Un autre adulte",
+    travelerName: "Nom du Voyageur",
+    noUnaccompaniedMinor: "American Rider n'accepte pas les Voyages de mineurs non accompagnés au lancement.",
+
   },
 
   legal: {

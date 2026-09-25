@@ -74,11 +74,9 @@ function disclosureStale(o, current = DISCLOSURE_VERSION) {
 // re-offer sweep then hands to somebody else. Too long and a traveler pays for a car that
 // does not exist. Those are not comparable, so this errs short.
 //
-// WHAT IT DOES NOT SOLVE: iOS suspends timers for a backgrounded app, so an operator who
-// leaves the app will go stale even though they are there. The real answer is background
-// location, which needs a native capability we have not built. Until then an operator has to
-// keep the app open to receive travel — which is what the screen already implies by saying
-// "Matching you with nearby travelers", and is true rather than flattering.
+// The mobile app now renews presence from the native background-location task on supported
+// iOS/Android builds. This server cutoff remains authoritative: background execution is never
+// assumed merely because a handset once said it was available.
 const PRESENCE_STALE_MS = 5 * 60 * 1000;
 
 /** Has this operator's phone said anything recently enough to be believed? */

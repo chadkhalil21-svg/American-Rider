@@ -559,7 +559,7 @@ export default {
     messageNotDelivered: 'That message was not delivered. Send it again.',
     disclosureRecorded: 'Recorded on your account with the text you agreed to. If this disclosure changes, you will be asked to read the new one.',
     expiryFromDocuments: 'Expiry dates are taken from the documents themselves. American Rider does not yet send a reminder before one lapses — check them yourself.',
-    certificateHolder: 'Ask your agent to name American Rider as a certificate holder. If the policy lapses or is not renewed, your insurer tells us, and travel stops being assigned rather than continuing uninsured.',
+    certificateHolder: 'Ask your agent or broker to issue current proof of coverage to American Rider. A standard certificate holder designation does not by itself guarantee cancellation notice; where the policy offers cancellation or non-renewal notice by endorsement, ask the agent to include it. Expired or insufficient coverage stops travel assignment.',
     notAdditionalInsured: 'Certificate holder only. Do not ask to have American Rider added as an additional insured — that grants coverage under your policy, costs you more, and is not what this is for.',
     noCommissionOnPremium: 'American Rider receives no commission and takes no share of your premium.',
     declarationsPage: 'The declarations page, which shows the limits and the type of use — not the wallet card.',

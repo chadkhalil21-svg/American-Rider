@@ -1463,7 +1463,7 @@ app.post('/fare-quote', attachAuth, LIMITS.quoteIp, async (req, res) => {
   res.json({
     travelerPays: priced.travelerPays, operatorGets: priced.operatorGets,
     platformTake: priced.platformTake, commission: priced.commission, appFee: priced.appFee,
-    governmentFeeCents: priced.governmentFeeCents, feeLines: priced.feeLines,
+    governmentFeeCents: priced.governmentFeeCents, tollCents: priced.tollCents || 0, feeLines: priced.feeLines,
     travelCostCents: priced.travelCostCents, miles: priced.miles, minutes: priced.minutes,
     timedBy: priced.timedBy, pricedBy: priced.pricedBy,
   });
@@ -1562,6 +1562,7 @@ app.post('/create-payment-intent', requireAuth, LIMITS.payments, async (req, res
           // remittance.js reads it back by the month.
           governmentFees: ride.feeLines,
           cardCountry: ride.cardCountry || null,
+          tollCents: Math.max(0, Number(ride.tollCents) || 0),
           // Stamped onto the PaymentIntent so a later refund can prove who paid, and for which
           // travel.
           uid: req.uid,
@@ -1584,6 +1585,7 @@ app.post('/create-payment-intent', requireAuth, LIMITS.payments, async (req, res
           journey: ride.journey || null,
           governmentFees: ride.feeLines,
           cardCountry: ride.cardCountry || null,
+          tollCents: Math.max(0, Number(ride.tollCents) || 0),
         }),
     });
     if (out.status !== 200) return res.status(out.status).json(out.body);
@@ -1639,6 +1641,7 @@ app.post('/charge-ride', requireAuth, LIMITS.payments, async (req, res) => {
       tripNo: req.body?.tripNo || null,
       governmentFees: priced.feeLines,
       cardCountry: priced.cardCountry,
+      tollCents: Math.max(0, Number(priced.tollCents) || 0),
     });
     res.json(result);
   } catch (e) {
@@ -2613,6 +2616,7 @@ app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, async (req, res) => {
     costCents: priced.travelerPays,
     miles: priced.miles,
     governmentFeeCents: priced.governmentFeeCents,
+    tollCents: Math.max(0, Number(priced.tollCents) || 0),
     feeLines: priced.feeLines,
     pricedBy: priced.pricedBy,
     cardCountry: priced.cardCountry,
@@ -2685,6 +2689,7 @@ app.post('/travel/schedule', requireAuth, LIMITS.dispatch, async (req, res) => {
       travelClass: String(b.travelClass || 'Standard'), atMs,
       travelCostCents: priced.travelCostCents, costCents: priced.travelerPays,
       miles: priced.miles, governmentFeeCents: priced.governmentFeeCents,
+      tollCents: Math.max(0, Number(priced.tollCents) || 0),
       feeLines: priced.feeLines, cardCountry: priced.cardCountry, tripNo,
       status: 'reserved', createdAt: Date.now(),
     };

@@ -37,7 +37,7 @@ import {
 } from '../backend/dispatch';
 import { Coords, fetchQuote, isUnavailable } from '../backend/fares';
 import { sendTravelMessage } from '../backend/messages';
-import { cancelTravel, payForRide, settleTravel, tipTravel } from '../backend/payments';
+import { cancelTravel, payForRide, settleTravel } from '../backend/payments';
 import { announceTravel, answerCheckIn } from '../backend/checkin';
 import {
   endTravelActivity,
@@ -217,10 +217,8 @@ export type RideStore = {
   setViewTrip: (t: (Trip & { sub?: string }) | null) => void;
   pastTrips: (Trip & { sub: string; credit: boolean })[];
   stats: { trips: number; spent: number };
-  /** Write the rating and tip for the travel that just finished. False if nothing was written. */
-  submitReview: (stars: number, tipCents: number) => Promise<boolean>;
-  /** Whether the tip actually reached the operator. Null until one is offered. */
-  tipResult: { ok: boolean; cents?: number; error?: string } | null;
+  /** Write the traveler's rating for the Travel that just finished. American Rider does not offer tipping. */
+  submitReview: (stars: number) => Promise<boolean>;
 
   // messaging — one thread per travel, so an operator always knows which journey a
   // message concerns (and a lost item thread is not mixed into the live ride's).
@@ -538,8 +536,6 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   const [schedPeriod, setSchedPeriod] = useState<'AM' | 'PM'>('AM');
   const [schedTime, setSchedTime] = useState('6:00');
   const [customTime, setCustomTime] = useState('');
-  // What became of the tip, so Travel Complete can state it rather than assume it.
-  const [tipResult, setTipResult] = useState<{ ok: boolean; cents?: number; error?: string } | null>(null);
   const [scheduled, setScheduled] = useState(false);
   // What route monitoring makes of the travel underway. Null on an ordinary journey — this is
   // never furniture; it appears only when the platform has something to say.
@@ -1401,22 +1397,13 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
    * database never accepted. The screen shows that answer rather than a check mark it has
    * not earned.
    */
-  const submitReview = useCallback(async (stars: number, tipCents: number) => {
-    const rideId = reviewedRideId.current;
+  const submitReview = useCallback(async (stars: number) => {
+    const rideId = completedRideIdRef.current;
     if (!rideId) return false;
-    const ok = await recordTravelReview(rideId, { stars, tipCents });
-    // A TIP IS MONEY, NOT A FIELD. recordTravelReview writes tipCents to the travel and
-    // nothing in the backend has ever read it — the traveler was not charged and the operator
-    // was not paid, under a screen reading "The operator keeps 100% of every tip". The charge
-    // and the transfer happen here. Failure is reported, never swallowed: a tip that did not
-    // reach anybody must not be shown as though it had.
-    if (tipCents > 0) {
-      const paid = await tipTravel({ rideId, tipCents });
-      setTipResult(paid.ok ? { ok: true, cents: paid.chargedCents ?? tipCents } : { ok: false, error: paid.error });
-    }
-    if (ok) refreshMyRides();
-    return ok;
-  }, [refreshMyRides]);
+    // Ratings are feedback only. American Rider deliberately has no gratuity/tip product,
+    // endpoint, stored tip amount or post-Travel money path.
+    return recordTravelReview(rideId, { stars });
+  }, []);
 
   // The reservation is written to the traveler's account, not just to this screen's memory.
   // It shows immediately either way — losing the write must not lose what they chose — but
@@ -1602,7 +1589,6 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     setSchedTime,
     customTime,
     setCustomTime,
-    tipResult,
     scheduled,
     schedState,
     travelMonitor,

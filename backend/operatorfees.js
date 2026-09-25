@@ -68,12 +68,22 @@ async function recordPayoutActivity({ accountId, createdAt = Date.now() }) {
 async function completedTravelsInMonth(db, uid, month) {
   const b = monthBounds(month);
   if (!b) return 0;
-  const snap = await db.collection('rides').where('operatorId', '==', String(uid)).get();
-  return snap.docs.filter((d) => {
-    const x = d.data() || {};
-    const at = Number(x.completedAt || x.statusAt || 0);
-    return x.status === 'completed' && at >= b.start && at < b.end;
-  }).length;
+  // Bound the read to this Operator's completed Travels and this month. The previous version
+  // fetched the Operator's lifetime history and filtered in process, making a monthly $2
+  // assessment progressively more expensive forever.
+  try {
+    const snap = await db.collection('rides')
+      .where('operatorId', '==', String(uid))
+      .where('status', '==', 'completed')
+      .where('completedAt', '>=', b.start)
+      .where('completedAt', '<', b.end)
+      .get();
+    return snap.size;
+  } catch (e) {
+    // Fail closed: never assess a fee from an incomplete count. The required composite index
+    // is deployment configuration, not a reason to silently fall back to a lifetime scan.
+    throw new Error(`completed-Travel count unavailable: ${e?.message || e}`);
+  }
 }
 
 function previousMonth(now = Date.now()) {

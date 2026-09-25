@@ -107,9 +107,11 @@ async function processProviderEvent({ id, handlers, workerId }) {
 async function sweepProviderEvents({ handlers, workerId = crypto.randomUUID(), limit = MAX_BATCH } = {}) {
   const db = adminDb();
   if (!db) return { ok: false, reason: adminStatus().reason };
-  const snap = await db.collection(COLLECTION).where('status', '==', 'pending').limit(limit).get();
+  const snap = await db.collection(COLLECTION).where('status', 'in', ['pending', 'processing']).limit(limit).get();
   const out = [];
   for (const doc of snap.docs) {
+    // processProviderEvent/claim() skips a processing record while its lease is live and
+    // reclaims it after the lease expires. This is the crash-recovery path.
     out.push(await processProviderEvent({ id: doc.id, handlers, workerId }));
   }
   return {

@@ -85,6 +85,7 @@ async function sweepOperatorAccountFees({ charge, now = Date.now() } = {}) {
   for (const d of snap.docs) {
     const rec = d.data() || {};
     if (!rec.payoutSeen || rec.feeStatus === 'paid' || rec.feeStatus === 'waived') continue;
+    if (rec.feeStatus === 'due' && Number(rec.lastAttemptAt || 0) > now - 24 * 60 * 60 * 1000) continue;
     const count = await completedTravelsInMonth(db, d.id, month);
     const q = accountFeeQuote(count, true);
     if (q.waived) {
@@ -98,12 +99,12 @@ async function sweepOperatorAccountFees({ charge, now = Date.now() } = {}) {
     if (result?.ok) {
       await d.ref.set({
         completedTravels: count, feeStatus: 'paid', feeQuote: q, assessedAt: now,
-        paymentIntentId: result.paymentIntentId || null, paidAt: now,
+        paymentIntentId: result.paymentIntentId || null, paidAt: now, lastAttemptAt: now,
       }, { merge: true });
       charged++;
     } else {
       await d.ref.set({
-        completedTravels: count, feeStatus: 'due', feeQuote: q, assessedAt: now,
+        completedTravels: count, feeStatus: 'due', feeQuote: q, assessedAt: now, lastAttemptAt: now,
         lastChargeError: String(result?.error || 'payment method unavailable').slice(0, 500),
       }, { merge: true });
       due++; failed++;

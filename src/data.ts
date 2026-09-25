@@ -417,11 +417,13 @@ export const APP_FEE = 2.0;
 
 // Internal launch-economics constants. The server remains authoritative; these mirror
 // backend/economics.js so local display fallbacks cannot quote a different amount.
+// Stripe's $2 monthly active-account cost is recovered separately from low-volume Operators
+// and waived at 20 completed Travels; it is not a Traveler transaction cost.
 const CARD_BPS_DOMESTIC = 290;
 const CARD_BPS_INTERNATIONAL = 440;
 const STRIPE_FIXED_CENTS = 30;
 const CONNECT_VARIABLE_BPS = 50;
-const CONNECT_FIXED_ALLOWANCE_CENTS = 16;
+const CONNECT_FIXED_ALLOWANCE_CENTS = 6;
 const CONTINGENCY_RESERVE_CENTS = 25;
 const OPERATING_OVERHEAD_ALLOWANCE_CENTS = 25;
 const MIN_PLATFORM_CONTRIBUTION_CENTS = 75;
@@ -438,7 +440,7 @@ const ceilBps = (cents: number, bps: number) =>
  * The smallest whole-cent fee that preserves the complete launch unit-economic invariant.
  *
  * This is NOT "$2 or a percentage". It directly funds card processing on the whole charge,
- * both variable Connect charges, a conservative fixed Connect allowance, 25c contingency,
+ * both variable Connect charges, the per-payout fixed Connect allowance, 25c contingency,
  * 25c operating/infrastructure allowance and at least 75c of platform contribution.
  *
  * Government fees and tolls remain pass-throughs to their beneficiaries. Their induced

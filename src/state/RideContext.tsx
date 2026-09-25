@@ -142,6 +142,8 @@ export type RideStore = {
   setPay: (p: PayKey) => void;
 
   // booking
+  travelParty: { mode: 'self' | 'other_adult' | 'minor'; travelerName: string; travelerAge?: number; guardianAttestation?: boolean };
+  setTravelParty: (p: { mode: 'self' | 'other_adult' | 'minor'; travelerName: string; travelerAge?: number; guardianAttestation?: boolean }) => void;
   arrival: Place;
   departure: DepPlace;
   setArrival: (p: Place) => void;
@@ -297,6 +299,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   const payRef = useRef(pay);
   payRef.current = pay;
   const [travelClass, setTravelClass] = useState('standard');
+  const [travelParty, setTravelParty] = useState<{ mode: 'self' | 'other_adult' | 'minor'; travelerName: string; travelerAge?: number; guardianAttestation?: boolean }>({ mode: 'self', travelerName: '' });
   const [smartPlan, setSmartPlan] = useState<import('../backend/smart').SmartPlan | null>(null);
   const [smartStatus, setSmartStatus] = useState<SmartStatus>('idle');
   const [smartJourney, setSmartJourney] = useState<SmartJourney | null>(null);
@@ -754,6 +757,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       // Nobody is offered the same travel twice.
       excludeIds: declinedByRef.current,
       journeyNo: smartJourneyRef.current?.stage === 'leg2' ? smartJourneyRef.current.leg1No ?? null : null,
+      party: travelParty,
     })
       .then((res) => {
         if (res) {
@@ -1529,6 +1533,8 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     setPay,
     travelClass,
     setTravelClass,
+    travelParty,
+    setTravelParty,
     smartPlan,
     setSmartPlan,
     smartStatus,

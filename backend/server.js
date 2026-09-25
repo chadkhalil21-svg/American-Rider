@@ -1529,8 +1529,9 @@ app.post('/create-payment-intent', requireAuth, LIMITS.payments, async (req, res
 // called and whose own comment says "NOT used by the real app". Found 27 Aug 2026 by auditing
 // which routes take money and where their inputs come from.
 //
-// Kept, because proving a charge end to end from a terminal is genuinely useful — but only
-// where a test key means no real money can move, and never with a destination the caller named.
+// Kept because proving a charge end to end from a terminal is useful. The current test helper
+// ignores destination splitting entirely; settlement is tested through the same explicit
+// separate-transfer architecture as production.
 app.post('/charge-ride', requireAuth, LIMITS.payments, async (req, res) => {
   if (keyMode === 'no-key') {
     return res.status(500).json({ error: 'No Stripe secret key configured. Add STRIPE_SECRET_KEY to backend/.env' });

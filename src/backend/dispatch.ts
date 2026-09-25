@@ -359,20 +359,15 @@ export async function fetchMyRides(): Promise<RideRecord[]> {
  * amount stated as charged that had never been charged. A rating nobody stores cannot affect
  * an operator's standing, and a tip nobody records cannot reach them.
  *
- * `tipCents` is RECORDED, not collected: no second charge is made here. The screen must say
- * so rather than implying the money has moved.
- *
- * Returns whether the write landed. Never throws.
  */
 export async function recordTravelReview(
   rideId: string,
-  review: { stars: number; tipCents: number },
+  review: { stars: number },
 ): Promise<boolean> {
   if (!rideId) return false;
   try {
     await updateDoc(doc(db, 'rides', rideId), {
       rating: review.stars || null,
-      tipCents: review.tipCents || 0,
       reviewedAt: Date.now(),
     });
     return true;

@@ -2,8 +2,17 @@ const assert=require('node:assert/strict');
 const { journeyFor }=require('./fareauthority');
 
 function dbWith(rows){
-  return {collection(){return {where(){return this},limit(){return this},async get(){return {docs:rows.map(x=>({data:()=>x}))}}}}};
+  return {
+    collection(){
+      return {
+        where(){ return this; },
+        limit(){ return this; },
+        async get(){ return { docs: rows.map((x)=>({ data:()=>x })) }; },
+      };
+    },
+  };
 }
+
 (async()=>{
   const base={travelerUid:'u',tripNo:'AR-1',paymentIntentId:'pi',status:'completed',travelCostCents:1000,governmentFeeCents:0,tollCents:0};
   assert.ok(await journeyFor({db:dbWith([base]),uid:'u',journeyNo:'AR-1'}));

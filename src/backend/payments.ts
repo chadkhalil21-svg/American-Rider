@@ -265,50 +265,6 @@ export async function cancelTravel(opts: {
   }
 }
 
-/**
- * Pay a tip: charged to the card already on file, and passed to the operator whole.
- *
- * Travel Complete collected a tip for months and wrote it to a field nothing read — neither
- * charged nor paid, beneath a line promising the operator kept all of it. This is the call
- * that makes the sentence true.
- *
- * Returns what actually happened so the screen can say it. Never throws.
- */
-export async function tipTravel(opts: {
-  rideId: string;
-  tipCents: number;
-}): Promise<{ ok: boolean; chargedCents?: number; forwarded?: boolean; error?: string }> {
-  if (!opts.rideId || !(opts.tipCents > 0)) return { ok: false, error: 'nothing to tip' };
-  try {
-    const res = await fetch(`${PAYMENT_SERVER_URL}/travel/tip`, {
-      method: 'POST',
-      headers: await authHeaders(),
-      body: JSON.stringify({ rideId: opts.rideId, tipCents: opts.tipCents }),
-    });
-    const d = await res.json().catch(() => ({}));
-    if (!res.ok) return { ok: false, error: d?.error || `Server error ${res.status}` };
-    return { ok: true, chargedCents: d?.chargedCents, forwarded: d?.forwarded === true };
-  } catch {
-    return { ok: false, error: t('traveler.paymentServerUnreachable') };
-  }
-}
-
-
-// ——— SAVED PAYMENT METHODS — the traveler's own, read from their Stripe Customer record ———
-// The Payment & Settlement screen shows exactly what the server returns (Chad, 14 Sept 2026:
-// real payment management, not text). Nothing here is typed into the app.
-
-export type SavedMethod = {
-  id: string;
-  type: string;
-  brand: string;
-  last4: string;
-  expMonth: number | null;
-  expYear: number | null;
-  wallet: string | null;
-  isDefault: boolean;
-};
-
 /** The name a traveler knows the network by. Stripe returns lowercase codes. */
 export function brandName(brand: string): string {
   const b = String(brand || '').toLowerCase();

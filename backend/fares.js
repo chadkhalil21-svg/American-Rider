@@ -129,7 +129,7 @@ const PER_MINUTE_CENTS = 15; // $0.15 per minute
 // $7.50 total would still be above Uber. A $5.00 total is below it. Flagged to the founders
 // rather than settled quietly; one constant reverses it.
 const MIN_TOTAL_CENTS = 500; // $5.00, the lowest total travel cost
-const MINIMUM_CENTS = MIN_TOTAL_CENTS - 150; // $3.50 fare + the $1.50 platform fee
+const MINIMUM_CENTS = MIN_TOTAL_CENTS - 200; // $3.00 fare + the $2.00 platform-fee floor
 
 // Straight-line distance under-states how far a car actually drives (roads bend, one-ways,
 // causeways). This multiplier approximates real driving distance, and is used ONLY when no

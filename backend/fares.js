@@ -28,12 +28,12 @@ const FARES = {
   // so the busiest destination in the market could not be priced by name at all. Hidden the
   // same way as the last two: the app normally prices by coordinates, so only the web preview
   // and any coordinate-less path ever hit this table. Added 25 Aug 2026.
-  'Miami International Airport': 1020,
-  'MIA Airport': 1020,
-  'Miami Airport': 1020,
-  PortMiami: 401,
-  Wynwood: 494,
-  'South Beach': 744,
+  'Miami International Airport': 1488,
+  'MIA Airport': 1488,
+  'Miami Airport': 1488,
+  PortMiami: 592,
+  Wynwood: 730,
+  'South Beach': 1090,
   'Coral Gables': 1032,
   'Port of Miami': 401,
   'Kaseya Center': 350,
@@ -109,9 +109,18 @@ function fareCentsFor(destination) {
 // Uber's is $2.74 to $4.12. We do not have to choose between a cheaper travel and a better-paid
 // operator; we can do both, out of the difference in what the platform keeps. Choosing between
 // them would have meant one half of the proposition was marketing.
-const BASE_CENTS = 100; // $1.00 to start any trip
-const PER_MILE_CENTS = 85; // $0.85 per mile — the operator's floor lives here; do not cut it
-const PER_MINUTE_CENTS = 15; // $0.15 per minute
+// LAUNCH ECONOMICS — 25 SEPT 2026.
+// The transportation fare prices three real resources: activation, road distance, and the
+// operator's traffic-adjusted time. It is deliberately NOT surge pricing and is never keyed
+// to the traveler's identity or willingness to pay. The routing layer supplies road miles and
+// expected minutes; congestion therefore changes the time term without a separate multiplier.
+// Founder decision after the South-Florida pricing audit:
+//   fare = $1.50 + $1.15 / road mile + $0.25 / routed minute, $4.50 fare minimum.
+// The Operator receives 99% of this fare. The traveler pays the fare plus the platform charge
+// in payments.js (minimum $2.00), so the lowest ordinary Traveler Total is $6.50.
+const BASE_CENTS = 150;
+const PER_MILE_CENTS = 115;
+const PER_MINUTE_CENTS = 25;
 
 // WHY A TIME TERM AT ALL. Distance-only pricing pays an operator the same for five miles in
 // twelve minutes and five miles in forty. In Miami traffic that is a straight transfer from the
@@ -128,8 +137,8 @@ const PER_MINUTE_CENTS = 15; // $0.15 per minute
 // minimum at $6.09 and Lyft's at $3.62, and calls our old $9.00 "meaningfully above both". A
 // $7.50 total would still be above Uber. A $5.00 total is below it. Flagged to the founders
 // rather than settled quietly; one constant reverses it.
-const MIN_TOTAL_CENTS = 500; // $5.00, the lowest total travel cost
-const MINIMUM_CENTS = MIN_TOTAL_CENTS - 150; // $3.50 fare + the $1.50 platform fee
+const MIN_TOTAL_CENTS = 650; // $4.50 fare minimum + $2.00 platform-charge minimum
+const MINIMUM_CENTS = 450; // transportation fare floor; independent of card/payment method
 
 // Straight-line distance under-states how far a car actually drives (roads bend, one-ways,
 // causeways). This multiplier approximates real driving distance, and is used ONLY when no

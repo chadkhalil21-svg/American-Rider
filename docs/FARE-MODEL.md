@@ -1,62 +1,97 @@
-# American Rider — Consolidated Fare Model
+# American Rider — Launch Fare Model
 
-Source: Chad's WhatsApp consolidation (2026-07-10). This is the OFFICIAL pricing
-methodology — the demo's fixed destination prices are placeholders standing in for
-formula #1; the backend implements the formula for real.
+Updated 25 September 2026. This document is the business contract for Standard Travel pricing.
+The server remains authoritative; the app may display a quote but may never choose the charge.
 
-> **Corrections since this was written (15 Sept 2026).** (1) §2's fixed $1.50 became, on
-> 9 Sept 2026 (Chad: "five percent"; Adrian in writing, 13 Sept), **the greater of $1.50 and
-> 5% of the travel fare, rounded up to the cent** — $1.50 exactly below a $30 fare, continuous
-> at $30. (2) §3's 1% commission has **no cap** (Chad, 16 Aug 2026). (3) The formula in §1 is
-> not what `backend/fares.js` implements today: $3.00 base + $1.80 per mile, $9.00 minimum,
-> no time term (open P1; proposal in docs/ECONOMICS-AND-INFRASTRUCTURE.md §8). The margin
-> table in §4 is at the old flat fee; current margins per fare are in that document's §2.
-> The product contract in `.claude/skills/american-rider-release-review/references/` is the
-> authority.
+## 1. Transportation fare
 
-## 1. Fare formula (sets the Travel Cost — the operator's base fare)
-> **Travel Cost = $2.00 base + ($0.85 × miles) + ($0.20 × minutes)**, floor of **$6.00** minimum
+> **Travel Fare = max($4.50, $1.50 + $1.15 × routed miles + $0.25 × traffic-adjusted routed minutes)**
 
-## 2. What the traveler sees
-> **Total = Travel Cost + the platform fee** — the greater of $1.50 and 5% of the Travel Cost
-> (since 9 Sept 2026; $1.50 at every fare below $30). The fee is embedded and **absorbs payment
-> processing**; it is never itemized and processing is never billed on top.
-> One number, one blue box: *"Operator retains 99% of the travel cost — $X."*
-> No Travel Cost sub-line, no Platform Fee line, no Payment Processing line. Ever.
+Distance pays for vehicle use. Time pays for the Operator's occupied time and congestion.
+There is no general surge multiplier and no traveler-specific willingness-to-pay pricing.
+Different departure times may therefore quote differently when expected road time differs.
 
-## 3. What the operator receives
-> **Operator Payout = 99% × Travel Cost** (1% commission, no cap).
-> The platform fee never touches the operator's math.
+If the production router is unavailable, the server may use its documented distance/time
+fallback; the quote records whether time came from the router or from the fallback estimate.
 
-## 4. Platform's real net margin per ride (internal — invisible to the traveler)
-> Margin = (platform fee + 1% of Travel Cost) − actual Stripe processing cost
-> (the table below is at the old flat $1.50)
+## 2. Operator compensation
 
-| Payment method | Platform receives | Real Stripe cost (on ~$36 total) | Actual net margin |
-|---|---|---|---|
-| Card | $1.50 + $0.35 commission | ~$1.35 (2.9% + $0.30) | **~$0.50** |
-| ACH | $1.50 + $0.35 commission | ~$0.29 (0.8%, cap $5) | **~$1.56** |
+> **Operator base compensation = 99% × Travel Fare**
 
-**Why ACH steering matters:** ~3× the margin on the identical trip. This is the
-dollars-and-cents case behind the "Preferred" ACH nudge in the Wallet (the rider-facing
-label says only "Preferred" — no fee talk on the rider surface).
+The 1% coordination commission has no cap. Tolls are not fare and are reimbursed separately,
+whole, to the Operator when the Operator incurs them. Government/facility charges are
+pass-through amounts and are not included in the 99/1 split.
 
-## Worked example — the calibration check
-12-mile, 24-minute trip:
+Instant payout is optional. Any Stripe Instant Payout charge elected by an Operator is an
+Operator withdrawal convenience cost, not a reduction of the displayed base compensation.
 
-| Step | Calculation | Result |
-|---|---|---|
-| Travel Cost | $2.00 + (12 × $0.85) + (24 × $0.20) | $17.00 |
-| Total charged to traveler | $17.00 + $1.50 | **$18.50** |
-| Operator receives | 99% × $17.00 | **$16.83** |
-| Platform margin (card) | $1.50 + $0.17 − ~$0.84 | ~$0.83 |
-| Platform margin (ACH) | $1.50 + $0.17 − ~$0.15 | ~$1.52 |
+## 3. Traveler Total
 
-$18.50 lands exactly on the average-fare figure used in the volume projections —
-the formula is calibrated against the existing forecast math.
+> **Traveler Total = Travel Fare + platform charge + tolls + mandatory government/facility charges**
 
-## Demo status (2026-07-10)
-The traveler demo implements #2 and #3 exactly: `PROC=0` (absorbed), `APP_FEE=1.50`,
-all-in display everywhere (airport Standard $26.00, Premium $36.29 — Chad's exact
-numbers), Smart Travel total $20.25 vs $46.50 direct. Formula #1 is backend work —
-demo destination prices are hand-set placeholders.
+The traveler sees one Total Travel Cost before confirmation. Tolls and legally required
+facility charges remain auditable internally even when the primary purchase surface is kept
+simple.
+
+For a U.S.-issued card, the launch platform-charge schedule is:
+
+> **max($2.00, 5.00% × Travel Fare)**
+
+For an international-issued card:
+
+> **max($2.00, 6.50% × Travel Fare)**
+
+The international increment mirrors Stripe's published additional 1.5 percentage-point card
+processing charge. The platform charge funds card processing, Connect, routing/maps, hosting,
+storage, monitoring, payment risk, and American Rider's operating contribution. It is not
+described to the traveler as a Stripe fee.
+
+The $2.00 floor and the percentage branch meet continuously:
+- domestic: $40.00 fare -> $2.00 charge;
+- international: approximately $30.77 fare -> percentage branch.
+
+## 4. Payment-cost invariant
+
+The amount displayed to an Operator as **You receive** is not reduced later by American Rider's
+ordinary payment-processing or platform-infrastructure costs.
+
+American Rider pays ordinary platform-side Stripe/Connect costs from its own platform revenue.
+An optional Instant Payout fee may be borne by the Operator only when the Operator affirmatively
+chooses that withdrawal method.
+
+A first-time travel must not be deliberately priced on a payment schedule known to be
+insufficient. The authoritative quote flow must know the selected PaymentMethod's issuer country
+before the traveler confirms the final amount. Until that flow is proven end-to-end, it remains
+a release blocker for international-card pricing.
+
+## 5. No tipping
+
+American Rider does not solicit gratuities. Operator compensation is designed into the Travel
+Fare itself. Do not restore a tip surface or treat tips as part of modeled Operator earnings.
+
+## 6. Pricing examples — domestic card, before toll/facility pass-throughs
+
+| Travel | Travel Fare | Platform charge | Traveler Total | Operator receives |
+|---|---:|---:|---:|---:|
+| fare minimum | $4.50 | $2.00 | $6.50 | $4.46* |
+| 0.89 mi / 8 min | $4.52 | $2.00 | $6.52 | $4.47 |
+| 2 mi / 9 min | $6.05 | $2.00 | $8.05 | $5.99* |
+| 6 mi / 16 min | $12.40 | $2.00 | $14.40 | $12.28* |
+| 15 mi / 30 min | $26.25 | $2.00 | $28.25 | $25.99* |
+| $50 fare | $50.00 | $2.50 | $52.50 | $49.50 |
+| $100 fare | $100.00 | $5.00 | $105.00 | $99.00 |
+
+*Server commission uses integer cents and floors the 1% commission, so exact cent outcomes are
+authoritative in code.
+
+## 7. Calibration policy
+
+Short/medium/long categories are analytics bins, not separate rate cards. Recalibration uses
+actual South-Florida completed Travels and comparable incumbent receipts. A rate change belongs
+server-side and must preserve all of these invariants:
+
+1. competitive Traveler Total across a representative distribution, not every instantaneous quote;
+2. materially superior Operator dollar compensation;
+3. positive American Rider unit economics after directly attributable platform costs;
+4. no hidden reduction of the Operator's displayed compensation;
+5. deterministic, auditable pricing logic.

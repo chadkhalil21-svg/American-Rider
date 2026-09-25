@@ -568,7 +568,7 @@ async function sweepAssignments({ now = Date.now() } = {}) {
       continue;
     }
 
-    const since = age / 1000;
+    const since = (now - (Number(ride.offeredAt || ride.notifiedOperatorAt || ride.createdAt) || now)) / 1000;
     out.pending++;
 
     // RELEASED BY POST /travel/accept: the operator it was offered to is no longer eligible.
@@ -581,7 +581,7 @@ async function sweepAssignments({ now = Date.now() } = {}) {
         body: `${ride.dep || 'Pickup'} to ${ride.dest || 'destination'}. Open to accept.`,
         data: { screen: '/operator', rideId: ride.id, tripNo: ride.tripNo || '' },
       });
-      await write(db, ride.id, { notifiedOperatorAt: now });
+      await write(db, ride.id, { notifiedOperatorAt: now, offeredAt: now });
       out.notified.push(ride.id);
       continue; // give them the window before anything is taken away
     }
@@ -639,7 +639,8 @@ async function sweepAssignments({ now = Date.now() } = {}) {
       operatorId: next.operator.id,
       operatorName: next.operator.name || '',
       declinedBy: [...declined, ride.operatorId],
-      createdAt: now, // restarts the answer window for the new operator
+      createdAt: now,
+      offeredAt: now, // the answer window belongs to this offer, not the Travel's lifetime
       notifiedOperatorAt: null,
       releasedAt: null,
       releasedReason: null,

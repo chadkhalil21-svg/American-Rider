@@ -1,4 +1,4 @@
-# American Rider — Maps (Stage 1 build note)
+# American Rider — Maps and Routing
 
 Plain English: a "map license" is **not** a legal thing and needs **no lawyer**. It's just
 signing up for a maps company (free), getting an **API key** (a password-like code), putting
@@ -18,10 +18,15 @@ a card on file, and pasting the key into the app. Billed by usage, like an elect
 | **Apple Maps (MapKit)** | Free, but iPhone-only | Free |
 | OpenStreetMap + tile host | Cheapest/DIY, more work | ~Free data, you host |
 
-**Recommendation:** because the differentiators (predictive traffic, Metrorail stitching in
-Smart Travel) lean on rich traffic/transit data, **Google Maps Platform** is the strongest fit
-and is Chad's stack pick. If keeping early costs rock-bottom matters more, **start on Mapbox**
-and switch later — the app abstracts the provider so swapping is cheap if done cleanly.
+**Current decision:** keep **MapLibre** as American Rider's visual renderer on iOS and Android.
+The visual map is deliberately independent of the routing and traffic providers. Baseline street
+routing is OSRM using OpenStreetMap-derived data, with OpenTripPlanner for multimodal/transit
+planning. A commercial traffic feed is optional and server-side; Mapbox driving-traffic is the
+first supported provider. If it is absent or unavailable, Travel falls back to OSRM/OTP.
+
+Do not use the public OpenStreetMap tile servers as American Rider's production CDN. OpenStreetMap
+data is open; the community-operated public tile service is not our infrastructure. At scale,
+use a production tile service or American Rider-controlled tile delivery while retaining MapLibre.
 
 ## Cost reality (the reassuring part)
 - **Launch / pilot (small volume): effectively free** — Google's monthly free credit and
@@ -31,6 +36,6 @@ and switch later — the app abstracts the provider so swapping is cheap if done
   minimizing unnecessary map/route calls (Google bills per SKU).
 
 ## Where it fits
-**Stage 1 backend work.** Getting the key is a ~15-minute signup, not a project. The current
-**demo uses a hand-drawn vector map on purpose** — no key, no cost, works offline. Plug in a
-real provider when the backend is built (alongside Stripe, GPS, accounts).
+**Stage 1 backend work.** Getting the key is a ~15-minute signup, not a project. The mobile application consumes American Rider route geometry rather than a provider-specific
+route object. Provider credentials stay on the server. This lets traffic intelligence, routing,
+and tile delivery evolve independently without changing the first-class MapLibre presentation.

@@ -21,17 +21,14 @@ const usd = (cents) => `$${(cents / 100).toFixed(2)}`;
 // fare on a US-issued card, or 5% on any other. A card we do not know yet is quoted domestic —
 // see isDomesticCard() in payments.js for why that, and not the safer-looking opposite.
 const DOMESTIC = [
-  [100, 150], [999, 150], [2500, 150], [3000, 150], [3001, 150], [5999, 150],
-  [6000, 150], // 2.5% of $60.00 is exactly $1.50 — the two halves meet, so there is no step
-  [6001, 151], // 2.5% of $60.01 is $1.50025, rounded UP
-  [10000, 250], [25000, 625], [100000, 2500], [500000, 12500],
+  [100, 200], [999, 200], [2500, 200], [3999, 200],
+  [4000, 200], // 5% of $40.00 is exactly $2.00
+  [4001, 201], [10000, 500], [25000, 1250], [100000, 5000], [500000, 25000],
 ];
 const INTERNATIONAL = [
-  [100, 150], [999, 150], [2500, 150], [2999, 150],
-  [3000, 150], // 5% of $30.00 is exactly $1.50 — the two halves meet
-  [3001, 151], // 5% of $30.01 is $1.5005, rounded UP
-  [4500, 225], [5999, 300], [6000, 300], [6100, 305], [7500, 375],
-  [10000, 500], [25000, 1250], [100000, 5000], [500000, 25000],
+  [100, 200], [999, 200], [2500, 200], [3076, 200],
+  [3077, 201], // 6.5% first exceeds the $2.00 floor here
+  [4500, 293], [6000, 390], [10000, 650], [25000, 1625], [100000, 6500], [500000, 32500],
 ];
 for (const [fare, fee] of DOMESTIC) {
   check(`domestic fee(${usd(fare)}) = ${usd(fee)}`, platformFeeCents(fare, 'US') === fee, `got ${platformFeeCents(fare, 'US')}`);
@@ -41,18 +38,18 @@ for (const [fare, fee] of INTERNATIONAL) {
 }
 
 check('an unknown card is quoted on the DOMESTIC schedule',
-  platformFeeCents(10000) === platformFeeCents(10000, 'US') && platformFeeCents(10000) === 250);
+  platformFeeCents(10000) === platformFeeCents(10000, 'US') && platformFeeCents(10000) === 500);
 check('country is read case- and space-insensitively',
   platformFeeCents(10000, ' us ') === 250 && platformFeeCents(10000, 'us') === 250);
 check('every non-US country is international',
-  ['GB', 'FR', 'CA', 'DE', 'MX', 'JP'].every((c) => platformFeeCents(10000, c) === 500));
+  ['GB', 'FR', 'CA', 'DE', 'MX', 'JP'].every((c) => platformFeeCents(10000, c) === 650));
 
 let flatBelowD = true;
-for (let c = 0; c < 6000; c++) if (platformFeeCents(c, 'US') !== 150) flatBelowD = false;
-check('$1.50 exactly at every cent below a $60 fare, domestic', flatBelowD);
+for (let c = 0; c < 4000; c++) if (platformFeeCents(c, 'US') !== 200) flatBelowD = false;
+check('$2.00 exactly at every cent below a $40 fare, domestic', flatBelowD);
 let flatBelowI = true;
-for (let c = 0; c < 3000; c++) if (platformFeeCents(c, 'GB') !== 150) flatBelowI = false;
-check('$1.50 exactly at every cent below a $30 fare, international', flatBelowI);
+for (let c = 0; c <= 3076; c++) if (platformFeeCents(c, 'GB') !== 200) flatBelowI = false;
+check('$2.00 through a $30.76 fare, international', flatBelowI);
 
 // ——— NO STEP, ON EITHER SCHEDULE ——————————————————————————————————————————————————
 // This is why the rule is max(floor, rate) and not the tier table proposed on 20 Sept: a tier
@@ -124,11 +121,14 @@ function appPlatformFeeFromSource() {
 }
 const appPlatformFee = appPlatformFeeFromSource();
 // The same rule written out by hand, in case the extraction and the file both drift together.
-const portedAppFormula = (dollars, country) =>
-  Math.max(1.5, Math.ceil(Math.round(dollars * 100) / (String(country || 'US').toUpperCase() === 'US' ? 40 : 20)) / 100);
-// The formula as it might naively be written in dollars. It is NOT equal to the server's, and
-// this test exists because of it: 0.05 * 30.60 * 100 is 153.00000000000003, which ceils to 154.
-const naiveDollarFormula = (dollars) => Math.ceil(Math.max(1.5, 0.05 * dollars) * 100) / 100;
+const portedAppFormula = (dollars, country) => {
+  const cents = Math.round(dollars * 100);
+  const bps = String(country || 'US').toUpperCase() === 'US' ? 500 : 650;
+  return Math.max(2, Math.ceil((cents * bps) / 10000) / 100);
+};
+// A deliberately naive floating-point version, retained to prove the integer-cent path stays
+// authoritative at percentage boundaries.
+const naiveDollarFormula = (dollars) => Math.ceil(Math.max(2, 0.065 * dollars) * 100) / 100;
 
 for (const country of ['US', 'GB']) {
   let realMismatch = 0;
@@ -151,7 +151,7 @@ for (let c = 0; c <= 50000; c++) {
 }
 check('the naive dollar arithmetic would NOT have matched — which is why cents come first',
   naiveMismatch > 0, `${naiveMismatch} mismatches`);
-check('the app declares the same $1.50 minimum the server does', appPlatformFee(0) === 1.5);
+check('the app declares the same $2.00 minimum the server does', appPlatformFee(0) === 2);
 
 // ——— NEVER A LOSS ———————————————————————————————————————————————————————————————
 // Stripe takes its rate of the WHOLE charge (fare + fee) plus $0.30, rounded to the cent —
@@ -198,38 +198,36 @@ check('and the exposure only becomes large at fares the market cannot produce',
 
 // ——— THE SPLIT ——————————————————————————————————————————————————————————————————
 const q1 = quote(2450, undefined, undefined, 'US');
-check('quote($24.50): traveler pays $26.00, operator gets $24.26, we keep $1.74',
-  q1.travelerPays === 2600 && q1.operatorGets === 2426 && q1.platformTake === 174 &&
-  q1.commission === 24 && q1.appFee === 150, JSON.stringify(q1));
+check('quote($24.50): traveler pays $26.50, operator gets $24.26, we keep $2.24',
+  q1.travelerPays === 2650 && q1.operatorGets === 2426 && q1.platformTake === 224 &&
+  q1.commission === 24 && q1.appFee === 200, JSON.stringify(q1));
 const q2 = quote(10000, undefined, undefined, 'GB');
-check('quote($100.00): traveler pays $105.00, operator gets $99.00, we keep $6.00',
-  q2.travelerPays === 10500 && q2.operatorGets === 9900 && q2.platformTake === 600 &&
-  q2.commission === 100 && q2.appFee === 500, JSON.stringify(q2));
+check('quote($100.00 international): traveler pays $106.50, operator gets $99.00, we keep $7.50',
+  q2.travelerPays === 10650 && q2.operatorGets === 9900 && q2.platformTake === 750 &&
+  q2.commission === 100 && q2.appFee === 650, JSON.stringify(q2));
 check('the operator\'s share never depends on the fee: 99% of the fare at $24.50 and at $100.00',
   q1.operatorGets === 2450 - 24 && q2.operatorGets === 10000 - 100);
 
 // ——— ONE FEE PER SMART TRAVEL JOURNEY ————————————————————————————————————————————————
 // Leg 2 names leg 1; it pays the fee on the combined car fare less what leg 1 carried.
 const { journeyFeeCents } = require('./payments');
-// THESE ARE ON THE INTERNATIONAL SCHEDULE, which is the 5% rule the arithmetic in these
-// labels was written against. The journey rule is about not charging a second fee for one
-// journey; it is the same rule on either schedule, and the domestic case is checked below.
-check('journey: $12 leg 1 ($1.50) then $10 leg 2 → combined $22 fee is $1.50, leg 2 pays $0',
-  journeyFeeCents(1000, { leg1FareCents: 1200 }, 'GB') === 0, journeyFeeCents(1000, { leg1FareCents: 1200 }, 'GB'));
-check('journey: $40 leg 1 ($2.00) then $30 leg 2 → combined $70 fee $3.50, leg 2 pays $1.50',
-  journeyFeeCents(3000, { leg1FareCents: 4000 }, 'GB') === 150, journeyFeeCents(3000, { leg1FareCents: 4000 }, 'GB'));
-check('journey: leg 2 is never charged below zero even when leg 1 alone reached the $1.50 floor',
+// The journey rule is identical on both schedules: the second car leg pays only the difference
+// between the fee on the combined car fare and the fee already carried by leg 1.
+check('journey: $12 leg 1 then $10 leg 2 remains inside the $2 floor, so leg 2 pays $0',
+  journeyFeeCents(1000, { leg1FareCents: 1200 }, 'GB') === 0);
+check('journey international: $40 leg 1 ($2.60) + $30 → combined $70 fee $4.55; leg 2 pays $1.95',
+  journeyFeeCents(3000, { leg1FareCents: 4000 }, 'GB') === 195);
+check('journey: leg 2 is never charged below zero',
   journeyFeeCents(100, { leg1FareCents: 500 }, 'GB') === 0);
 check('journey: with no leg 1 the standard fee applies',
-  journeyFeeCents(1000, null, 'GB') === 150 && journeyFeeCents(10000, { leg1FareCents: 0 }, 'GB') === 500);
-check('journey, domestic: $50 leg 1 ($1.50) then $30 leg 2 → combined $80 fee $2.00, leg 2 pays $0.50',
-  journeyFeeCents(3000, { leg1FareCents: 5000 }, 'US') === 50, journeyFeeCents(3000, { leg1FareCents: 5000 }, 'US'));
+  journeyFeeCents(1000, null, 'GB') === 200 && journeyFeeCents(10000, { leg1FareCents: 0 }, 'GB') === 650);
+check('journey domestic: $50 leg 1 ($2.50) + $30 → combined $80 fee $4.00; leg 2 pays $1.50',
+  journeyFeeCents(3000, { leg1FareCents: 5000 }, 'US') === 150);
 check('journey, domestic: one journey is never charged two fees',
   journeyFeeCents(2000, null, 'US') + journeyFeeCents(2000, { leg1FareCents: 2000 }, 'US')
     === platformFeeCents(4000, 'US'));
-// Also on the international schedule, for the same reason as the block above.
 check('quote() carries the journey fee into what the traveler pays and what we keep',
-  (() => { const q = quote(3000, { leg1FareCents: 4000 }, undefined, 'GB'); return q.appFee === 150 && q.travelerPays === 3150 && q.platformTake === 150 + 30 && q.operatorGets === 2970; })());
+  (() => { const q = quote(3000, { leg1FareCents: 4000 }, undefined, 'GB'); return q.appFee === 195 && q.travelerPays === 3195 && q.platformTake === 225 && q.operatorGets === 2970; })());
 const legsSum = (a, b, c) => journeyFeeCents(a, null, c) + journeyFeeCents(b, { leg1FareCents: a }, c);
 for (const country of ['US', 'GB']) {
   check(`journey, ${country}: the two legs together always pay exactly the fee on the combined fare (every $1 pair to $200)`,
@@ -243,8 +241,8 @@ const MIA_FEE = { id: 'mia-tnc-pickup', name: 'Miami International Airport fee',
 const plain = quote(2450);
 const withFee = quote(2450, undefined, [MIA_FEE]);
 check('with no fee the quote is unchanged: no government cents, no lines',
-  plain.governmentFeeCents === 0 && plain.passThroughCents === 0 && Array.isArray(plain.feeLines) && plain.feeLines.length === 0 && plain.travelerPays === 2450 + 150);
-check('a $2.00 airport fee adds $2.00 to what the traveler pays', withFee.travelerPays === 2450 + 150 + 200, withFee.travelerPays);
+  plain.governmentFeeCents === 0 && plain.passThroughCents === 0 && Array.isArray(plain.feeLines) && plain.feeLines.length === 0 && plain.travelerPays === 2450 + 200);
+check('a $2.00 airport fee adds $2.00 to what the traveler pays', withFee.travelerPays === 2450 + 200 + 200, withFee.travelerPays);
 check('  and to nothing else: operatorGets, platformTake, commission and appFee are identical',
   withFee.operatorGets === plain.operatorGets && withFee.platformTake === plain.platformTake && withFee.commission === plain.commission && withFee.appFee === plain.appFee);
 check('  it is carried as governmentFeeCents and passThroughCents', withFee.governmentFeeCents === 200 && withFee.passThroughCents === 200);
@@ -259,7 +257,7 @@ check('a negative, a fraction, a line with no payee and non-objects are not fees
 check('a non-array is no fee', quote(2450, undefined, 'MIA').governmentFeeCents === 0 && quote(2450, undefined, { cents: 200 }).governmentFeeCents === 0);
 const journeyFee = quote(3000, { leg1FareCents: 4000 }, [MIA_FEE], 'GB');
 check('on the second leg of a journey the fee rule and the government fee are both honoured',
-  journeyFee.appFee === 150 && journeyFee.governmentFeeCents === 200 && journeyFee.travelerPays === 3000 + 150 + 200 && journeyFee.operatorGets === 2970);
+  journeyFee.appFee === 195 && journeyFee.governmentFeeCents === 200 && journeyFee.travelerPays === 3000 + 195 + 200 && journeyFee.operatorGets === 2970);
 
 const failed = results.filter((r) => !r.ok);
 for (const r of results) console.log(`${r.ok ? 'PASS' : 'FAIL'}  ${r.label}${r.ok ? '' : '  <-- ' + (r.detail || '')}`);

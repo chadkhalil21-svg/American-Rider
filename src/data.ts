@@ -235,12 +235,10 @@ export const RIDER = {
   rating: 4.92,
 };
 
-// Fare model (ONE all-in price for the traveler): the operator keeps 99% of the fare
-// (1% coordination commission, no cap). American Rider adds a per-travel platform fee —
-// the greater of $1.50 and 5% of the fare, see platformFee() — and that fee ALSO absorbs
-// our payment-processing cost, so the traveler is never shown a separate "processing"
-// line. Total charged = fare + platformFee(fare).
-// PROC_* below is our INTERNAL processing cost (not added on top, not shown to travelers).
+// Fare model (ONE all-in price for the traveler): the Operator keeps 99% of the transportation
+// fare. American Rider adds the platform charge from platformFee(): $2.00 minimum, then 5%
+// domestic / 6.5% international. That charge funds payment processing, Connect and ordinary
+// platform infrastructure; it is never presented as a separate Stripe surcharge.
 // Travel classes (the web demo's Travel Options). ⚠️ MIRROR of backend/fares.js
 // TRAVEL_CLASSES — the server is the authority; these exist so screens can DISPLAY
 // per-class prices with the same math the server will charge.
@@ -413,7 +411,7 @@ export const INSURERS: {
   },
 ];
 
-export const APP_FEE = 1.5;
+export const APP_FEE = 2.0;
 export const PROC_ACH = 0.25;
 export const PROC_CARD = 0.74;
 
@@ -474,22 +472,17 @@ export function isDomesticCard(cardCountry?: string | null): boolean {
 }
 
 /**
- * What American Rider adds to the travel fare, on the schedule the card falls under:
- * the greater of $1.50 and 2.5% of the fare on a US card, or 5% on any other, rounded up
- * to the cent. Chad, 20 Sept 2026 — before this one 5% rule covered both, which charged the
- * domestic traveler for the international card's cost.
- *
- * Each schedule is continuous where its halves meet: 2.5% of $60 and 5% of $30 are both
- * exactly $1.50, so no fare costs 50 cents more than the fare one cent below it.
+ * American Rider's launch platform charge. Mirrors backend/payments.js exactly.
+ * Domestic: max($2, 5% of fare). International: max($2, 6.5% of fare).
+ * The percentage branch is continuous with the floor and protects full platform economics,
+ * not only the card processor.
  */
 export function platformFee(travelCost: number, cardCountry?: string | null): number {
-  // Whole cents first. 2.5% is 1/40 and 5% is 1/20, and an integer divided by either is
-  // correctly rounded, so ceil() is exact at every cent. `Math.ceil(0.05 * fare * 100)` is
-  // not: 0.05 * 30.60 * 100 is 153.00000000000003, which ceils to 154 — a cent the server
-  // would not charge, on 766 of the first 50,001 cent values.
+  // Mirrors backend/payments.js exactly: $2.00 minimum, then 5.0% domestic / 6.5%
+  // international. Integer basis points prevent the quote and charge from drifting by a cent.
   const fareCents = Math.round(travelCost * 100);
-  const divisor = isDomesticCard(cardCountry) ? 40 : 20;
-  return Math.max(APP_FEE, Math.ceil(fareCents / divisor) / 100);
+  const bps = isDomesticCard(cardCountry) ? 500 : 650;
+  return Math.max(APP_FEE, Math.ceil((fareCents * bps) / 10000) / 100);
 }
 
 export const procFor = (pay: string) => (pay === 'ach' ? PROC_ACH : PROC_CARD);

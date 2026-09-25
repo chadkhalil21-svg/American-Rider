@@ -30,12 +30,39 @@ export default function OperatorQualification() {
   }, [op.ready, op.verification, router]);
 
   const n = op.verifiedCount;
+  // The checklist remains visible as a record, but the primary action advances to the first
+  // unmet requirement. The Operator should not have to understand our compliance graph.
+  const nextRequired = QUAL_DOCS.find(
+    (d) => op.docs[d.key] !== 'ok' && op.docReviews[d.key]?.verdict !== 'review',
+  );
+  const continueQualification = () => {
+    if (!nextRequired) return;
+    const k = nextRequired.key;
+    if (k === 'insurance') router.navigate('/operator/insurance');
+    else if (k === 'background') router.navigate('/operator/background');
+    else if (k === 'license' || k === 'registration' || k === 'inspection')
+      router.navigate('/operator/documents');
+    else op.verifyDoc(k);
+  };
   // A DOCUMENT THE READER HELD MAY GO TO REVIEW. A hold asks for a person, and submitting is
   // how the person is asked. Without this a held licence was a dead end on this screen.
   const done = QUAL_DOCS.every(
     (d) => op.docs[d.key] === 'ok' || op.docReviews[d.key]?.verdict === 'review',
   );
   const [submitting, setSubmitting] = useState(false);
+  // Qualification is a guided process, not a filing cabinet. Keep every requirement visible
+  // for institutional transparency, but give one authoritative next action at the foot of the
+  // screen so an Operator never has to decide which department to visit next.
+  const nextRequired = QUAL_DOCS.find(
+    (d) => !(op.docs[d.key] === 'ok' || op.docReviews[d.key]?.verdict === 'review'),
+  ) || null;
+  const openRequirement = (key: string) => {
+    if (key === 'insurance') router.navigate('/operator/insurance');
+    else if (key === 'background') router.navigate('/operator/background');
+    else if (key === 'license' || key === 'registration' || key === 'inspection')
+      router.navigate('/operator/documents');
+    else op.verifyDoc(key as any);
+  };
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   // THE OPERATING AREA. The server reads documents, orders screening and opens payouts only for
@@ -131,17 +158,7 @@ export default function OperatorQualification() {
           return (
             <Pressable
               key={d.key}
-              onPress={() => {
-                // THE FOUR DOCUMENT STEPS GO TO THE SCREEN THAT CAN READ ONE. They used to call
-                // verifyDoc, which ticked them after 900 milliseconds without ever seeing a
-                // document. verifyDoc now refuses those keys, so leaving this would have made
-                // the row do nothing at all — quieter than the timer and no more honest.
-                if (d.key === 'insurance') router.navigate('/operator/insurance');
-                else if (d.key === 'background') router.navigate('/operator/background');
-                else if (d.key === 'license' || d.key === 'registration' || d.key === 'inspection')
-                  router.navigate('/operator/documents');
-                else op.verifyDoc(d.key);
-              }}
+              onPress={() => openRequirement(d.key)}
             >
               <View style={[styles.row, i > 0 && styles.hair]}>
                 <View style={{ flex: 1 }}>
@@ -173,9 +190,13 @@ export default function OperatorQualification() {
       <View style={{ flex: 1 }} />
       {submitError && <Text style={styles.footnote}>{submitError}</Text>}
       <PrimaryButton
-        label={done ? t('traveler.qualSubmitReview') : t('traveler.qualVerifyAll', { total: QUAL_DOCS.length })}
-        disabled={!done || submitting}
+        label={done ? t('traveler.qualSubmitReview') : t('traveler.continueQualification')}
+        disabled={submitting}
         onPress={async () => {
+          if (!done) {
+            continueQualification();
+            return;
+          }
           setSubmitting(true);
           setSubmitError(null);
           const out = await op.submitQualification();

@@ -2807,6 +2807,41 @@ app.post('/travel/accept', requireAuth, async (req, res) => {
   }
 });
 
+// Explicit decline is a RELEASE, not a terminal travel status. Keeping the travel assigned
+// lets the server offer it to the next eligible Operator instead of stranding the Traveler.
+app.post('/travel/decline', requireAuth, LIMITS.dispatch, async (req, res) => {
+  const db = adminDb();
+  if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
+  const rideId = String(req.body?.rideId || '');
+  if (!rideId) return res.status(400).json({ error: 'rideId is required' });
+  const ref = db.collection('rides').doc(rideId);
+  try {
+    const out = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) return { status: 404, body: { error: 'No such travel' } };
+      const ride = snap.data() || {};
+      if (ride.status !== 'assigned') return { status: 409, body: { error: 'This request is no longer awaiting an answer.', code: 'not_pending' } };
+      if (String(ride.operatorId || '') !== String(req.uid)) return { status: 403, body: { error: 'This request belongs to another operator.' } };
+      const declined = Array.isArray(ride.declinedBy) ? ride.declinedBy : [];
+      tx.set(ref, {
+        declinedBy: Array.from(new Set([...declined, String(req.uid)])),
+        releasedAt: Date.now(),
+        releasedReason: 'declined',
+        notifiedOperatorAt: null,
+      }, { merge: true });
+      return { status: 200, body: { ok: true } };
+    });
+    if (out.status === 200) {
+      // Do not make an explicit decline wait for the periodic clock. The sweep is idempotent
+      // and the transaction above has already made the declining Operator ineligible.
+      sweepAssignments().catch(() => {});
+    }
+    return res.status(out.status).json(out.body);
+  } catch (e) {
+    return res.status(502).json({ error: e.message });
+  }
+});
+
 app.post('/travel/return-operator', requireAuth, LIMITS.dispatch, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });

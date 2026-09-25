@@ -354,7 +354,9 @@ export async function fetchMyRides(): Promise<RideRecord[]> {
 /**
  * Record the traveler's review of a completed travel.
  *
- * Ratings are feedback only; no gratuity amount is stored or collected.\n */\nexport async function recordTravelReview(
+ * Ratings are feedback only; no gratuity amount is stored or collected.
+ */
+export async function recordTravelReview(
   rideId: string,
   review: { stars: number },
 ): Promise<boolean> {

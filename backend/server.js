@@ -26,7 +26,7 @@ const {
   transferToOperator, refundableFor, connectDashboardLink, pingStripe, probeNetwork,
   chargeTip, transferFixed, createScreeningIntent, operatorPayoutAccount,
   listPaymentMethods, createSetupIntent, setDefaultPaymentMethod, detachPaymentMethod,
-  defaultCardCountry,
+  defaultCardCountry, chargeOperatorAccountFee,
 } = require('./payments');
 const { readKey } = require('./env');
 const { requireAuth, attachAuth, requireVerifiedEmail } = require('./auth');
@@ -109,6 +109,11 @@ const { sweepScheduled, sweepSettlements } = require('./scheduler');
 const { sweepMonitor, sweepAssignments } = require('./monitor');
 const { notify } = require('./push');
 const { handleEvent, webhookReady } = require('./webhook');
+const { enqueueProviderEvent, processProviderEvent, sweepProviderEvents } = require('./providerqueue');
+const { acquireLease } = require('./schedulerlease');
+const { sweepOperatorAccountFees } = require('./operatorfees');
+const crypto = require('node:crypto');
+const WORKER_ID = crypto.randomUUID();
 const { send, receiptEmail, emailReady: mailReady } = require('./email');
 const {
   ready: verifyReady, startVerification, checkVerification, toE164,
@@ -136,66 +141,50 @@ app.use(cors()); // let the app (a different origin) call this server
 // A signature is computed over the EXACT bytes Stripe sent. Once express.json() has parsed and
 // re-serialised the body, those bytes are gone and every event fails verification — which is
 // the classic way this endpoint ends up either broken or, worse, "fixed" by skipping the check.
+async function handleCheckrProviderEvent(event) {
+  const out = await checkr.handleEvent(event);
+  const db = adminDb();
+  if (out?.uid && db && ['decided', 'dispute cleared operator', 'dispute remains pre-adverse', 'adverse action finalized'].includes(out.action)) {
+    await assessAndRecord({ db, uid: out.uid, checks: qualificationChecks, liveMoney: keyMode === 'live' });
+  }
+  return out;
+}
+
+const PROVIDER_HANDLERS = {
+  stripe: handleEvent,
+  checkr: handleCheckrProviderEvent,
+};
+
+async function acceptDurableProviderEvent(provider, event, res) {
+  const queued = await enqueueProviderEvent({ provider, event });
+  // No durable write means no acknowledgement. The provider will retry instead of us losing
+  // an event in a process crash or Firestore outage.
+  if (!queued.ok) return res.status(503).json({ error: queued.reason || 'event queue unavailable' });
+  res.json({ received: true, type: event?.type || 'unknown', duplicate: !!queued.duplicate });
+  processProviderEvent({ id: queued.id, handlers: PROVIDER_HANDLERS, workerId: WORKER_ID })
+    .then((out) => console.log(`[${provider}] ${event?.type}: ${out.result?.action || out.reason || (out.skipped ? 'already claimed' : 'processed')}`))
+    .catch((e) => console.log(`[${provider}] ${event?.type} failed: ${e.message}`));
+}
+
 app.post('/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   const secret = readKey('STRIPE_WEBHOOK_SECRET');
   if (!secret) return res.status(503).json({ error: 'STRIPE_WEBHOOK_SECRET is not set' });
-
   let event;
   try {
-    event = stripeClient().webhooks.constructEvent(
-      req.body,
-      req.get('stripe-signature'),
-      secret,
-    );
+    event = stripeClient().webhooks.constructEvent(req.body, req.get('stripe-signature'), secret);
   } catch (e) {
-    // 400, deliberately: Stripe stops retrying a 400 and shows it in the dashboard, which is
-    // how a wrong secret gets noticed instead of quietly retrying forever.
     return res.status(400).json({ error: `Signature verification failed: ${e.message}` });
   }
-
-  // ACKNOWLEDGE FIRST, WORK AFTER. Stripe retries anything that does not answer in seconds,
-  // and the work here writes to Firestore and files cases — slow enough to be retried into
-  // duplicates. The result is logged rather than returned; nothing is waiting for it.
-  res.json({ received: true, type: event.type });
-  handleEvent(event)
-    .then((out) => console.log(`[stripe] ${event.type}: ${out.action || out.reason}`))
-    .catch((e) => console.log(`[stripe] ${event.type} failed: ${e.message}`));
+  return acceptDurableProviderEvent('stripe', event, res);
 });
 
-// --- Checkr's webhook. Same raw-body rule as Stripe's above, for the same reason: the -------
-// signature is an HMAC-SHA256 over the EXACT bytes Checkr sent, and express.json() destroys
-// them. (The previous handler compared the signature header to the secret itself — Checkr
-// never sends the secret, so every genuine result was a 403 and none ever landed.)
 app.post('/checkr/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-  if (!readKey('CHECKR_WEBHOOK_SECRET')) {
-    return res.status(503).json({ error: 'CHECKR_WEBHOOK_SECRET is not set' });
-  }
-  if (!checkr.verifySignature(req.body, req.get('x-checkr-signature'))) {
-    // 403 and no retry-forever loop: a wrong secret should surface in Checkr's dashboard.
-    return res.status(403).json({ error: 'Bad signature' });
-  }
+  if (!readKey('CHECKR_WEBHOOK_SECRET')) return res.status(503).json({ error: 'CHECKR_WEBHOOK_SECRET is not set' });
+  if (!checkr.verifySignature(req.body, req.get('x-checkr-signature'))) return res.status(403).json({ error: 'Bad signature' });
   let event;
-  try {
-    event = JSON.parse(req.body.toString('utf8'));
-  } catch {
-    return res.status(400).json({ error: 'Not JSON' });
-  }
-  // ACKNOWLEDGE FIRST, WORK AFTER — same as Stripe. The work fetches the report's screenings
-  // from Checkr's API and writes decisions, which is slow enough to be retried into
-  // duplicates if the 200 waited for it.
-  res.json({ received: true, type: event?.type || 'unknown' });
-  checkr.handleEvent(event)
-    .then(async (out) => {
-      console.log(`[checkr] ${event?.type}: ${out.action}${out.decision ? ` (${out.decision})` : ''}`);
-      // A SCREENING RESULT MOVES QUALIFICATION AT ONCE — a pass can complete it, a hold puts
-      // the operator in the /ops queue, a refusal takes them out of dispatch — without waiting
-      // for the operator to open the app. keyMode is read at call time (declared below).
-      const db = adminDb();
-      if (out?.action === 'decided' && out.uid && db) {
-        await assessAndRecord({ db, uid: out.uid, checks: qualificationChecks, liveMoney: keyMode === 'live' });
-      }
-    })
-    .catch((e) => console.log(`[checkr] ${event?.type} failed: ${e.message}`));
+  try { event = JSON.parse(req.body.toString('utf8')); }
+  catch { return res.status(400).json({ error: 'Not JSON' }); }
+  return acceptDurableProviderEvent('checkr', event, res);
 });
 
 app.use(express.json()); // parse JSON request bodies — everything BELOW the webhook

@@ -1544,6 +1544,7 @@ app.post('/charge-ride', requireAuth, LIMITS.payments, async (req, res) => {
   }
   // Price the ride on the server — never from a client-sent amount.
   const priced = await authoritativeFare({ body: req.body, uid: req.uid, email: req.email, cardCountryFor: defaultCardCountry });
+  if (priced?.invalidJourney) return res.status(409).json({ error: priced.reason, code: 'invalid_smart_journey' });
   if (priced?.outsideMarket) {
     return res.status(409).json({ error: priced.reason, code: 'outside_market', where: priced.outsideMarket });
   }
@@ -2428,6 +2429,7 @@ app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, async (req, res) => {
     body: { pickup, dest: b.destinationPoint, destination: b.dest, travelClass: b.cls, journeyNo: b.journeyNo },
     uid: req.uid, email: req.email, db, cardCountryFor: defaultCardCountry,
   });
+  if (priced?.invalidJourney) return res.status(409).json({ error: priced.reason, code: 'invalid_smart_journey' });
   if (priced?.outsideMarket) {
     return res.status(409).json({ error: priced.reason, code: 'outside_market', where: priced.outsideMarket });
   }
@@ -2580,6 +2582,7 @@ app.post('/travel/schedule', requireAuth, LIMITS.dispatch, async (req, res) => {
     body: { pickup, dest: destinationPoint, destination: b.dest, travelClass: b.travelClass },
     uid: req.uid, email: req.email, db, cardCountryFor: defaultCardCountry,
   });
+  if (priced?.invalidJourney) return res.status(409).json({ error: priced.reason, code: 'invalid_smart_journey' });
   if (!priced || priced.outsideMarket || priced.permitRequired) {
     return res.status(409).json({ error: priced?.reason || 'The scheduled travel cannot be priced' });
   }
@@ -2782,6 +2785,7 @@ app.post('/travel/return-operator', requireAuth, LIMITS.dispatch, async (req, re
     body: { pickup: { lat: Number(next.operator.lat), lng: Number(next.operator.lng) }, dest: destination, travelClass: 'Standard' },
     uid: req.uid, email: req.email, db, cardCountryFor: defaultCardCountry,
   });
+  if (priced?.invalidJourney) return res.status(409).json({ error: priced.reason, code: 'invalid_smart_journey' });
   if (!priced || priced.outsideMarket || priced.permitRequired) {
     return res.status(409).json({ error: 'The return travel cannot be priced' });
   }

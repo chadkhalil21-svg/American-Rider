@@ -48,7 +48,7 @@ const mins = (p: TravelActivityProps) =>
 // app side (or a native string catalogue) — a native change that needs a prebuild to verify.
 /** What each stage is called, in the traveler's words rather than the operator's. */
 function headline(p: TravelActivityProps): string {
-  if (p.stage === 'arrived') return 'Your operator has arrived';
+  if (p.stage === 'arrived') return 'Operator arrived';
   if (p.stage === 'onboard') return `To ${p.destination}`;
   return 'Operator en route';
 }

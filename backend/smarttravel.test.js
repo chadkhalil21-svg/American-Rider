@@ -9,7 +9,8 @@ for (const country of ['US','GB',null]) {
     t(`Smart Travel funds two contribution units ${country||'unknown'} ${a}+${b}`,()=>{
       const q1=quote(a,null,[],country,0);
       const q2=quote(b,{journeyNo:'AR-LEG1',leg1FareCents:a,leg1GovernmentFeeCents:0,leg1TollCents:0},[],country,0);
-      assert.equal(q1.appFee+q2.appFee,q2._economics.platformGrossCents-q2._economics.commission);
+      const combinedCommission=Math.floor((a+b)*.01);
+      assert.equal(q1.appFee+q2.appFee,q2._economics.platformGrossCents-combinedCommission);
       assert.ok(q2._economics.platformContributionCents >= 2*MIN_PLATFORM_CONTRIBUTION_CENTS);
       assert.equal(q1.operatorGets, a-Math.floor(a*.01));
       assert.equal(q2.operatorGets, b-Math.floor(b*.01));

@@ -279,9 +279,8 @@ function describePaymentMethod(pm, defaultId) {
  * This is what quote() is given, and what decides which of the two fee schedules applies.
  *
  * null is not an error and is not a failure to look: a traveler on their first travel has no
- * default, and isDomesticCard() treats null as domestic on purpose. Returning null rather than
- * throwing keeps a Stripe outage from blocking a quote — the worst case is that one travel is
- * priced on the domestic schedule, which is the same worst case as a first travel.
+ * default. The canonical economics treats null as international-safe, so returning null rather
+ * than guessing domestic keeps a Stripe outage or first Travel from being deliberately under-priced.
  */
 async function defaultCardCountry({ uid, email }) {
   try {

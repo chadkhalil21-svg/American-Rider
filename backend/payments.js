@@ -34,7 +34,7 @@ function getStripe() {
   return _stripe;
 }
 
-const APP_FEE_CENTS = 150; // the platform fee's $1.50 minimum (the fee absorbs Stripe's processing cost)
+const APP_FEE_CENTS = 200; // the platform fee's $2.00 minimum (absorbs payment + Connect operating costs)
 
 // ——— THE PLATFORM FEE — TWO SCHEDULES, CHOSEN BY THE CARD'S ISSUING COUNTRY ——————————
 // Chad, 20 Sept 2026: read Stripe's card.country and stop padding the domestic traveler for
@@ -42,8 +42,8 @@ const APP_FEE_CENTS = 150; // the platform fee's $1.50 minimum (the fee absorbs 
 // and 5% — and 5% was the smallest round rate that covered the WORSE of the two cards. Every
 // US traveler above a $30 fare was paying for that headroom.
 //
-//   domestic       (card.country === 'US')   the greater of $1.50 and 2.5% of the fare
-//   international  (anything else)            the greater of $1.50 and 5%   of the fare
+//   domestic       (card.country === 'US')   the greater of $2.00 and 3.25% of the fare
+//   international  (anything else)            the greater of $2.00 and 5.5%  of the fare
 //
 // WHY THESE TWO RATES, AND WHY NOT CHAD'S TIER TABLE. His note specified tiers keyed on the
 // TOTAL ($0–60 → $1.50, $60–85 → $2.00, …, above $135 → 2% of total). Run against every fare
@@ -73,8 +73,10 @@ const APP_FEE_CENTS = 150; // the platform fee's $1.50 minimum (the fee absorbs 
 // with one and the server charges with the other, and a traveler who is quoted $64.54 and
 // charged $64.55 has been shown two prices for one journey. payments.test.js checks every cent
 // from $0 to $500 against the app's formula, on BOTH schedules.
-const DOMESTIC_DIVISOR = 40; // 2.5% = 1/40
-const INTERNATIONAL_DIVISOR = 20; // 5% = 1/20
+const DOMESTIC_RATE_NUM = 13; // 3.25% = 13/400
+const DOMESTIC_RATE_DEN = 400;
+const INTERNATIONAL_RATE_NUM = 11; // 5.5% = 11/200
+const INTERNATIONAL_RATE_DEN = 200;
 
 /**
  * Which schedule a card falls under. Stripe writes the issuing country on
@@ -100,8 +102,10 @@ function isDomesticCard(cardCountry) {
 function platformFeeCents(travelCostCents, cardCountry) {
   // An integer divided by 20 or by 40 is correctly rounded, so ceil() is exact at every cent.
   // `Math.ceil(travelCostCents * 0.05)` is not (3060 * 0.05 is 153.00000000000003).
-  const divisor = isDomesticCard(cardCountry) ? DOMESTIC_DIVISOR : INTERNATIONAL_DIVISOR;
-  return Math.max(APP_FEE_CENTS, Math.ceil(travelCostCents / divisor));
+  const domestic = isDomesticCard(cardCountry);
+  const numerator = domestic ? DOMESTIC_RATE_NUM : INTERNATIONAL_RATE_NUM;
+  const denominator = domestic ? DOMESTIC_RATE_DEN : INTERNATIONAL_RATE_DEN;
+  return Math.max(APP_FEE_CENTS, Math.ceil((travelCostCents * numerator) / denominator));
 }
 
 // The 1% commission on the travel cost. NO CAP — matches src/data.ts coordinationFee

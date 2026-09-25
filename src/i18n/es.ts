@@ -980,6 +980,21 @@ export default {
     operatorRetainedNote: 'El Operador retuvo el 99 % de la tarifa del viaje.',
     contactPatronSupport: 'Contactar con Atención al Viajero',
     copyEmailed: 'Copia enviada por correo',
+    activeAccountCost: "Costo de cuenta activa",
+    activeAccountCostBody: "Stripe cobra un costo de cuenta de $2 en un mes cuando se envía un pago a su cuenta bancaria o tarjeta de débito. American Rider exime ese costo cuando completa al menos 20 Viajes en el mismo mes. Por debajo de 20, el costo de $2 y el costo inevitable de procesamiento de tarjeta para cobrarlo se cobran por separado; su 99% de cada Tarifa de Viaje no se reduce.",
+    inboxBody: "Calificación, cobertura, evaluación, pagos y avisos operativos.",
+    communications: "COMUNICACIONES",
+    noCommunications: "Ninguna comunicación requiere su atención.",
+    newCommunication: "NUEVO",
+    guardianTeenTravel: "Viaje de adolescente autorizado por tutor",
+    bookedByAnother: "Viaje solicitado por otro titular de cuenta",
+    travelerLabel: "VIAJERO",
+    whoIsTraveling: "¿Quién viaja?",
+    me: "Yo",
+    anotherAdult: "Otro adulto",
+    travelerName: "Nombre del Viajero",
+    noUnaccompaniedMinor: "American Rider no acepta Viajes de menores no acompañados en el lanzamiento.",
+
   },
 
   legal: {

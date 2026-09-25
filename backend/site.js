@@ -47,14 +47,13 @@ const HOME_HTML = page(
   <p>One price, quoted before the travel and covering the journey in full.</p>
   <div class="rows" style="margin-top:16px">
     <div><span class="k">Travel fare</span><span class="amount">$24.50</span></div>
-    <div><span class="k">Platform fee</span><span class="amount">$1.50</span></div>
-    <div><span class="k">Charged to the traveler</span><span class="amount">$26.00</span></div>
     <div class="split"><span class="k">To the operator</span><span class="amount">$24.26</span></div>
-    <div><span class="k">To American Rider</span><span class="amount">$1.74</span></div>
+    <div><span class="k">American Rider commission</span><span class="amount">$0.24</span></div>
   </div>
-  <p style="margin-top:16px">A 1% coordination commission on the fare, and a platform fee of
-  $1.50 or 5% of the travel fare, whichever is greater. Payment processing is paid from that
-  fee. The operator's 99% is unaffected at every fare.</p>
+  <p style="margin-top:16px">The traveler is quoted one Total before reservation. A platform
+  fee funds payment and platform infrastructure without reducing the operator's 99% share of
+  the travel fare. Government fees and tolls, when applicable, are passed through to their
+  beneficiaries rather than retained by American Rider.</p>
 </section>
 
 <section>

@@ -320,6 +320,21 @@ async function handleEvent(event) {
     return { ok: true, action: `adverse state ${state}`, uid };
   }
 
+  if (type === 'report.pre_adverse_action' || type === 'report.post_adverse_action') {
+    const reportId = object.id || object.report_id || null;
+    const uid = await uidForCandidate(object.candidate_id);
+    if (!uid) return { ok: true, action: 'adverse report event not mapped to operator' };
+    if (type === 'report.post_adverse_action') {
+      await recordAdverseState({
+        uid, state: 'final', reportId, final: true,
+        note: 'Checkr sent the post-adverse action notice.',
+      });
+      return { ok: true, action: 'adverse action finalized', uid, decision: 'refuse' };
+    }
+    await recordAdverseState({ uid, state: 'pre_adverse', reportId });
+    return { ok: true, action: 'pre-adverse notice recorded', uid };
+  }
+
   // A completed dispute is re-adjudicated from fresh provider data. If the corrected report
   // clears the statutory rules, any pending adverse action is canceled automatically.
   if (type === 'report.dispute_completed') {

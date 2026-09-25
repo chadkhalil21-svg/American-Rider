@@ -1,0 +1,17 @@
+const assert=require('node:assert');
+const fs=require('fs'),path=require('path');
+const {eventDocId,backoffMs}=require('./providerqueue');
+const R=[];const check=(l,c,d='')=>R.push({l,ok:!!c,d});
+check('provider event ids deterministic',eventDocId('stripe','evt_123')===eventDocId('stripe','evt_123'));
+check('provider namespaces prevent collision',eventDocId('stripe','1')!==eventDocId('checkr','1'));
+check('retry backoff increases',backoffMs(2)>backoffMs(1));
+check('retry backoff capped',backoffMs(100)<=15*60*1000);
+const server=fs.readFileSync(path.join(__dirname,'server.js'),'utf8');
+const a=server.indexOf('async function acceptDurableProviderEvent');
+const b=server.indexOf("app.post('/stripe/webhook'",a);
+const block=server.slice(a,b);
+check('ACK follows durable enqueue',block.indexOf('await enqueueProviderEvent')>=0&&block.indexOf('res.json')>block.indexOf('await enqueueProviderEvent'));
+check('queue outage returns 503',/!queued\.ok[\s\S]{0,120}status\(503\)/.test(block));
+check('pending provider events are swept',/sweepProviderEvents/.test(server));
+for(const r of R)console.log(`${r.ok?'PASS':'FAIL'}  ${r.l}${r.ok?'':' — '+r.d}`);
+const bad=R.filter(r=>!r.ok);console.log(`\n${R.length-bad.length}/${R.length} passed`);assert.equal(bad.length,0);

@@ -235,12 +235,10 @@ export const RIDER = {
   rating: 4.92,
 };
 
-// Fare model (ONE all-in price for the traveler): the operator keeps 99% of the fare
-// (1% coordination commission, no cap). American Rider adds a per-travel platform fee —
-// the greater of $1.50 and 5% of the fare, see platformFee() — and that fee ALSO absorbs
-// our payment-processing cost, so the traveler is never shown a separate "processing"
-// line. Total charged = fare + platformFee(fare).
-// PROC_* below is our INTERNAL processing cost (not added on top, not shown to travelers).
+// Fare model (ONE all-in price for the traveler): the Operator keeps 99% of the transportation
+// fare. American Rider adds the platform charge from platformFee(): $2.00 minimum, then 5%
+// domestic / 6.5% international. That charge funds payment processing, Connect and ordinary
+// platform infrastructure; it is never presented as a separate Stripe surcharge.
 // Travel classes (the web demo's Travel Options). ⚠️ MIRROR of backend/fares.js
 // TRAVEL_CLASSES — the server is the authority; these exist so screens can DISPLAY
 // per-class prices with the same math the server will charge.
@@ -474,13 +472,10 @@ export function isDomesticCard(cardCountry?: string | null): boolean {
 }
 
 /**
- * What American Rider adds to the travel fare, on the schedule the card falls under:
- * the greater of $1.50 and 2.5% of the fare on a US card, or 5% on any other, rounded up
- * to the cent. Chad, 20 Sept 2026 — before this one 5% rule covered both, which charged the
- * domestic traveler for the international card's cost.
- *
- * Each schedule is continuous where its halves meet: 2.5% of $60 and 5% of $30 are both
- * exactly $1.50, so no fare costs 50 cents more than the fare one cent below it.
+ * American Rider's launch platform charge. Mirrors backend/payments.js exactly.
+ * Domestic: max($2, 5% of fare). International: max($2, 6.5% of fare).
+ * The percentage branch is continuous with the floor and protects full platform economics,
+ * not only the card processor.
  */
 export function platformFee(travelCost: number, cardCountry?: string | null): number {
   // Mirrors backend/payments.js exactly: $2.00 minimum, then 5.0% domestic / 6.5%

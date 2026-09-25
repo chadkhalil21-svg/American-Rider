@@ -123,6 +123,7 @@ const { readDocument, documentsReady, READER_VERSION } = require('./documents');
 const { ready: r2Ready, uploadUrl: r2UploadUrl, readUrl: r2ReadUrl, owns: r2Owns } = require('./r2');
 const { assessOperator, assessAndRecord } = require('./qualification');
 const { normalizeParty, operatorPartyView } = require('./travelparty');
+const family = require('./family');
 const { listPlatformMessages, markPlatformMessageRead } = require('./platforminbox');
 const { page } = require('./shell');
 const {
@@ -618,6 +619,11 @@ app.get('/support/cases', requireAuth, async (req, res) => {
     return res.status(502).json({ error: 'Your cases could not be read', detail: String(e && e.message || e) });
   }
 });
+
+// Family / Teen Travel: guardian-created relationship, accepted by the teen account.
+app.post('/family/invite', requireAuth, async (req,res)=>{const b=req.body||{};const out=await family.createFamilyInvite({guardianUid:req.uid,guardianName:req.name||b.guardianName,teenName:b.teenName,teenEmail:b.teenEmail,teenDob:b.teenDob});return res.status(out.ok?200:400).json(out);});
+app.post('/family/invite/:id/accept', requireAuth, async (req,res)=>{const out=await family.acceptFamilyInvite({id:req.params.id,inviteToken:req.body?.inviteToken,teenUid:req.uid});return res.status(out.ok?200:400).json(out);});
+app.post('/family/:id/revoke', requireAuth, async (req,res)=>{const out=await family.revokeFamilyLink({id:req.params.id,guardianUid:req.uid});return res.status(out.ok?200:403).json(out);});
 
 // --- Platform inbox: durable American Rider -> Operator/account communications. -----------
 app.get('/operator/inbox', requireAuth, async (req, res) => {
@@ -2458,7 +2464,7 @@ app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, async (req, res) => {
     return res.status(400).json({ error: 'A valid pickup and destination position are required to create Travel.', code: 'route_geometry_required' });
   }
 
-  const partyResult = normalizeParty(b, { uid: req.uid, name: req.name || b.bookerName || b.travelerName || '' });
+  const partyResult = await normalizeParty(b, { uid: req.uid, name: req.name || b.bookerName || b.travelerName || '' });
   if (!partyResult.ok) return res.status(400).json({ error: partyResult.error, code: partyResult.code });
   const party = partyResult.party;
 
@@ -2604,7 +2610,7 @@ app.post('/travel/schedule', requireAuth, LIMITS.dispatch, async (req, res) => {
   if (priced.pricedBy !== 'distance') {
     return res.status(400).json({ error: 'A valid pickup and destination position are required to create Travel.', code: 'route_geometry_required' });
   }
-  const partyResult = normalizeParty(b, { uid: req.uid, name: req.name || b.bookerName || b.travelerName || '' });
+  const partyResult = await normalizeParty(b, { uid: req.uid, name: req.name || b.bookerName || b.travelerName || '' });
   if (!partyResult.ok) return res.status(400).json({ error: partyResult.error, code: partyResult.code });
   const party = partyResult.party;
   try {

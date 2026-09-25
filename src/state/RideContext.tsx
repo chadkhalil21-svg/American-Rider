@@ -309,14 +309,14 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   // against. Zero when the boarding stop was within walking distance and there was no leg 1.
   const smartLeg1Fare = (j: SmartJourney | null) =>
     (j?.plan.legs.find((l) => l.kind === 'car')?.cents ?? 0) / 100;
-  // ONE PLATFORM FEE PER JOURNEY. Leg 1 is charged exactly as any travel is. Leg 2 pays the
-  // difference between the fee on the combined car fare and the fee leg 1 already carried —
-  // never below zero. backend/payments.js applies the same rule from `journeyNo`; the two
+  // ONE COMBINED FEE REQUIREMENT PER JOURNEY. Leg 1 is charged exactly as any Travel is. Leg 2
+  // pays the difference between the TWO-transaction fee on the combined car fare and the fee
+  // leg 1 already carried — never below zero. backend/payments.js applies the same rule; the two
   // must never disagree, or the traveler is quoted one amount and charged another.
   const feeFor = (fare: number, j: SmartJourney | null) => {
     if (j && j.stage === 'leg2' && j.leg1No) {
       const leg1 = smartLeg1Fare(j);
-      return Math.max(0, +(platformFee(leg1 + fare) - platformFee(leg1)).toFixed(2));
+      return Math.max(0, +(platformFee(leg1 + fare, null, 0, 0, 2) - platformFee(leg1, null, 0, 0, 1)).toFixed(2));
     }
     return platformFee(fare);
   };

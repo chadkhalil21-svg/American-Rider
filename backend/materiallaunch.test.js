@@ -46,9 +46,11 @@ t('operator active-account cost is waived at 20 Travels', () => {
   assert.equal(accountFeeQuote(0, false).waived, true);
 });
 t('operator account charge recovers processing rather than losing money', () => {
-  const q = accountFeeQuote(1, true);
-  assert.ok(q.totalCents > 200);
-  assert.equal(q.processingCents, q.totalCents - 200);
+  const us = accountFeeQuote(1, true, 'US');
+  const unknown = accountFeeQuote(1, true, null);
+  assert.ok(us.totalCents > 200);
+  assert.equal(us.processingCents, us.totalCents - 200);
+  assert.ok(unknown.totalCents >= us.totalCents, 'unknown card must not be priced cheaper than domestic');
 });
 t('UTC month accounting is deterministic', () => {
   assert.equal(monthKey(Date.UTC(2026, 8, 25)), '2026-09');

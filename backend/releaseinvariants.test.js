@@ -27,12 +27,12 @@ assert.ok(lease.includes('renewLease'), 'scheduler lease must support renewal');
 assert.ok(server.includes('renewLease(name'), 'server must renew leadership during long sweeps');
 assert.ok(server.includes('releaseLease(name'), 'server must release leadership after a sweep');
 
-assert.ok(scheduled.includes("mode: 'self' | 'other_adult' | 'minor'"), 'scheduled Travel must carry minor party semantics');
-assert.ok(scheduled.includes('guardianAttestation'), 'scheduled Travel must carry guardian attestation');
+assert.ok(scheduled.includes("mode: 'self' | 'other_adult'"), 'scheduled Travel must preserve Booker/Traveler party semantics');
+assert.equal(/guardianAttestation|travelerAge|\| 'minor'/.test(scheduled), false, 'provisional minor product must not remain in scheduled Travel');
 assert.ok(scheduler.includes('party: r.party || null'), 'scheduled reservation party must reach dispatched Travel');
 
 console.log('✓ one-transfer Stripe architecture');
 console.log('✓ durable provider crash recovery');
 console.log('✓ adverse-action replay safety');
 console.log('✓ renewable scheduler leadership');
-console.log('✓ scheduled party propagation');
+console.log('✓ scheduled Booker/Traveler propagation without provisional minor product');

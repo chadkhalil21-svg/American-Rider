@@ -5,9 +5,10 @@ methodology — the demo's fixed destination prices are placeholders standing in
 formula #1; the backend implements the formula for real.
 
 > **Corrections since this was written (15 Sept 2026).** (1) §2's fixed $1.50 became, on
-> 9 Sept 2026 (Chad: "five percent"; Adrian in writing, 13 Sept), **the greater of $1.50 and
-> 5% of the travel fare, rounded up to the cent** — $1.50 exactly below a $30 fare, continuous
-> at $30. (2) §3's 1% commission has **no cap** (Chad, 16 Aug 2026). (3) The formula in §1 is
+> 9 Sept 2026 (Chad: "five percent"; Adrian in writing, 13 Sept), **the greater of $2.00 and the card-cost schedule: 3.25% of the travel fare for a US-issued card,
+> or 5.5% for an international card, rounded up to the cent**. This 25 Sept 2026 revision funds
+> ordinary Stripe Connect account/payout overhead and preserves a 25¢ operating reserve in the
+> launch model rather than pricing only to card-processing break-even. (2) §3's 1% commission has **no cap** (Chad, 16 Aug 2026). (3) The formula in §1 is
 > not what `backend/fares.js` implements today: $3.00 base + $1.80 per mile, $9.00 minimum,
 > no time term (open P1; proposal in docs/ECONOMICS-AND-INFRASTRUCTURE.md §8). The margin
 > table in §4 is at the old flat fee; current margins per fare are in that document's §2.
@@ -18,8 +19,8 @@ formula #1; the backend implements the formula for real.
 > **Travel Cost = $2.00 base + ($0.85 × miles) + ($0.20 × minutes)**, floor of **$6.00** minimum
 
 ## 2. What the traveler sees
-> **Total = Travel Cost + the platform fee** — the greater of $1.50 and 5% of the Travel Cost
-> (since 9 Sept 2026; $1.50 at every fare below $30). The fee is embedded and **absorbs payment
+> **Total = Travel Cost + the platform fee** — minimum $2.00; above the floor, 3.25% of Travel Cost
+> on a US-issued card or 5.5% on an international card (25 Sept 2026 Connect-cost audit). The fee is embedded and **absorbs payment
 > processing**; it is never itemized and processing is never billed on top.
 > One number, one blue box: *"Operator retains 99% of the travel cost — $X."*
 > No Travel Cost sub-line, no Platform Fee line, no Payment Processing line. Ever.

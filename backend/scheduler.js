@@ -222,6 +222,7 @@ async function sweepScheduled({ now = Date.now() } = {}) {
       const rideRef = await db.collection('rides').add({
         travelerUid: r.travelerUid,
         travelerName: r.travelerName || '',
+        party: r.party || null,
         tripNo: r.tripNo || '',
         operatorId: match.operator.id,
         operatorName: match.operator.name || '',

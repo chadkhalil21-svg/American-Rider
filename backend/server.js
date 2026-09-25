@@ -1659,14 +1659,17 @@ let lastSweep = { at: 0, report: null };
  * Promise.all.
  */
 async function runAllSweeps() {
-  const [scheduled, monitor, assignments, screening, settlements] = await Promise.allSettled([
+  const [scheduled, monitor, assignments, screening, settlements, providerEvents, operatorFees] = await Promise.allSettled([
     sweepScheduled(),
     sweepMonitor(),
     sweepAssignments(),
     sweepScreening(),
-    // Money owed to operators for work already done. Last, and never allowed to fail the
-    // others — Promise.allSettled, like the rest.
     sweepSettlements(),
+    sweepProviderEvents({ handlers: PROVIDER_HANDLERS, workerId: WORKER_ID }),
+    sweepOperatorAccountFees({
+      charge: ({ uid, email, month, amountCents }) =>
+        chargeOperatorAccountFee({ uid, email, month, amountCents }),
+    }),
   ]);
   const unwrap = (r) => (r.status === 'fulfilled' ? r.value : { ok: false, reason: String(r.reason) });
   return {
@@ -1675,7 +1678,16 @@ async function runAllSweeps() {
     assignments: unwrap(assignments),
     screening: unwrap(screening),
     settlements: unwrap(settlements),
+    providerEvents: unwrap(providerEvents),
+    operatorFees: unwrap(operatorFees),
   };
+}
+
+async function runLeasedSweeps() {
+  const lease = await acquireLease('operations_sweep', { owner: WORKER_ID });
+  if (!lease.ok) return { ok: false, reason: lease.reason || 'scheduler lease unavailable' };
+  if (!lease.acquired) return { ok: true, skipped: 'another server owns this sweep', leaseUntil: lease.leaseUntil };
+  return runAllSweeps();
 }
 
 async function runSweep(req, res) {
@@ -1697,7 +1709,7 @@ async function runSweep(req, res) {
   if (now - lastSweep.at < 10000 && lastSweep.report) {
     return res.json({ ...lastSweep.report, cached: true, ageMs: now - lastSweep.at });
   }
-  const report = await runAllSweeps();
+  const report = await runLeasedSweeps();
   lastSweep = { at: Date.now(), report };
   return res.json(report);
 }
@@ -3055,7 +3067,7 @@ app.listen(PORT, () => {
   // noticed at most a minute after six, which is inside the margin of "a long light".
   // `unref()` so the interval never holds a test process open.
   const tick = setInterval(() => {
-    runAllSweeps()
+    runLeasedSweeps()
       .then((r) => {
         lastSweep = { at: Date.now(), report: r };
       })

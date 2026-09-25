@@ -106,8 +106,6 @@ const TODO_DOCS: Record<DocKey, DocState> = {
 export type SimRequest = {
   traveler: string;
   bookedForAnother?: boolean;
-  minor?: boolean;
-  guardianName?: string | null;
   tInit: string;
   tRating?: number;
   pickup: string;

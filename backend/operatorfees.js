@@ -8,6 +8,7 @@
 const { adminDb, adminStatus } = require('./firebase-admin');
 const { notify } = require('./push');
 const { postPlatformMessage } = require('./platforminbox');
+const { defaultCardCountry } = require('./payments');
 
 const ACCOUNT_COST_CENTS = 200;
 const WAIVER_TRAVELS = 20;
@@ -94,7 +95,7 @@ async function sweepOperatorAccountFees({ charge, now = Date.now() } = {}) {
     const count = await completedTravelsInMonth(db, d.id, month);
     const user = await db.collection('users').doc(d.id).get();
     const email = user.exists ? (user.data()?.email || null) : null;
-    const cardCountry = user.exists ? (user.data()?.defaultCardCountry || null) : null;
+    const cardCountry = await defaultCardCountry(d.id).catch(() => null);
     const q = accountFeeQuote(count, true, cardCountry);
     if (q.waived) {
       await d.ref.set({ completedTravels: count, feeStatus: 'waived', feeQuote: q, assessedAt: now }, { merge: true });

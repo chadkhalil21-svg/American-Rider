@@ -1440,13 +1440,14 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
         destinationLat: tripCoords?.dest?.lat ?? arrival.lat,
         destinationLng: tripCoords?.dest?.lng ?? arrival.lng,
         travelClass: operatorClassFor(travelClass),
+        party: travelParty,
       }).then((saved) => {
         schedIdRef.current = saved?.id ?? null;
         setSchedId(saved?.id ?? null);
         setSchedSaved(!!saved);
       });
     },
-    [arrival, departure, travelClass, tripCoords],
+    [arrival, departure, travelClass, tripCoords, travelParty],
   );
 
   const cancelScheduled = useCallback(() => {

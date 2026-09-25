@@ -100,6 +100,9 @@ export default function TravelConfirmation() {
   const [searchingDep, setSearchingDep] = useState(false);
   const [query, setQuery] = useState('');
   const [queryDep, setQueryDep] = useState('');
+  const [partyOpen, setPartyOpen] = useState(false);
+  const [partyName, setPartyName] = useState(ride.travelParty.travelerName || '');
+  const [partyAge, setPartyAge] = useState(ride.travelParty.travelerAge ? String(ride.travelParty.travelerAge) : '');
 
   // navigate() can update params on an already-mounted screen — reopen search then too.
   useEffect(() => {
@@ -328,7 +331,8 @@ export default function TravelConfirmation() {
   // sheet happens to be showing while the server is computing a different one. And a travel
   // that cannot be charged, or that American Rider does not make, is not one to confirm.
   const busy = pricing || ride.repricing;
-  const canReserve = payConfig.canTakePayment && !busy && !priceFailed && !unavailable;
+  const partyReady = ride.travelParty.mode === 'self' || (ride.travelParty.travelerName.trim().length > 0 && (ride.travelParty.mode !== 'minor' || ((ride.travelParty.travelerAge ?? 0) >= 13 && (ride.travelParty.travelerAge ?? 0) <= 17 && ride.travelParty.guardianAttestation === true)));
+  const canReserve = payConfig.canTakePayment && partyReady && !busy && !priceFailed && !unavailable;
   const confirm = () => {
     if (!canReserve) return;
     ride.confirmRide();
@@ -362,6 +366,41 @@ export default function TravelConfirmation() {
         >
           <Title>{t('traveler.travelConfirmation')}</Title>
           {!editing && <Sub>{t('traveler.reviewAndConfirm')}</Sub>}
+
+          {!editing && !smartLeg && (
+            <>
+              <SectionLabel style={{ marginTop: 20, marginBottom: 10 }}>TRAVELER</SectionLabel>
+              <Card style={{ paddingHorizontal: 20, paddingVertical: 4 }}>
+                <Pressable onPress={() => setPartyOpen(!partyOpen)}>
+                  <View style={[styles.slotRow]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.slotLabel}>Who is traveling?</Text>
+                      <Text style={styles.slotValue}>
+                        {ride.travelParty.mode === 'self' ? 'Me' : ride.travelParty.travelerName || 'Another person'}
+                      </Text>
+                    </View>
+                    <Chev />
+                  </View>
+                </Pressable>
+                {partyOpen && (
+                  <View style={[styles.slot, styles.hair]}>
+                    <Pressable onPress={() => { ride.setTravelParty({ mode: 'self', travelerName: '' }); setPartyOpen(false); }}>
+                      <Text style={styles.modify}>Me</Text>
+                    </Pressable>
+                    <Pressable onPress={() => ride.setTravelParty({ mode: 'other_adult', travelerName: partyName })}>
+                      <Text style={[styles.modify,{marginTop:14}]}>Another adult</Text>
+                    </Pressable>
+                    <TextInput value={partyName} onChangeText={(v) => { setPartyName(v); if (ride.travelParty.mode !== 'self') ride.setTravelParty({ ...ride.travelParty, travelerName: v }); }} placeholder="Traveler name" placeholderTextColor={colors.muted} style={styles.input} />
+                    <Pressable onPress={() => ride.setTravelParty({ mode: 'minor', travelerName: partyName, travelerAge: Number(partyAge) || undefined, guardianAttestation: true })}>
+                      <Text style={[styles.modify,{marginTop:14}]}>My teen (13–17)</Text>
+                    </Pressable>
+                    <TextInput value={partyAge} onChangeText={(v) => { setPartyAge(v); if (ride.travelParty.mode === 'minor') ride.setTravelParty({ ...ride.travelParty, travelerAge: Number(v) || undefined, guardianAttestation: true }); }} placeholder="Age 13–17" keyboardType="number-pad" placeholderTextColor={colors.muted} style={styles.input} />
+                    {ride.travelParty.mode === 'minor' ? <Text style={{fontSize:12.5,color:colors.muted,lineHeight:18,marginTop:8}}>By requesting this Travel, you confirm that you are the teen’s parent or legal guardian. You will be able to follow the Travel from assignment through completion.</Text> : null}
+                  </View>
+                )}
+              </Card>
+            </>
+          )}
 
           {!editing && (
             <RouteMap pickup={ride.tripCoords?.pickup} dest={ride.tripCoords?.dest} route={ride.route} />

@@ -15,8 +15,8 @@ check('scheduler secret is read', /readKey\('SCHEDULER_TOKEN'\)/.test(block));
 check('missing or wrong scheduler secret fails closed', /if \(!want \|\| got !== want\)/.test(block));
 check('unauthorized scheduler request receives 401', /status\(401\)/.test(block));
 check('the old public redaction helper is gone', !/function sweepBody\(/.test(src));
-check('the process still has its internal 60-second operational clock',
-  /setInterval\([\s\S]*runAllSweeps\(\)[\s\S]*60 \* 1000/.test(src));
+check('the process still has its internal 60-second operational clock through the leader lease',
+  /setInterval\([\s\S]*runLeasedSweeps\(\)[\s\S]*60 \* 1000/.test(src));
 check('GET and POST sweep routes both use the protected handler',
   /app\.get\('\/scheduled\/sweep', runSweep\)/.test(src) &&
   /app\.post\('\/scheduled\/sweep', runSweep\)/.test(src));

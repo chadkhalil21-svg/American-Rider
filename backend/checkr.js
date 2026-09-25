@@ -276,8 +276,9 @@ async function fetchReportDetails(reportId) {
 // ---- The webhook's work, after the signature has been proved ------------------------------
 
 /**
- * One verified Checkr event. Called after the 200 has been sent (their retries are for
- * failures to ANSWER, not failures to finish), so everything here logs rather than throws.
+ * One verified Checkr event. server.js durably stores the verified event before HTTP 2xx;
+ * this handler may therefore fail and be retried from the provider-event inbox without losing
+ * the provider notification.
  */
 async function handleEvent(event) {
   const type = String(event?.type || '');

@@ -354,13 +354,7 @@ export async function fetchMyRides(): Promise<RideRecord[]> {
 /**
  * Record the traveler's review of a completed travel.
  *
- * THE DEFECT THIS CLOSES: the Travel Complete screen collected a star rating and a tip and
- * did nothing with either. Worse, it added the tip to a row labelled "Total Charged" — an
- * amount stated as charged that had never been charged. A rating nobody stores cannot affect
- * an operator's standing, and a tip nobody records cannot reach them.
- *
- */
-export async function recordTravelReview(
+ * Ratings are feedback only; no gratuity amount is stored or collected.\n */\nexport async function recordTravelReview(
   rideId: string,
   review: { stars: number },
 ): Promise<boolean> {

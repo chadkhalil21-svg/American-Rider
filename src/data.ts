@@ -413,7 +413,7 @@ export const INSURERS: {
   },
 ];
 
-export const APP_FEE = 1.5;
+export const APP_FEE = 2.0;
 export const PROC_ACH = 0.25;
 export const PROC_CARD = 0.74;
 
@@ -483,13 +483,11 @@ export function isDomesticCard(cardCountry?: string | null): boolean {
  * exactly $1.50, so no fare costs 50 cents more than the fare one cent below it.
  */
 export function platformFee(travelCost: number, cardCountry?: string | null): number {
-  // Whole cents first. 2.5% is 1/40 and 5% is 1/20, and an integer divided by either is
-  // correctly rounded, so ceil() is exact at every cent. `Math.ceil(0.05 * fare * 100)` is
-  // not: 0.05 * 30.60 * 100 is 153.00000000000003, which ceils to 154 — a cent the server
-  // would not charge, on 766 of the first 50,001 cent values.
+  // Mirrors backend/payments.js exactly: $2.00 minimum, then 5.0% domestic / 6.5%
+  // international. Integer basis points prevent the quote and charge from drifting by a cent.
   const fareCents = Math.round(travelCost * 100);
-  const divisor = isDomesticCard(cardCountry) ? 40 : 20;
-  return Math.max(APP_FEE, Math.ceil(fareCents / divisor) / 100);
+  const bps = isDomesticCard(cardCountry) ? 500 : 650;
+  return Math.max(APP_FEE, Math.ceil((fareCents * bps) / 10000) / 100);
 }
 
 export const procFor = (pay: string) => (pay === 'ach' ? PROC_ACH : PROC_CARD);

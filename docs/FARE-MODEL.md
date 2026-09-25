@@ -61,3 +61,5 @@ The traveler demo implements #2 and #3 exactly: `PROC=0` (absorbed), `APP_FEE=1.
 all-in display everywhere (airport Standard $26.00, Premium $36.29 — Chad's exact
 numbers), Smart Travel total $20.25 vs $46.50 direct. Formula #1 is backend work —
 demo destination prices are hand-set placeholders.
+
+<!-- Release-gate audit trigger: 2026-09-25. No runtime effect. -->

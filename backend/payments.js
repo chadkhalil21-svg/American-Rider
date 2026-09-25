@@ -838,70 +838,6 @@ async function transferToOperator({
 }
 
 /**
- * A tip: charged to the traveler's saved card, and passed to the operator in full.
- *
- * THE DEFECT THIS CLOSES. Travel Complete collected a tip and wrote `tipCents` onto the ride
- * document. Nothing in the backend has ever referenced that field. The tip was neither charged
- * to the traveler nor paid to the operator — it was a number in a database, under a screen
- * reading "The operator keeps 100% of every tip."
- *
- * 100% MEANS 100%. No commission is taken and no platform fee is added, so Stripe's processing
- * on the tip is paid by American Rider — roughly $0.33 on a $1.00 tip, which is a loss on every
- * tip taken. That is deliberate: the alternative is an operator receiving $0.67 of a dollar a
- * traveler was told they would receive whole.
- *
- * Charged off-session against the card already saved for the travel, so the traveler is not
- * asked to present it again for a sum they have just agreed to.
- */
-async function chargeTip({ uid, email, operatorStripeAccount, amountCents, tripNo }) {
-  if (!(amountCents > 0)) return { ok: false, error: 'no tip to charge' };
-  const stripe = getStripe();
-  try {
-    const customer = await customerForTraveler({ uid, email });
-    // The traveler's default when they set one — the card they said to use when not asked.
-    const pm = await savedPaymentMethodFor(customer);
-    if (!pm) return { ok: false, code: 'no_saved_card', error: 'No card on file for this traveler' };
-
-    const pi = await stripe.paymentIntents.create(
-      {
-        amount: amountCents,
-        currency: 'usd',
-        customer: customer.id,
-        payment_method: pm.id,
-        off_session: true,
-        confirm: true,
-        statement_descriptor_suffix: STATEMENT_DESCRIPTOR,
-        description: `American Rider gratuity ${tripNo || ''}`.trim(),
-        metadata: { product: 'American Rider gratuity', uid: uid || '', tripNo: tripNo || '' },
-      },
-      { idempotencyKey: `ar_tip_${uid}_${tripNo}_${amountCents}` },
-    );
-    if (pi.status !== 'succeeded') {
-      return { ok: false, code: pi.status, error: `Tip payment is ${pi.status}` };
-    }
-
-    // The whole tip goes on to the operator. If it cannot be forwarded now, the charge stands
-    // and the caller records it as owed — never kept quietly.
-    const out = await transferFixed({
-      paymentIntentId: pi.id,
-      operatorStripeAccount,
-      amountCents,
-      reference: `gratuity ${tripNo || ''}`.trim(),
-    });
-    return {
-      ok: true,
-      chargedCents: amountCents,
-      paymentIntentId: pi.id,
-      forwarded: out.ok,
-      transferId: out.transferId || null,
-      forwardError: out.ok ? null : out.error,
-    };
-  } catch (e) {
-    return { ok: false, code: e.code || 'tip_failed', error: e.message };
-  }
-}
-
-/**
  * Move a fixed amount to an operator, drawn from a specific charge.
  *
  * Used for the arrival fee on a cancellation, where the sum is a flat figure rather than a
@@ -1111,9 +1047,7 @@ async function createScreeningIntent({ amountCents, uid, email }) {
   };
 }
 
-// EVERY function server.js names must appear here. chargeTip and transferFixed were written,
-// reviewed and committed WITHOUT being exported, so `POST /travel/tip` and the cancellation
-// arrival fee both threw ReferenceError on the first line that mattered — the two paths that
+// EVERY function server.js names must appear here. // arrival fee both threw ReferenceError on the first line that mattered — the two paths that
 // move money to an operator outside a completed travel, dead from the day they shipped.
 
 /**
@@ -1181,7 +1115,7 @@ module.exports = {
   MIN_PLATFORM_FEE_CENTS,
   customerForTraveler, connectAccountFor, connectOnboardingLink, connectAccountStatus,
   transferToOperator, paidWithFromIntent, refundableFor, connectDashboardLink, pingStripe, probeNetwork,
-  chargeTip, transferFixed, chargeScheduledTravel, createScreeningIntent, chargeOperatorAccountFee,
+  transferFixed, chargeScheduledTravel, createScreeningIntent, chargeOperatorAccountFee,
   describePaymentMethod, listPaymentMethods, createSetupIntent, setDefaultPaymentMethod, detachPaymentMethod,
   // Exported under an underscored name for idempotency.test.js only. It is an internal detail
   // of how a charge is keyed, not part of the module's interface.

@@ -8,7 +8,7 @@
 const { adminDb, adminStatus } = require('./firebase-admin');
 const { notify } = require('./push');
 const { postPlatformMessage } = require('./platforminbox');
-const { defaultCardCountry } = require('./payments');
+
 
 const ACCOUNT_COST_CENTS = 200;
 const WAIVER_TRAVELS = 20;
@@ -81,7 +81,7 @@ function previousMonth(now = Date.now()) {
   return monthKey(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, 1));
 }
 
-async function sweepOperatorAccountFees({ charge, now = Date.now() } = {}) {
+async function sweepOperatorAccountFees({ charge, cardCountryFor = async () => null, now = Date.now() } = {}) {
   const db = adminDb();
   if (!db) return { ok: false, reason: adminStatus().reason };
   if (typeof charge !== 'function') return { ok: false, reason: 'charge function required' };
@@ -95,7 +95,7 @@ async function sweepOperatorAccountFees({ charge, now = Date.now() } = {}) {
     const count = await completedTravelsInMonth(db, d.id, month);
     const user = await db.collection('users').doc(d.id).get();
     const email = user.exists ? (user.data()?.email || null) : null;
-    const cardCountry = await defaultCardCountry(d.id).catch(() => null);
+    const cardCountry = await cardCountryFor(d.id).catch(() => null);
     const q = accountFeeQuote(count, true, cardCountry);
     if (q.waived) {
       await d.ref.set({ completedTravels: count, feeStatus: 'waived', feeQuote: q, assessedAt: now }, { merge: true });

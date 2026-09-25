@@ -21,17 +21,14 @@ const usd = (cents) => `$${(cents / 100).toFixed(2)}`;
 // fare on a US-issued card, or 5% on any other. A card we do not know yet is quoted domestic —
 // see isDomesticCard() in payments.js for why that, and not the safer-looking opposite.
 const DOMESTIC = [
-  [100, 150], [999, 150], [2500, 150], [3000, 150], [3001, 150], [5999, 150],
-  [6000, 150], // 2.5% of $60.00 is exactly $1.50 — the two halves meet, so there is no step
-  [6001, 151], // 2.5% of $60.01 is $1.50025, rounded UP
-  [10000, 250], [25000, 625], [100000, 2500], [500000, 12500],
+  [100, 200], [999, 200], [2500, 200], [3999, 200],
+  [4000, 200], // 5% of $40.00 is exactly $2.00
+  [4001, 201], [10000, 500], [25000, 1250], [100000, 5000], [500000, 25000],
 ];
 const INTERNATIONAL = [
-  [100, 150], [999, 150], [2500, 150], [2999, 150],
-  [3000, 150], // 5% of $30.00 is exactly $1.50 — the two halves meet
-  [3001, 151], // 5% of $30.01 is $1.5005, rounded UP
-  [4500, 225], [5999, 300], [6000, 300], [6100, 305], [7500, 375],
-  [10000, 500], [25000, 1250], [100000, 5000], [500000, 25000],
+  [100, 200], [999, 200], [2500, 200], [3076, 200],
+  [3077, 201], // 6.5% first exceeds the $2.00 floor here
+  [4500, 293], [6000, 390], [10000, 650], [25000, 1625], [100000, 6500], [500000, 32500],
 ];
 for (const [fare, fee] of DOMESTIC) {
   check(`domestic fee(${usd(fare)}) = ${usd(fee)}`, platformFeeCents(fare, 'US') === fee, `got ${platformFeeCents(fare, 'US')}`);
@@ -41,18 +38,18 @@ for (const [fare, fee] of INTERNATIONAL) {
 }
 
 check('an unknown card is quoted on the DOMESTIC schedule',
-  platformFeeCents(10000) === platformFeeCents(10000, 'US') && platformFeeCents(10000) === 250);
+  platformFeeCents(10000) === platformFeeCents(10000, 'US') && platformFeeCents(10000) === 500);
 check('country is read case- and space-insensitively',
   platformFeeCents(10000, ' us ') === 250 && platformFeeCents(10000, 'us') === 250);
 check('every non-US country is international',
-  ['GB', 'FR', 'CA', 'DE', 'MX', 'JP'].every((c) => platformFeeCents(10000, c) === 500));
+  ['GB', 'FR', 'CA', 'DE', 'MX', 'JP'].every((c) => platformFeeCents(10000, c) === 650));
 
 let flatBelowD = true;
-for (let c = 0; c < 6000; c++) if (platformFeeCents(c, 'US') !== 150) flatBelowD = false;
-check('$1.50 exactly at every cent below a $60 fare, domestic', flatBelowD);
+for (let c = 0; c < 4000; c++) if (platformFeeCents(c, 'US') !== 200) flatBelowD = false;
+check('$2.00 exactly at every cent below a $40 fare, domestic', flatBelowD);
 let flatBelowI = true;
-for (let c = 0; c < 3000; c++) if (platformFeeCents(c, 'GB') !== 150) flatBelowI = false;
-check('$1.50 exactly at every cent below a $30 fare, international', flatBelowI);
+for (let c = 0; c <= 3076; c++) if (platformFeeCents(c, 'GB') !== 200) flatBelowI = false;
+check('$2.00 through a $30.76 fare, international', flatBelowI);
 
 // ——— NO STEP, ON EITHER SCHEDULE ——————————————————————————————————————————————————
 // This is why the rule is max(floor, rate) and not the tier table proposed on 20 Sept: a tier

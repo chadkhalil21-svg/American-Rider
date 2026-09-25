@@ -266,6 +266,14 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // ---- platform messages -------------------------------------------------
+    // American Rider writes these with Admin credentials. The app reads/marks them through
+    // authenticated backend routes, not Firestore directly, so neither an Operator nor another
+    // client can forge, delete or rewrite an institutional notice.
+    match /users/{uid}/platform_messages/{messageId} {
+      allow read, write: if false;
+    }
+
     // ---- operators ---------------------------------------------------------
     match /operators/{operatorId} {
       // THE FLEET IS NOT READABLE FROM A PHONE.

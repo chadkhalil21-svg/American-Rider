@@ -45,24 +45,11 @@ function normalizeParty(body = {}, booker = {}) {
   // The product does not accept an unaccompanied-minor booking from a non-guardian account.
   // The declaration is recorded on the Travel and can be audited; do not collect a child's
   // date of birth merely to make the UI look precise.
-  const teenAge = Math.trunc(Number(body.travelerAge));
-  if (!(teenAge >= 13 && teenAge <= 17)) {
-    return { ok: false, code: 'minor_age_not_supported', error: 'Unaccompanied minor Travel is available only for ages 13–17.' };
-  }
-  if (body.guardianAttestation !== true) {
-    return {
-      ok: false, code: 'guardian_attestation_required',
-      error: 'A parent or legal guardian must request Travel for a minor and accept responsibility for the booking.',
-    };
-  }
-  return {
-    ok: true,
-    party: {
-      mode, travelerName, bookerName,
-      guardian: { uid: String(booker.uid || ''), name: bookerName },
-      bookedForAnother: true, minor: true, teen: true,
-    },
-  };
+  // Launch posture: do not create an unaccompanied-minor transportation product until the
+  // insurance carrier, Florida counsel and operating procedure explicitly approve it. A
+  // parent may book for another ADULT; a minor must travel with their guardian in the vehicle.
+  return { ok: false, code: 'unaccompanied_minor_not_supported', error: 'American Rider does not accept unaccompanied-minor Travel.' };
+
 }
 
 function operatorPartyView(party) {

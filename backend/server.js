@@ -1690,54 +1690,29 @@ async function runAllSweeps() {
 }
 
 async function runSweep(req, res) {
-  // THE TOKEN NOW DECIDES WHAT COMES BACK, NOT WHETHER THE SWEEP RUNS.
+  // Operational sweeps can dispatch reserved travel, re-offer assignments, block expired
+  // screenings, open safety cases and move money owed to operators. They are therefore an
+  // authenticated operational control, not a public health endpoint. The process already
+  // runs the same sweep internally every sixty seconds; external schedulers are optional.
   //
-  // Found in the pre-launch sweep, 19 Sept 2026: this endpoint is open on production, by
-  // design — free cron services send an unauthenticated GET and cannot be told otherwise, and
-  // the sweep takes no parameters, so it cannot be aimed at a traveler, an amount or an
-  // operator. That reasoning covers what the endpoint DOES. It did not cover what it SAYS.
-  //
-  // The report is operational state: how many travels are waiting, how many operators are
-  // moving, settlements and `centsPaid` — and, when they are not empty, `emergencies`,
-  // `cases`, `stranded` and `dispatched`, which carry identifiers. Anyone on the internet
-  // could read all of it, once every ten seconds, including whether an emergency had just
-  // happened. That is the disclosure, and it is worst on exactly the quietest day, when one
-  // non-empty array is the whole story.
-  //
-  // Failing CLOSED was the wrong fix: no token is set on Render today, so refusing the call
-  // would stop scheduled travel being dispatched and settlements being paid. The clock must
-  // keep running for anyone. Only the detail is held back.
+  // Previous behavior deliberately let an unauthenticated caller execute the sweep and merely
+  // hid the detailed response. That still exposed a public resource-amplification endpoint:
+  // an attacker could force repeated Firestore/Stripe work every ten seconds. Fail closed.
   const want = readKey('SCHEDULER_TOKEN');
   const got = String(req.query?.token || req.get('x-scheduler-token') || '');
-  const trusted = !!want && got === want;
-  // One real sweep per ten seconds. Protects against a pinger set too fast and against a
-  // manual sweep landing on top of the interval — the claim transaction makes that safe, but
-  // there is no reason to make Stripe and Firestore absorb it.
+  if (!want || got !== want) {
+    return res.status(401).json({ error: 'scheduler authorization required' });
+  }
+
   const now = Date.now();
   if (now - lastSweep.at < 10000 && lastSweep.report) {
-    return res.json(sweepBody({ ...lastSweep.report, cached: true, ageMs: now - lastSweep.at }, trusted));
+    return res.json({ ...lastSweep.report, cached: true, ageMs: now - lastSweep.at });
   }
   const report = await runAllSweeps();
   lastSweep = { at: Date.now(), report };
-  res.json(sweepBody(report, trusted));
+  return res.json(report);
 }
 
-/**
- * What a caller is allowed to read back from a sweep.
- *
- * With the token: everything, which is what makes `GET /scheduled/sweep` the fastest way to
- * see what the platform is doing (docs/SCHEDULED-TRAVEL.md). Without it: that the sweep ran
- * and whether each pass succeeded, which is all a cron service needs in order to alert on a
- * failing job — and no counts, no amounts and no identifiers.
- */
-function sweepBody(report, trusted) {
-  if (trusted) return report;
-  const ran = {};
-  for (const [pass, result] of Object.entries(report)) {
-    if (result && typeof result === 'object' && 'ok' in result) ran[pass] = { ok: !!result.ok };
-  }
-  return { ok: true, swept: true, passes: ran, detail: 'set SCHEDULER_TOKEN and pass ?token= to read it' };
-}
 
 // --- Private file storage. -----------------------------------------------------------------
 // The mobile app may request a five-minute upload URL only for its own namespace. R2 remains

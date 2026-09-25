@@ -2,13 +2,8 @@
 //
 // Booker = authenticated account that requests and pays for the Travel.
 // Traveler = person physically taking the Travel. They may be the Booker or another person.
-// Guardian = adult Booker responsible for a minor Traveler.
-//
-// This module deliberately does not infer age or relationship. The Booker declares the party
-// arrangement. A minor may travel only under the explicit guardian flow; the Operator receives
-// only what is operationally necessary: the Traveler's first name, that the Traveler is a minor,
-// and the guardian's in-app contact channel through American Rider. The Operator never receives
-// the guardian's payment data, phone number, address book or account history.
+// At launch, Booker may request Travel for self or another adult. Unaccompanied-minor Travel
+// fails closed until carrier/counsel/operations explicitly approve that separate product.
 
 const MAX_NAME = 80;
 const clean = (v, n = MAX_NAME) => String(v || '').trim().replace(/\s+/g, ' ').slice(0, n);
@@ -62,9 +57,4 @@ function operatorPartyView(party) {
   };
 }
 
-function guardianCanFollow({ ride, uid }) {
-  return !!ride && ride.party?.minor === true &&
-    String(ride.party?.guardian?.uid || ride.travelerUid || '') === String(uid || '');
-}
-
-module.exports = { normalizeParty, operatorPartyView, guardianCanFollow };
+module.exports = { normalizeParty, operatorPartyView };

@@ -185,7 +185,7 @@ export async function dispatchRide(opts: {
   journeyNo?: string | null;
   /** Operators who have already declined this travel. Never offered it twice. */
   excludeIds?: string[];
-  party?: { mode: 'self' | 'other_adult' | 'minor'; travelerName?: string; guardianAttestation?: boolean };
+  party?: { mode: 'self' | 'other_adult' | 'minor'; travelerName?: string; travelerAge?: number; guardianAttestation?: boolean };
 }): Promise<MatchedOp | null> {
   // Never dispatch without a signed-in traveler: the server writes the travel against the
   // authenticated uid, and an "anon" travel could not be read back by anyone.
@@ -211,6 +211,7 @@ export async function dispatchRide(opts: {
       bookerName: auth.currentUser?.displayName || '',
       partyMode: opts.party?.mode || 'self',
       guardianAttestation: opts.party?.guardianAttestation === true,
+      travelerAge: opts.party?.travelerAge,
     }),
   });
 

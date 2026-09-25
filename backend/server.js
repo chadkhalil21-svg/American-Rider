@@ -1361,6 +1361,7 @@ app.post('/fare-quote', attachAuth, LIMITS.quoteIp, async (req, res) => {
   const priced = await authoritativeFare({
     body: req.body, uid: req.uid, email: req.email, db: adminDb(), cardCountryFor: defaultCardCountry,
   });
+  if (priced?.invalidJourney) return res.status(409).json({ error: priced.reason, code: 'invalid_smart_journey' });
   if (priced?.outsideMarket) {
     return res.status(409).json({ error: priced.reason, code: 'outside_market', where: priced.outsideMarket });
   }

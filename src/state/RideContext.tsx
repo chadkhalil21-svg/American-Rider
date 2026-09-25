@@ -1398,7 +1398,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
    * not earned.
    */
   const submitReview = useCallback(async (stars: number) => {
-    const rideId = completedRideIdRef.current;
+    const rideId = reviewedRideId.current;
     if (!rideId) return false;
     // Ratings are feedback only. American Rider deliberately has no gratuity/tip product,
     // endpoint, stored tip amount or post-Travel money path.

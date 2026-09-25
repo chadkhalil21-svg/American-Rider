@@ -122,6 +122,7 @@ const { mount: mountOps, opsAuthMode } = require('./ops');
 const { readDocument, documentsReady, READER_VERSION } = require('./documents');
 const { ready: r2Ready, uploadUrl: r2UploadUrl, readUrl: r2ReadUrl, owns: r2Owns } = require('./r2');
 const { assessOperator, assessAndRecord } = require('./qualification');
+const { normalizeParty, operatorPartyView } = require('./travelparty');
 const { page } = require('./shell');
 const {
   screeningReady, evaluateExistingReport, screeningCurrent,
@@ -2430,6 +2431,10 @@ app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, async (req, res) => {
     return res.status(400).json({ error: 'A valid pickup and destination position are required to create Travel.', code: 'route_geometry_required' });
   }
 
+  const partyResult = normalizeParty(b, { uid: req.uid, name: req.name || b.bookerName || b.travelerName || '' });
+  if (!partyResult.ok) return res.status(400).json({ error: partyResult.error, code: partyResult.code });
+  const party = partyResult.party;
+
   let fleet;
   try {
     const snap = await db.collection('operators').get();
@@ -2486,7 +2491,8 @@ app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, async (req, res) => {
   const tripNo = travelNumberFor(ref.id, pickup);
   const ride = {
     travelerUid: String(req.uid),
-    travelerName: String(b.travelerName || '').slice(0, 60),
+    travelerName: party.travelerName.slice(0, 60),
+    party,
     tripNo,
     // WRITTEN FROM THE SERVER'S OWN MATCH, never from the request. This is the line the whole
     // endpoint exists for.
@@ -2538,6 +2544,7 @@ app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, async (req, res) => {
         miles: best.miles,
         demo: !!op.demo,
       },
+      party: operatorPartyView(party),
     });
   } catch (e) {
     res.status(502).json({ error: e.message });

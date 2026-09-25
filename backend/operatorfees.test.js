@@ -1,10 +1,11 @@
 const assert=require('node:assert');
 const {accountFeeQuote,monthKey,monthBounds,previousMonth}=require('./operatorfees');
 const R=[];const check=(l,c,d='')=>R.push({l,ok:!!c,d});
-let q=accountFeeQuote(0,true);
+let q=accountFeeQuote(0,true,'US');
 check('active low-volume operator owes $2 Connect account cost',q.costCents===200,JSON.stringify(q));
 check('collection cost is itemized and grossed up',q.processingCents===37&&q.totalCents===237,JSON.stringify(q));
-check('19 Travels does not waive',accountFeeQuote(19,true).waived===false);
+check('unknown card is international-safe',accountFeeQuote(0,true,null).totalCents>=q.totalCents);
+check('19 Travels does not waive',accountFeeQuote(19,true,'US').waived===false);
 check('20 Travels waives',accountFeeQuote(20,true).waived===true);
 check('21 Travels remains waived',accountFeeQuote(21,true).totalCents===0);
 check('no payout means no active-account recovery',accountFeeQuote(0,false).totalCents===0);

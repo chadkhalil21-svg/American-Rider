@@ -1600,7 +1600,7 @@ async function runAllSweeps() {
     sweepOperatorAccountFees({
       charge: ({ uid, email, month, amountCents }) =>
         chargeOperatorAccountFee({ uid, email, month, amountCents }),
-      cardCountryFor: defaultCardCountry,
+      cardCountryFor: async (uid) => defaultCardCountry({ uid }),
     }),
   ]);
   const unwrap = (r) => (r.status === 'fulfilled' ? r.value : { ok: false, reason: String(r.reason) });

@@ -27,16 +27,16 @@ export default function OperatorInbox() {
     <Screen>
       <LetterheadBar onBack={() => router.back()} />
       <Title>American Rider</Title>
-      <Text style={styles.sub}>Qualification, coverage, screening, payouts and operational notices.</Text>
-      <SectionLabel style={styles.label}>COMMUNICATIONS</SectionLabel>
+      <Text style={styles.sub}>{t('operator.inboxBody')}</Text>
+      <SectionLabel style={styles.label}>{t('operator.communications')}</SectionLabel>
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      {!error && items.length === 0 ? <Text style={styles.empty}>No communications require your attention.</Text> : null}
+      {!error && items.length === 0 ? <Text style={styles.empty}>{t('operator.noCommunications')}</Text> : null}
       {items.map((m) => (
         <Pressable key={m.id} onPress={() => open(m)}>
           <Card style={styles.card}>
             <View style={styles.head}>
               <Text style={[styles.title, !m.readAt && styles.unread]}>{m.title}</Text>
-              {!m.readAt ? <Text style={styles.new}>NEW</Text> : null}
+              {!m.readAt ? <Text style={styles.new}>{t('operator.newCommunication')}</Text> : null}
             </View>
             <Text style={styles.body}>{m.body}</Text>
             <Text style={styles.date}>{new Date(m.createdAt).toLocaleString()}</Text>

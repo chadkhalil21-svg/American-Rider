@@ -331,7 +331,7 @@ export default function TravelConfirmation() {
   // sheet happens to be showing while the server is computing a different one. And a travel
   // that cannot be charged, or that American Rider does not make, is not one to confirm.
   const busy = pricing || ride.repricing;
-  const partyReady = ride.travelParty.mode === 'self' || (ride.travelParty.travelerName.trim().length > 0 && (ride.travelParty.mode !== 'minor' || ((ride.travelParty.travelerAge ?? 0) >= 13 && (ride.travelParty.travelerAge ?? 0) <= 17 && ride.travelParty.guardianAttestation === true)));
+  const partyReady = ride.travelParty.mode === 'self' || (ride.travelParty.mode === 'other_adult' && ride.travelParty.travelerName.trim().length > 0);
   const canReserve = payConfig.canTakePayment && partyReady && !busy && !priceFailed && !unavailable;
   const confirm = () => {
     if (!canReserve) return;
@@ -391,11 +391,7 @@ export default function TravelConfirmation() {
                       <Text style={[styles.modify,{marginTop:14}]}>Another adult</Text>
                     </Pressable>
                     <TextInput value={partyName} onChangeText={(v) => { setPartyName(v); if (ride.travelParty.mode !== 'self') ride.setTravelParty({ ...ride.travelParty, travelerName: v }); }} placeholder="Traveler name" placeholderTextColor={colors.muted} style={styles.input} />
-                    <Pressable onPress={() => ride.setTravelParty({ mode: 'minor', travelerName: partyName, travelerAge: Number(partyAge) || undefined, guardianAttestation: true })}>
-                      <Text style={[styles.modify,{marginTop:14}]}>My teen (13–17)</Text>
-                    </Pressable>
-                    <TextInput value={partyAge} onChangeText={(v) => { setPartyAge(v); if (ride.travelParty.mode === 'minor') ride.setTravelParty({ ...ride.travelParty, travelerAge: Number(v) || undefined, guardianAttestation: true }); }} placeholder="Age 13–17" keyboardType="number-pad" placeholderTextColor={colors.muted} style={styles.input} />
-                    {ride.travelParty.mode === 'minor' ? <Text style={{fontSize:12.5,color:colors.muted,lineHeight:18,marginTop:8}}>By requesting this Travel, you confirm that you are the teen’s parent or legal guardian. You will be able to follow the Travel from assignment through completion.</Text> : null}
+                    <Text style={{fontSize:12.5,color:colors.muted,lineHeight:18,marginTop:14}}>American Rider does not accept unaccompanied-minor Travel at launch.</Text>
                   </View>
                 )}
               </Card>

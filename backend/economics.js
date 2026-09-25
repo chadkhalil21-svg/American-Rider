@@ -16,9 +16,10 @@
 //     fee rather than silently absorbed.
 //
 // COST MODEL, 25 Sept 2026. Monetary values are cents; percentage rates are basis points.
-// The Connect fixed allowance is the conservative per-Travel budget at the 20-Travel/month
-// activity standard: $2 active-account charge + about 4.33 x $0.25 scheduled-payout fixed
-// charge = $3.0825/month / 20 = 15.4c, rounded UP to 16c.
+// The $2 monthly active-account cost is recovered separately from the Operator account and is
+// waived at 20 completed Travels/month (backend/operatorfees.js). It is therefore NOT charged
+// to Travelers here. This model retains only the fixed payout allowance: about 4.33 x $0.25
+// scheduled payouts / 20 Travels = 5.4c per Travel, rounded UP to 6c.
 //
 // IMPORTANT. Costs that cannot yet be known from a quote (e.g. actual TNC corporate insurance,
 // legal/accounting retainers) belong in the OPERATING_OVERHEAD allowance once quoted and in the
@@ -31,7 +32,7 @@ const INTERNATIONAL_CARD_BPS = 440; // 2.9% + 1.5%
 const STRIPE_FIXED_CENTS = 30;
 
 const CONNECT_VARIABLE_BPS = 50; // 0.25% payout + 0.25% funds routing
-const CONNECT_FIXED_ALLOWANCE_CENTS = 16;
+const CONNECT_FIXED_ALLOWANCE_CENTS = 6;
 
 const CONTINGENCY_RESERVE_CENTS = 25;
 const OPERATING_OVERHEAD_ALLOWANCE_CENTS = 25;

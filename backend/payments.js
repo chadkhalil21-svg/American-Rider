@@ -521,7 +521,7 @@ async function resumePaymentIntent({ paymentIntentId, uid, rideId, email, travel
   };
 }
 
-async function chargeRide({ travelCostCents, operatorStripeAccount, travelerPaymentMethod, uid, tripNo, governmentFees, cardCountry, tollCents = 0 }) {
+async function chargeRide({ travelCostCents, travelerPaymentMethod, uid, tripNo, governmentFees, cardCountry, tollCents = 0 }) {
   const stripe = getStripe();
   const q = quote(travelCostCents, undefined, governmentFees, cardCountry, tollCents);
   const params = {

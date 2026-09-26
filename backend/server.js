@@ -623,8 +623,9 @@ app.get('/support/cases', requireAuth, async (req, res) => {
 });
 
 // Family / Teen Travel: guardian-created relationship, accepted by the teen account.
-app.post('/family/invite', requireAuth, async (req,res)=>{const b=req.body||{};const out=await family.createFamilyInvite({guardianUid:req.uid,guardianName:req.name||b.guardianName,teenName:b.teenName,teenEmail:b.teenEmail,teenDob:b.teenDob});return res.status(out.ok?200:400).json(out);});
-app.post('/family/invite/:id/accept', requireAuth, async (req,res)=>{const out=await family.acceptFamilyInvite({id:req.params.id,inviteToken:req.body?.inviteToken,teenUid:req.uid});return res.status(out.ok?200:400).json(out);});
+app.get('/family', requireAuth, async (req,res)=>{const out=await family.listFamilyLinks({uid:req.uid});return res.status(out.ok?200:503).json(out);});
+app.post('/family/invite', requireAuth, requireVerifiedEmail, async (req,res)=>{const b=req.body||{};const out=await family.createFamilyInvite({guardianUid:req.uid,guardianName:req.name||b.guardianName,teenName:b.teenName,teenEmail:b.teenEmail,teenDob:b.teenDob});return res.status(out.ok?200:400).json(out);});
+app.post('/family/invite/:id/accept', requireAuth, requireVerifiedEmail, async (req,res)=>{const out=await family.acceptFamilyInvite({id:req.params.id,inviteToken:req.body?.inviteToken,teenUid:req.uid,teenEmail:req.email,emailVerified:req.emailVerified});return res.status(out.ok?200:400).json(out);});
 app.post('/family/:id/revoke', requireAuth, async (req,res)=>{const out=await family.revokeFamilyLink({id:req.params.id,guardianUid:req.uid});return res.status(out.ok?200:403).json(out);});
 
 // --- Platform inbox: durable American Rider -> Operator/account communications. -----------

@@ -1,7 +1,7 @@
-// Operator home — the operator demo's "Ready to operate" screen, exactly: the quiet
-// wallet card (money stays OFF the dashboard), Go Available, the pulsing available
-// state, and the Operation Request sheet with the demo's 15-second response window
-// (armed 2.6s after going available). Requests are simulated — test program.
+// Operator home — the operator demo's visual language carried into the real operating loop:
+// the quiet wallet card, in-service presence, and the Operation Request sheet with a 15-second
+// visible response window. Requests are never scripted in production; the sheet opens only for
+// a server-assigned Travel.
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, AppState, Modal, Pressable, StyleSheet, View } from 'react-native';

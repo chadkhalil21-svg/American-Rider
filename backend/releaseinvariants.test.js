@@ -11,6 +11,10 @@ const checkr=read('backend/checkr.js');
 const lease=read('backend/schedulerlease.js');
 const scheduled=read('src/backend/scheduled.ts');
 const scheduler=read('backend/scheduler.js');
+const smart=read('backend/smart.js');
+const inbox=read('backend/platforminbox.js');
+const opInboxScreen=read('app/operator/inbox.tsx');
+const appConfig=JSON.parse(read('app.json'));
 
 assert.equal(/transfer_data\s*:/.test(payments), false, 'payments.js must not create destination charges');
 assert.equal(/application_fee_amount\s*:/.test(payments), false, 'payments.js must not create application-fee charges');
@@ -52,9 +56,17 @@ assert.ok(server.includes("app.get('/family/travels'"), 'guardian must have an a
 assert.ok(family.includes('listGuardianActiveTravels'), 'Family service must expose only guardian-authorized active Teen Travel');
 assert.ok(server.includes("screen: '/family'"), 'guardian Travel alerts must open Family monitoring');
 assert.ok(scheduler.includes('party: r.party || null'), 'scheduled reservation party must reach dispatched Travel');
+assert.ok(smart.includes("const q1 = quote(first.cents"), 'Smart Travel preview must price first real car Travel');
+assert.ok(smart.includes("const q2 = quote(second.cents"), 'Smart Travel preview must price second real car Travel as journey continuation');
+assert.ok(inbox.includes("if (!snap.data()?.readAt)"), 'Operator Inbox must preserve first-read timestamp');
+assert.ok(opInboxScreen.includes("if (!recorded)"), 'Operator Inbox UI must fail closed when read acknowledgement fails');
+assert.equal(appConfig.expo.ios.infoPlist.CFBundleDisplayName, 'American Rider', 'iOS display name must carry full brand');
 
 console.log('✓ one-transfer Stripe architecture');
 console.log('✓ durable provider crash recovery');
 console.log('✓ adverse-action replay safety');
 console.log('✓ renewable scheduler leadership');
 console.log('✓ scheduled Family/Teen authorization propagation');
+console.log('✓ Smart Travel preview/payment alignment');
+console.log('✓ Operator Inbox durable read semantics');
+console.log('✓ full iOS brand name');

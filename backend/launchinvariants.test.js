@@ -39,6 +39,12 @@ const inbox=read('backend/platforminbox.js');
 assert.ok(inbox.includes("collection('platform_messages')"));
 assert.ok(read('src/components/operator.tsx').includes("'Communications'"));
 
+
+assert.ok(server.includes("app.post('/smart-quote', requireOperationalReadiness"), 'Smart Travel quote must fail closed when production providers are incomplete');
+assert.ok(server.includes("app.post('/smart-revalidate', requireOperationalReadiness"), 'Smart Travel continuation verification must fail closed when production providers are incomplete');
+assert.ok(server.includes("const productionMode = declaredProduction || keyMode === 'live'"), 'a live Stripe key must force production posture even if DEPLOYMENT_MODE is omitted');
+assert.ok(server.includes("if (keyMode !== 'test' || productionMode)"), 'local Stripe test helper must be disabled in production posture');
+
 console.log('✓ production money path has one transfer architecture');
 console.log('✓ no gratuity money path');
 console.log('✓ durable webhook ACK ordering');

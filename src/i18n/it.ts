@@ -927,6 +927,7 @@ export default {
     oneCarTravel: 'American Rider · 1 viaggio in auto',
     nCarTravels: 'American Rider · %{n} viaggi in auto',
     transitPaidToAgency: 'Mezzi pubblici · pagati all’azienda di trasporto',
+    transitPaidToNamedAgency: "Pagato a {agency}",
     transitFareNote: 'I biglietti dei mezzi pubblici si pagano in stazione o a bordo. American Rider non emette titoli di trasporto e non trattiene alcuna parte della tariffa.',
     fareSetBy: 'Tariffa non indicata · stabilita da %{agency}',
     reserveFirstTravel: 'Prenota il primo viaggio',

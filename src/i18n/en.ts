@@ -65,6 +65,7 @@ export default {
   // is deliberate and it translates as vocabulary, not as description — "Commence Operations"
   // becomes the equivalent formal undertaking in each language, never "start working".
   operator: {
+    inboxReadFailed: "This communication could not be recorded as read. Try again.",
     inboxBody: "Qualification, coverage, screening, payouts and operational notices.",
     communications: "COMMUNICATIONS",
     noCommunications: "No communications require your attention.",
@@ -992,7 +993,6 @@ export default {
     viewTravelReceipt: 'View Travel Receipt',
     leaveWithoutSaving: 'Leave without saving',
     operator: 'Operator',
-      inboxReadFailed: 'This communication could not be recorded as read. Try again.',
     paymentMethod: 'Payment Method',
     operatorRetainedNote: 'The Operator retained 99% of the travel fare.',
     contactPatronSupport: 'Contact Patron Support',

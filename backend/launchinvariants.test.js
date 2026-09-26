@@ -11,7 +11,7 @@ assert.equal(/\bchargeTip\b|\btipTravel\b|tipCents/.test(
 
 const server=read('backend/server.js');
 assert.ok(server.indexOf('await enqueueProviderEvent') < server.indexOf("res.json({ received: true"), 'durable receipt precedes webhook ACK');
-assert.ok(server.includes("acquireLease('operations_sweep'"),'sweeps have a single-leader lease');
+assert.ok(server.includes("const name = 'operations_sweep'") && server.includes('await acquireLease(name,'),'sweeps have a single-leader lease');
 
 const party=read('backend/travelparty.js');
 assert.ok(party.includes('unaccompanied_minor_not_supported'));

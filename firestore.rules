@@ -62,14 +62,14 @@ service cloud.firestore {
       return ride.tripNo == d.tripNo
         && d.travelerUid == ride.travelerUid
         && d.operatorId == ride.operatorId
-        && d.guardianUid == ride.get('party', {}).get('guardianUid', null)
+        && d.guardianUid == ride.party.guardianUid
         && ((d.from == 'traveler' && ride.travelerUid == request.auth.uid
              && (ride.status in ['assigned', 'accepted', 'arrived', 'onboard']
                  || (ride.status == 'completed' && d.lostItemId is string)))
             || (d.from == 'operator' && ride.operatorId == request.auth.uid
              && (ride.status in ['accepted', 'arrived', 'onboard']
                  || (ride.status == 'completed' && d.lostItemId is string)))
-            || (d.from == 'guardian' && ride.get('party', {}).get('teen', false) == true
+            || (d.from == 'guardian' && ride.party.teen == true
                 && ride.get('party', {}).get('guardianUid', null) == request.auth.uid
                 && ride.status in ['assigned', 'accepted', 'arrived', 'onboard'])));
     }

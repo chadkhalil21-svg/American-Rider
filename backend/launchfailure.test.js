@@ -1,4 +1,4 @@
-// Launch failure-mode regression suite.
+// Failure-mode regression suite.
 // These are cross-module invariants: conditions that must fail closed even when a happy-path
 // unit test in the owning module would still pass.
 const fs = require('fs');

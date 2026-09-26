@@ -1,3 +1,4 @@
+export type GuardianTravel={id:string;tripNo:string;status:string;travelerName:string;operatorName:string;operatorId:string;travelerUid:string;dep:string;dest:string;followUrl?:string|null};
 import { auth } from '../firebase';
 import { PAYMENT_SERVER_URL } from '../config';
 
@@ -9,3 +10,5 @@ export async function fetchFamily():Promise<FamilyLink[]>{const x=await call('/f
 export async function createFamilyInvite(input:{guardianName:string;teenName:string;teenEmail:string;teenDob:string}){return call('/family/invite',{method:'POST',body:JSON.stringify(input)});}
 export async function acceptFamilyInvite(id:string,inviteToken:string){return call(`/family/invite/${encodeURIComponent(id)}/accept`,{method:'POST',body:JSON.stringify({inviteToken})});}
 export async function revokeFamilyLink(id:string){return call(`/family/${encodeURIComponent(id)}/revoke`,{method:'POST'});}
+
+export async function fetchGuardianTravels():Promise<GuardianTravel[]>{const x=await call('/family/travels');return Array.isArray(x.travels)?x.travels:[];}

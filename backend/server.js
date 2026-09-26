@@ -183,7 +183,7 @@ app.post('/stripe/webhook', express.raw({ type: 'application/json' }), async (re
   return acceptDurableProviderEvent('stripe', event, res);
 });
 
-app.post('/smart-revalidate', async (req, res) => {
+app.post('/smart-revalidate', requireOperationalReadiness, async (req, res) => {
   const plan = req.body?.plan;
   const out = await revalidateTransit(plan);
   if (out.status === 'unavailable') return res.status(503).json(out);
@@ -253,8 +253,8 @@ const positiveCents = (v) => Number.isInteger(v) && v > 0;
 
 // Prices a ride from whatever the app told us about WHERE it is going — never from a price the
 // app sends. Two ways in, both server-priced:
-//   1. { destination: 'Wynwood' }                     -> the fixed FARES table (the demo places)
-//   2. { pickup: {lat,lng}, dest: {lat,lng} }         -> distance-based (any real address)
+//   1. { destination: '<configured place>' }          -> the fixed FARES table (development fixtures)
+//   2. { pickup: {lat,lng}, dest: {lat,lng} }         -> distance-based (authoritative operational path)
 // Coordinates win when both are present, because they describe a real trip rather than a label.
 // Returns { travelCostCents, miles|null, pricedBy, governmentFees } or null if we cannot price it.
 // `governmentFees` (fees.js) are fenced from THE SAME COORDINATES the price comes from — a fee

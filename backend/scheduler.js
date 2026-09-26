@@ -31,6 +31,8 @@ const { adminDb, adminStatus } = require('./firebase-admin');
 const { chargeScheduledTravel, operatorPayoutAccount } = require('./payments');
 const { fileTicket } = require('./tickets');
 const { notify } = require('./push');
+const { activeFamilyLink } = require('./family');
+const { provisionTeenPin } = require('./teenpickup');
 
 // How far ahead a reservation enters consideration. Inside this window it is looked at on
 // every sweep; outside it, it is not read at all.
@@ -168,6 +170,16 @@ async function sweepScheduled({ now = Date.now() } = {}) {
       continue;
     }
 
+    // Family authorization is revalidated at dispatch time, not trusted from reservation time.
+    if (r.party?.teen === true) {
+      const link = await activeFamilyLink({ id: r.party.familyLinkId, guardianUid: r.party.guardianUid, now });
+      if (!link || String(link.teenUid) !== String(r.party.teenUid)) {
+        await close(db, id, 'unmatched', 'Family authorization is no longer active.');
+        report.failed.push({ id, reason: 'Family authorization revoked or expired' });
+        continue;
+      }
+    }
+
     // ---- 2/3. Charge the card on file. ------------------------------------------------
     const fareCents = Number(r.travelCostCents);
     if (!Number.isFinite(fareCents) || fareCents <= 0) {
@@ -270,6 +282,10 @@ async function sweepScheduled({ now = Date.now() } = {}) {
           `${r.dep || 'your pickup'}.`,
         data: { screen: '/ride', rideId: rideRef.id, tripNo: r.tripNo || '' },
       });
+
+      const teenPickup = await provisionTeenPin({ rideRef, rideId: rideRef.id, party: r.party || null, now });
+      if (teenPickup.required && r.party?.teenUid) await notify({ uid:r.party.teenUid, kind:'teen_pickup_code', title:'Your pickup code', body:`Give ${teenPickup.pin} to your Operator after confirming the vehicle and Operator.`, data:{screen:'/ride',rideId:rideRef.id,tripNo:r.tripNo||''} });
+      if (teenPickup.required && r.party?.guardianUid && r.party.guardianUid !== r.party.teenUid) await notify({ uid:r.party.guardianUid, kind:'guardian_travel', title:'Teen Travel assigned', body:`${r.party.travelerName || 'Teen Traveler'}'s scheduled Travel has been assigned.`, data:{screen:'/ride',rideId:rideRef.id,tripNo:r.tripNo||''} });
 
       await touch(db, id, {
         status: 'dispatched',

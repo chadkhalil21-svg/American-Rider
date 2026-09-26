@@ -22,7 +22,7 @@
 // HOW MOST OF THEM ARE DECIDED IN A SECOND. Checkr returns `clear`, `consider` or `suspended`.
 // `clear` passes instantly with nobody involved. `consider` is put through the statutory
 // standard below, which is deterministic and resolves every case the authoritative data can
-// place. American Rider adds no discretionary criminal-history exclusions beyond the launch
+// place. American Rider adds no discretionary criminal-history exclusions beyond the statutory standard
 // jurisdiction's rule set. If source data is missing, contradictory or under dispute, the
 // operator remains blocked while the source is clarified; nobody is asked to guess. Human
 // review is the last exception path for a genuine source conflict, not a routine approval step.

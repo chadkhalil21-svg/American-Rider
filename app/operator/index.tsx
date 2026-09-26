@@ -364,9 +364,9 @@ export default function OperatorHome() {
                     {request.traveler || 'Traveler'}
                   </Text>
                   {request.teen ? (
-                    <Text style={styles.travelerRating}>Teen Travel{request.guardianName ? ` · Guardian: ${request.guardianName}` : ''}</Text>
+                    <Text style={styles.travelerRating}>{t('operator.guardianTeenTravel')}{request.guardianName ? ` · ${request.guardianName}` : ''}</Text>
                   ) : request.bookedForAnother ? (
-                    <Text style={styles.travelerRating}>Travel requested by another account holder</Text>
+                    <Text style={styles.travelerRating}>{t('operator.bookedByAnother')}</Text>
                   ) : null}
                   {request.tRating != null && (
                     <Text style={styles.travelerRating}>★ {request.tRating}</Text>

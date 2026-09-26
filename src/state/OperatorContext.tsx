@@ -358,7 +358,6 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
   const [msgs, setMsgs] = useState<OpMsg[]>([]);
   const [revenue, setRevenue] = useState<RevenueBlob>(EMPTY_REVENUE);
 
-  const msgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Mirror of the revenue blob so mutations never nest setState inside an updater
   // (React updaters must stay pure — StrictMode runs them twice).
   const revRef = useRef<RevenueBlob>(EMPTY_REVENUE);
@@ -414,9 +413,6 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
       })
       .catch(() => {})
       .finally(() => setReady(true));
-    return () => {
-      if (msgTimer.current) clearTimeout(msgTimer.current);
-    };
   }, []);
 
   const setRole = useCallback((r: Role) => {

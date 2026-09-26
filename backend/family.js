@@ -5,7 +5,9 @@ const { adminDb, adminStatus } = require('./firebase-admin');
 const COLLECTION='family_links';
 const MIN_AGE=13, MAX_AGE=17;
 const clean=(v,n=80)=>String(v||'').trim().replace(/\s+/g,' ').slice(0,n);
-const code=()=>crypto.randomBytes(16).toString('hex');
+const code=()=>crypto.randomBytes(32).toString('hex');
+const tokenHash=(v)=>crypto.createHash('sha256').update(String(v||'')).digest('hex');
+const INVITE_TTL_MS=7*24*60*60*1000;
 
 function ageOn(dob, now=Date.now()){
   const d=new Date(String(dob||'')+'T00:00:00Z'); if(!Number.isFinite(d.getTime())) return null;
@@ -18,16 +20,17 @@ async function createFamilyInvite({guardianUid,guardianName,teenName,teenEmail,t
  const age=ageOn(teenDob,now); if(age===null||age<MIN_AGE||age>MAX_AGE)return {ok:false,reason:'Teen Traveler must be 13–17.'};
  const ref=db.collection(COLLECTION).doc();
  const inviteToken=code();
- await ref.set({guardianUid:String(guardianUid),guardianName:clean(guardianName),teenUid:null,teenName:clean(teenName),teenEmail:clean(teenEmail,160).toLowerCase(),teenDob:String(teenDob),status:'invited',inviteToken,createdAt:now,updatedAt:now,revokedAt:null});
+ await ref.set({guardianUid:String(guardianUid),guardianName:clean(guardianName),teenUid:null,teenName:clean(teenName),teenEmail:clean(teenEmail,160).toLowerCase(),teenDob:String(teenDob),status:'invited',inviteTokenHash:tokenHash(inviteToken),inviteExpiresAt:now+INVITE_TTL_MS,createdAt:now,updatedAt:now,revokedAt:null});
  return {ok:true,id:ref.id,inviteToken};
 }
 async function acceptFamilyInvite({id,inviteToken,teenUid,now=Date.now()}){
  const db=adminDb(); if(!db)return {ok:false,reason:adminStatus().reason};
  const ref=db.collection(COLLECTION).doc(String(id));
  return db.runTransaction(async tx=>{const s=await tx.get(ref);if(!s.exists)return {ok:false,reason:'invite not found'};const x=s.data()||{};
-  if(x.status!=='invited'||x.inviteToken!==String(inviteToken)||!teenUid)return {ok:false,reason:'invite invalid'};
+  if(x.status!=='invited'||x.inviteTokenHash!==tokenHash(inviteToken)||!teenUid||Number(x.inviteExpiresAt||0)<now)return {ok:false,reason:'invite invalid'};
+  if(String(x.guardianUid)===String(teenUid))return {ok:false,reason:'Guardian and Teen accounts must be different.'};
   if((ageOn(x.teenDob,now)||0)<MIN_AGE||(ageOn(x.teenDob,now)||99)>MAX_AGE)return {ok:false,reason:'Teen Traveler is not eligible.'};
-  tx.set(ref,{teenUid:String(teenUid),status:'active',inviteToken:null,acceptedAt:now,updatedAt:now},{merge:true});return {ok:true,id:ref.id};
+  tx.set(ref,{teenUid:String(teenUid),status:'active',inviteTokenHash:null,inviteExpiresAt:null,acceptedAt:now,updatedAt:now},{merge:true});return {ok:true,id:ref.id};
  });
 }
 async function revokeFamilyLink({id,guardianUid,now=Date.now()}){

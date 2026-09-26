@@ -561,7 +561,6 @@ export default {
     nothingDeducted: 'Von Ihren 99 % wird nichts abgezogen. Der Reisende zahlt den Fahrpreis zuzüglich einer Plattformgebühr, und American Rider behält diese Gebühr sowie eine Koordinationsprovision von 1 % ein — die auch die Kartenabwicklung deckt. Ihr Anteil an einem Fahrpreis ändert sich nicht danach, wie der Reisende bezahlt hat.',
     weVerifyNotSell: 'American Rider prüft Ihren Versicherungsschutz, verkauft ihn aber nicht. Wir verweisen Sie an Anbieter mit geeigneten gewerblichen Tarifen.',
     verifyNotSellShort: 'American Rider prüft den gewerblichen Versicherungsschutz, verkauft ihn aber nicht.',
-    revenueSimulated: 'Testprogramm — die hier gezeigten Vorgänge und Erträge sind simuliert.',
     whatTravelerLooksFor: 'Ihr Name und Ihr Fahrzeug sind das, wonach ein Reisender am Straßenrand sucht, und das Kennzeichen ist das, was er vor dem Einsteigen prüft.',
     plateMustMatch: 'Der Reisende wird gebeten, vor dem Einsteigen das Kennzeichen zu prüfen. Es muss zu dem Fahrzeug passen, mit dem Sie ankommen.',
     reachesYouWithoutAsking: 'Sie behalten 99 % jedes Fahrpreises. Er erreicht Sie, ohne dass Sie ihn anfordern müssen.',

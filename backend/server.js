@@ -328,10 +328,11 @@ app.get('/health', async (req, res) => {
     // Stripe can reach us, and we can reach a traveler's inbox. Both were absent and both
     // were invisible; a field on a URL is how that stops happening.
     webhook: webhookReady() ? 'on' : 'off',
+    scheduler: readKey('SCHEDULER_TOKEN') ? 'authenticated' : 'off',
     receipts: mailReady() ? 'on' : 'off',
     // NO PROVIDER MEANS NOBODY CAN BE COMMISSIONED. Every operator sits at
     // `awaiting_provider`, which is deliberately not a pass and not dispatchable — so an
-    // empty fleet on launch day would otherwise look like nobody had applied.
+    // empty fleet would otherwise look like nobody had applied.
     screening: screeningReady() ? 'on' : 'off',
     // Reading an operator's licence, registration, inspection and insurance. `off` means every
     // document falls to 'review' — never to 'accept'.
@@ -1603,10 +1604,9 @@ app.post('/charge-ride', requireAuth, LIMITS.payments, async (req, res) => {
 // Render instance is also what wakes the process up. GET as well as POST: most free cron
 // services send GET and cannot be told otherwise.
 //
-// UNAUTHENTICATED BY DESIGN, unless SCHEDULER_TOKEN is set. The endpoint takes no parameters
-// and can only do what the clock would do a minute later on its own — it cannot be aimed at a
-// traveler, an amount, or an operator. Set SCHEDULER_TOKEN in the environment to require one
-// anyway, and give the same value to the pinger as ?token=.
+// AUTHENTICATED OPERATIONAL CONTROL. The endpoint takes no workload parameters and can only
+// invoke the same leased sweep the process clock invokes. SCHEDULER_TOKEN is mandatory; callers
+// without the configured token fail closed before any operational work begins.
 let lastSweep = { at: 0, report: null };
 
 /**

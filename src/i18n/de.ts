@@ -977,7 +977,6 @@ export default {
     me: "Ich",
     anotherAdult: "Ein anderer Erwachsener",
     travelerName: "Name des Reisenden",
-    noUnaccompaniedMinor: "American Rider akzeptiert zum Start keine Reisen unbegleiteter Minderjähriger.",
     familyTitle: 'Familie',
     familyAuthorized: 'AUTORISIERTE JUGENDLICHE REISENDE',
     familyTeenTraveler: 'Jugendlicher Reisender',

@@ -68,6 +68,7 @@ export default {
   },
 
   operator: {
+    inboxReadFailed: "No se pudo registrar esta comunicación como leída. Inténtelo de nuevo.",
     inboxBody: "Calificación, cobertura, evaluación, pagos y avisos operativos.",
     communications: "COMUNICACIONES",
     noCommunications: "Ninguna comunicación requiere su atención.",
@@ -984,7 +985,6 @@ export default {
     viewTravelReceipt: 'Ver Recibo de Viaje',
     leaveWithoutSaving: 'Salir sin guardar',
     operator: 'Operador',
-      inboxReadFailed: 'No se pudo registrar esta comunicación como leída. Inténtelo de nuevo.',
     paymentMethod: 'Método de Pago',
     operatorRetainedNote: 'El Operador retuvo el 99 % de la tarifa del viaje.',
     contactPatronSupport: 'Contactar con Atención al Viajero',

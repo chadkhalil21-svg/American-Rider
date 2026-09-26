@@ -1,5 +1,7 @@
 # Device and Provider Validation Matrix
 
+The executable release contract is `docs/COMMERCIAL-RELEASE-EVIDENCE.md`; record final results in a copy of `release-evidence.template.json` and validate it with `npm run release:evidence -- <evidence.json> <full-candidate-sha>`. This matrix supplies the detailed procedures. A result against another SHA does not release the candidate.
+
 Automated tests cannot establish OS scheduling, push delivery, bank payout timing or provider production behavior. These are release gates. Record each execution with date, build SHA, environment, executor, evidence link, result and any incident/corrective-action reference. A row without evidence is not a pass.
 
 ## Operator background-presence campaign

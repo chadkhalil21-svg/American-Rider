@@ -13,6 +13,7 @@ const server=read('backend/server.js');
 assert.ok(server.indexOf('await enqueueProviderEvent') < server.indexOf("res.json({ received: true"), 'durable receipt precedes webhook ACK');
 assert.ok(server.includes("const name = 'operations_sweep'") && server.includes('await acquireLease(name,'),'sweeps have a single-leader lease');
 assert.ok(server.includes("scheduler: readKey('SCHEDULER_TOKEN') ? 'authenticated' : 'off'"), 'health exposes scheduler authorization readiness');
+assert.ok(server.includes("tolls: readKey('HERE_API_KEY') ? 'on' : 'off'"), 'health exposes toll authority readiness');
 assert.ok(server.includes(".collection('operators').where('available', '==', true).get()"), 'dispatch prefilters to available Operators');
 
 const party=read('backend/travelparty.js');
@@ -35,6 +36,7 @@ console.log('✓ no gratuity money path');
 console.log('✓ durable webhook ACK ordering');
 console.log('✓ single-leader sweeps');
 console.log('✓ scheduler authorization readiness is observable');
+console.log('✓ toll authority readiness is observable');
 console.log('✓ dispatch prefilters to available Operators before authoritative matching');
 console.log('✓ another-person identity is server authoritative');
 console.log('✓ Teen Travel is bound to Family authorization');

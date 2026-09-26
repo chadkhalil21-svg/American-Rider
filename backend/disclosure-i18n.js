@@ -22,6 +22,18 @@
 // language that an English speaker gets.
 const { readKey } = require('./env');
 const COVERAGE_KEYS = { es:'TNC_INSURANCE_DISCLOSURE_ES', fr:'TNC_INSURANCE_DISCLOSURE_FR', it:'TNC_INSURANCE_DISCLOSURE_IT', de:'TNC_INSURANCE_DISCLOSURE_DE' };
+const REQUIRED_BODY = {
+  es: 'Florida exige que la cobertura del §627.748(7) esté vigente siempre que usted esté conectado. American Rider también exige que usted mantenga una cobertura comercial, de transporte por contrato o de limusina que cumpla los requisitos. American Rider verifica esa póliza y su vencimiento y no asigna viajes cuando deja de estar vigente.',
+  fr: 'La Floride exige que la couverture prévue au §627.748(7) soit en vigueur lorsque vous êtes connecté. American Rider exige également que vous mainteniez une couverture commerciale, de transport rémunéré ou de limousine conforme. American Rider vérifie cette police et son expiration et n’attribue aucun voyage lorsqu’elle n’est plus en vigueur.',
+  it: 'La Florida richiede che la copertura prevista dal §627.748(7) sia in vigore ogni volta che è connesso. American Rider richiede inoltre che lei mantenga una copertura commerciale, per trasporto a pagamento o limousine conforme. American Rider verifica tale polizza e la sua scadenza e non assegna viaggi quando non è più in vigore.',
+  de: 'Florida verlangt, dass der Versicherungsschutz nach §627.748(7) besteht, wann immer Sie angemeldet sind. American Rider verlangt außerdem, dass Sie einen entsprechenden gewerblichen Versicherungsschutz für entgeltliche Personenbeförderung vorhalten. American Rider prüft diese Police und ihr Ablaufdatum und weist keine Fahrten zu, wenn der Schutz nicht mehr besteht.',
+};
+const ACKNOWLEDGEMENT = {
+  es: 'He leído esta declaración, incluida la cobertura que proporciona American Rider y la advertencia de que mi propia póliza podría no cubrirme mientras estoy conectado o llevo a un viajero.',
+  fr: 'J’ai lu cette déclaration, y compris la couverture fournie par American Rider et l’avertissement selon lequel ma propre police pourrait ne pas me couvrir lorsque je suis connecté ou transporte un voyageur.',
+  it: 'Ho letto questa dichiarazione, inclusa la copertura fornita da American Rider e l’avvertenza che la mia polizza potrebbe non coprirmi mentre sono connesso o trasporto un viaggiatore.',
+  de: 'Ich habe diesen Hinweis gelesen, einschließlich des von American Rider bereitgestellten Versicherungsschutzes und des Hinweises, dass meine eigene Police mich möglicherweise nicht abdeckt, während ich angemeldet bin oder einen Reisenden befördere.',
+};
 
 const TRANSLATIONS = {
   es: {
@@ -236,7 +248,7 @@ function translationFor(lang) {
   // was identified. Until a reviewed translation of the bound policy is configured, this
   // language is unavailable and the caller falls back to the governing English disclosure.
   if (!coverage) return null;
-  return { ...base, provided: { ...base.provided, body: coverage } };
+  return { ...base, provided: { ...base.provided, body: coverage }, required: { ...base.required, body: REQUIRED_BODY[code] }, acknowledgement: ACKNOWLEDGEMENT[code] };
 }
 
 module.exports = { TRANSLATIONS, DISCLOSURE_LANGUAGES, translationFor };

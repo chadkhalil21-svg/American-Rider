@@ -1,4 +1,5 @@
 import type { SmartPlan } from '../backend/smart';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { FeeLine } from '../data';
 import React, {
   createContext,
@@ -120,6 +121,8 @@ export type SmartStatus = 'idle' | 'checking' | 'ok' | 'none' | 'unavailable';
 // transit leg the traveler rides on their own ticket. This record ties them together. The
 // journey has one combined platform-fee requirement sized for BOTH car PaymentIntents; leg 1
 // carries the ordinary first-leg amount and leg 2 carries only the incremental remainder.
+const SMART_JOURNEY_STORAGE_KEY = 'american-rider.smart-journey.v1';
+
 export type SmartJourney = {
   plan: SmartPlan;
   /** Where the journey began and where it ends — the endpoints leg 2 needs to restore. */
@@ -307,6 +310,44 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   const [smartJourney, setSmartJourney] = useState<SmartJourney | null>(null);
   const smartJourneyRef = useRef<SmartJourney | null>(null);
   smartJourneyRef.current = smartJourney;
+  const smartJourneyHydrated = useRef(false);
+
+  // A coordinated journey must survive a process death between its two car Travels. Persist only
+  // the journey envelope; authoritative Travel/payment state is still reconstructed from the
+  // server and leg 2 remains server-gated by the paid/completed first Travel.
+  useEffect(() => {
+    let live = true;
+    AsyncStorage.getItem(SMART_JOURNEY_STORAGE_KEY)
+      .then((raw) => {
+        if (!live || !raw) return;
+        try {
+          const saved = JSON.parse(raw) as SmartJourney;
+          if (
+            saved &&
+            (saved.stage === 'leg1' || saved.stage === 'leg2') &&
+            saved.plan?.status === 'ok' &&
+            Array.isArray(saved.plan.legs) &&
+            saved.destination &&
+            saved.destCoords &&
+            saved.party
+          ) {
+            smartJourneyRef.current = saved;
+            setSmartJourney(saved);
+            setSmartPlan(saved.plan);
+            setSmartStatus('ok');
+            setTravelParty({ ...saved.party });
+          }
+        } catch { /* corrupt local continuation is ignored; server authority is never reconstructed from it */ }
+      })
+      .finally(() => { smartJourneyHydrated.current = true; });
+    return () => { live = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!smartJourneyHydrated.current) return;
+    if (smartJourney) AsyncStorage.setItem(SMART_JOURNEY_STORAGE_KEY, JSON.stringify(smartJourney)).catch(() => {});
+    else AsyncStorage.removeItem(SMART_JOURNEY_STORAGE_KEY).catch(() => {});
+  }, [smartJourney]);
   // The fare of the journey's first car travel, in dollars — what leg 2's fee is computed
   // against. Zero when the boarding stop was within walking distance and there was no leg 1.
   const smartLeg1Fare = (j: SmartJourney | null) =>

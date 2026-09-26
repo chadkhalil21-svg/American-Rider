@@ -1,6 +1,6 @@
 # American Rider — Fare and Unit-Economics Model
 
-Status: **current launch model, audited 25 September 2026**.
+Status: **current model, audited 25 September 2026**.
 
 The server is authoritative. Request clients provide route inputs; they do not provide a price.
 
@@ -52,7 +52,7 @@ The absolute Platform Fee floor is $2.00.
 Unknown card country is priced on the international-safe schedule. A first foreign card is not
 allowed to become a deliberately loss-making exception.
 
-Launch payment presentment and settlement are USD-only. Therefore the normal launch formula
+Payment presentment and settlement are USD-only. Therefore the normal launch formula
 does not assume Stripe FX conversion. A future non-USD path must add the actual FX cost before
 it can be enabled.
 
@@ -104,7 +104,7 @@ Operator payout = Travel Fare − 1% commission + toll reimbursement
 
 Government fees are never included in the operator share.
 
-The separate Stripe Connect active-account economics are budgeted in the launch unit model.
+The separate Stripe Connect active-account economics are budgeted in the unit model.
 Any future Operator account-service charge must be disclosed separately and must never be
 described as a reduction of the 99% Travel Fare share.
 

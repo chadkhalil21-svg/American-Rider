@@ -73,7 +73,7 @@ export default function Settings() {
         </View>
         <Pressable onPress={() => router.navigate('/family')}>
           <View style={styles.row}>
-            <Text style={[styles.rowTitle, styles.rowTitleWrap]}>Family</Text>
+            <Text style={[styles.rowTitle, styles.rowTitleWrap]}>{t('traveler.familyTitle')}</Text>
             <Chev />
           </View>
         </Pressable>

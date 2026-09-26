@@ -39,7 +39,7 @@ service cloud.firestore {
       return signedIn() && resource.data.operatorId == request.auth.uid;
     }
     function guardsExisting() {
-      return signedIn() && resource.data.guardianUid == request.auth.uid;
+      return signedIn() && resource.data.get('guardianUid', null) == request.auth.uid;
     }
     // The set of fields this update touches, and nothing more.
     function touchesOnly(fields) {
@@ -62,15 +62,15 @@ service cloud.firestore {
       return ride.tripNo == d.tripNo
         && d.travelerUid == ride.travelerUid
         && d.operatorId == ride.operatorId
-        && d.guardianUid == ride.party.guardianUid
+        && d.get('guardianUid', null) == ride.get('party', {}).get('guardianUid', null)
         && ((d.from == 'traveler' && ride.travelerUid == request.auth.uid
              && (ride.status in ['assigned', 'accepted', 'arrived', 'onboard']
                  || (ride.status == 'completed' && d.lostItemId is string)))
             || (d.from == 'operator' && ride.operatorId == request.auth.uid
              && (ride.status in ['accepted', 'arrived', 'onboard']
                  || (ride.status == 'completed' && d.lostItemId is string)))
-            || (d.from == 'guardian' && ride.party.teen == true
-                && ride.party.guardianUid == request.auth.uid
+            || (d.from == 'guardian' && ride.get('party', {}).get('teen', false) == true
+                && ride.get('party', {}).get('guardianUid', null) == request.auth.uid
                 && ride.status in ['assigned', 'accepted', 'arrived', 'onboard']));
     }
 

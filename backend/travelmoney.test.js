@@ -11,7 +11,7 @@ const check = (l, c, d) => R.push({ l, ok: !!c, d });
 function fakeDb(seed) {
   const data = JSON.parse(JSON.stringify(seed));
   const snap = (c, id) => ({ exists: !!data[c]?.[id], data: () => (data[c]?.[id] ? JSON.parse(JSON.stringify(data[c][id])) : undefined) });
-  return {
+  const db = {
     data,
     collection: (c) => ({
       doc: (id) => ({
@@ -24,6 +24,15 @@ function fakeDb(seed) {
       }),
     }),
   };
+  db.runTransaction = async (fn) => {
+    const tx = {
+      get: async (ref) => ref.get(),
+      update: (ref, fields) => ref.update(fields),
+      set: (ref, fields, opts) => ref.set(fields, opts),
+    };
+    return fn(tx);
+  };
+  return db;
 }
 
 // A Stripe stand-in: two paid intents belonging to the SAME traveler, one per travel.
@@ -162,7 +171,7 @@ const rides = (over = {}) => ({
   {
     const src = fs.readFileSync(path.join(__dirname, 'travelmoney.js'), 'utf8');
     const body = src.slice(src.indexOf('async function payForTravel'), src.indexOf('async function cancelTravel'));
-    check('payForTravel checks the recorded payment BEFORE calling create()', body.indexOf('if (ride.paymentIntentId)') > 0 && body.indexOf('if (ride.paymentIntentId)') < body.indexOf('await create('));
+    check('payForTravel transactionally claims the payment transition BEFORE calling create()', /runTransaction/.test(body) && /paymentClaim/.test(body) && body.indexOf('runTransaction') < body.indexOf('await create('));
     const pay = fs.readFileSync(path.join(__dirname, 'payments.js'), 'utf8');
     const resume = pay.slice(pay.indexOf('async function resumePaymentIntent'), pay.indexOf('async function chargeRide'));
     check('resumePaymentIntent retrieves and never creates a PaymentIntent', /paymentIntents\.retrieve\(/.test(resume) && !/paymentIntents\.create\(/.test(resume));

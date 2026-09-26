@@ -37,6 +37,16 @@ assert.ok(family.includes("status:'active'"), 'Teen Travel requires an active Fa
 assert.ok(family.includes('pinRequired:true'), 'Teen Travel must require pickup PIN');
 assert.ok(family.includes('guardianTracking:true'), 'Teen Travel must enable guardian tracking');
 assert.ok(family.includes('guardianMessaging:true'), 'Teen Travel must enable guardian messaging');
+assert.ok(family.includes('continuedFromJourneyNo'), 'Smart Travel leg two must inherit the first leg Family safety envelope');
+assert.ok(family.includes("status:'aged_out'"), 'Family authorization must automatically age out');
+assert.ok(family.includes('sweepFamilyAgeOut'), 'Family age-out must run as an operational sweep');
+const familyScreen=read('app/family.tsx');
+assert.ok(familyScreen.includes('useLocalSearchParams'), 'Family invitation must enter through a deep link');
+assert.equal(familyScreen.includes('Invitation ID'), false, 'Family UI must not ask a Teen to type an invitation id');
+assert.equal(familyScreen.includes('Invitation code'), false, 'Family UI must not ask a Teen to type an invitation token');
+const rideContext=read('src/state/RideContext.tsx');
+assert.ok(rideContext.includes('party: {...travelPartyRef.current}'), 'Smart Travel must freeze the party at journey start');
+assert.ok(rideContext.includes('setTravelParty({...next.party})'), 'Smart Travel leg two must restore the frozen party');
 assert.ok(scheduler.includes('party: r.party || null'), 'scheduled reservation party must reach dispatched Travel');
 
 console.log('✓ one-transfer Stripe architecture');

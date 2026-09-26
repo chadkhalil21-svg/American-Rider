@@ -28,13 +28,19 @@ assert.ok(server.includes('renewLease(name'), 'server must renew leadership duri
 assert.ok(server.includes('releaseLease(name'), 'server must release leadership after a sweep');
 
 assert.ok(scheduled.includes("mode: 'self' | 'other_adult'"), 'scheduled Travel must preserve Booker/Traveler party semantics');
-assert.equal(/guardianAttestation|travelerAge|\| 'minor'/.test(scheduled), false, 'provisional minor product must not remain in scheduled Travel');
+assert.ok(scheduled.includes("| 'teen'"), 'scheduled Travel must support authorized Teen Travel');
+assert.ok(scheduled.includes('familyLinkId'), 'scheduled Teen Travel must carry Family authorization reference');
 const party=read('backend/travelparty.js');
-assert.equal(/guardian|minor/i.test(party), false, 'provisional minor/guardian product must not remain in server party semantics');
+const family=read('backend/family.js');
+assert.ok(party.includes('normalizeTeenParty'), 'Teen Travel must be normalized server-side');
+assert.ok(family.includes("status:'active'"), 'Teen Travel requires an active Family relationship');
+assert.ok(family.includes('pinRequired:true'), 'Teen Travel must require pickup PIN');
+assert.ok(family.includes('guardianTracking:true'), 'Teen Travel must enable guardian tracking');
+assert.ok(family.includes('guardianMessaging:true'), 'Teen Travel must enable guardian messaging');
 assert.ok(scheduler.includes('party: r.party || null'), 'scheduled reservation party must reach dispatched Travel');
 
 console.log('✓ one-transfer Stripe architecture');
 console.log('✓ durable provider crash recovery');
 console.log('✓ adverse-action replay safety');
 console.log('✓ renewable scheduler leadership');
-console.log('✓ scheduled Booker/Traveler propagation without provisional minor product');
+console.log('✓ scheduled Family/Teen authorization propagation');

@@ -36,7 +36,23 @@ Cases: ordinary itinerary; unknown/variable transit fare; changed transit after 
 
 Use authorized low-value production transactions. Record Travel Number and provider IDs, not PAN/card details. Prove exactly one Traveler charge per actual charged Travel, exactly one Operator transfer after completion, 99% of Travel Fare plus whole toll reimbursement, no commission on toll/government pass-through, retry idempotency, failed-transfer debt preservation, refund/dispute exposure accounting, and Operator account-cost recovery/waiver behavior.
 
-## 6. Evidence manifest and sign-off
+## 6. Complete experience / American Rider rubric
+
+Commercial release is blocked until the signed release candidate has been walked screen-by-screen and state-by-state on physical devices. The review is against the product doctrine, not generic taste:
+
+- **Language:** Traveler, Operator and Travel are the canonical nouns. Copy is precise, calm and institutional; ordinary actions keep ordinary verbs. No gig-economy slang, hype, unexplained technical/provider language, fake urgency, invented measurements or unsupported claims.
+- **Ford — friction:** every step earns its place. The shortest safe path is used; duplicate confirmations, repeated data entry, dead-end controls and unnecessary screens fail.
+- **Rockefeller — trust:** consequential states come from durable authoritative records. Money, qualification, insurance, identity/screening, Travel state, Family authorization and receipts cannot depend on presentation/cache state or optimistic client assertions.
+- **Jobs — outcome over mechanism:** the person sees what they need to decide or do, not payment plumbing, provider architecture, internal fee mechanics or implementation detail. Familiar transportation actions remain recognizable.
+- **First-class standard:** restrained hierarchy, typography, spacing and palette; no visual clutter, promotional furniture or casual app-speak. The interface remains composed in loading, empty, refusal, offline, cancellation, recovery and support states—not only the happy path.
+- **Seamlessness:** state survives app backgrounding/restart where it should; back/cancel semantics are predictable; one action produces one result; duplicate taps are idempotent; errors explain the next available action; no legitimate user is stranded between screens or Travel states.
+- **Accessibility:** meaningful controls have accessible names/roles, touch targets and contrast are adequate, dynamic/error state is perceivable, text scaling/reflow is usable, and meaning is never conveyed by color alone.
+- **Localization:** all five supported languages cover every reachable production string and preserve meaning, hierarchy and layout. Proper nouns remain proper nouns.
+- **No theater:** no production-reachable placeholder, simulated Traveler/Operator/Travel, fake fare, fake ETA, fake rating, fake receipt, fake provider success or control that promises a feature it cannot perform.
+
+The evidence package must include a complete reachable-screen inventory plus critical-path/state matrix covering Traveler, Operator, Family/Teen and Smart Travel; empty/loading/error/offline/restart states; small and large supported device layouts; accessibility checks; and terminology/copy review. Every material finding is either fixed on the candidate and re-tested or explicitly blocks release. A sample of attractive screens is not evidence of whole-product readiness.
+
+## 7. Evidence manifest and sign-off
 
 Copy `release-evidence.template.json` to an evidence file outside the public repository or in an access-controlled release system. Every gate requires `result: "pass"`, the exact candidate SHA, UTC execution time, executor/reviewer and at least one durable evidence reference. `npm run release:evidence -- /secure/path/evidence.json <candidate-sha>` validates completeness without inspecting the underlying sensitive artifact.
 

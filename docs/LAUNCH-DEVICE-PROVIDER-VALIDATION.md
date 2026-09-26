@@ -1,4 +1,4 @@
-# Launch Device and Provider Validation Matrix
+# Device and Provider Validation Matrix
 
 Automated tests cannot establish OS scheduling, push delivery, bank payout timing or provider production behavior. These are release gates.
 
@@ -14,9 +14,9 @@ Pass criteria: no stale Operator is matched; no active Travel is corrupted by a 
 
 ## Stripe production/staged-money campaign
 
-Use the production Connect account configuration before public launch with controlled low-value transactions. Verify one platform charge only; no `transfer_data` destination charge; exactly one transfer after completed Travel; transfer amount = 99% fare + toll; duplicate completion/retry produces no second transfer; failed transfer remains owed; refund/dispute after transfer creates explicit exposure record; payout.paid maps to the correct Operator active month; <20 completed Travels produces the separate monthly account-cost recovery; >=20 waives it.
+Use the production Connect account configuration in production validation with controlled low-value transactions. Verify one platform charge only; no `transfer_data` destination charge; exactly one transfer after completed Travel; transfer amount = 99% fare + toll; duplicate completion/retry produces no second transfer; failed transfer remains owed; refund/dispute after transfer creates explicit exposure record; payout.paid maps to the correct Operator active month; <20 completed Travels produces the separate monthly account-cost recovery; >=20 waives it.
 
-Verify actual Connect invoice lines against the economic constants. If Stripe's contracted account/payout/routing pricing differs from public pricing, update `economics.js` before launch.
+Verify actual Connect invoice lines against the economic constants. If Stripe's contracted account/payout/routing pricing differs from public pricing, update `economics.js` before production use.
 
 ## Checkr production validation
 

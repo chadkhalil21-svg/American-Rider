@@ -124,6 +124,7 @@ const { ready: r2Ready, uploadUrl: r2UploadUrl, readUrl: r2ReadUrl, owns: r2Owns
 const { assessOperator, assessAndRecord } = require('./qualification');
 const { normalizeParty, operatorPartyView } = require('./travelparty');
 const family = require('./family');
+const { provisionTeenPin, verifyTeenPin } = require('./teenpickup');
 const { listPlatformMessages, markPlatformMessageRead } = require('./platforminbox');
 const { page } = require('./shell');
 const {
@@ -2564,6 +2565,9 @@ app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, async (req, res) => {
 
   try {
     await ref.create(ride);
+    const teenPickup = await provisionTeenPin({ rideRef: ref, rideId: ref.id, party });
+    if (teenPickup.required && party.teenUid) await notify({ uid: party.teenUid, kind: 'teen_pickup_code', title: 'Your pickup code', body: `Give ${teenPickup.pin} to your Operator after confirming the vehicle and Operator.`, data: { screen: '/ride', rideId: ref.id, tripNo } });
+    if (teenPickup.required && party.guardianUid && party.guardianUid !== party.teenUid) await notify({ uid: party.guardianUid, kind: 'guardian_travel', title: 'Teen Travel assigned', body: `${party.travelerName}'s Travel has been assigned. You can follow it in American Rider.`, data: { screen: '/ride', rideId: ref.id, tripNo } });
     res.json({
       rideId: ref.id,
       tripNo,
@@ -2706,6 +2710,8 @@ app.post('/voice/connect', async (req, res) => {
     return res.type('text/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>');
   }
 });
+
+app.post('/travel/teen-pickup/verify', requireAuth, async (req,res)=>{const out=await verifyTeenPin({rideId:req.body?.rideId,operatorUid:req.uid,pin:req.body?.pin});return res.status(out.status||500).json(out);});
 
 // POST /travel/accept { rideId } — the operator accepts the travel offered to them.
 //

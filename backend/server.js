@@ -2589,8 +2589,8 @@ app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, async (req, res) => {
   try {
     await ref.create(ride);
     const teenPickup = await provisionTeenPin({ rideRef: ref, rideId: ref.id, party });
-    if (teenPickup.required && party.teenUid) await notify({ uid: party.teenUid, kind: 'teen_pickup_code', title: 'Your pickup code', body: `Give ${teenPickup.pin} to your Operator after confirming the vehicle and Operator.`, data: { screen: '/family', rideId: ref.id, tripNo } });
-    if (teenPickup.required && party.guardianUid && party.guardianUid !== party.teenUid) await notify({ uid: party.guardianUid, kind: 'guardian_travel', title: 'Teen Travel assigned', body: `${party.travelerName}'s Travel has been assigned. You can follow it in American Rider.`, data: { screen: '/ride', rideId: ref.id, tripNo } });
+    if (teenPickup.required && party.teenUid) await notify({ uid: party.teenUid, kind: 'teen_pickup_code', title: 'Your pickup code', body: `Give ${teenPickup.pin} to your Operator after confirming the vehicle and Operator.`, data: { screen: '/ride', rideId: ref.id, tripNo } });
+    if (teenPickup.required && party.guardianUid && party.guardianUid !== party.teenUid) await notify({ uid: party.guardianUid, kind: 'guardian_travel', title: 'Teen Travel assigned', body: `${party.travelerName}'s Travel has been assigned. You can follow it in American Rider.`, data: { screen: '/family', rideId: ref.id, tripNo } });
     res.json({
       rideId: ref.id,
       tripNo,

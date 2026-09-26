@@ -1019,6 +1019,17 @@ export default {
     familyAccepting: 'Accepting Family invitation…',
     familyAccepted: 'Family authorization accepted.',
     familyInviteUnable: 'This invitation could not be accepted.',
+    familyActiveTravel: 'ACTIVE TEEN TRAVEL',
+    familyViewTravel: 'View',
+    familyTeenTravel: 'Teen Travel',
+    familyOperator: 'Operator: %{name}',
+    familyFollowLive: 'Follow Live Travel',
+    familyConversation: 'FAMILY CONVERSATION',
+    familyYou: 'Guardian',
+    familyNoMessages: 'No messages in this Travel.',
+    familyMessagePlaceholder: 'Message the Teen Traveler and Operator',
+    familySendMessage: 'Send Message',
+    familyMessageFailed: 'The message was not sent.',
 
   },
 

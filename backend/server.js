@@ -2571,8 +2571,12 @@ app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, requireOperationalRea
     return res.status(503).json({ error: 'Toll cost could not be verified for this route.', code: 'toll_unavailable' });
   }
 
-  const partyResult = await normalizeParty(b, { uid: req.uid, name: req.name || b.bookerName || b.travelerName || '' });
+  const partyResult = priced.journey?.party
+    ? { ok: true, party: priced.journey.party }
+    : await normalizeParty(b, { uid: req.uid, name: req.name || b.bookerName || b.travelerName || '' });
   if (!partyResult.ok) return res.status(400).json({ error: partyResult.error, code: partyResult.code });
+  // Smart Travel leg 2 inherits the server-recorded first-leg party. The request may repeat
+  // party fields for presentation, but cannot change the Traveler/Teen/guardian envelope.
   const party = partyResult.party;
 
   let fleet;

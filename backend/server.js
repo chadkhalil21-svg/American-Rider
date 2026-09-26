@@ -97,6 +97,7 @@ const { lostItemTicket, stampLostItemCase } = require('./lostitem');
 const { adminDb, adminStatus, accountDisabled } = require('./firebase-admin');
 const { closeOperationalAccount } = require('./accountclosure');
 const { acceptOffer } = require('./eligibility');
+const { progressTravel } = require('./travelprogress');
 const { payForTravel, cancelTravel: cancelTravelFor, settleTravel: settleTravelFor } = require('./travelmoney');
 const { authorizeVoiceTravel, lostItemTravel, authorizeAnnouncement, claimAnnouncement } = require('./trustboundaries');
 const { TERMS_HTML, PRIVACY_HTML, ABOUT_HTML, legalPage, LEGAL_LANGUAGES } = require('./legal');

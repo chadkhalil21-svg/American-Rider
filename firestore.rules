@@ -177,8 +177,9 @@ service cloud.firestore {
                     && touchesOnly(['status', 'statusAt', 'arrivedAt', 'onboardAt', 'completedAt', 'declinedAt',
                                     'opLat', 'opLng', 'opAt', 'stillSince', 'needsPayout'])
                     && (!changes('status')
-                        || (request.resource.data.status in ['arrived', 'onboard', 'completed']
-                            && resource.data.status in ['accepted', 'arrived', 'onboard'])
+                        || (request.resource.data.status == 'arrived' && resource.data.status == 'accepted')
+                        || (request.resource.data.status == 'onboard' && resource.data.status == 'arrived')
+                        || (request.resource.data.status == 'completed' && resource.data.status == 'onboard')
                         || (request.resource.data.status == 'declined'
                             && resource.data.status == 'assigned'))
                     && stampedOnlyEntering('arrivedAt', 'arrived')

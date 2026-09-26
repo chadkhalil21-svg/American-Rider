@@ -53,12 +53,36 @@ async function activeFamilyLink({id,guardianUid=null,teenUid=null,now=Date.now()
  if(x.status!=='active'||ageOn(x.teenDob,now)<MIN_AGE||ageOn(x.teenDob,now)>MAX_AGE)return null;
  if(guardianUid&&String(x.guardianUid)!==String(guardianUid))return null;if(teenUid&&String(x.teenUid)!==String(teenUid))return null;return x;
 }
-async function normalizeTeenParty({familyLinkId,requesterUid,bookerUid,now=Date.now()}){
+async function normalizeTeenParty({familyLinkId,requesterUid,bookerUid,journeyNo=null,now=Date.now()}){
+ const requester=String(requesterUid), db=adminDb();
+ // Smart Travel is one journey with two car legs. Once leg 1 has completed, leg 2 inherits
+ // the exact server-stamped Family party from leg 1. A guardian revocation or eighteenth
+ // birthday blocks NEW Teen Travel, but cannot strand a Teen at a transit interchange in a
+ // journey American Rider has already undertaken to complete.
+ if(journeyNo&&db){
+  const q=await db.collection('rides').where('travelerUid','==',requester).where('tripNo','==',String(journeyNo).slice(0,24)).limit(1).get();
+  const first=q.docs[0]?.data();
+  if(first&&first.status==='completed'&&first.paymentIntentId&&first.party?.teen===true&&!first.journeyNo&&String(first.party.familyLinkId)===String(familyLinkId)){
+   const p=first.party;
+   if(requester===String(p.guardianUid)||requester===String(p.teenUid))return {ok:true,party:{...p,continuedFromJourneyNo:String(journeyNo)}};
+  }
+ }
  const link=await activeFamilyLink({id:familyLinkId,now});if(!link)return {ok:false,code:'family_authorization_required',error:'An active Family authorization is required.'};
- const requester=String(requesterUid), guardian=String(link.guardianUid), teen=String(link.teenUid);
+ const guardian=String(link.guardianUid), teen=String(link.teenUid);
  if(requester!==guardian&&requester!==teen)return {ok:false,code:'family_authorization_required',error:'This Family authorization does not belong to this account.'};
  if(String(bookerUid)!==guardian&&String(bookerUid)!==teen)return {ok:false,code:'family_authorization_required',error:'Invalid Family Booker.'};
  return {ok:true,party:{mode:'teen',travelerName:link.teenName,bookerName:link.guardianName,bookedForAnother:requester===guardian,teen:true,familyLinkId:link.id,guardianUid:guardian,teenUid:teen,guardianName:link.guardianName,pinRequired:true,guardianTracking:true,guardianMessaging:true}};
 }
+
+async function sweepFamilyAgeOut({now=Date.now()}={}){
+ const db=adminDb();if(!db)return {ok:false,reason:adminStatus().reason};
+ const q=await db.collection(COLLECTION).where('status','==','active').get();let agedOut=0,cancelledScheduledTravels=0;
+ for(const d of q.docs){const x=d.data()||{},age=ageOn(x.teenDob,now);if(age!==null&&age>=MIN_AGE&&age<=MAX_AGE)continue;
+  await d.ref.set({status:'aged_out',agedOutAt:now,updatedAt:now},{merge:true});agedOut++;
+  const reserved=await db.collection('scheduled_rides').where('status','==','reserved').get();
+  for(const r of reserved.docs){const v=r.data()||{};if(v.party?.teen===true&&String(v.party?.familyLinkId)===String(d.id)){await r.ref.set({status:'cancelled',cancelledAt:now,closedReason:'Teen Traveler is no longer age-eligible.'},{merge:true});cancelledScheduledTravels++;}}
+ }
+ return {ok:true,agedOut,cancelledScheduledTravels};
+}
 function operatorTeenView(p={}){return p.teen===true?{travelerName:clean(p.travelerName),bookedForAnother:p.bookedForAnother===true,teen:true,guardianName:clean(p.guardianName),pinRequired:true}:{travelerName:clean(p.travelerName||'Traveler'),bookedForAnother:p.bookedForAnother===true,teen:false};}
-module.exports={COLLECTION,MIN_AGE,MAX_AGE,ageOn,createFamilyInvite,acceptFamilyInvite,revokeFamilyLink,listFamilyLinks,activeFamilyLink,normalizeTeenParty,operatorTeenView};
+module.exports={COLLECTION,MIN_AGE,MAX_AGE,ageOn,createFamilyInvite,acceptFamilyInvite,revokeFamilyLink,listFamilyLinks,activeFamilyLink,normalizeTeenParty,sweepFamilyAgeOut,operatorTeenView};

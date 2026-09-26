@@ -211,5 +211,15 @@ export async function acceptTravel(
 }
 export const declineTravel = (rideId: string) => setStatus(rideId, 'declined');
 export const markArrived = (rideId: string) => setStatus(rideId, 'arrived');
-export const markOnboard = (rideId: string) => setStatus(rideId, 'onboard');
+export async function markOnboard(rideId: string, teenPickupCode?: string): Promise<boolean> {
+  if (!rideId) return false;
+  if (teenPickupCode) {
+    try {
+      const token = await auth.currentUser?.getIdToken().catch(() => null);
+      const res = await fetch(`${PAYMENT_SERVER_URL}/travel/teen-pickup/verify`, { method:'POST', headers:{'Content-Type':'application/json', ...(token?{Authorization:`Bearer ${token}`}:{})}, body:JSON.stringify({rideId,pin:teenPickupCode}) });
+      if (!res.ok) return false;
+    } catch { return false; }
+  }
+  return setStatus(rideId, 'onboard');
+}
 export const markCompleted = (rideId: string) => setStatus(rideId, 'completed');

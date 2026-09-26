@@ -1420,7 +1420,7 @@ app.get('/destinations', LIMITS.quoteIp, (req, res) => {
 // any government fee inside that price (name, payee, cents) so a screen can say what it is;
 // `travelerPays` already contains it — nothing is added on top of the number shown.
 // No login needed: this only reveals pricing, and a traveler must see the price before booking.
-app.post('/fare-quote', attachAuth, LIMITS.quoteIp, async (req, res) => {
+app.post('/fare-quote', attachAuth, LIMITS.quoteIp, requireOperationalReadiness, async (req, res) => {
   const priced = await authoritativeFare({
     body: req.body, uid: req.uid, email: req.email, db: adminDb(), cardCountryFor: defaultCardCountry,
   });
@@ -1508,7 +1508,7 @@ app.delete('/payment-methods/:id', requireAuth, LIMITS.payments, async (req, res
   }
 });
 
-app.post('/create-payment-intent', requireAuth, LIMITS.payments, async (req, res) => {
+app.post('/create-payment-intent', requireAuth, LIMITS.payments, requireOperationalReadiness, async (req, res) => {
   if (keyMode === 'no-key') {
     return res.status(500).json({ error: 'No Stripe secret key configured. Add STRIPE_SECRET_KEY to backend/.env' });
   }
@@ -1599,7 +1599,7 @@ app.post('/create-payment-intent', requireAuth, LIMITS.payments, async (req, res
 // Kept because proving a charge end to end from a terminal is useful. The current test helper
 // ignores destination splitting entirely; settlement is tested through the same explicit
 // separate-transfer architecture as production.
-app.post('/charge-ride', requireAuth, LIMITS.payments, async (req, res) => {
+app.post('/charge-ride', requireAuth, LIMITS.payments, requireOperationalReadiness, async (req, res) => {
   if (keyMode === 'no-key') {
     return res.status(500).json({ error: 'No Stripe secret key configured. Add STRIPE_SECRET_KEY to backend/.env' });
   }
@@ -2505,7 +2505,7 @@ function travelNumberFor(documentId, pickup) {
   return 'AR-' + String(documentId).slice(0, 8).toUpperCase() + '-' + code;
 }
 
-app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, async (req, res) => {
+app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, requireOperationalReadiness, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
 
@@ -2669,7 +2669,7 @@ app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, async (req, res) => {
 
 // Create a scheduled reservation with the same server authority as immediate dispatch.
 // The time and labels are traveler inputs. Fare, distance, fees and Travel Number are not.
-app.post('/travel/schedule', requireAuth, LIMITS.dispatch, async (req, res) => {
+app.post('/travel/schedule', requireAuth, LIMITS.dispatch, requireOperationalReadiness, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   const b = req.body || {};
@@ -2820,7 +2820,7 @@ app.post('/travel/message', requireAuth, async (req,res)=>{
 // A REFUSAL RELEASES THE TRAVEL. It stays `assigned`, marked `releasedAt`, and the operator is
 // taken out of service; sweepAssignments re-offers it to somebody else on its next pass
 // without waiting out the answer window. The traveler's payment and travel number stand.
-app.post('/travel/accept', requireAuth, async (req, res) => {
+app.post('/travel/accept', requireAuth, requireOperationalReadiness, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   const rideId = String(req.body?.rideId || '');
@@ -2847,7 +2847,7 @@ app.post('/travel/accept', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/travel/return-operator', requireAuth, LIMITS.dispatch, async (req, res) => {
+app.post('/travel/return-operator', requireAuth, LIMITS.dispatch, requireOperationalReadiness, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
 

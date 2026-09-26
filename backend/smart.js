@@ -22,7 +22,7 @@
 // THE ANSWER is one of { status: 'ok', plan }, { status: 'none' } (no transit route exists),
 // { status: 'unavailable' } (the planner is not answering). Never a throw.
 const { fareCentsForCoords, straightLineMiles } = require('./fares');
-const { platformFeeCents } = require('./payments');
+const { quote } = require('./payments');
 const { governmentFeesFor } = require('./fees');
 const { REGIONS, regionForTrip } = require('./regions');
 const transit = require('./transit');
@@ -323,16 +323,36 @@ function buildPlan(pickup, dest, itinerary, direct) {
     }
   }
 
-  // Money. carCents is what we operate; ONE fee on that total; transit fares reported apart.
-  // A journey with no car leg at all is nothing American Rider sells, so it carries no fee.
-  const carCents = sum(ours, (l) => (l.kind === 'car' ? l.cents : 0));
-  const feeCents = carCents > 0 ? platformFeeCents(carCents) : 0;
-  const governmentFeeCents = sum(ours, (l) => l.governmentFeeCents || 0);
-  const smartCents = carCents + feeCents + governmentFeeCents;
+  // Money. Each car leg is a real, separately charged Travel. Quote the first leg normally,
+  // then quote the second as the continuation of that paid journey. This keeps the screen's
+  // preview on the SAME two-transaction economics that payment uses, instead of the historical
+  // one-fee-on-combined-fare shortcut.
+  const carLegs = ours.filter((l) => l.kind === 'car');
+  const carCents = sum(carLegs, (l) => l.cents);
+  const governmentFeeCents = sum(carLegs, (l) => l.governmentFeeCents || 0);
+  let feeCents = 0;
+  let smartCents = 0;
+  if (carLegs.length === 1) {
+    const q = quote(carLegs[0].cents, null, carLegs[0].feeLines || [], null, 0);
+    feeCents = q.appFee;
+    smartCents = q.total;
+  } else if (carLegs.length >= 2) {
+    const first = carLegs[0];
+    const second = carLegs[carLegs.length - 1];
+    const q1 = quote(first.cents, null, first.feeLines || [], null, 0);
+    const q2 = quote(second.cents, {
+      journeyNo: 'smart-preview',
+      leg1FareCents: first.cents,
+      leg1GovernmentFeeCents: first.governmentFeeCents || 0,
+      leg1TollCents: 0,
+    }, second.feeLines || [], null, 0);
+    feeCents = q1.appFee + q2.appFee;
+    smartCents = q1.total + q2.total;
+  }
   const transitFareCents = sum(ours, (l) => (l.kind === 'transit' ? l.cents : 0));
   const transitFareUnknown = ours.some((l) => l.fareUnknown);
   const journeyCents = smartCents + transitFareCents;
-  const directCents = direct.travelCostCents + platformFeeCents(direct.travelCostCents);
+  const directCents = quote(direct.travelCostCents, null, governmentFeesFor(pickup, dest), null, 0).total;
   const saveCents = directCents - journeyCents;
 
   // Time. The transit part is OTP's timetable; our ends are added on either side of it.

@@ -30,6 +30,7 @@ const rides = {
   rideAssigned: { tripNo: 'AR-1003-MIA', travelerUid: 'travA', operatorId: 'opA', status: 'assigned' },
   rideDone: { tripNo: 'AR-1004-MIA', travelerUid: 'travA', operatorId: 'opA', status: 'completed' },
   rideCancelled: { tripNo: 'AR-1005-MIA', travelerUid: 'travA', operatorId: 'opA', status: 'cancelled' },
+  rideTeen: { tripNo: 'AR-1006-MIA', travelerUid: 'teenA', operatorId: 'opA', status: 'accepted', party: { teen: true, guardianUid: 'guardA' } },
 };
 const seed = async (overrides = {}) => {
   await env.clearFirestore();
@@ -42,7 +43,9 @@ const msg = (over) => ({ lostItemId: null, text: 'Hello', createdAt: 1, ...over 
 const fromTraveler = (rideId, r, uid = r.travelerUid, over = {}) =>
   msg({ rideId, tripNo: r.tripNo, from: 'traveler', travelerUid: uid, operatorId: r.operatorId, ...over });
 const fromOperator = (rideId, r, uid = r.operatorId, over = {}) =>
-  msg({ rideId, tripNo: r.tripNo, from: 'operator', travelerUid: r.travelerUid, operatorId: uid, ...over });
+  msg({ rideId, tripNo: r.tripNo, from: 'operator', travelerUid: r.travelerUid, operatorId: uid, guardianUid: r.party?.guardianUid ?? null, ...over });
+const fromGuardian = (rideId, r, uid = r.party?.guardianUid, over = {}) =>
+  msg({ rideId, tripNo: r.tripNo, from: 'guardian', travelerUid: r.travelerUid, operatorId: r.operatorId, guardianUid: uid, ...over });
 const write = (uid, data) => addDoc(collection(as(uid), 'messages'), data);
 
 await seed();
@@ -52,6 +55,13 @@ await check('assigned traveler can write on their travel', () => assertSucceeds(
 await check('assigned operator can write on their travel', () => assertSucceeds(write('opA', fromOperator('rideA', rides.rideA))));
 await check('traveler reads their thread', () => assertSucceeds(getDocs(query(collection(as('travA'), 'messages'), where('tripNo', '==', 'AR-1001-MIA'), where('travelerUid', '==', 'travA')))));
 await check('operator reads their thread', () => assertSucceeds(getDocs(query(collection(as('opA'), 'messages'), where('tripNo', '==', 'AR-1001-MIA'), where('operatorId', '==', 'opA')))));
+
+// ——— Family / Teen three-party conversation boundary ———————————————————————————————
+await check('authorized guardian can write in Teen Travel', () => assertSucceeds(write('guardA', fromGuardian('rideTeen', rides.rideTeen))));
+await check('authorized guardian can read Teen Travel thread', () => assertSucceeds(getDocs(query(collection(as('guardA'), 'messages'), where('tripNo','==','AR-1006-MIA'), where('guardianUid','==','guardA')))));
+await check('unrelated account cannot pose as Teen guardian', () => assertFails(write('mallory', fromGuardian('rideTeen', rides.rideTeen, 'mallory'))));
+await check('traveler cannot pose as guardian', () => assertFails(write('teenA', fromGuardian('rideTeen', rides.rideTeen, 'guardA'))));
+await check('guardian cannot enter ordinary adult Travel', () => assertFails(write('guardA', fromGuardian('rideA', rides.rideA, 'guardA'))));
 
 // ——— Traveler A cannot reach Traveler B's travel ——————————————————————————————————————
 await check("traveler A cannot write into traveler B's travel as a traveler", () =>

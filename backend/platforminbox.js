@@ -51,7 +51,8 @@ async function markPlatformMessageRead(uid, id, now = Date.now()) {
   const ref = db.collection('users').doc(String(uid)).collection('platform_messages').doc(String(id));
   const snap = await ref.get();
   if (!snap.exists) return { ok: false, reason: 'not found' };
-  await ref.set({ readAt: now }, { merge: true });
+  // Read-once semantics: reopening a notice must not rewrite the evidence timestamp.
+  if (!snap.data()?.readAt) await ref.set({ readAt: now }, { merge: true });
   return { ok: true };
 }
 

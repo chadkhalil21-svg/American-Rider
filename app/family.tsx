@@ -9,18 +9,18 @@ import {useLanguage} from '../src/state/LanguageContext';
 import {colors} from '../src/theme';
 
 export default function FamilyScreen(){
- const back=useGoBack(),{note}=useNote(),{t}=useLanguage();
+ const back=useGoBack(),{note,showNote}=useNote(),{t}=useLanguage();
  const params=useLocalSearchParams<{invite?:string;token?:string}>();
  const inviteId=useMemo(()=>typeof params.invite==='string'?params.invite:'',[params.invite]);
  const inviteToken=useMemo(()=>typeof params.token==='string'?params.token:'',[params.token]);
- const [links,setLinks]=useState<FamilyLink[]>([]),[busy,setBusy]=useState(false),[accepting,setAccepting]=useState(false),[accepted,setAccepted]=useState(false);
+ const [links,setLinks]=useState<FamilyLink[]>([]),[busy,setBusy]=useState(false),[accepting,setAccepting]=useState(false),[accepted,setAccepted]=useState(false),[acceptFailed,setAcceptFailed]=useState(false);
  const [teenName,setTeenName]=useState(''),[teenEmail,setTeenEmail]=useState(''),[teenDob,setTeenDob]=useState('');
  const refresh=async()=>setLinks(await fetchFamily().catch(()=>[]));
  useEffect(()=>{refresh();},[]);
- useEffect(()=>{if(!inviteId||!inviteToken||accepted||accepting)return;setAccepting(true);acceptFamilyInvite(inviteId,inviteToken).then(async()=>{setAccepted(true);await refresh();}).finally(()=>setAccepting(false));},[inviteId,inviteToken,accepted,accepting]);
- const invite=async()=>{setBusy(true);try{await createFamilyInvite({guardianName:'',teenName,teenEmail,teenDob});setTeenName('');setTeenEmail('');setTeenDob('');await refresh();}finally{setBusy(false);}};
+ useEffect(()=>{if(!inviteId||!inviteToken||accepted||accepting)return;setAccepting(true);setAcceptFailed(false);acceptFamilyInvite(inviteId,inviteToken).then(async()=>{setAccepted(true);await refresh();}).catch(()=>setAcceptFailed(true)).finally(()=>setAccepting(false));},[inviteId,inviteToken,accepted,accepting]);
+ const invite=async()=>{setBusy(true);try{await createFamilyInvite({guardianName:'',teenName,teenEmail,teenDob});setTeenName('');setTeenEmail('');setTeenDob('');await refresh();}catch{showNote(t('traveler.familyInviteUnable'));}finally{setBusy(false);}};
  return <Screen note={note}><LetterheadBar onBack={back}/><Title>{t('traveler.familyTitle')}</Title>
-  {(inviteId&&inviteToken)?<Card style={styles.notice}><Text style={styles.name}>{accepting?t('traveler.familyAccepting'):accepted?t('traveler.familyAccepted'):t('traveler.familyInviteUnable')}</Text></Card>:null}
+  {(inviteId&&inviteToken)?<Card style={styles.notice}><Text style={styles.name}>{accepting?t('traveler.familyAccepting'):accepted?t('traveler.familyAccepted'):acceptFailed?t('traveler.familyInviteUnable'):t('traveler.familyAccepting')}</Text></Card>:null}
   <SectionLabel style={{marginTop:20}}>{t('traveler.familyAuthorized')}</SectionLabel>
   <Card style={styles.card}>{links.length?links.map(x=><View key={x.id} style={styles.row}><View style={{flex:1}}><Text style={styles.name}>{x.teenName||t('traveler.familyTeenTraveler')}</Text><Text style={styles.meta}>{x.status==='active'&&x.eligible?t('traveler.familyAuthorizedStatus'):t('traveler.familyStatus',{status:x.status})}</Text></View>{x.role==='guardian'&&x.status!=='revoked'?<Pressable onPress={async()=>{await revokeFamilyLink(x.id);await refresh();}}><Text style={styles.action}>{t('traveler.familyRevoke')}</Text></Pressable>:null}</View>):<Text style={styles.meta}>{t('traveler.familyNone')}</Text>}</Card>
   <SectionLabel style={{marginTop:24}}>{t('traveler.familyAddTeen')}</SectionLabel><Card style={styles.card}>

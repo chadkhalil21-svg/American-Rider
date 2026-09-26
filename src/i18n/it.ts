@@ -55,6 +55,7 @@ export default {
     language: 'Lingua',
   },
   operator: {
+    inboxReadFailed: "Non è stato possibile registrare questa comunicazione come letta. Riprovi.",
     inboxBody: "Qualificazione, copertura, verifica, pagamenti e comunicazioni operative.",
     communications: "COMUNICAZIONI",
     noCommunications: "Nessuna comunicazione richiede la tua attenzione.",
@@ -967,7 +968,6 @@ export default {
     viewTravelReceipt: 'Vedere la Ricevuta',
     leaveWithoutSaving: 'Esci senza salvare',
     operator: 'Operatore',
-      inboxReadFailed: 'Non è stato possibile registrare questa comunicazione come letta. Riprovi.',
     paymentMethod: 'Metodo di Pagamento',
     operatorRetainedNote: 'L’Operatore ha trattenuto il 99 % della tariffa del viaggio.',
     contactPatronSupport: 'Contattare l’Assistenza Viaggiatori',

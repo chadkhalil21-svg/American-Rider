@@ -27,7 +27,8 @@ export type SchedStatus =
   | 'dispatched' // an operator has been sent
   | 'unmatched' // nobody was available, and the hour has passed
   | 'payment_failed' // the card on file was declined
-  | 'needs_attention'; // charged, but the travel could not be created — for us, not them
+  | 'needs_attention' // charged, but the travel could not be created — for us, not them
+  | 'cancelled'; // cancelled before dispatch, including revoked Family authorization
 
 export type ScheduledRide = {
   id: string;
@@ -132,7 +133,7 @@ export async function fetchScheduledRide(): Promise<ScheduledRide | null> {
         // A reservation that failed is kept in view for an hour, because the traveler has to
         // be told. Silently dropping it is how a 6:30 AM pickup that never came became
         // indistinguishable from one that was never made.
-        if (s === 'unmatched' || s === 'payment_failed' || s === 'needs_attention') {
+        if (s === 'unmatched' || s === 'payment_failed' || s === 'needs_attention' || s === 'cancelled') {
           return r.atMs > Date.now() - 60 * 60 * 1000;
         }
         return r.atMs > Date.now();

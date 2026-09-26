@@ -31,7 +31,7 @@ import { t } from '../i18n';
 
 export type TravelMessage = {
   id: string;
-  from: 'traveler' | 'operator';
+  from: 'traveler' | 'operator' | 'guardian';
   text: string;
   createdAt: number;
   lostItemId?: string | null;
@@ -52,10 +52,11 @@ export async function sendTravelMessage(args: {
   rideId: string | null | undefined;
   tripNo: string;
   text: string;
-  from: 'traveler' | 'operator';
+  from: 'traveler' | 'operator' | 'guardian';
   /** The other party's uid, so the rule can let both of them read the thread. */
   travelerUid?: string | null;
   operatorId?: string | null;
+  guardianUid?: string | null;
   /** Set when the message belongs to a lost item report, so it lands with that case. */
   lostItemId?: string | null;
 }): Promise<boolean> {
@@ -72,6 +73,7 @@ export async function sendTravelMessage(args: {
       // The writer is always themselves; the counterparty comes from the travel record.
       travelerUid: args.from === 'traveler' ? uid : args.travelerUid ?? null,
       operatorId: args.from === 'operator' ? uid : args.operatorId ?? null,
+      guardianUid: args.from === 'guardian' ? uid : args.guardianUid ?? null,
       lostItemId: args.lostItemId ?? null,
       text: text.slice(0, 2000),
       createdAt: Date.now(),
@@ -104,7 +106,7 @@ export async function sendTravelMessage(args: {
  */
 export function watchTravelThread(
   tripNo: string,
-  side: 'traveler' | 'operator',
+  side: 'traveler' | 'operator' | 'guardian',
   onChange: (msgs: TravelMessage[]) => void,
   onError?: (reason: string) => void,
 ): () => void {
@@ -117,7 +119,7 @@ export function watchTravelThread(
     const q = query(
       collection(db, 'messages'),
       where('tripNo', '==', tripNo),
-      where(side === 'operator' ? 'operatorId' : 'travelerUid', '==', uid),
+      where(side === 'operator' ? 'operatorId' : side === 'guardian' ? 'guardianUid' : 'travelerUid', '==', uid),
     );
     return onSnapshot(
       q,
@@ -128,7 +130,7 @@ export function watchTravelThread(
               const x = d.data() as Record<string, unknown>;
               return {
                 id: d.id,
-                from: x.from === 'operator' ? 'operator' : 'traveler',
+                from: x.from === 'operator' ? 'operator' : x.from === 'guardian' ? 'guardian' : 'traveler',
                 text: String(x.text ?? ''),
                 createdAt: Number(x.createdAt ?? 0),
                 lostItemId: (x.lostItemId as string | null) ?? null,

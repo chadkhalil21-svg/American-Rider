@@ -1,4 +1,4 @@
-// Smart Travel — the journey, as planned by OpenTripPlanner on Miami-Dade's own timetable.
+// Smart Travel — the journey, as planned by the OpenTripPlanner instance for the Travel's configured service region.
 // Route: /smart (Travel Options, Travel Complete and Home open it). /smartride is gone with the
 // simulation it carried.
 //
@@ -154,20 +154,13 @@ export default function SmartTravel() {
   const origin = journey ? prettyPlace(journey.pickup.name) : prettyPlace(ride.departure.name);
   const destination = journey ? prettyPlace(journey.destination.name) : prettyPlace(ride.arrival.name);
 
-  // Transit money: Miami-Dade Transit is paid at the station; anything else is paid to that
-  // agency. A service whose fare we do not know says so rather than showing a number.
-  const allMdt = transit.every((l) => /miami-?dade/i.test(l.route?.agency ?? ''));
+  // Transit money belongs to the transit provider, regardless of market. The UI must not
+  // encode a home agency: fare amount and agency identity come from the regional feed record.
   const transitUnknown = transit.some((l) => l.fareUnknown);
-  // Where the fare is paid depends on the vehicle: a train's at the station, a bus's on board.
-  const allBus = transit.every((l) => l.mode === 'bus');
-  const anyBus = transit.some((l) => l.mode === 'bus');
-  const transitLabel = !allMdt
-    ? t('traveler.transitPaidToAgency')
-    : allBus
-      ? t('traveler.transitPaidOnBoard')
-      : anyBus
-        ? t('traveler.transitPaidAtStationOrOnBoard')
-        : t('traveler.transitPaidAtStation');
+  const agencies = [...new Set(transit.map((l) => l.route?.agency).filter(Boolean))];
+  const transitLabel = agencies.length === 1
+    ? t('traveler.transitPaidToNamedAgency', { agency: agencies[0] as string })
+    : t('traveler.transitPaidToAgency');
   // The server names the journey's ends "Pickup" and "Destination"; the traveler's own
   // names for them are on this screen already.
   const endName = (name: string) =>

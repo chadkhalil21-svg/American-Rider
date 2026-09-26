@@ -928,6 +928,7 @@ export default {
     oneCarTravel: 'American Rider · 1 Autofahrt',
     nCarTravels: 'American Rider · %{n} Autofahrten',
     transitPaidToAgency: 'Nahverkehr · an das Verkehrsunternehmen bezahlt',
+    transitPaidToNamedAgency: "Zahlung an {agency}",
     transitFareNote: 'Nahverkehrstickets werden an der Station oder im Fahrzeug bezahlt. American Rider gibt keine Nahverkehrstickets aus und behält keinen Anteil am Fahrpreis ein.',
     fareSetBy: 'Fahrpreis nicht angezeigt · festgelegt von %{agency}',
     reserveFirstTravel: 'Erste Fahrt reservieren',

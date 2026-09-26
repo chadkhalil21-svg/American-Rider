@@ -120,7 +120,7 @@ what's deliberately not, open style questions") before it ships.
   retainers, statements or expense integrations — none exist. Chad, 14 Sept 2026.
 - Section labels: quiet grey letterspaced uppercase (SUGGESTED TRAVEL, RECENT TRAVEL).
   SUGGESTED TRAVEL is EARNED from the traveler's real trips — never shown to a new account.
-- IBM Plex Mono is used ONLY for prices and trip/case numbers (the `Mono` component). Everything else is the system font.
+- IBM Plex Mono is used ONLY for identifiers and verification-style values that the demo deliberately renders as mono (for example Travel/case numbers, invite/verification codes). **Prices are NOT mono.** Prices use the system font with tabular numerals through `Num`, matching the demo. Everything else is the system font.
 - The AI planner ("Plan in your own words") is WITHDRAWN as of 4 Sept 2026 — the founders'
   decision, not currently offered, possibly refined and reintroduced later. This line
   previously recorded it as an explicit keep; that is superseded. `app/plan.tsx` and
@@ -133,7 +133,7 @@ what's deliberately not, open style questions") before it ships.
 
 ## Architecture
 - `app/` — one file per screen (expo-router): index (home + drawer), reserve (THE ONE SHEET between a destination and a car — Travel Confirmation: destination entry, route map, departure time, vehicle class with prices, the saved cabin environment, Complete Travel Cost, Confirm Travel; Chad, 14 Sept 2026: "it is subpar to have four screens before a car is on its way" — options.tsx and review.tsx were folded into it and deleted), prefs (Cabin Environment, a sub-screen that returns), ride (live status — named `/ride` because Metro's dev server reserves `/status`), complete (rating/tip), message, receipt, issues (Patron Support), account (Menu), profile, wallet, safety (Safe Travels), settings, notifications, invite, schedule, history (Travel Log), drive (operator recruiting), +not-found.
-- `src/state/RideContext.tsx` — single store: booking, live ride progression (2.6s/step demo timer), payments, scheduling, help flows.
+- `src/state/RideContext.tsx` — Traveler presentation/cache store for booking, authoritative server-backed Travel state, payments, scheduling, Smart Travel continuity and help flows. Production Travel progression comes from server records/provider events; no scripted/demo timer may advance a real Travel.
 - `src/data.ts` — demo data and the fare-display fallback. **Live pricing is server-authoritative.**
   Operator retains 99% of Travel Fare; American Rider receives a 1% uncapped coordination
   commission. The Traveler Platform Fee is no longer a flat fee or percentage schedule:
@@ -145,7 +145,7 @@ what's deliberately not, open style questions") before it ships.
   and `backend/payments.test.js` checks app/server parity for every cent from $3 to $500.
   Government fees and tolls are pass-through amounts whose induced processing cost is recovered
   by the Platform Fee. The Traveler sees one Total; no payment-processing line is added.
-- `src/backend/dispatch.ts` — real in-app dispatch: upserts the Miami fleet to Firestore, matches the nearest available operator, writes the `rides/{tripNo}` doc, and reads the signed-in traveler's rides back (`fetchMyRides`).
+- `src/backend/dispatch.ts` — client bridge to the authenticated server-authoritative dispatch/Travel APIs and the signed-in Traveler's Travel records. Fleet authority, qualification gates and matching remain server-side; client code must never manufacture or self-authorize Operators.
 - `src/firebase.ts` / `src/state/AuthContext.tsx` — live Firebase Auth + Firestore. The web config in `firebase.ts` is NOT secret; real secrets (e.g. `STRIPE_SECRET_KEY`) belong only in a backend `.env`, which is gitignored.
 - `src/components/LiveMap.tsx` — animated route map (SVG bezier + Animated).
 - **Maps (Chad, 13 Sept 2026; supersedes his 9 Sept "iPhone = Apple Maps"): MapLibre, drawn in
@@ -186,8 +186,8 @@ what's deliberately not, open style questions") before it ships.
   silently skipping every re-offer of unanswered travel. Tests prove a module. Lint proves it
   is wired. This codebase's recurring defect is the second thing, not the first.
 
-## Not built yet (see ../extracted/CLAUDE.md roadmap)
-Driver (operator) app, real backend, sign-up flow, splash/logo (waiting on logo asset), payments integration.
+## Current release posture
+The Traveler app, Operator surfaces, authentication, backend, payment architecture, qualification/screening architecture, Family/Teen Travel and Smart Travel are implemented and under commercial-release audit. Do **not** treat old prototype roadmaps as the current feature inventory. The commercial release authority is `docs/COMMERCIAL-RELEASE-EVIDENCE.md` plus the executable Release Gate and release-evidence verifier. Features that remain unproven in production must fail closed rather than being represented as absent or simulated.
 
 ## Building the app locally (free — no EAS credits)
 

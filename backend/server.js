@@ -545,8 +545,10 @@ app.post('/support', requireAuth, requireVerifiedEmail, LIMITS.support, async (r
     const db = adminDb();
     const rideId = String(req.body?.rideId || trip?.rideId || '');
     let refundRide = null;
+    let refundRideRef = null;
     if (db && rideId) {
-      const snap = await db.collection('rides').doc(rideId).get();
+      refundRideRef = db.collection('rides').doc(rideId);
+      const snap = await refundRideRef.get();
       const r = snap.exists ? snap.data() || {} : null;
       if (r && String(r.travelerUid || '') === String(req.uid)) refundRide = r;
     }
@@ -562,7 +564,7 @@ app.post('/support', requireAuth, requireVerifiedEmail, LIMITS.support, async (r
       paymentIntentId: refundRide.paymentIntentId,
       amountCents: decision.credit_cents,
       expectUid: req.uid,
-      idempotencyKey: `ar_support_refund_${rideId}_${decision.credit_cents}`,
+      idempotencyKey: `ar_support_refund_${rideId}`,
     });
     // THE EXPOSURE CAP, WHICH IS NOT THE SAME AS THE CREDIT CAP. The credit cap measures what
     // a traveler might reasonably be owed; this measures what the company actually pays for
@@ -579,6 +581,7 @@ app.post('/support', requireAuth, requireVerifiedEmail, LIMITS.support, async (r
       });
     }
     if (refund.ok) {
+      if (refundRideRef) await refundRideRef.set({ supportRefundId: refund.refundId, supportRefundedCents: refund.amountCents, supportRefundedAt: Date.now() }, { merge: true });
       return res.json({ ...decision, refunded: true, refundId: refund.refundId });
     }
     decision = {

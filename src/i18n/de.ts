@@ -505,7 +505,6 @@ export default {
     qualBgSub: 'Von American Rider veranlasst · zum Selbstkostenpreis',
     inboxNotSignedIn: 'Dieses Gerät ist nicht angemeldet und kann daher keine Fahrten empfangen.',
     inboxNotCommissioned: 'Dieses Konto ist noch nicht beauftragt, daher können ihm keine Fahrten zugewiesen werden.',
-    replySeeShortly: 'Danke — bis gleich.',
     noLongerInService: 'Sie sind nicht mehr im Dienst.',
     blockNameVehicle: 'Der Reisende erhält Name, Fahrzeug und Kennzeichen des Betreibers, bevor das Auto eintrifft, und prüft sie am Straßenrand.',
     blockCoverage: 'American Rider stellt keine Kfz-Versicherung, daher ist die Police des Betreibers die einzige Deckung einer Fahrt. Erfassen Sie ihr Ablaufdatum.',

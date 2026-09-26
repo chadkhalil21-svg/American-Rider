@@ -125,72 +125,13 @@ service cloud.firestore {
                         || request.resource.data.rating == null
                         || (request.resource.data.rating >= 1 && request.resource.data.rating <= 5));
 
-      // The operator's own progress through the travel they were given. A separate, narrower
-      // grant than the traveler's: an operator may move the travel along and record when they
-      // arrived, and may touch nothing else. Not the fare, not the traveler, not the rating
-      // of their own work, and not the operator assignment — an operator cannot hand a travel
-      // to somebody else or take one that was not given to them.
-      //
-      // opLat/opLng/opAt/stillSince are the operator's POSITION WHILE CARRYING A TRAVELER —
-      // what route monitoring watches. Writable by the operator because the phone is the only
-      // thing that knows where the car is; `monitor` is NOT, in either direction, because it
-      // decides whether a case is opened and neither party may clear a concern raised about
-      // the other. That field is written only by the server (backend/monitor.js), which
-      // bypasses these rules, and answered only through POST /travel/check-in.
-      // `needsPayout` IS THE QUEUE MARKER THE SETTLEMENT SWEEP READS, and leaving it off this
-      // list cost a real payout on 2 Sept 2026.
-      //
-      // The operator app began stamping it when a travel completes, so the sweep could query
-      // the travels that owe somebody money instead of scanning every completed travel ever.
-      // It was never added here — so touchesOnly() rejected the WHOLE update, and setStatus's
-      // `catch` swallowed the rejection. The effect was not a missing flag: completion itself
-      // stopped being written. The operator saw "Operation Complete" and $17.77, the traveler's
-      // record stayed `onboard`, and nobody was paid. Adding a field to a client write without
-      // adding it here does not fail loudly; it fails silently and takes the rest of the write
-      // with it.
-      //
-      // A CLIENT-SETTABLE "PAY ME" FLAG IS SAFE ONLY BECAUSE IT AUTHORIZES NOTHING. It is a
-      // hint that a travel is ready to be looked at. The sweep still re-reads the travel,
-      // still checks the operator's payout account, and transferToOperator still verifies the
-      // traveler's uid against Stripe's own metadata on the payment before a cent moves. So
-      // the worst an operator can do by setting it is ask to be paid for a travel they were
-      // actually assigned — which is what it means. It is constrained to `true`, and only
-      // alongside a status of `completed`, so it cannot be used to un-queue a payout either.
-      //
-      // ACCEPTANCE IS NOT HERE ANY MORE (22 Sept 2026). 'accepted' and acceptedAt were on this
-      // list, so the phone accepted a travel with no check of anything but operatorId — an
-      // operator whose disclosure, approval, documents, insurance, screening or payouts had
-      // stopped standing after the offer could still take it. POST /travel/accept re-checks all
-      // of them and writes 'accepted' with admin access. And because a phone that cannot write
-      // 'accepted' could otherwise jump straight to 'arrived', every later status now requires
-      // the travel to be under way already; 'declined' is only an answer to an open offer.
-      //
-      // THE WRITE THE APP ACTUALLY SENDS (src/backend/rideStatusWrite.ts, audit of f6ef88d):
-      //   arrived    status, statusAt, arrivedAt
-      //   onboard    status, statusAt, onboardAt
-      //   completed  status, statusAt, completedAt, needsPayout: true
-      //   declined   status, statusAt, declinedAt
-      // onboardAt and completedAt were missing from this list, so the moves to 'onboard' and to
-      // 'completed' were refused. Each timestamp — and needsPayout — is now accepted ONLY in the
-      // update that ENTERS its status (enteringStatus below), so none can be rewritten later.
+      // Operator progression is server-authoritative. A phone may publish only its telemetry
+      // on a Travel already assigned to it; /travel/progress owns status, timestamps and the
+      // payout queue marker. This closes the authenticated-Operator attack in which a client
+      // could legally write arrived -> onboard -> completed without transportation occurring.
       allow update: if drivesExisting()
-                    && touchesOnly(['status', 'statusAt', 'arrivedAt', 'onboardAt', 'completedAt', 'declinedAt',
-                                    'opLat', 'opLng', 'opAt', 'stillSince', 'needsPayout'])
-                    && (!changes('status')
-                        || (request.resource.data.status == 'arrived' && resource.data.status == 'accepted')
-                        || (request.resource.data.status == 'onboard' && resource.data.status == 'arrived')
-                        || (request.resource.data.status == 'completed' && resource.data.status == 'onboard')
-                        || (request.resource.data.status == 'declined'
-                            && resource.data.status == 'assigned'))
-                    && stampedOnlyEntering('arrivedAt', 'arrived')
-                    && (!enteringStatus('onboard') || resource.data.get('party', {}).get('teen', false) != true || resource.data.get('teenPickup', {}).get('verifiedAt', null) is number)
-                    && stampedOnlyEntering('onboardAt', 'onboard')
-                    && stampedOnlyEntering('completedAt', 'completed')
-                    && stampedOnlyEntering('declinedAt', 'declined')
-                    && (!changes('needsPayout')
-                        || (request.resource.data.needsPayout == true
-                            && enteringStatus('completed')));
-
+                    && touchesOnly(['opLat', 'opLng', 'opAt', 'stillSince'])
+                    && !changes('status');
       // A travel record is history. It is never deleted from a phone.
       allow delete: if false;
     }

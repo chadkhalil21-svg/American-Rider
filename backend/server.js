@@ -1406,6 +1406,9 @@ app.post('/fare-quote', attachAuth, LIMITS.quoteIp, async (req, res) => {
   if (!priced) {
     return res.status(400).json({ error: 'Need either pickup+dest coordinates or a known destination' });
   }
+  if (priced.pricedBy === 'distance' && priced.tollStatus === 'unknown') {
+    return res.status(503).json({ error: 'Toll cost could not be verified for this route.', code: 'toll_unavailable' });
+  }
   // WHICH FEE SCHEDULE, DECIDED HERE AND NOWHERE ELSE. The fee depends on the issuing country
   // of the traveler's default card (Chad, 20 Sept 2026), and the ONE place that can be read
   // without the price moving later is before the quote is given. A traveler with nothing on
@@ -1413,7 +1416,7 @@ app.post('/fare-quote', attachAuth, LIMITS.quoteIp, async (req, res) => {
   res.json({
     travelerPays: priced.travelerPays, operatorGets: priced.operatorGets,
     platformTake: priced.platformTake, commission: priced.commission, appFee: priced.appFee,
-    governmentFeeCents: priced.governmentFeeCents, tollCents: priced.tollCents || 0, feeLines: priced.feeLines,
+    governmentFeeCents: priced.governmentFeeCents, tollCents: priced.tollCents || 0, tollStatus: priced.tollStatus, feeLines: priced.feeLines,
     travelCostCents: priced.travelCostCents, miles: priced.miles, minutes: priced.minutes,
     timedBy: priced.timedBy, pricedBy: priced.pricedBy,
   });
@@ -1580,6 +1583,9 @@ app.post('/charge-ride', requireAuth, LIMITS.payments, async (req, res) => {
   }
   if (!priced) {
     return res.status(400).json({ error: 'Need either pickup+dest coordinates or a known destination' });
+  }
+  if (priced.pricedBy === 'distance' && priced.tollStatus === 'unknown') {
+    return res.status(503).json({ error: 'Toll cost could not be verified for this route.', code: 'toll_unavailable' });
   }
   try {
     const result = await chargeRide({
@@ -2498,6 +2504,9 @@ app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, async (req, res) => {
   if (priced.pricedBy !== 'distance') {
     return res.status(400).json({ error: 'A valid pickup and destination position are required to create Travel.', code: 'route_geometry_required' });
   }
+  if (priced.tollStatus === 'unknown') {
+    return res.status(503).json({ error: 'Toll cost could not be verified for this route.', code: 'toll_unavailable' });
+  }
 
   const partyResult = await normalizeParty(b, { uid: req.uid, name: req.name || b.bookerName || b.travelerName || '' });
   if (!partyResult.ok) return res.status(400).json({ error: partyResult.error, code: partyResult.code });
@@ -2650,6 +2659,9 @@ app.post('/travel/schedule', requireAuth, LIMITS.dispatch, async (req, res) => {
   }
   if (priced.pricedBy !== 'distance') {
     return res.status(400).json({ error: 'A valid pickup and destination position are required to create Travel.', code: 'route_geometry_required' });
+  }
+  if (priced.tollStatus === 'unknown') {
+    return res.status(503).json({ error: 'Toll cost could not be verified for this route.', code: 'toll_unavailable' });
   }
   const partyResult = await normalizeParty(b, { uid: req.uid, name: req.name || b.bookerName || b.travelerName || '' });
   if (!partyResult.ok) return res.status(400).json({ error: partyResult.error, code: partyResult.code });

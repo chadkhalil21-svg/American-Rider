@@ -522,7 +522,6 @@ export default {
     qualBgSub: 'Arranged by American Rider · paid at cost',
     inboxNotSignedIn: 'This device is not signed in, so travel cannot be received.',
     inboxNotCommissioned: 'This account is not commissioned yet, so travel cannot be assigned to it.',
-    replySeeShortly: 'Thank you — see you shortly.',
     noLongerInService: 'You are no longer in service.',
     blockNameVehicle: 'A traveler is given the operator’s name, vehicle and license plate before the car arrives, and checks them at the kerb.',
     blockCoverage: 'Your qualifying commercial policy must remain current while you operate. Record its expiry date; any separate contingency coverage maintained by American Rider does not replace your policy.',

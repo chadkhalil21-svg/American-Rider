@@ -27,6 +27,7 @@
 // forge a message from the other side.
 import { addDoc, collection, onSnapshot, query, where } from 'firebase/firestore';
 import { auth, db } from '../firebase';
+import { PAYMENT_SERVER_URL } from '../config';
 import { t } from '../i18n';
 
 export type TravelMessage = {

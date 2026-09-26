@@ -2923,6 +2923,7 @@ app.post('/travel/announce', requireAuth, LIMITS.announce, async (req, res) => {
       });
       await ref.set({ notifiedOperatorAt: Date.now() }, { merge: true });
     } else if (event === 'arrived') {
+      if (ride.party?.teen && ride.party?.guardianUid && String(ride.party.guardianUid) !== String(ride.travelerUid)) await notify({ uid: ride.party.guardianUid, kind:'guardian_travel', title:'Operator arrived', body:`${ride.operatorName || 'The Operator'} has arrived for ${ride.party.travelerName || 'the Teen Traveler'}.`, data:{screen:'/ride',rideId,tripNo:trip} });
       sent = await notify({
         uid: ride.travelerUid,
         kind: 'operator_arrived',
@@ -2931,6 +2932,7 @@ app.post('/travel/announce', requireAuth, LIMITS.announce, async (req, res) => {
         data: { screen: '/ride', rideId, tripNo: trip },
       });
     } else {
+      if (ride.party?.teen && ride.party?.guardianUid && String(ride.party.guardianUid) !== String(ride.travelerUid)) await notify({ uid: ride.party.guardianUid, kind:'guardian_travel', title:'Teen Travel complete', body:`${ride.party.travelerName || 'The Teen Traveler'} has reached ${ride.dest || 'the destination'}.`, data:{screen:'/receipt',rideId,tripNo:trip} });
       sent = await notify({
         uid: ride.travelerUid,
         kind: 'travel_complete',

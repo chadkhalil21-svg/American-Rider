@@ -52,7 +52,7 @@ The absolute Platform Fee floor is $2.00.
 Unknown card country is priced on the international-safe schedule. A first foreign card is not
 allowed to become a deliberately loss-making exception.
 
-Payment presentment and settlement are USD-only. Therefore the normal launch formula
+Payment presentment and settlement are USD-only. Therefore the normal formula
 does not assume Stripe FX conversion. A future non-USD path must add the actual FX cost before
 it can be enabled.
 

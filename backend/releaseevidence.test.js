@@ -9,5 +9,5 @@ assert.ok(verifier.includes("g.result !== 'pass'"),'pending/failing external gat
 assert.ok(verifier.includes("independent reviewer missing"),'external evidence requires review');
 assert.ok(verifier.includes("operationalMissing must be []"),'production readiness must be clean');
 assert.ok(verifier.includes("English disclosure not reviewed"),'insurance disclosure review is mandatory');
-assert.ok(verifier.includes("uxRubric: "+"'+k+'" )||verifier.includes("uxRubric:"),'whole-product UX doctrine is enforced by the release verifier');
+assert.ok(verifier.includes("uxRubric:"),'whole-product UX doctrine is enforced by the release verifier');
 console.log('all external release-evidence contract tests passed');

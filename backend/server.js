@@ -536,12 +536,31 @@ app.post('/support', requireAuth, requireVerifiedEmail, LIMITS.support, async (r
   // method" while no money moved. Issue it against the real PaymentIntent; if that cannot
   // be done, this is a person's job and the case falls through to the escalation below.
   if (decision.action === 'credit') {
+    // A refund is bound to an authoritative Travel, not merely to *some* Stripe payment owned
+    // by this Traveler. Otherwise a caller with Travels A and B could file about A while
+    // supplying B's PaymentIntent. The phone supplies only rideId; ownership and payment id
+    // come back out of Firestore.
+    const db = adminDb();
+    const rideId = String(req.body?.rideId || trip?.rideId || '');
+    let refundRide = null;
+    if (db && rideId) {
+      const snap = await db.collection('rides').doc(rideId).get();
+      const r = snap.exists ? snap.data() || {} : null;
+      if (r && String(r.travelerUid || '') === String(req.uid)) refundRide = r;
+    }
+    if (!refundRide?.paymentIntentId) {
+      decision = {
+        action: 'escalate',
+        message: decision.message,
+        reason: 'Automatic credit approved but no authoritative owned Travel payment could be verified.',
+        forced: true,
+      };
+    } else {
     const refund = await refundTravel({
-      paymentIntentId: trip?.paymentIntentId,
+      paymentIntentId: refundRide.paymentIntentId,
       amountCents: decision.credit_cents,
-      // The request body cannot be trusted to say whose payment this is. refundTravel
-      // checks the id against Stripe's own record of who paid before a cent moves.
       expectUid: req.uid,
+      idempotencyKey: `ar_support_refund_${rideId}_${decision.credit_cents}`,
     });
     // THE EXPOSURE CAP, WHICH IS NOT THE SAME AS THE CREDIT CAP. The credit cap measures what
     // a traveler might reasonably be owed; this measures what the company actually pays for
@@ -566,6 +585,7 @@ app.post('/support', requireAuth, requireVerifiedEmail, LIMITS.support, async (r
       reason: `Credit of ${decision.credit_cents}c approved but not issued: ${refund.error}`,
       forced: true,
     };
+    }
   }
 
   if (decision.action === 'escalate') {

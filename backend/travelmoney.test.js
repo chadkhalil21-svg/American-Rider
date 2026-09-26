@@ -50,9 +50,9 @@ function stripe() {
       if (!pi || pi.uid !== expectUid) return { cents: 0, reason: 'not yours' };
       return { cents: pi.cents - pi.refunded, reason: null };
     },
-    refundTravel: async ({ paymentIntentId, amountCents }) => {
+    refundTravel: async ({ paymentIntentId, amountCents, idempotencyKey }) => {
       intents[paymentIntentId].refunded += amountCents;
-      log.refunds.push({ paymentIntentId, amountCents });
+      log.refunds.push({ paymentIntentId, amountCents, idempotencyKey });
       return { ok: true, refundId: `re_${paymentIntentId}`, amountCents, status: 'succeeded' };
     },
     transferFixed: async (x) => { log.transfers.push({ kind: 'fee', ...x }); return { ok: true, transferId: 'tr_fee' }; },
@@ -79,6 +79,7 @@ const rides = (over = {}) => ({
     const out = await cancelTravel({ db, uid: 'alice', rideId: 'A', deps: s, paymentIntentId: 'pi_B', body: { paymentIntentId: 'pi_B' } });
     check('cancel A while naming B\'s payment: A is refunded', out.status === 200 && out.body.refunded === true && s.log.refunds.length === 1 && s.log.refunds[0].paymentIntentId === 'pi_A', JSON.stringify(s.log.refunds));
     check('…and B is NEVER refunded', s.intents.pi_B.refunded === 0 && !s.log.refunds.some((r) => r.paymentIntentId === 'pi_B'));
+    check('cancellation carries one stable Stripe idempotency key for this Travel', s.log.refunds[0].idempotencyKey === 'ar_cancel_refund_A');
     check('…and B stays live', db.data.rides.B.status === 'accepted' && !db.data.rides.B.refundId);
     check('the cancel function takes no payment id from its caller at all', !/paymentIntentId\s*[,}]/.test(cancelTravel.toString().split('\n')[0]));
   }

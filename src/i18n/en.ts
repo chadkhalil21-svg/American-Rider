@@ -578,7 +578,6 @@ export default {
     nothingDeducted: 'Nothing is deducted from your 99%. The traveler pays the fare plus a platform fee, and American Rider retains that fee and a 1% coordination commission — which is also what covers card processing. Your share of a fare does not change with how the traveler chose to pay.',
     weVerifyNotSell: 'American Rider verifies your coverage but does not sell it. We direct you to providers with qualifying commercial rates.',
     verifyNotSellShort: 'American Rider verifies commercial coverage but does not sell it.',
-    revenueSimulated: 'Test program — operations and revenue shown here are simulated.',
     whatTravelerLooksFor: 'Your name and your car are what a traveler looks for at the kerb, and the plate is what they check before getting in.',
     plateMustMatch: 'A traveler is asked to check the plate before boarding. It has to match the car you arrive in.',
     reachesYouWithoutAsking: 'You retain 99% of every fare. It reaches you without you having to ask for it.',

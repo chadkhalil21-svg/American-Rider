@@ -25,7 +25,9 @@ t('Smart Travel second leg never receives a negative incremental platform fee',(
 console.log(`\n${n} Smart Travel economics tests passed`);
 
 (async()=>{
-  const pickup={lat:25.7617,lng:-80.1918}, dest={lat:25.7959,lng:-80.2870};
+  // Keep both ends beyond the walk threshold. This fixture verifies two charged car
+  // Travels, so nearby coordinates that correctly become walk legs do not exercise it.
+  const pickup={lat:25.7520,lng:-80.2100}, dest={lat:25.8150,lng:-80.3050};
   const stopA={name:'BRICKELL STAT.RAIL NORTHBOUND',lat:25.7639,lng:-80.1915,stopId:'A'};
   const stopB={name:'MIAMI INTERNATIONAL AIRPORT',lat:25.7950,lng:-80.2850,stopId:'B'};
   const when=new Date('2026-09-25T16:00:00Z');
@@ -40,7 +42,7 @@ console.log(`\n${n} Smart Travel economics tests passed`);
   assert.equal(cars.length,2);
   const q1=quote(cars[0].cents,null,cars[0].feeLines||[],null,0);
   const q2=quote(cars[1].cents,{journeyNo:'preview',leg1FareCents:cars[0].cents,leg1GovernmentFeeCents:cars[0].governmentFeeCents||0,leg1TollCents:0},cars[1].feeLines||[],null,0);
-  assert.equal(out.plan.smartCents,q1.total+q2.total,'Smart Travel preview must equal the two actual car-Travel charges');
+  assert.equal(out.plan.smartCents,q1.travelerPays+q2.travelerPays,'Smart Travel preview must equal the two actual car-Travel charges');
   assert.equal(out.plan.feeCents,q1.appFee+q2.appFee);
   console.log('✓ Smart Travel preview equals its two real Travel charges');
 })().catch(e=>{console.error(e);process.exitCode=1});

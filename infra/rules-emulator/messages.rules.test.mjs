@@ -41,7 +41,7 @@ const seed = async (overrides = {}) => {
 const as = (uid) => env.authenticatedContext(uid).firestore();
 const msg = (over) => ({ lostItemId: null, text: 'Hello', createdAt: 1, ...over });
 const fromTraveler = (rideId, r, uid = r.travelerUid, over = {}) =>
-  msg({ rideId, tripNo: r.tripNo, from: 'traveler', travelerUid: uid, operatorId: r.operatorId, ...over });
+  msg({ rideId, tripNo: r.tripNo, from: 'traveler', travelerUid: uid, operatorId: r.operatorId, guardianUid: r.party?.guardianUid ?? null, ...over });
 const fromOperator = (rideId, r, uid = r.operatorId, over = {}) =>
   msg({ rideId, tripNo: r.tripNo, from: 'operator', travelerUid: r.travelerUid, operatorId: uid, guardianUid: r.party?.guardianUid ?? null, ...over });
 const fromGuardian = (rideId, r, uid = r.party?.guardianUid, over = {}) =>

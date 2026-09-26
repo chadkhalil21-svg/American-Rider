@@ -635,7 +635,7 @@ app.post('/family/invite', requireAuth, requireVerifiedEmail, async (req,res)=>{
     to:String(b.teenEmail||'').trim().toLowerCase(),
     subject:'American Rider · Family invitation',
     text:`AMERICAN RIDER — NATIONAL TRANSPORTATION\n\n${req.name||'Your guardian'} has invited you to join their American Rider Family account for Teen Travel.\n\nOpen this invitation on the device where American Rider is installed:\n${link}\n\nThe invitation expires in seven days and can be accepted only while signed in to the verified account at this email address.\n`,
-    html:`<p><strong>American Rider · Family</strong></p><p>${req.name||'Your guardian'} has invited you to join their Family account for Teen Travel.</p><p><a href="${link}">Accept Family Invitation</a></p><p>This invitation expires in seven days and can be accepted only while signed in to the verified account at this email address.</p>`,
+    html:`<p><strong>American Rider · Family</strong></p><p>You have been invited to join a Family account for Teen Travel.</p><p><a href="${link}">Accept Family Invitation</a></p><p>This invitation expires in seven days and can be accepted only while signed in to the verified account at this email address.</p>`,
   });
   if(!delivery.ok)return res.status(502).json({ok:false,reason:'The Family invitation could not be delivered. No invitation code is shown in the app.',id:out.id});
   return res.json({ok:true,id:out.id,delivered:true});
@@ -1612,7 +1612,7 @@ let lastSweep = { at: 0, report: null };
  * Promise.all.
  */
 async function runAllSweeps() {
-  const [scheduled, monitor, assignments, screening, settlements, providerEvents, operatorFees] = await Promise.allSettled([
+  const [scheduled, monitor, assignments, screening, settlements, providerEvents, operatorFees, familyAgeOut] = await Promise.allSettled([
     sweepScheduled(),
     sweepMonitor(),
     sweepAssignments(),
@@ -1624,6 +1624,7 @@ async function runAllSweeps() {
         chargeOperatorAccountFee({ uid, email, month, amountCents }),
       cardCountryFor: async (uid) => defaultCardCountry({ uid }),
     }),
+    family.sweepFamilyAgeOut(),
   ]);
   const unwrap = (r) => (r.status === 'fulfilled' ? r.value : { ok: false, reason: String(r.reason) });
   return {
@@ -1634,6 +1635,7 @@ async function runAllSweeps() {
     settlements: unwrap(settlements),
     providerEvents: unwrap(providerEvents),
     operatorFees: unwrap(operatorFees),
+    familyAgeOut: unwrap(familyAgeOut),
   };
 }
 

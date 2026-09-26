@@ -378,7 +378,7 @@ export default function TravelConfirmation() {
                     <View style={{ flex: 1 }}>
                       <Text style={styles.slotLabel}>{t('traveler.whoIsTraveling')}</Text>
                       <Text style={styles.slotValue}>
-                        {ride.travelParty.mode === 'self' ? 'Me' : ride.travelParty.travelerName || 'Another person'}
+                        {ride.travelParty.mode === 'self' ? t('traveler.me') : ride.travelParty.travelerName || t('traveler.anotherAdult')}
                       </Text>
                     </View>
                     <Chev />
@@ -393,7 +393,7 @@ export default function TravelConfirmation() {
                       <Text style={[styles.modify,{marginTop:14}]}>{t('traveler.anotherAdult')}</Text>
                     </Pressable>
                     <TextInput value={partyName} onChangeText={(v) => { setPartyName(v); if (ride.travelParty.mode === 'other_adult') ride.setTravelParty({ mode: 'other_adult', travelerName: v }); }} placeholder={t('traveler.travelerName')} placeholderTextColor={colors.muted} style={styles.input} />
-                    {familyLinks.map(f=><Pressable key={f.id} onPress={()=>{ride.setTravelParty({mode:'teen',travelerName:f.teenName||'Teen Traveler',familyLinkId:f.id});setPartyOpen(false);}}><Text style={[styles.modify,{marginTop:14}]}>Teen Travel · {f.teenName||'Teen Traveler'}</Text></Pressable>)}
+                    {familyLinks.map(f=><Pressable key={f.id} onPress={()=>{ride.setTravelParty({mode:'teen',travelerName:f.teenName||t('traveler.familyTeenTraveler'),familyLinkId:f.id});setPartyOpen(false);}}><Text style={[styles.modify,{marginTop:14}]}>{t('traveler.familyTeenTravel')} · {f.teenName||t('traveler.familyTeenTraveler')}</Text></Pressable>)}
                   </View>
                 )}
               </Card>

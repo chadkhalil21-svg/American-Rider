@@ -104,7 +104,7 @@ const { TERMS_HTML, PRIVACY_HTML, ABOUT_HTML, legalPage, LEGAL_LANGUAGES } = req
 const {
   HOME_HTML, OPERATE_HTML, SUPPORT_HTML, TRAVEL_HTML, SAFETY_HTML, SMART_HTML,
 } = require('./site');
-const { smartQuote } = require('./smart');
+const { smartQuote, revalidateTransit } = require('./smart');
 const { transitHealth } = require('./transit');
 const { sweepScheduled, sweepSettlements } = require('./scheduler');
 const { sweepMonitor, sweepAssignments } = require('./monitor');
@@ -181,6 +181,13 @@ app.post('/stripe/webhook', express.raw({ type: 'application/json' }), async (re
     return res.status(400).json({ error: `Signature verification failed: ${e.message}` });
   }
   return acceptDurableProviderEvent('stripe', event, res);
+});
+
+app.post('/smart-revalidate', async (req, res) => {
+  const plan = req.body?.plan;
+  const out = await revalidateTransit(plan);
+  if (out.status === 'unavailable') return res.status(503).json(out);
+  return res.json(out);
 });
 
 app.post('/checkr/webhook', express.raw({ type: 'application/json' }), async (req, res) => {

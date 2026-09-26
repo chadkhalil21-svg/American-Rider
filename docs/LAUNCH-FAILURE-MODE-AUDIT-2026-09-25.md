@@ -16,6 +16,7 @@ Do not merge while a Critical item is open. High items require either a fix or a
 - **Webhook durability — High.** Verified Stripe and Checkr events are written to `provider_events` before HTTP acknowledgement. Processing is leased, idempotently reclaimed after worker failure, retried with backoff, and swept periodically.
 - **Scheduler single-instance behavior — High.** Every server may keep its local 60-second clock, but `operations_sweep` is protected by a transactional Firestore leader lease with renewal and owner-checked release, preventing horizontally scaled instances from concurrently executing the sweep.
 - **Payout wording and cadence — Medium.** Public copy now distinguishes American Rider’s transfer of the Operator’s 99% fare share to the Stripe connected account on Travel completion from Stripe’s separate bank-payout schedule.
+- **FCRA adverse-action workflow — High.** The screening pipeline now maps only concrete statutory reasons to provider adverse items, starts provider-hosted pre-adverse action with an explicit seven-day dispute interval, persists provider notice/dispute/final states, re-adjudicates corrected reports, cancels pending adverse action when a dispute clears the record, blocks qualification throughout, and escalates notice-delivery exceptions.
 
 ## Screening policy: minimum-human-intervention design
 
@@ -34,12 +35,11 @@ The 25-cent contingency reserve and 25-cent operating-overhead allowance are pla
 ## Remaining release blockers / high-risk verification
 
 1. **Florida insurance backstop interpretation — legal.** Operator-procured coverage is mandatory by product policy. Counsel must resolve the platform's separate obligation under §627.748(7)(d) if operator coverage lapses or fails.
-2. **FCRA adverse-action workflow — compliance/engineering.** A refusal currently creates a support ticket describing the notice process. Replace the ticket dependency with an auditable notice-state machine before using third-party consumer reports for live adverse decisions.
-3. **Operator background execution — engineering.** Foreground timers are not a durable production presence mechanism on iOS/Android. Verify native background location/presence behavior under lock, suspension, network loss, force-quit and reboot.
-4. **Low-volume Connect economics — business/economics.** Resolve the 16-cent allocation assumption before representing the 75-cent floor as fully loaded.
-5. **Dispatch scale — engineering/cost.** Ordinary and return dispatch now use Firestore’s indexed `available == true` prefilter before the authoritative eligibility/distance gate. This removes reads for off-duty Operators without duplicating qualification logic. At materially larger fleet size, add a server-owned spatial candidate partition so reads scale with nearby on-duty supply rather than all on-duty Operators.
-6. **Disaster tests — operations.** Exercise Firestore quota exhaustion, Stripe outage, Checkr outage, routing outage, push failure, email/support failure, stale GPS, device clock skew, duplicate requests, out-of-order webhooks, process restart mid-settlement and partial region outage.
-7. **Secrets/production configuration — operations.** Production configuration must verify restricted Stripe keys, webhook secrets, scheduler token, ops authentication, private object storage, support delivery, production Firebase project and no test-mode bypass.
+2. **Operator background execution — engineering.** Foreground timers are not a durable production presence mechanism on iOS/Android. Verify native background location/presence behavior under lock, suspension, network loss, force-quit and reboot.
+3. **Low-volume Connect economics — business/economics.** Resolve the 16-cent allocation assumption before representing the 75-cent floor as fully loaded.
+4. **Dispatch scale — engineering/cost.** Ordinary and return dispatch now use Firestore’s indexed `available == true` prefilter before the authoritative eligibility/distance gate. This removes reads for off-duty Operators without duplicating qualification logic. At materially larger fleet size, add a server-owned spatial candidate partition so reads scale with nearby on-duty supply rather than all on-duty Operators.
+5. **Disaster tests — operations.** Exercise Firestore quota exhaustion, Stripe outage, Checkr outage, routing outage, push failure, email/support failure, stale GPS, device clock skew, duplicate requests, out-of-order webhooks, process restart mid-settlement and partial region outage.
+6. **Secrets/production configuration — operations.** Production configuration must verify restricted Stripe keys, webhook secrets, scheduler token, ops authentication, private object storage, support delivery, production Firebase project and no test-mode bypass.
 
 ## Definition of done
 

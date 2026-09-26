@@ -6,9 +6,9 @@
 //
 // The traveler still sees one Total. These constants and calculations are internal.
 //
-// LAUNCH PAYMENT ARCHITECTURE
+// PAYMENT ARCHITECTURE
 //   * Present and settle in USD only. An international-issued card therefore incurs Stripe's
-//     international-card rate, but no Stripe FX conversion is assumed in the launch path.
+//     international-card rate, but no Stripe FX conversion is assumed in the payment path.
 //   * Unknown card country is costed as international. Under-pricing a first foreign card is
 //     not an acceptable "first Travel" exception.
 //   * Operators retain 99% of Travel Fare. Tolls are reimbursed whole.

@@ -4,7 +4,7 @@ This is a release-gate document, not a claim that passing automated tests makes 
 
 ## Release rule
 
-Do not merge while a Critical item is open. High items require either a fix or an explicit launch-blocking operational control with an owner.
+Do not merge while a Critical item is open. High items require either a fix or an explicit release-blocking operational control with an owner.
 
 ## Closed in this audit
 

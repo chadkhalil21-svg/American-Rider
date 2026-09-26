@@ -105,3 +105,25 @@ export async function fetchSmartQuote(
     return { status: 'unavailable', plan: null };
   }
 }
+
+
+export type SmartRevalidation =
+  | { status: 'ok'; changed: boolean; checkedAt: string; departAt: string | null; arriveAt: string | null; routeSignature: string }
+  | { status: 'none'; reason?: string }
+  | { status: 'unavailable'; reason?: string };
+
+export async function revalidateSmartTransit(plan: SmartPlan): Promise<SmartRevalidation> {
+  try {
+    const res = await fetch(`${PAYMENT_SERVER_URL}/smart-revalidate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-AR-Smart': '2' },
+      body: JSON.stringify({ plan }),
+    });
+    const body = await res.json().catch(() => null) as SmartRevalidation | null;
+    if (!body || !['ok', 'none', 'unavailable'].includes(body.status)) return { status: 'unavailable', reason: 'malformed_response' };
+    if (!res.ok && body.status !== 'unavailable') return { status: 'unavailable', reason: 'planner_error' };
+    return body;
+  } catch {
+    return { status: 'unavailable', reason: 'network_error' };
+  }
+}

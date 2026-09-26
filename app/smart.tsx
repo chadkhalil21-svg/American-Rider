@@ -14,7 +14,7 @@
 // says "you saved"; the comparison with direct travel is stated in either direction, as a
 // fact. No control is named after anything other than what it does.
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Text } from '../src/components/AppText';
 import Svg, { Path, Rect } from 'react-native-svg';
@@ -30,7 +30,7 @@ import {
   Sub,
   Title,
 } from '../src/components/UI';
-import type { SmartLeg, SmartPlan } from '../src/backend/smart';
+import { revalidateSmartTransit, type SmartLeg, type SmartPlan, type SmartRevalidation } from '../src/backend/smart';
 import { useGoBack } from '../src/components/nav';
 import { prettyPlace } from '../src/data';
 import { carLegs, clockTime, legTitle, placeName, transitLegs } from '../src/smartLegs';
@@ -130,6 +130,19 @@ export default function SmartTravel() {
   const ride = useRide();
   const journey = ride.smartJourney;
   const plan = journey?.plan ?? ride.smartPlan;
+  const [revalidation, setRevalidation] = useState<SmartRevalidation | null>(null);
+  const [checkingTransit, setCheckingTransit] = useState(false);
+
+  const checkTransit = useCallback(async () => {
+    if (!journey?.plan || checkingTransit) return;
+    setCheckingTransit(true);
+    try { setRevalidation(await revalidateSmartTransit(journey.plan)); }
+    finally { setCheckingTransit(false); }
+  }, [journey?.plan, checkingTransit]);
+
+  useEffect(() => {
+    if (journey?.stage === 'leg1' && journey.leg1No && !ride.rideActive && !revalidation && !checkingTransit) void checkTransit();
+  }, [journey?.stage, journey?.leg1No, ride.rideActive, revalidation, checkingTransit, checkTransit]);
 
   if (!plan) {
     return (
@@ -208,10 +221,27 @@ export default function SmartTravel() {
           <OutlineButton label={t('traveler.viewTravel')} onPress={() => router.navigate('/ride')} />
         ) : lastIsCar ? (
           <>
-            <Text style={styles.actionNote}>
-              {t('traveler.lastTravelTo', { from: placeName(plan.to.name), to: destination })}
-            </Text>
-            <PrimaryButton label={t('traveler.reserveLastTravel')} onPress={() => reserve(2)} />
+            {checkingTransit ? (
+              <Text style={styles.actionNote}>{t('traveler.checkingTransit')}</Text>
+            ) : revalidation?.status === 'ok' && !revalidation.changed ? (
+              <>
+                <Text style={styles.actionNote}>
+                  {t('traveler.lastTravelTo', { from: placeName(plan.to.name), to: destination })}
+                </Text>
+                <PrimaryButton label={t('traveler.reserveLastTravel')} onPress={() => reserve(2)} />
+              </>
+            ) : (
+              <>
+                <Text style={styles.actionNote}>
+                  {revalidation?.status === 'ok' && revalidation.changed
+                    ? t('traveler.transitChanged')
+                    : revalidation?.status === 'none'
+                      ? t('traveler.transitNoLongerAvailable')
+                      : t('traveler.transitVerificationUnavailable')}
+                </Text>
+                <PrimaryButton label={t('traveler.checkTransitAgain')} onPress={() => { setRevalidation(null); void checkTransit(); }} />
+              </>
+            )}
           </>
         ) : (
           <PrimaryButton label={t('traveler.complete')} onPress={() => { ride.endSmartJourney(); router.dismissTo('/'); }} />

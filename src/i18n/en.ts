@@ -992,6 +992,7 @@ export default {
     viewTravelReceipt: 'View Travel Receipt',
     leaveWithoutSaving: 'Leave without saving',
     operator: 'Operator',
+      inboxReadFailed: 'This communication could not be recorded as read. Try again.',
     paymentMethod: 'Payment Method',
     operatorRetainedNote: 'The Operator retained 99% of the travel fare.',
     contactPatronSupport: 'Contact Patron Support',

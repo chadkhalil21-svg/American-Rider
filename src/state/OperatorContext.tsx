@@ -318,10 +318,10 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
   const [vehicle, setVehicleState] = useState<{ car: string; plate: string } | null>(null);
   // THE DATE THE COMMERCIAL POLICY RUNS OUT, as printed on the certificate.
   //
-  // Florida requires an operator carrying a traveler to hold $1,000,000 of commercial
-  // liability, and American Rider provides none of it — so the operator's own policy is the
-  // only coverage there is. Nothing recorded when it ended, which meant nothing could stop a
-  // travel being assigned to somebody whose coverage had run out weeks earlier.
+  // The Operator's qualifying commercial coverage is a mandatory duty gate. Any separate
+  // contingency coverage maintained by the TNC under applicable law does not replace that
+  // Operator obligation. Nothing recorded when the Operator policy ended, which meant nothing
+  // could stop a Travel being assigned after that policy had run out.
   //
   // An expiry date is on the certificate and can be checked without asking anybody anything.
   // It does not catch a policy cancelled mid-term, which needs a carrier feed; it does catch
@@ -1146,10 +1146,10 @@ tr('traveler.blockCoverage'),
         );
         return;
       }
-      // COVERAGE IS THE ONLY COVERAGE THERE IS. American Rider carries no policy, so a travel
-      // assigned to an operator whose commercial insurance has run out has nothing behind it.
-      // Same posture as the payout and vehicle gates: we do not assign what we cannot stand
-      // behind. An expiry date is on the certificate and needs nobody's cooperation to check.
+      // OPERATOR COVERAGE REMAINS A DUTY GATE. Any separate TNC contingency coverage required by
+      // law does not substitute for the Operator's own qualifying policy. Same posture as the
+      // payout and vehicle gates: we do not assign Travel when the Operator coverage gate fails.
+      // An expiry date is on the certificate and needs nobody's cooperation to check.
       if (!coverageRef.current) {
         setOnlineState(false);
         setOnlineError(tr('traveler.gateCoverageDate'));

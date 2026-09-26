@@ -504,7 +504,6 @@ export default {
     qualBgSub: 'Organizzata da American Rider · pagata al costo',
     inboxNotSignedIn: 'Questo dispositivo non ha l’accesso effettuato, quindi non può ricevere viaggi.',
     inboxNotCommissioned: 'Questo account non è ancora abilitato, quindi non gli possono essere assegnati viaggi.',
-    replySeeShortly: 'Grazie, a tra poco.',
     noLongerInService: 'Non è più in servizio.',
     blockNameVehicle: 'Al viaggiatore vengono forniti nome, veicolo e targa dell’operatore prima dell’arrivo dell’auto, e li controlla sul marciapiede.',
     blockCoverage: 'American Rider non fornisce alcuna assicurazione auto, quindi la polizza dell’operatore è l’unica copertura di un viaggio. Registri la data di scadenza.',

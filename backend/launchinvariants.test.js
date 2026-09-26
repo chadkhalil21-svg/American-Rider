@@ -14,7 +14,8 @@ assert.ok(server.indexOf('await enqueueProviderEvent') < server.indexOf("res.jso
 assert.ok(server.includes("const name = 'operations_sweep'") && server.includes('await acquireLease(name,'),'sweeps have a single-leader lease');
 
 const party=read('backend/travelparty.js');
-assert.ok(party.includes('unaccompanied_minor_not_supported'));
+assert.ok(party.includes("['self','other_adult','teen']"), 'Teen Travel is an explicit server-authoritative party mode');
+assert.ok(party.includes('normalizeTeenParty'), 'Teen Travel delegates to the Family authorization authority');
 assert.ok(server.includes('party: operatorPartyView(party)'));
 assert.ok(server.includes('travelerName: party.travelerName'));
 assert.ok((server.match(/travelerName: party\.travelerName/g)||[]).length >= 2, 'immediate and scheduled Travel use normalized Traveler identity');
@@ -32,6 +33,6 @@ console.log('✓ no gratuity money path');
 console.log('✓ durable webhook ACK ordering');
 console.log('✓ single-leader sweeps');
 console.log('✓ another-person identity is server authoritative');
-console.log('✓ unaccompanied minors fail closed');
+console.log('✓ Teen Travel is bound to Family authorization');
 console.log('✓ Smart Travel two-charge economics is explicit');
 console.log('✓ Operator platform communications are durable and reachable');

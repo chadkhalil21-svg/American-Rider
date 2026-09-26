@@ -2,7 +2,7 @@ const assert=require('node:assert');
 const fs=require('fs'),path=require('path');
 const src=fs.readFileSync(path.join(__dirname,'server.js'),'utf8');
 const R=[];const check=(l,c)=>R.push({l,ok:!!c});
-check('clock work is guarded by Firestore lease',/acquireLease\('operations_sweep'/.test(src));
+check('clock work is guarded by Firestore lease',/const name = 'operations_sweep'[\s\S]*acquireLease\(name,/.test(src));
 check('non-owner skips sweep',/if \(!lease\.acquired\) return/.test(src));
 check('internal timer calls leased sweep',/setInterval\([\s\S]*runLeasedSweeps\(\)/.test(src));
 check('external scheduler calls leased sweep',/async function runSweep[\s\S]*runLeasedSweeps\(\)/.test(src));

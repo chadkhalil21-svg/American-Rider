@@ -13,6 +13,8 @@ Do not merge while a Critical item is open. High items require either a fix or a
 - **Insurance copy — High.** Removed the categorical statement that the operator policy is the only coverage that can apply. The product rule remains: every operator procures and maintains qualifying coverage; any separate coverage the platform may be legally required to maintain does not relieve that duty.
 - **Screening exception semantics — Medium.** A provider flag with unreadable findings or a record with no usable date still fails closed, but is now described as source clarification/dispute resolution rather than routine human approval. The deterministic statutory screen remains the normal path.
 - **Cross-module regression coverage.** `backend/launchfailure.test.js` now pins these failure boundaries and exhaustively checks the modeled contribution floor from $3 through $500 for domestic, international and unknown card country.
+- **Webhook durability — High.** Verified Stripe and Checkr events are written to `provider_events` before HTTP acknowledgement. Processing is leased, idempotently reclaimed after worker failure, retried with backoff, and swept periodically.
+- **Scheduler single-instance behavior — High.** Every server may keep its local 60-second clock, but `operations_sweep` is protected by a transactional Firestore leader lease with renewal and owner-checked release, preventing horizontally scaled instances from concurrently executing the sweep.
 
 ## Screening policy: minimum-human-intervention design
 
@@ -35,11 +37,9 @@ The 25-cent contingency reserve and 25-cent operating-overhead allowance are pla
 3. **Operator background execution — engineering.** Foreground timers are not a durable production presence mechanism on iOS/Android. Verify native background location/presence behavior under lock, suspension, network loss, force-quit and reboot.
 4. **Low-volume Connect economics — business/economics.** Resolve the 16-cent allocation assumption before representing the 75-cent floor as fully loaded.
 5. **Payout wording and cadence — product/payments.** Distinguish transfer to the connected account on Travel completion from Stripe's bank payout schedule. Public copy must not imply bank settlement is instantaneous.
-6. **Webhook durability — engineering.** Both provider webhooks acknowledge before asynchronous work completes. A process death after HTTP 200 but before Firestore completion can lose work unless events are durably queued or idempotently reconciled from provider state.
-7. **Scheduler single-instance behavior — engineering.** Every server process starts its own 60-second interval. Idempotency protects several money paths, but multi-instance deployment must prove all sweep jobs are safe under concurrent execution or elect a single scheduler.
-8. **Dispatch scale — engineering/cost.** Re-offer paths can read the fleet collection. Replace full-fleet scans with indexed/geospatial partitioning before fleet scale makes read cost/latency material.
-9. **Disaster tests — operations.** Exercise Firestore quota exhaustion, Stripe outage, Checkr outage, routing outage, push failure, email/support failure, stale GPS, device clock skew, duplicate requests, out-of-order webhooks, process restart mid-settlement and partial region outage.
-10. **Secrets/production configuration — operations.** Production configuration must verify restricted Stripe keys, webhook secrets, scheduler token, ops authentication, private object storage, support delivery, production Firebase project and no test-mode bypass.
+6. **Dispatch scale — engineering/cost.** Re-offer paths can read the fleet collection. Replace full-fleet scans with indexed/geospatial partitioning before fleet scale makes read cost/latency material.
+7. **Disaster tests — operations.** Exercise Firestore quota exhaustion, Stripe outage, Checkr outage, routing outage, push failure, email/support failure, stale GPS, device clock skew, duplicate requests, out-of-order webhooks, process restart mid-settlement and partial region outage.
+8. **Secrets/production configuration — operations.** Production configuration must verify restricted Stripe keys, webhook secrets, scheduler token, ops authentication, private object storage, support delivery, production Firebase project and no test-mode bypass.
 
 ## Definition of done
 

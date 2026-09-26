@@ -54,7 +54,7 @@ export type SmartPlan = {
   from: SmartStop;
   to: SmartStop;
   legs: SmartLeg[];
-  /** What American Rider charges: the car legs plus ONE platform fee. */
+  /** What American Rider charges across the real car Travels, including their coordinated platform fees. */
   smartCents: number;
   feeCents: number;
   carCents: number;

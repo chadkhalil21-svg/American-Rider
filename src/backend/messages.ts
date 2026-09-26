@@ -48,37 +48,21 @@ export type TravelMessage = {
  * unless this returned true.
  */
 export async function sendTravelMessage(args: {
-  /** The ride record's id. The security rule reads it; the parties come from it. */
   rideId: string | null | undefined;
   tripNo: string;
   text: string;
   from: 'traveler' | 'operator' | 'guardian';
-  /** The other party's uid, so the rule can let both of them read the thread. */
   travelerUid?: string | null;
   operatorId?: string | null;
   guardianUid?: string | null;
-  /** Set when the message belongs to a lost item report, so it lands with that case. */
   lostItemId?: string | null;
 }): Promise<boolean> {
-  const uid = auth.currentUser?.uid;
   const text = args.text.trim();
-  // THE RIDE IS REQUIRED. firestore.rules reads it to decide who may write here; a message
-  // with no ride is refused there, so it is not sent at all.
-  if (!uid || !text || !args.tripNo || !args.rideId) return false;
+  if (!auth.currentUser?.uid || !text || !args.rideId) return false;
   try {
-    await addDoc(collection(db, 'messages'), {
-      rideId: args.rideId,
-      tripNo: args.tripNo,
-      from: args.from,
-      // The writer is always themselves; the counterparty comes from the travel record.
-      travelerUid: args.from === 'traveler' ? uid : args.travelerUid ?? null,
-      operatorId: args.from === 'operator' ? uid : args.operatorId ?? null,
-      guardianUid: args.from === 'guardian' ? uid : args.guardianUid ?? null,
-      lostItemId: args.lostItemId ?? null,
-      text: text.slice(0, 2000),
-      createdAt: Date.now(),
-    });
-    return true;
+    const token=await auth.currentUser.getIdToken();
+    const res=await fetch(`${PAYMENT_SERVER_URL}/travel/message`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({rideId:args.rideId,text:text.slice(0,2000),lostItemId:args.lostItemId??null})});
+    return res.ok;
   } catch {
     return false;
   }

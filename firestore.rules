@@ -175,6 +175,7 @@ service cloud.firestore {
                         || (request.resource.data.status == 'declined'
                             && resource.data.status == 'assigned'))
                     && stampedOnlyEntering('arrivedAt', 'arrived')
+                    && (!enteringStatus('onboard') || resource.data.get('party', {}).get('teen', false) != true || resource.data.get('teenPickup', {}).get('verifiedAt', null) is number)
                     && stampedOnlyEntering('onboardAt', 'onboard')
                     && stampedOnlyEntering('completedAt', 'completed')
                     && stampedOnlyEntering('declinedAt', 'declined')

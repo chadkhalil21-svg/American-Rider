@@ -20,6 +20,9 @@
 // that sentence into something more polite. They must not. An operator deciding whether to
 // spend $200 a month on commercial cover is entitled to the same flat statement in their own
 // language that an English speaker gets.
+const { readKey } = require('./env');
+const COVERAGE_KEYS = { es:'TNC_INSURANCE_DISCLOSURE_ES', fr:'TNC_INSURANCE_DISCLOSURE_FR', it:'TNC_INSURANCE_DISCLOSURE_IT', de:'TNC_INSURANCE_DISCLOSURE_DE' };
+
 const TRANSLATIONS = {
   es: {
     title: 'Declaración de Seguro',
@@ -225,7 +228,15 @@ const DISCLOSURE_LANGUAGES = ['en', ...Object.keys(TRANSLATIONS)];
  * part another: an operator cannot tell which half they agreed to.
  */
 function translationFor(lang) {
-  return TRANSLATIONS[String(lang || '').slice(0, 2).toLowerCase()] || null;
+  const code = String(lang || '').slice(0, 2).toLowerCase();
+  const base = TRANSLATIONS[code] || null;
+  if (!base) return null;
+  const coverage = String(readKey(COVERAGE_KEYS[code]) || '').trim();
+  // Never serve the historical "no TNC coverage" paragraph after the contingency requirement
+  // was identified. Until a reviewed translation of the bound policy is configured, this
+  // language is unavailable and the caller falls back to the governing English disclosure.
+  if (!coverage) return null;
+  return { ...base, provided: { ...base.provided, body: coverage } };
 }
 
 module.exports = { TRANSLATIONS, DISCLOSURE_LANGUAGES, translationFor };

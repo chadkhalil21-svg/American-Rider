@@ -202,11 +202,15 @@ app.use(express.json()); // parse JSON request bodies — everything BELOW the w
 const KEY = readKey('STRIPE_SECRET_KEY');
 const keyMode = /^(sk|rk)_live_/.test(KEY) ? 'live' : /^(sk|rk)_test_/.test(KEY) ? 'test' : 'no-key';
 const DEPLOYMENT_MODE = String(readKey('DEPLOYMENT_MODE') || 'development').toLowerCase();
-const productionMode = DEPLOYMENT_MODE === 'production';
-const operationalMode = productionMode || keyMode === 'live';
+const declaredProduction = DEPLOYMENT_MODE === 'production';
+// A live Stripe credential is itself a production posture. This prevents an omitted or mistyped
+// DEPLOYMENT_MODE from allowing real-money operation around the full readiness gate.
+const productionMode = declaredProduction || keyMode === 'live';
+const operationalMode = productionMode;
 
 function productionReadiness() {
   const missing = [];
+  if (!['development', 'production'].includes(DEPLOYMENT_MODE)) missing.push('deployment_mode');
   if (keyMode !== 'live') missing.push('stripe_live_key');
   if (!readKey('STRIPE_PUBLISHABLE_KEY')) missing.push('stripe_publishable_key');
   if (!readKey('STRIPE_WEBHOOK_SECRET')) missing.push('stripe_webhook_secret');
@@ -1629,7 +1633,7 @@ app.post('/charge-ride', requireAuth, LIMITS.payments, requireOperationalReadine
   if (keyMode === 'no-key') {
     return res.status(500).json({ error: 'No Stripe secret key configured. Add STRIPE_SECRET_KEY to backend/.env' });
   }
-  if (keyMode !== 'test') {
+  if (keyMode !== 'test' || productionMode) {
     return res.status(403).json({
       error: 'This route exists only for test-mode verification and is disabled with live keys.',
     });
@@ -2476,7 +2480,7 @@ app.post('/operator/screening/reinvite', requireAuth, LIMITS.screening, requireA
 // record the decision, handle expired invitations) lives in checkr.js.
 
 // --- The operations view. -----------------------------------------------------------------
-mountOps(app, express, { checks: qualificationChecks, liveMoney: () => keyMode === 'live' });
+mountOps(app, express, { checks: qualificationChecks, liveMoney: () => operationalMode });
 
 app.get('/scheduled/sweep', runSweep);
 app.post('/scheduled/sweep', runSweep);

@@ -12,6 +12,7 @@ assert.equal(/\bchargeTip\b|\btipTravel\b|tipCents/.test(
 const server=read('backend/server.js');
 assert.ok(server.indexOf('await enqueueProviderEvent') < server.indexOf("res.json({ received: true"), 'durable receipt precedes webhook ACK');
 assert.ok(server.includes("const name = 'operations_sweep'") && server.includes('await acquireLease(name,'),'sweeps have a single-leader lease');
+assert.ok(server.includes(".collection('operators').where('available', '==', true).get()"), 'dispatch prefilters to available Operators');
 
 const party=read('backend/travelparty.js');
 assert.ok(party.includes("['self','other_adult','teen']"), 'Teen Travel is an explicit server-authoritative party mode');
@@ -32,6 +33,7 @@ console.log('✓ production money path has one transfer architecture');
 console.log('✓ no gratuity money path');
 console.log('✓ durable webhook ACK ordering');
 console.log('✓ single-leader sweeps');
+console.log('✓ dispatch prefilters to available Operators before authoritative matching');
 console.log('✓ another-person identity is server authoritative');
 console.log('✓ Teen Travel is bound to Family authorization');
 console.log('✓ Smart Travel two-charge economics is explicit');

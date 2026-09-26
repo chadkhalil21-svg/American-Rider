@@ -22,11 +22,11 @@ Attacks that must fail: forged screening pass; client-written insurance acceptan
 
 1. Account. Firebase uid `trav_alex` owns the booking and payment relationship.
 2. Quote. /fare-quote derives route, fare, class, government fees, tolls, card-country cost schedule and platform fee on the server. A client-sent amount is not authority.
-3. Party declaration. The Booker states self or another adult. The server normalizes this declaration and another-person Travel requires the physical Traveler's name. Unaccompanied-minor Travel fails closed at launch until carrier, Florida counsel and operating procedures explicitly approve that separate service.
+3. Party declaration. The Booker states self or another adult. The server normalizes this declaration and another-person Travel requires the physical Traveler's name. Teen Travel requires the Family / Teen Travel authorization architecture, including verified guardian authorization and pickup verification.
 4. Dispatch. /travel/dispatch prices again, verifies active market/route, matches an eligible Operator, creates the authoritative ride, and stores Booker/Traveler party semantics. The phone cannot create the ride or select an Operator.
 5. Payment. /create-payment-intent first proves that the ride exists, belongs to Alex and is payable. Stripe amount comes from the ride. A retry resumes the same PaymentIntent. The client cannot substitute another ride, amount or Connect destination.
 6. Assignment and identity. Alex receives the matched Operator's name, vehicle, plate and Travel Number. For a Travel booked for another person, the Operator receives the Traveler identity needed at pickup rather than assuming the cardholder is physically present.
-7. Follow/safety. A Booker can mint a high-entropy follow link only for their active Travel. The link shows route, Operator/vehicle and fresh vehicle position, not account history or phone number, and expires. A parent traveling with a child can use this ordinary Booker safety surface; American Rider does not launch an unaccompanied-minor service.
+7. Follow/safety. A Booker can mint a high-entropy follow link only for their active Travel. The link shows route, Operator/vehicle and fresh vehicle position, not account history or phone number, and expires. Family / Teen Travel uses its dedicated guardian authorization, follow, messaging and pickup-verification controls.
 8. Travel. Operator status drives the Traveler screen. Traveler cannot mark the Travel complete or cancel around the server refund path. Messaging is ride-bound and identity-bound.
 9. Cancellation. Before arrival, the Travel's own payment is refunded. After Operator arrival, the $3 arrival amount is withheld and passed to that Operator. Onboard/completed Travel cannot be cancelled through this route.
 10. Completion. Operator marks completion. Settlement pays the Operator from the Travel's own PaymentIntent. Receipt records the actual payment method, distance/time, Operator and government fees. Optional rating is feedback only. American Rider has no tip/gratuity product or post-Travel tip money path.
@@ -43,4 +43,4 @@ Traveler↔Operator chat remains Travel-scoped. American Rider↔Operator commun
 
 ## Release evidence still requiring physical/provider systems
 
-Unit and integration tests cannot prove iOS/Android process suspension behavior, APNs/Expo delivery, Checkr production adverse-action behavior, Stripe production settlement timing, bank payout timing, carrier cancellation feeds, or regional network outages. These require staged provider accounts and physical-device campaigns before launch.
+Unit and integration tests cannot prove iOS/Android process suspension behavior, APNs/Expo delivery, Checkr production adverse-action behavior, Stripe production settlement timing, bank payout timing, carrier cancellation feeds, or regional network outages. These require staged provider accounts and physical-device campaigns before production use.

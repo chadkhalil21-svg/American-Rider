@@ -2735,6 +2735,15 @@ app.post('/voice/connect', async (req, res) => {
 });
 
 app.post('/travel/teen-pickup/verify', requireAuth, async (req,res)=>{const out=await verifyTeenPin({rideId:req.body?.rideId,operatorUid:req.uid,pin:req.body?.pin});return res.status(out.status||500).json(out);});
+// One server-stamped three-party thread. The client supplies words and the Travel id; the
+// server derives every participant id from the Travel so nobody can forge a correspondent.
+app.post('/travel/message', requireAuth, async (req,res)=>{
+ const db=adminDb();if(!db)return res.status(503).json({error:adminStatus().reason});const rideId=String(req.body?.rideId||''),text=String(req.body?.text||'').trim().slice(0,2000);
+ if(!rideId||!text)return res.status(400).json({error:'Travel and message text are required'});const snap=await db.collection('rides').doc(rideId).get();if(!snap.exists)return res.status(404).json({error:'No such Travel'});const r=snap.data()||{},uid=String(req.uid);
+ const from=uid===String(r.travelerUid)?'traveler':uid===String(r.operatorId)?'operator':r.party?.teen===true&&uid===String(r.party?.guardianUid)?'guardian':null;
+ if(!from)return res.status(403).json({error:'This account is not a participant in that Travel'});if(!['assigned','accepted','arrived','onboard'].includes(String(r.status))&&!req.body?.lostItemId)return res.status(409).json({error:'This Travel thread is closed'});
+ await db.collection('messages').add({rideId,tripNo:r.tripNo||rideId,from,travelerUid:r.travelerUid||null,operatorId:r.operatorId||null,guardianUid:r.party?.teen?r.party.guardianUid||null:null,lostItemId:req.body?.lostItemId||null,text,createdAt:Date.now()});return res.json({ok:true});
+});
 
 // POST /travel/accept { rideId } — the operator accepts the travel offered to them.
 //

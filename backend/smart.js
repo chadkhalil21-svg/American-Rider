@@ -416,4 +416,34 @@ async function smartQuote(pickup, dest, opts = {}) {
   return { status: 'ok', plan: built };
 }
 
-module.exports = { smartQuote, transitFareFor, transitFareGroup, fareGroupsFor, pickItinerary, tidyName, WALK_MILES };
+/**
+ * Re-checks the transit middle of an already selected Smart Travel against the region's current
+ * OTP state. This is intentionally geography-agnostic: OTP decides which configured GTFS /
+ * realtime feeds apply. It never silently blesses an old itinerary when the planner is down.
+ */
+async function revalidateTransit(currentPlan, opts = {}) {
+  if (!currentPlan || !isCoord(currentPlan.from) || !isCoord(currentPlan.to)) return { status: 'none', reason: 'bad_plan' };
+  const plan = typeof opts.planTransit === 'function' ? opts.planTransit : transit.planTransit;
+  const when = opts.when instanceof Date ? opts.when : new Date();
+  let res;
+  try { res = await plan({ from: currentPlan.from, to: currentPlan.to, when, access: 'WALK', egress: 'WALK', first: 4 }); }
+  catch (e) { return { status: 'unavailable', reason: (e && e.message) || String(e) }; }
+  if (!res || res.status === 'unavailable') return { status: 'unavailable', reason: (res && res.reason) || 'no answer' };
+  if (res.status !== 'ok') return { status: 'none', reason: res.reason || 'no_current_transit' };
+  const itinerary = pickItinerary(res.itineraries);
+  if (!itinerary) return { status: 'none', reason: 'no_current_transit' };
+  const oldTransit = (currentPlan.legs || []).filter((l) => l.kind === 'transit');
+  const newTransit = (itinerary.legs || []).filter((l) => l.kind === 'transit');
+  const sig = (legs) => legs.map((l) => [l.route?.gtfsId || '', l.from?.stopId || '', l.to?.stopId || ''].join('|')).join('>');
+  const changed = sig(oldTransit) !== sig(newTransit);
+  return {
+    status: 'ok',
+    changed,
+    checkedAt: when.toISOString(),
+    departAt: newTransit[0]?.startTime || itinerary.startTime || null,
+    arriveAt: newTransit[newTransit.length - 1]?.endTime || itinerary.endTime || null,
+    routeSignature: sig(newTransit),
+  };
+}
+
+module.exports = { smartQuote, revalidateTransit, transitFareFor, transitFareGroup, fareGroupsFor, pickItinerary, tidyName, WALK_MILES };

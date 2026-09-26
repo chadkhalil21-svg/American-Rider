@@ -65,7 +65,7 @@ const tickets = [];
 function inject(dbHandle) {
   for (const [rel, exports] of [
     ['./firebase-admin.js', { adminDb: () => dbHandle, adminStatus: () => ({ ok: true, reason: null }) }],
-    ['./payments.js', { chargeScheduledTravel: (...a) => charge(...a) }],
+    ['./payments.js', { chargeScheduledTravel: (...a) => charge(...a), connectAccountStatus: async () => ({ payoutsEnabled:true }) }],
     ['./tickets.js', { fileTicket: async (t) => { tickets.push(t); return { caseNo: 'AR-CASE-1' }; } }],
   ]) {
     const p = require.resolve(path.join(ROOT, rel));

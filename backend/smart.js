@@ -46,7 +46,7 @@ const sameAgency = (a, b) => {
 /** A region's fare table: one row per feed, { feedId, name, cents, freeModes }. */
 function fareGroupsFor(region) {
   const feeds = region && region.transit && Array.isArray(region.transit.feeds) ? region.transit.feeds : [];
-  return feeds.map((f) => ({ feedId: f.feedId, name: f.agency, cents: f.fareCents == null ? null : f.fareCents, freeModes: f.freeModes || [] }));
+  return feeds.map((f) => ({ feedId: f.feedId, name: f.agency, cents: f.fareCents == null ? null : f.fareCents, freeModes: f.freeModes || [], transferIncluded: f.transferIncluded === true }));
 }
 
 /** The fare table row a leg falls under, or null when its feed is not known here. */
@@ -304,19 +304,17 @@ function buildPlan(pickup, dest, itinerary, direct) {
   }
   ours.push(egress);
 
-  // ONE FARE PER SYSTEM, NOT PER BOARDING. Miami-Dade Transit's $2.25 buys a journey: the
-  // change at Earlington Heights is inside the fare gates, and Metrorail ↔ Metrobus transfers
-  // are free on the EASY Card and on contactless payment (cash on a bus is per boarding, and
-  // the app does not assume cash). Counted per boarding, Brickell → the airport cost $4.50.
-  // The first PAID boarding on each system carries the fare; later ones on that system carry
-  // none. A free leg (a mover) neither pays for the system nor is paid for by it.
+  // Transfer policy is agency/feed data, never a universal transit assumption. Only a feed
+  // explicitly configured with transferIncluded=true may collapse later paid boardings into
+  // the first fare. Unknown policy therefore errs toward not understating the Traveler's cost.
   const paid = new Set();
   for (const l of ours) {
     if (l.kind !== 'transit' || !l.fareGroup || !(l.cents > 0)) continue;
-    if (paid.has(l.fareGroup)) {
+    const group = transitFareGroup(l, region);
+    if (group?.transferIncluded && paid.has(l.fareGroup)) {
       l.cents = 0;
       l.transfer = true;
-    } else {
+    } else if (group?.transferIncluded) {
       paid.add(l.fareGroup);
     }
   }
@@ -365,7 +363,7 @@ function buildPlan(pickup, dest, itinerary, direct) {
     from: { id: board.stopId || '', name: bareName(board), lat: board.lat, lng: board.lng },
     to: { id: alight.stopId || '', name: bareName(alight), lat: alight.lat, lng: alight.lng },
     legs: ours,
-    smartCents, // what American Rider charges: the car legs, one fee, any government fee
+    smartCents, // what American Rider charges across the real car Travels and any government fee
     feeCents,
     governmentFeeCents, // an airport or port pickup fee on a car leg, passed through
     carCents,

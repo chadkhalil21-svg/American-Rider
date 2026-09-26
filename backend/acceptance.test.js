@@ -155,11 +155,12 @@ const accept = (db, extra = {}) => acceptOffer({ db, uid: 'op', rideId: 'r1', ex
   check('rules: the operator update rule was found', opRule.length > 0);
   check("rules: a phone cannot write 'accepted'", opRule.length > 0 && !/'accepted', 'arrived'/.test(opRule.split('resource.data.status in')[0]) && !/request\.resource\.data\.status in\s*\[\s*'accepted'/.test(opRule));
   check('rules: a phone cannot write acceptedAt', !/'acceptedAt'/.test(opRule));
-  check('rules: Operator progress is an exact accepted → arrived → onboard → completed state machine',
-    /status == 'arrived' && resource\.data\.status == 'accepted'/.test(opRule) &&
-    /status == 'onboard' && resource\.data\.status == 'arrived'/.test(opRule) &&
-    /status == 'completed' && resource\.data\.status == 'onboard'/.test(opRule));
-  check("rules: 'declined' only answers an open offer", /status == 'declined'\s*&& resource\.data\.status == 'assigned'/.test(opRule));
+  check('rules: a phone can publish telemetry but cannot progress Travel state',
+    /touchesOnly\(\['opLat', 'opLng', 'opAt', 'stillSince'\]\)/.test(opRule) && /!changes\('status'\)/.test(opRule));
+  check("rules: a phone cannot author 'declined' either", !/status == 'declined'/.test(opRule));
+  const progress = fs.readFileSync(path.join(__dirname, 'travelprogress.js'), 'utf8');
+  check('server: Operator progress is an exact accepted → arrived → onboard → completed state machine',
+    /declined: \['assigned'\]/.test(progress) && /arrived: \['accepted'\]/.test(progress) && /onboard: \['arrived'\]/.test(progress) && /completed: \['onboard'\]/.test(progress));
 
   const server = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
   const route = (server.match(/app\.post\('\/travel\/accept'[\s\S]*?\n\}\);/) || [''])[0];

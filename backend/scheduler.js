@@ -28,7 +28,8 @@
 const { matchOperator, etaMinutes, coverageLapsed } = require('./matching');
 const { screeningReady } = require('./screening');
 const { adminDb, adminStatus } = require('./firebase-admin');
-const { chargeScheduledTravel, operatorPayoutAccount } = require('./payments');
+const { chargeScheduledTravel, operatorPayoutAccount, connectAccountStatus } = require('./payments');
+const { assessOperator } = require('./qualification');
 const { fileTicket } = require('./tickets');
 const { notify } = require('./push');
 const { activeFamilyLink } = require('./family');
@@ -178,6 +179,41 @@ async function sweepScheduled({ now = Date.now() } = {}) {
         report.failed.push({ id, reason: 'Family authorization revoked or expired' });
         continue;
       }
+    }
+
+    // Re-run the same authoritative duty assessment used by immediate Travel immediately
+    // before money moves. Matching fields are only a candidate filter; they are not proof that
+    // documents, screening, disclosure, account state and Stripe payouts still stand.
+    try {
+      const [userSnap, opSnap] = await Promise.all([
+        db.collection('users').doc(String(match.operator.id)).get(),
+        db.collection('operators').doc(String(match.operator.id)).get(),
+      ]);
+      const user = userSnap.exists ? userSnap.data() : null;
+      const payout = await connectAccountStatus(user?.stripeAccountId || null);
+      const assessment = assessOperator({
+        user,
+        fleet: opSnap.exists ? opSnap.data() : null,
+        context: 'accept',
+        liveMoney: true,
+        account: { disabled: false },
+        payouts: { enabled: !!payout.payoutsEnabled },
+        now,
+      });
+      if (!assessment.eligible) {
+        const first = assessment.blockers[0];
+        await touch(db, id, { claimedAt: null, lastSweepAt: now, lastSweepResult: `operator ineligible: ${first.code}` });
+        await db.collection('operators').doc(String(match.operator.id)).set(
+          { available: false, offDutyReason: first.code, offDutyAt: now },
+          { merge: true },
+        );
+        report.waiting++;
+        continue;
+      }
+    } catch (e) {
+      await touch(db, id, { claimedAt: null, lastSweepAt: now, lastSweepResult: 'operator eligibility unavailable' });
+      report.failed.push({ id, reason: `operator eligibility unavailable: ${e.message}` });
+      continue;
     }
 
     // ---- 2/3. Charge the card on file. ------------------------------------------------

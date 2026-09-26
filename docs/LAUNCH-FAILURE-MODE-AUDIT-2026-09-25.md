@@ -17,6 +17,7 @@ Do not merge while a Critical item is open. High items require either a fix or a
 - **Scheduler single-instance behavior — High.** Every server may keep its local 60-second clock, but `operations_sweep` is protected by a transactional Firestore leader lease with renewal and owner-checked release, preventing horizontally scaled instances from concurrently executing the sweep.
 - **Payout wording and cadence — Medium.** Public copy now distinguishes American Rider’s transfer of the Operator’s 99% fare share to the Stripe connected account on Travel completion from Stripe’s separate bank-payout schedule.
 - **FCRA adverse-action workflow — High.** The screening pipeline now maps only concrete statutory reasons to provider adverse items, starts provider-hosted pre-adverse action with an explicit seven-day dispute interval, persists provider notice/dispute/final states, re-adjudicates corrected reports, cancels pending adverse action when a dispute clears the record, blocks qualification throughout, and escalates notice-delivery exceptions.
+- **Low-volume Connect economics — Medium.** The low-volume policy is encoded: the $2 monthly active-account cost is recovered from the Operator account that incurs it, with separate card-cost gross-up, and is waived at 20 completed Travels in that calendar month. Traveler pricing carries only the distinct 6-cent per-Travel fixed payout allowance.
 
 ## Screening policy: minimum-human-intervention design
 
@@ -28,7 +29,7 @@ Where consumer-report adverse-action rules apply, the decision workflow must pre
 
 ## Economics failure boundaries
 
-The canonical pricing engine guarantees the configured 75-cent **modeled transaction contribution**, not company net profit. Its current fixed Connect allowance is 16 cents per Travel. That is a planning allocation, not a universal guarantee: low-volume active Operators can incur more fixed Connect cost per completed Travel. Before economics are called fully loaded, choose and encode the low-volume account policy (platform subsidy, operator account charge/waiver, or another verified Connect structure).
+The canonical pricing engine guarantees the configured 75-cent **modeled transaction contribution**, not company net profit. The current Travel-level model carries a 6-cent fixed payout allowance. Stripe's separate $2 monthly active-account cost is recovered from the Operator account that incurs it and is waived when that Operator completes 20 Travels in the same calendar month; card collection cost for that pass-through is grossed up separately. The 99% fare share is not reduced.
 
 The 25-cent contingency reserve and 25-cent operating-overhead allowance are planning values. Replace them with measured loss and operating data as volume develops. Refunds, disputes, small separately charged gratuities, support labor, insurance/compliance, legal/accounting, tax administration and fixed infrastructure can exceed those allowances.
 
@@ -36,10 +37,9 @@ The 25-cent contingency reserve and 25-cent operating-overhead allowance are pla
 
 1. **Florida insurance backstop interpretation — legal.** Operator-procured coverage is mandatory by product policy. Counsel must resolve the platform's separate obligation under §627.748(7)(d) if operator coverage lapses or fails.
 2. **Operator background execution — engineering.** Foreground timers are not a durable production presence mechanism on iOS/Android. Verify native background location/presence behavior under lock, suspension, network loss, force-quit and reboot.
-3. **Low-volume Connect economics — business/economics.** Resolve the 16-cent allocation assumption before representing the 75-cent floor as fully loaded.
-4. **Dispatch scale — engineering/cost.** Ordinary and return dispatch now use Firestore’s indexed `available == true` prefilter before the authoritative eligibility/distance gate. This removes reads for off-duty Operators without duplicating qualification logic. At materially larger fleet size, add a server-owned spatial candidate partition so reads scale with nearby on-duty supply rather than all on-duty Operators.
-5. **Disaster tests — operations.** Exercise Firestore quota exhaustion, Stripe outage, Checkr outage, routing outage, push failure, email/support failure, stale GPS, device clock skew, duplicate requests, out-of-order webhooks, process restart mid-settlement and partial region outage.
-6. **Secrets/production configuration — operations.** Production configuration must verify restricted Stripe keys, webhook secrets, scheduler token, ops authentication, private object storage, support delivery, production Firebase project and no test-mode bypass.
+3. **Dispatch scale — engineering/cost.** Ordinary and return dispatch now use Firestore’s indexed `available == true` prefilter before the authoritative eligibility/distance gate. This removes reads for off-duty Operators without duplicating qualification logic. At materially larger fleet size, add a server-owned spatial candidate partition so reads scale with nearby on-duty supply rather than all on-duty Operators.
+4. **Disaster tests — operations.** Exercise Firestore quota exhaustion, Stripe outage, Checkr outage, routing outage, push failure, email/support failure, stale GPS, device clock skew, duplicate requests, out-of-order webhooks, process restart mid-settlement and partial region outage.
+5. **Secrets/production configuration — operations.** Production configuration must verify restricted Stripe keys, webhook secrets, scheduler token, ops authentication, private object storage, support delivery, production Firebase project and no test-mode bypass.
 
 ## Definition of done
 

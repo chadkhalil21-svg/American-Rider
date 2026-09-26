@@ -56,6 +56,7 @@ export default {
     language: 'Sprache',
   },
   operator: {
+    inboxReadFailed: "Diese Mitteilung konnte nicht als gelesen erfasst werden. Versuchen Sie es erneut.",
     inboxBody: "Qualifikation, Versicherungsschutz, Überprüfung, Auszahlungen und betriebliche Mitteilungen.",
     communications: "MITTEILUNGEN",
     noCommunications: "Keine Mitteilung erfordert Ihre Aufmerksamkeit.",
@@ -968,7 +969,6 @@ export default {
     viewTravelReceipt: 'Beleg Ansehen',
     leaveWithoutSaving: 'Ohne Speichern verlassen',
     operator: 'Operator',
-      inboxReadFailed: 'Diese Mitteilung konnte nicht als gelesen erfasst werden. Versuchen Sie es erneut.',
     paymentMethod: 'Zahlungsmethode',
     operatorRetainedNote: 'Der Operator behielt 99 % des Fahrpreises.',
     contactPatronSupport: 'Reisendenbetreuung kontaktieren',

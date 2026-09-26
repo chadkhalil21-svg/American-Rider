@@ -329,6 +329,7 @@ app.get('/health', async (req, res) => {
     // were invisible; a field on a URL is how that stops happening.
     webhook: webhookReady() ? 'on' : 'off',
     scheduler: readKey('SCHEDULER_TOKEN') ? 'authenticated' : 'off',
+    tolls: readKey('HERE_API_KEY') ? 'on' : 'off',
     receipts: mailReady() ? 'on' : 'off',
     // NO PROVIDER MEANS NOBODY CAN BE COMMISSIONED. Every operator sits at
     // `awaiting_provider`, which is deliberately not a pass and not dispatchable — so an

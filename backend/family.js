@@ -74,6 +74,15 @@ async function normalizeTeenParty({familyLinkId,requesterUid,bookerUid,journeyNo
  return {ok:true,party:{mode:'teen',travelerName:link.teenName,bookerName:link.guardianName,bookedForAnother:requester===guardian,teen:true,familyLinkId:link.id,guardianUid:guardian,teenUid:teen,guardianName:link.guardianName,pinRequired:true,guardianTracking:true,guardianMessaging:true}};
 }
 
+
+async function listGuardianActiveTravels({guardianUid}){
+ const db=adminDb();if(!db)return {ok:false,reason:adminStatus().reason};
+ const links=await db.collection(COLLECTION).where('guardianUid','==',String(guardianUid)).get();const teenUids=new Set();
+ for(const d of links.docs){const x=d.data()||{};if(x.teenUid)teenUids.add(String(x.teenUid));}
+ const active=[];
+ for(const teenUid of teenUids){const q=await db.collection('rides').where('travelerUid','==',teenUid).get();for(const d of q.docs){const r=d.data()||{};if(r.party?.teen===true&&String(r.party?.guardianUid)===String(guardianUid)&&['assigned','accepted','arrived','onboard'].includes(String(r.status)))active.push({id:d.id,tripNo:r.tripNo||d.id,status:r.status,travelerName:r.party?.travelerName||'Teen Traveler',operatorName:r.operatorName||'',operatorId:r.operatorId||'',travelerUid:r.travelerUid||teenUid,dep:r.dep||'',dest:r.dest||'',createdAt:Number(r.createdAt)||0});}}
+ active.sort((a,b)=>b.createdAt-a.createdAt);return {ok:true,travels:active};
+}
 async function sweepFamilyAgeOut({now=Date.now()}={}){
  const db=adminDb();if(!db)return {ok:false,reason:adminStatus().reason};
  const q=await db.collection(COLLECTION).where('status','==','active').get();let agedOut=0,cancelledScheduledTravels=0;
@@ -85,4 +94,4 @@ async function sweepFamilyAgeOut({now=Date.now()}={}){
  return {ok:true,agedOut,cancelledScheduledTravels};
 }
 function operatorTeenView(p={}){return p.teen===true?{travelerName:clean(p.travelerName),bookedForAnother:p.bookedForAnother===true,teen:true,guardianName:clean(p.guardianName),pinRequired:true}:{travelerName:clean(p.travelerName||'Traveler'),bookedForAnother:p.bookedForAnother===true,teen:false};}
-module.exports={COLLECTION,MIN_AGE,MAX_AGE,ageOn,createFamilyInvite,acceptFamilyInvite,revokeFamilyLink,listFamilyLinks,activeFamilyLink,normalizeTeenParty,sweepFamilyAgeOut,operatorTeenView};
+module.exports={COLLECTION,MIN_AGE,MAX_AGE,ageOn,createFamilyInvite,acceptFamilyInvite,revokeFamilyLink,listFamilyLinks,activeFamilyLink,normalizeTeenParty,listGuardianActiveTravels,sweepFamilyAgeOut,operatorTeenView};

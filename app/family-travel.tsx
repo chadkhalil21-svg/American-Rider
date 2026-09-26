@@ -2,7 +2,7 @@ import {useLocalSearchParams} from 'expo-router';
 import React,{useEffect,useState} from 'react';
 import {Linking,Pressable,StyleSheet,TextInput,View} from 'react-native';
 import {Text} from '../src/components/AppText';
-import {Card,LetterheadBar,PrimaryButton,Screen,SectionLabel,Title,useNote} from '../src/components/UI';
+import {Card,LetterheadBar,Mono,PrimaryButton,Screen,SectionLabel,Title,useNote} from '../src/components/UI';
 import {useGoBack} from '../src/components/nav';
 import {sendTravelMessage,watchTravelThread,type TravelMessage} from '../src/backend/messages';
 import {useLanguage} from '../src/state/LanguageContext';
@@ -16,13 +16,13 @@ export default function FamilyTravel(){
  useEffect(()=>watchTravelThread(tripNo,'guardian',setMessages,()=>showNote(t('traveler.errConversationLoad'))),[tripNo,showNote,t]);
  const send=async()=>{if(!text.trim()||sending)return;setSending(true);const value=text.trim();const ok=await sendTravelMessage({rideId,tripNo,text:value,from:'guardian'});if(ok)setText('');else showNote(t('traveler.familyMessageFailed'));setSending(false);};
  return <Screen note={note}><LetterheadBar onBack={back}/><Title>{t('traveler.familyTeenTravel')}</Title>
-  <Card style={styles.card}><Text style={styles.name}>{String(p.travelerName||t('traveler.familyTeenTraveler'))}</Text><Text style={styles.meta}>{tripNo}</Text><Text style={styles.meta}>{t('traveler.familyOperator',{name:String(p.operatorName||'—')})}</Text>
-   {p.followUrl?<Pressable onPress={()=>Linking.openURL(String(p.followUrl))}><Text style={styles.link}>{t('traveler.familyFollowLive')}</Text></Pressable>:null}
+  <Card style={styles.card}><Text style={styles.name}>{String(p.travelerName||t('traveler.familyTeenTraveler'))}</Text><Text style={styles.meta}>{t('traveler.travelNumber')}</Text><Mono size={13}>{tripNo||'—'}</Mono><Text style={styles.meta}>{t('traveler.familyOperator',{name:String(p.operatorName||'—')})}</Text>
+   {p.followUrl?<Pressable accessibilityRole="link" onPress={()=>Linking.openURL(String(p.followUrl))}><Text style={styles.link}>{t('traveler.familyFollowLive')}</Text></Pressable>:null}
   </Card>
   <SectionLabel style={{marginTop:24}}>{t('traveler.familyConversation')}</SectionLabel>
   <Card style={styles.card}>{messages.length?messages.map(m=><View key={m.id} style={styles.message}><Text style={styles.messageWho}>{m.from==='guardian'?t('traveler.familyYou'):m.from==='operator'?t('traveler.operator'):t('traveler.familyTeenTraveler')}</Text><Text style={styles.messageText}>{m.text}</Text></View>):<Text style={styles.meta}>{t('traveler.familyNoMessages')}</Text>}
    <TextInput value={text} onChangeText={setText} placeholder={t('traveler.familyMessagePlaceholder')} multiline style={styles.input}/>
-   <PrimaryButton label={sending?t('traveler.familyWorking'):t('traveler.familySendMessage')} onPress={send}/>
+   <PrimaryButton label={sending?t('traveler.familyWorking'):t('traveler.familySendMessage')} onPress={send} disabled={sending||!text.trim()}/>
   </Card>
  </Screen>;
 }

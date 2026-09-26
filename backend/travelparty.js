@@ -5,7 +5,7 @@ const clean=(v,n=MAX_NAME)=>String(v||'').trim().replace(/\s+/g,' ').slice(0,n);
 
 async function normalizeParty(body={},booker={}){
  const mode=['self','other_adult','teen'].includes(body.partyMode)?body.partyMode:'self';
- if(mode==='teen') return normalizeTeenParty({familyLinkId:body.familyLinkId,requesterUid:booker.uid,bookerUid:booker.uid});
+ if(mode==='teen') return normalizeTeenParty({familyLinkId:body.familyLinkId,requesterUid:booker.uid,bookerUid:booker.uid,journeyNo:body.journeyNo||null});
  const bookerName=clean(booker.name||body.bookerName||'Traveler');
  if(mode==='self') return {ok:true,party:{mode:'self',travelerName:bookerName,bookerName,bookedForAnother:false}};
  const travelerName=clean(body.travelerName);

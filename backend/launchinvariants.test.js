@@ -16,6 +16,12 @@ assert.ok(server.includes("scheduler: readKey('SCHEDULER_TOKEN') ? 'authenticate
 assert.ok(server.includes("tolls: readKey('HERE_API_KEY') ? 'on' : 'off'"), 'health exposes toll authority readiness');
 assert.ok(server.includes("const productionMode = DEPLOYMENT_MODE === 'production'"), 'server has explicit production posture');
 assert.ok(server.includes("if (!fleet.length && !operationalMode)"), 'demonstration fleet is impossible in production posture');
+assert.ok(server.includes('function productionReadiness()'), 'production readiness is centralized');
+assert.ok(server.includes("code: 'production_not_ready'"), 'production operations fail closed when dependencies are incomplete');
+for (const route of ['/operator/online', '/fare-quote', '/create-payment-intent', '/travel/dispatch', '/travel/schedule', '/travel/accept']) {
+  const line = server.split('\\n').find((x) => x.includes(`app.post('${route}'`)) || '';
+  assert.ok(line.includes('requireOperationalReadiness'), `${route} is gated by production readiness`);
+}
 assert.ok(server.includes(".collection('operators').where('available', '==', true).get()"), 'dispatch prefilters to available Operators');
 
 const party=read('backend/travelparty.js');
@@ -40,6 +46,7 @@ console.log('✓ single-leader sweeps');
 console.log('✓ scheduler authorization readiness is observable');
 console.log('✓ toll authority readiness is observable');
 console.log('✓ production posture disables demonstration fleet independently of Stripe mode');
+console.log('✓ production Travel/payment operations fail closed on missing dependencies');
 console.log('✓ dispatch prefilters to available Operators before authoritative matching');
 console.log('✓ another-person identity is server authoritative');
 console.log('✓ Teen Travel is bound to Family authorization');

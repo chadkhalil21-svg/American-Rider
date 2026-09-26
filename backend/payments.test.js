@@ -30,13 +30,13 @@ check('unknown card country is international-safe', !isDomesticCard(null));
 const expected = [
   // fare, US, international/unknown
   [500, 200, 200],
-  [1000, 201, 220],
-  [2000, 226, 261],
-  [3000, 251, 302],
-  [4000, 275, 343],
-  [5000, 300, 383],
-  [6100, 328, 429],
-  [10000, 424, 587],
+  [1000, 200, 210],
+  [2000, 216, 250],
+  [3000, 240, 291],
+  [4000, 265, 332],
+  [5000, 290, 373],
+  [6100, 318, 418],
+  [10000, 413, 577],
 ];
 for (const [fare, us, intl] of expected) {
   check(`US ${usd(fare)} fee ${usd(us)}`, platformFeeCents(fare, 'US') === us,

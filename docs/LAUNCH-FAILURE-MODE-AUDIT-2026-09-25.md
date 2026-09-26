@@ -1,10 +1,10 @@
-# Launch failure-mode audit — 2026-09-25
+# Failure-mode audit — 2026-09-25
 
 This is a release-gate document, not a claim that passing automated tests makes the service legally or operationally ready.
 
 ## Release rule
 
-Do not merge for launch while a Critical item is open. High items require either a fix or an explicit launch-blocking operational control with an owner.
+Do not merge while a Critical item is open. High items require either a fix or an explicit launch-blocking operational control with an owner.
 
 ## Closed in this audit
 
@@ -16,7 +16,7 @@ Do not merge for launch while a Critical item is open. High items require either
 
 ## Screening policy: minimum-human-intervention design
 
-For Florida launch, the automatic decision standard is the statutory standard in Fla. Stat. §627.748(12), applied identically to every applicant. A machine-readable report passes automatically when no statutory disqualifier is present and refuses qualification when an authoritative report establishes a statutory disqualifier. American Rider does not add a general "criminal record" exclusion.
+For Florida operations, the automatic decision standard is the statutory standard in Fla. Stat. §627.748(12), applied identically to every applicant. A machine-readable report passes automatically when no statutory disqualifier is present and refuses qualification when an authoritative report establishes a statutory disqualifier. American Rider does not add a general "criminal record" exclusion.
 
 An ambiguous source is not a discretionary judgement call. Missing dates, unreadable findings, contradictory source data, provider suspension/dispute, or an unmapped candidate remain blocked while the authoritative source is corrected or clarified. Human intervention is reserved for source conflicts the provider/operator dispute process cannot resolve automatically. Nobody may manually waive a statutory minimum.
 
@@ -24,11 +24,11 @@ Where consumer-report adverse-action rules apply, the decision workflow must pre
 
 ## Economics failure boundaries
 
-The canonical pricing engine guarantees the configured 75-cent **modeled transaction contribution**, not company net profit. Its current fixed Connect allowance is 16 cents per Travel. That is a planning allocation, not a universal guarantee: low-volume active Operators can incur more fixed Connect cost per completed Travel. Before launch economics are called fully loaded, choose and encode the low-volume account policy (platform subsidy, operator account charge/waiver, or another verified Connect structure).
+The canonical pricing engine guarantees the configured 75-cent **modeled transaction contribution**, not company net profit. Its current fixed Connect allowance is 16 cents per Travel. That is a planning allocation, not a universal guarantee: low-volume active Operators can incur more fixed Connect cost per completed Travel. Before economics are called fully loaded, choose and encode the low-volume account policy (platform subsidy, operator account charge/waiver, or another verified Connect structure).
 
 The 25-cent contingency reserve and 25-cent operating-overhead allowance are planning values. Replace them with measured loss and operating data as volume develops. Refunds, disputes, small separately charged gratuities, support labor, insurance/compliance, legal/accounting, tax administration and fixed infrastructure can exceed those allowances.
 
-## Remaining launch blockers / high-risk verification
+## Remaining release blockers / high-risk verification
 
 1. **Florida insurance backstop interpretation — legal.** Operator-procured coverage is mandatory by product policy. Counsel must resolve the platform's separate obligation under §627.748(7)(d) if operator coverage lapses or fails.
 2. **FCRA adverse-action workflow — compliance/engineering.** A refusal currently creates a support ticket describing the notice process. Replace the ticket dependency with an auditable notice-state machine before using third-party consumer reports for live adverse decisions.
@@ -39,8 +39,8 @@ The 25-cent contingency reserve and 25-cent operating-overhead allowance are pla
 7. **Scheduler single-instance behavior — engineering.** Every server process starts its own 60-second interval. Idempotency protects several money paths, but multi-instance deployment must prove all sweep jobs are safe under concurrent execution or elect a single scheduler.
 8. **Dispatch scale — engineering/cost.** Re-offer paths can read the fleet collection. Replace full-fleet scans with indexed/geospatial partitioning before fleet scale makes read cost/latency material.
 9. **Disaster tests — operations.** Exercise Firestore quota exhaustion, Stripe outage, Checkr outage, routing outage, push failure, email/support failure, stale GPS, device clock skew, duplicate requests, out-of-order webhooks, process restart mid-settlement and partial region outage.
-10. **Secrets/production configuration — operations.** Launch checklist must verify restricted Stripe keys, webhook secrets, scheduler token, ops authentication, private object storage, support delivery, production Firebase project and no test-mode bypass.
+10. **Secrets/production configuration — operations.** Production configuration must verify restricted Stripe keys, webhook secrets, scheduler token, ops authentication, private object storage, support delivery, production Firebase project and no test-mode bypass.
 
 ## Definition of done
 
-A launch candidate is ready for final release review only when the Release Gate is green at the candidate SHA, Critical/High blockers above are closed or explicitly prevented from occurring in production, live-provider sandbox drills have been recorded, and the deployed configuration has been checked independently of source code.
+A release candidate is ready for final review only when the Release Gate is green at the candidate SHA, Critical/High blockers above are closed or explicitly prevented from occurring in production, live-provider sandbox drills have been recorded, and the deployed configuration has been checked independently of source code.

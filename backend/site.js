@@ -73,7 +73,7 @@ const HOME_HTML = page(
 <section>
   <h2>Operators</h2>
   <p>Operators are independent contractors. They own their vehicles, carry their own commercial
-  coverage, and are paid directly on completion of each travel.</p>
+  coverage. On completion of each Travel, American Rider initiates the Operator’s earnings transfer to the Operator’s Stripe connected account; bank payout timing follows the Operator’s Stripe payout schedule.</p>
   <a class="cta" href="/operate">Operate with American Rider</a>
 </section>
 
@@ -122,10 +122,7 @@ const OPERATE_HTML = page(
 
 <section>
   <h2>Payment</h2>
-  <p>Payouts are made by Stripe directly to the operator's bank account, and bank details are
-  held by Stripe.</p>
-  <p>The 99% transfers on completion of each travel. Standard bank transfer is made without
-  charge.</p>
+  <p>On completion of each Travel, American Rider transfers the Operator’s 99% fare share to the Operator’s Stripe connected account. Stripe then pays the connected balance to the Operator’s bank account according to the Operator’s Stripe payout schedule. Bank details remain with Stripe.</p>
 </section>
 
 <section>
@@ -268,8 +265,7 @@ const TRAVEL_HTML = page(
 
 <section>
   <h2>Afterwards</h2>
-  <p>A receipt is written to the Travel Log stating the fare, the platform fee and the total
-  charged. The operator's 99% transfers on completion.</p>
+  <p>A receipt is written to the Travel Log stating the fare, the platform fee and the total charged. On completion, the Operator’s 99% fare share is transferred to the Operator’s Stripe connected account; bank payout timing is separate.</p>
 </section>
 
 <section>

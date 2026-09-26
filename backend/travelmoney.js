@@ -165,7 +165,12 @@ async function cancelTravel({ db, uid, rideId, deps, stripeConfigured = true, no
 
   // The arrival fee is withheld from the refund, never charged separately.
   const withheld = Math.min(arrivalFee, refundable);
-  const out = await deps.refundTravel({ paymentIntentId, amountCents: refundable - withheld, expectUid: String(uid) });
+  const out = await deps.refundTravel({
+    paymentIntentId,
+    amountCents: refundable - withheld,
+    expectUid: String(uid),
+    idempotencyKey: `ar_cancel_refund_${id}`,
+  });
   if (!out.ok) {
     await rideRef.set({ refundPending: true, refundBlockedReason: out.error }, { merge: true });
     return { status: 502, body: { ok: false, error: out.error } };

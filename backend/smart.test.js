@@ -3,8 +3,7 @@
 // about a timetable.
 //
 // What they hold to (founders, 9 Sept 2026):
-//   - car legs are priced by the ordinary distance model; ONE platform fee, from payments.js,
-//     on the car total; transit fares reported apart and never charged by us;
+//   - car legs are priced by the ordinary distance model; coordinated journey pricing funds the\n//     actual number of car-payment transactions; transit fares are reported apart and never charged by us;
 //   - an end of the journey under 0.4 miles is walked at $0;
 //   - a bus not on the allow-list is not offered;
 //   - 'none' and 'unavailable' are different answers;
@@ -101,9 +100,10 @@ const planner = (...answers) => {
   // Money.
   const carCents = first.travelCostCents + last.travelCostCents;
   check('carCents is the two car legs', plan && plan.carCents === carCents, plan && `${plan.carCents} vs ${carCents}`);
-  check('feeCents is payments.platformFeeCents of the car total — one fee, not one per leg',
-    plan && plan.feeCents === platformFeeCents(carCents), plan && `${plan.feeCents} vs ${platformFeeCents(carCents)}`);
-  check('smartCents = carCents + feeCents, and nothing else', plan && plan.smartCents === carCents + plan.feeCents);
+  const previewQ1 = require('./payments').quote(first.travelCostCents, null, plan.legs[0].feeLines || [], null, 0);
+  const previewQ2 = require('./payments').quote(last.travelCostCents, { journeyNo: 'preview', leg1FareCents: first.travelCostCents, leg1GovernmentFeeCents: plan.legs[0].governmentFeeCents || 0, leg1TollCents: 0 }, plan.legs[2].feeLines || [], null, 0);
+  check('feeCents funds the two actual car-payment transactions', plan && plan.feeCents === previewQ1.appFee + previewQ2.appFee);
+  check('smartCents equals the two actual American Rider charges', plan && plan.smartCents === previewQ1.total + previewQ2.total);
   check('transitFareCents is the Metrorail fare, reported and not charged by us',
     plan && plan.transitFareCents === 225 && plan.smartCents === plan.journeyCents - plan.transitFareCents);
   check('railFareCents is kept as an alias for older clients', plan && plan.railFareCents === plan.transitFareCents);

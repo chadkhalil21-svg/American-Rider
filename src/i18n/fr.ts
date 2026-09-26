@@ -567,7 +567,6 @@ export default {
     nothingDeducted: 'Rien n’est déduit de vos 99 %. Le voyageur paie la course plus des frais de plateforme, et American Rider conserve ces frais ainsi qu’une commission de coordination de 1 % — qui couvre aussi le traitement des cartes. Votre part d’une course ne change pas selon le mode de paiement choisi par le voyageur.',
     weVerifyNotSell: 'American Rider vérifie votre couverture mais ne la vend pas. Nous vous orientons vers des assureurs proposant des tarifs commerciaux qualifiants.',
     verifyNotSellShort: 'American Rider vérifie la couverture commerciale mais ne la vend pas.',
-    revenueSimulated: 'Programme de test — les opérations et les revenus affichés ici sont simulés.',
     whatTravelerLooksFor: 'Votre nom et votre voiture sont ce qu’un voyageur cherche au bord du trottoir, et la plaque est ce qu’il vérifie avant de monter.',
     plateMustMatch: 'Il est demandé au voyageur de vérifier la plaque avant de monter. Elle doit correspondre à la voiture avec laquelle vous arrivez.',
     reachesYouWithoutAsking: 'Vous conservez 99 % de chaque course. Cela vous parvient sans que vous ayez à le demander.',

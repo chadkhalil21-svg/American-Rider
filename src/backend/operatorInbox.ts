@@ -13,12 +13,11 @@ import {
   doc,
   onSnapshot,
   query,
-  updateDoc,
   where,
 } from 'firebase/firestore';
 import { fareFromTotal } from '../data';
 import { PAYMENT_SERVER_URL } from '../config';
-import { operatorStatusWrite, type OperatorStatus } from './rideStatusWrite';
+import { type OperatorStatus } from './rideStatusWrite';
 import { auth, db } from '../firebase';
 import { t } from '../i18n';
 
@@ -156,25 +155,21 @@ export function watchAssignedTravel(
 async function setStatus(rideId: string, status: OperatorStatus): Promise<boolean> {
   if (!rideId) return false;
   try {
-    // The exact write, defined once in rideStatusWrite.ts — the same object the Firestore
-    // emulator tests send (infra/rules-emulator).
-    await updateDoc(doc(db, 'rides', rideId), operatorStatusWrite(status, Date.now()));
+    const token = await auth.currentUser?.getIdToken().catch(() => null);
+    if (!token) return false;
+    const res = await fetch(`${PAYMENT_SERVER_URL}/travel/progress`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ rideId, status }),
+    });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      console.error(`[inbox] server refused travel ${rideId} -> ${status}:`, d?.code || d?.error || res.status);
+      return false;
+    }
     return true;
   } catch (e) {
-    // LOUD, because a silent one cost a payout on 2 Sept 2026.
-    //
-    // The caller already treats `false` correctly — completeOp does not claim a travel
-    // finished if the database refused. What was missing is any way to find out WHY. A
-    // security rule rejected the write (needsPayout was not on the permitted field list),
-    // and a bare `catch { return false }` turned a precise, actionable
-    // "PERMISSION_DENIED: Missing or insufficient permissions" into nothing at all. The
-    // operator saw "Operation Complete", the travel stayed `onboard`, and the only visible
-    // symptom was a payout that never arrived — three layers away from the cause.
-    //
-    // Rules rejections are the likeliest failure here and the hardest to guess at, so the
-    // message is kept. It goes to the console, not to the operator: they are told the
-    // travel did not save, which is their business; which field a rule refused is ours.
-    console.error(`[inbox] could not set travel ${rideId} to ${status}:`, (e as Error)?.message);
+    console.error(`[inbox] could not request travel ${rideId} -> ${status}:`, (e as Error)?.message);
     return false;
   }
 }

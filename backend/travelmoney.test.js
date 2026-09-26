@@ -142,6 +142,24 @@ const rides = (over = {}) => ({
     check('the owner pays for their own live ride', out.status === 200 && db.data.rides.N.paymentIntentId === 'pi_new' && db.data.rides.N.paidAt === 7);
     check('Stripe gets the RIDE\'s Travel Number and id, not the request\'s', s.log.creates[0].tripNo === 'AR-9-MIA' && s.log.creates[0].rideId === 'N');
   }
+  {
+    const db = fakeDb({ rides: { N: { ...fare, travelerUid: 'alice', tripNo: 'AR-9-MIA', status: 'assigned', paymentClaim: 'pay_other', paymentClaimedAt: 1000 } } });
+    const s = stripe();
+    const out = await payForTravel({ db, uid: 'alice', rideId: 'N', create: s.create, now: 2000 });
+    check('a concurrent live payment claim blocks a second Stripe creation', out.status === 409 && out.body.code === 'payment_in_progress' && s.log.creates.length === 0);
+  }
+  {
+    const db = fakeDb({ rides: { N: { ...fare, travelerUid: 'alice', tripNo: 'AR-9-MIA', status: 'assigned', paymentClaim: 'pay_dead', paymentClaimedAt: 1000 } } });
+    const s = stripe();
+    const out = await payForTravel({ db, uid: 'alice', rideId: 'N', create: s.create, now: 122001 });
+    check('an expired payment claim is recoverable instead of stranding the Travel', out.status === 200 && db.data.rides.N.paymentIntentId === 'pi_new' && s.log.creates.length === 1);
+  }
+  {
+    const src = fs.readFileSync(path.join(__dirname, 'travelmoney.js'), 'utf8');
+    const body = src.slice(src.indexOf('async function payForTravel'), src.indexOf('async function cancelTravel'));
+    check('payment claims use a unique nonce, not uid/ride as a pretend lock', /randomUUID\(\)/.test(body));
+    check('payment claims have an expiry so a dead process cannot strand payment forever', /PAYMENT_CLAIM_TTL_MS/.test(body) && /claimAge/.test(body));
+  }
   // ——— an already-paid travel: NO Stripe creation call at all (audit of f6ef88d) ——————————————
   {
     const db = fakeDb({ rides: { N: { ...fare, travelerUid: 'alice', tripNo: 'AR-9-MIA', status: 'assigned', paymentIntentId: 'pi_first' } } });

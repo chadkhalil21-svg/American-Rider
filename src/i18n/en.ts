@@ -1001,7 +1001,6 @@ export default {
     me: "Me",
     anotherAdult: "Another adult",
     travelerName: "Traveler name",
-    noUnaccompaniedMinor: "American Rider does not accept unaccompanied-minor Travel at launch.",
     familyTitle: 'Family',
     familyAuthorized: 'AUTHORIZED TEEN TRAVELERS',
     familyTeenTraveler: 'Teen Traveler',

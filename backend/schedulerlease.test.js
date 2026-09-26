@@ -6,5 +6,6 @@ check('clock work is guarded by Firestore lease',/acquireLease\('operations_swee
 check('non-owner skips sweep',/if \(!lease\.acquired\) return/.test(src));
 check('internal timer calls leased sweep',/setInterval\([\s\S]*runLeasedSweeps\(\)/.test(src));
 check('external scheduler calls leased sweep',/async function runSweep[\s\S]*runLeasedSweeps\(\)/.test(src));
+check('external scheduler requires configured token',/const want = readKey\('SCHEDULER_TOKEN'\)[\s\S]*if \(!want \|\| got !== want\)[\s\S]*status\(401\)/.test(src));
 for(const r of R)console.log(`${r.ok?'PASS':'FAIL'}  ${r.l}`);
 const bad=R.filter(r=>!r.ok);console.log(`\n${R.length-bad.length}/${R.length} passed`);assert.equal(bad.length,0);

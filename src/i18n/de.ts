@@ -995,6 +995,17 @@ export default {
     familyAccepting: 'Familieneinladung wird angenommen…',
     familyAccepted: 'Familienautorisierung angenommen.',
     familyInviteUnable: 'Diese Einladung konnte nicht angenommen werden.',
+    familyActiveTravel: 'AKTIVE JUGEND-REISE',
+    familyViewTravel: 'Ansehen',
+    familyTeenTravel: 'Jugend-Reise',
+    familyOperator: 'Operator: %{name}',
+    familyFollowLive: 'Reise Live Verfolgen',
+    familyConversation: 'FAMILIENGESPRÄCH',
+    familyYou: 'Erziehungsberechtigter',
+    familyNoMessages: 'Keine Nachrichten in dieser Reise.',
+    familyMessagePlaceholder: 'Nachricht an jugendlichen Reisenden und Operator',
+    familySendMessage: 'Nachricht Senden',
+    familyMessageFailed: 'Die Nachricht wurde nicht gesendet.',
 
   },
   legal: {

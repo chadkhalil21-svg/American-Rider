@@ -1,3 +1,5 @@
+const { randomUUID } = require('crypto');
+
 // Money on a travel: paying for it, cancelling it, settling it — each decided from the travel
 // RECORD, never from what a client names.
 //
@@ -59,7 +61,8 @@ async function payForTravel({ db, uid, rideId, create, resume = null, now = Date
 
   // Claim the payment transition transactionally before Stripe is called. This closes the
   // double-request window where two callers could both observe paymentIntentId as empty.
-  const claimId = `pay_${String(uid)}_${String(rideId)}`;
+  const claimId = `pay_${randomUUID()}`;
+  const PAYMENT_CLAIM_TTL_MS = 2 * 60 * 1000;
   const claimed = await db.runTransaction(async (tx) => {
     const snap = await tx.get(rideRef);
     if (!snap.exists) return { error: fail(404, 'No such travel', 'no_travel') };
@@ -67,7 +70,11 @@ async function payForTravel({ db, uid, rideId, create, resume = null, now = Date
     if (String(current.travelerUid) !== String(uid)) return { error: fail(403, 'That travel belongs to another traveler', 'not_yours') };
     if (!PAYABLE.includes(String(current.status))) return { error: fail(409, 'That travel can no longer be paid for', 'not_payable') };
     if (current.paymentIntentId) return { existing: current };
-    if (current.paymentClaim && current.paymentClaim !== claimId) return { busy: true };
+    const claimAge = now - Number(current.paymentClaimedAt || 0);
+    if (current.paymentClaim && claimAge >= 0 && claimAge < PAYMENT_CLAIM_TTL_MS) return { busy: true };
+    // A dead process must not strand the Travel forever. After the short lease expires a retry
+    // may take the claim; Stripe's Travel+amount idempotency key recovers the already-created
+    // intent if the old process died after Stripe accepted it.
     tx.update(rideRef, { paymentClaim: claimId, paymentClaimedAt: now });
     return { ride: current };
   });

@@ -212,6 +212,7 @@ function productionReadiness() {
   if (!readKey('STRIPE_WEBHOOK_SECRET')) missing.push('stripe_webhook_secret');
   if (!readKey('CHECKR_WEBHOOK_SECRET') || !screeningReady()) missing.push('screening_provider');
   if (!readKey('HERE_API_KEY')) missing.push('toll_provider');
+  if (!readKey('TNC_INSURANCE_DISCLOSURE')) missing.push('tnc_contingency_insurance');
   if (!readKey('SCHEDULER_TOKEN')) missing.push('scheduler_token');
   if (!adminStatus().ok) missing.push('firebase_admin');
   if (opsAuthMode() !== 'named') missing.push('ops_auth');

@@ -122,7 +122,7 @@ what's deliberately not, open style questions") before it ships.
   SUGGESTED TRAVEL is EARNED from the traveler's real trips — never shown to a new account.
 - IBM Plex Mono is used ONLY for prices and trip/case numbers (the `Mono` component). Everything else is the system font.
 - The AI planner ("Plan in your own words") is WITHDRAWN as of 4 Sept 2026 — the founders'
-  decision, not shipping at launch, possibly refined and reintroduced later. This line
+  decision, not currently offered, possibly refined and reintroduced later. This line
   previously recorded it as an explicit keep; that is superseded. `app/plan.tsx` and
   `src/backend/assistant.ts` remain in the tree with no entry point, so the work survives
   without a traveler being able to reach it. Do not re-add the link to home without the
@@ -140,7 +140,7 @@ what's deliberately not, open style questions") before it ships.
   `backend/economics.js` computes the smallest whole-cent fee that funds card processing,
   Connect variable/fixed allowances, pass-through processing, a 25c contingency reserve,
   a 25c operating/infrastructure allowance, and at least 75c modeled contribution per
-  separately charged Travel. Unknown card country is international-safe; launch currency is
+  separately charged Travel. Unknown card country is international-safe; settlement currency is
   USD only. `src/data.ts platformFee()` mirrors the integer-cent rule for display fallback,
   and `backend/payments.test.js` checks app/server parity for every cent from $3 to $500.
   Government fees and tolls are pass-through amounts whose induced processing cost is recovered

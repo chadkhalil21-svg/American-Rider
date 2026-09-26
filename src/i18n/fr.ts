@@ -1001,6 +1001,17 @@ export default {
     familyAccepting: 'Acceptation de l’invitation familiale…',
     familyAccepted: 'Autorisation familiale acceptée.',
     familyInviteUnable: 'Cette invitation n’a pas pu être acceptée.',
+    familyActiveTravel: 'VOYAGE ADOLESCENT ACTIF',
+    familyViewTravel: 'Voir',
+    familyTeenTravel: 'Voyage Adolescent',
+    familyOperator: 'Opérateur : %{name}',
+    familyFollowLive: 'Suivre le Voyage en Direct',
+    familyConversation: 'CONVERSATION FAMILIALE',
+    familyYou: 'Responsable',
+    familyNoMessages: 'Aucun message dans ce Voyage.',
+    familyMessagePlaceholder: 'Message au Voyageur Adolescent et à l’Opérateur',
+    familySendMessage: 'Envoyer le Message',
+    familyMessageFailed: 'Le message n’a pas été envoyé.',
 
   },
 

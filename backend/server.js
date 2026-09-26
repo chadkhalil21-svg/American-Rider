@@ -2443,7 +2443,7 @@ app.post('/scheduled/sweep', runSweep);
 // every signed-in account. And each dispatch attempt read every operator document, which is
 // billed per read and does not survive a real fleet.
 //
-// Found in the pre-launch sweep, 19 Sept 2026 (docs/SWEEP-2026-09-19.md, F-A).
+// Found in the 19 Sept 2026 product sweep (docs/SWEEP-2026-09-19.md, F-A).
 //
 // The match now happens here, once, against the fleet read with admin access, through the same
 // matchOperator every other caller uses — so a gate added to that function protects every path

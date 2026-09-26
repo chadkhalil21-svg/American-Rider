@@ -8,7 +8,7 @@
 // day: build it real. So this is a plan and two real reservations. The transit leg is the
 // traveler's own — they pay the agency at the station or on board. Each car leg is an
 // ordinary American Rider travel: Travel Confirmation, dispatch, an operator, a Travel
-// Number, a receipt. The journey pays ONE platform fee, on the combined car fare.
+// Number, a receipt. The journey uses coordinated pricing across its separately charged car Travels; the preview must equal those actual charges.
 //
 // THE RUBRIC. Every amount is labelled with what it is and who receives it. Nothing here
 // says "you saved"; the comparison with direct travel is stated in either direction, as a

@@ -92,10 +92,7 @@ what's deliberately not, open style questions") before it ships.
   (`localhost:8081`) at the same 390 × 844 viewport and diff `getComputedStyle` +
   `getBoundingClientRect` on the same elements. See docs/EXACTNESS-SWEEP.md for the recipe
   and the constant offsets to subtract.
-- **Type is pinned.** All text renders through `src/components/AppText.tsx`, never
-  `Text` from `react-native` directly. It carries the demo's inherited
-  `letter-spacing:-.005em` (RN has no `em` unit) and `allowFontScaling={false}` so iOS
-  Dynamic Type cannot resize a layout the demo cannot resize.
+- **Typography is centralized and accessibility-aware.** All text renders through `src/components/AppText.tsx`, never `Text` from `react-native` directly. It carries the demo's inherited `letter-spacing:-.005em` equivalent and permits Dynamic Type with the current capped scale defined by `MAX_FONT_SCALE`. Do not disable font scaling to preserve screenshot exactness; layout must be reflow-tested instead.
 - Colors and radii live in `src/theme.ts` — never hardcode. Palette = demo hex-for-hex:
   paper `#F7F7F5`, ink `#14171F`, hairline `#ECEBE6`, border `#E3E2DC`, muted `#8A8A82`,
   faint `#B4B3AB`. Cards: white, radius 16, 1px hairline border, NO shadow. Buttons: radius 13,

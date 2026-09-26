@@ -560,7 +560,6 @@ export default {
     nothingDeducted: 'Non viene detratto nulla dal suo 99 %. Il viaggiatore paga la tariffa più una commissione di piattaforma, e American Rider trattiene tale commissione e una commissione di coordinamento dell’1 %, che copre anche l’elaborazione delle carte. La sua quota di una tariffa non cambia in base a come il viaggiatore ha scelto di pagare.',
     weVerifyNotSell: 'American Rider verifica la sua copertura ma non la vende. La indirizziamo a fornitori con tariffe commerciali idonee.',
     verifyNotSellShort: 'American Rider verifica la copertura commerciale ma non la vende.',
-    revenueSimulated: 'Programma di prova: le operazioni e i ricavi qui mostrati sono simulati.',
     whatTravelerLooksFor: 'Il suo nome e la sua auto sono ciò che un viaggiatore cerca sul marciapiede, e la targa è ciò che controlla prima di salire.',
     plateMustMatch: 'Al viaggiatore viene chiesto di controllare la targa prima di salire. Deve corrispondere all’auto con cui lei arriva.',
     reachesYouWithoutAsking: 'Lei trattiene il 99 % di ogni tariffa. Le arriva senza che debba chiederlo.',

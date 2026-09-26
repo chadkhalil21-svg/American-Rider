@@ -283,12 +283,13 @@ const check = (l, c, d) => results.push({ l, ok: !!c, d });
            disclosureVersion: DISCLOSURE_VERSION, commissioned: true },
   };
 
-  // 15. Unanswered, and somebody else is free: it moves.
+  // 15. A fleet flag alone is not qualification. The replacement has no authoritative user
+  // record in this fixture, so the hardened sweep must refuse it rather than re-offer blindly.
   {
     const h = makeDb({ rides: { r1: assigned() }, operators: freeOperator });
     const rep = await inject(h.db).sweepAssignments({ now });
-    check('unanswered travel is re-offered to a free operator',
-      rep.reoffered.some((r) => r.rideId === 'r1') && h.data.rides.r1.operatorId === 'op2',
+    check('an unverifiable replacement is not re-offered a paid Travel',
+      rep.reoffered.length === 0 && rep.stranded.includes('r1') && h.data.rides.r1.operatorId === 'op1',
       JSON.stringify(rep) + ' | ' + JSON.stringify(h.data.rides.r1));
   }
 

@@ -1,4 +1,4 @@
-// Smart Travel — the journey, as planned by OpenTripPlanner on Miami-Dade's own timetable.
+// Smart Travel — the journey, as planned by the OpenTripPlanner instance for the Travel's configured service region.
 // Route: /smart (Travel Options, Travel Complete and Home open it). /smartride is gone with the
 // simulation it carried.
 //
@@ -8,13 +8,13 @@
 // day: build it real. So this is a plan and two real reservations. The transit leg is the
 // traveler's own — they pay the agency at the station or on board. Each car leg is an
 // ordinary American Rider travel: Travel Confirmation, dispatch, an operator, a Travel
-// Number, a receipt. The journey pays ONE platform fee, on the combined car fare.
+// Number, a receipt. The journey uses coordinated pricing across its separately charged car Travels; the preview must equal those actual charges.
 //
 // THE RUBRIC. Every amount is labelled with what it is and who receives it. Nothing here
 // says "you saved"; the comparison with direct travel is stated in either direction, as a
 // fact. No control is named after anything other than what it does.
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Text } from '../src/components/AppText';
 import Svg, { Path, Rect } from 'react-native-svg';
@@ -30,7 +30,7 @@ import {
   Sub,
   Title,
 } from '../src/components/UI';
-import type { SmartLeg, SmartPlan } from '../src/backend/smart';
+import { revalidateSmartTransit, type SmartLeg, type SmartPlan, type SmartRevalidation } from '../src/backend/smart';
 import { useGoBack } from '../src/components/nav';
 import { prettyPlace } from '../src/data';
 import { carLegs, clockTime, legTitle, placeName, transitLegs } from '../src/smartLegs';
@@ -130,6 +130,19 @@ export default function SmartTravel() {
   const ride = useRide();
   const journey = ride.smartJourney;
   const plan = journey?.plan ?? ride.smartPlan;
+  const [revalidation, setRevalidation] = useState<SmartRevalidation | null>(null);
+  const [checkingTransit, setCheckingTransit] = useState(false);
+
+  const checkTransit = useCallback(async () => {
+    if (!journey?.plan || checkingTransit) return;
+    setCheckingTransit(true);
+    try { setRevalidation(await revalidateSmartTransit(journey.plan)); }
+    finally { setCheckingTransit(false); }
+  }, [journey?.plan, checkingTransit]);
+
+  useEffect(() => {
+    if (journey?.stage === 'leg1' && journey.leg1No && !ride.rideActive && !revalidation && !checkingTransit) void checkTransit();
+  }, [journey?.stage, journey?.leg1No, ride.rideActive, revalidation, checkingTransit, checkTransit]);
 
   if (!plan) {
     return (
@@ -154,20 +167,13 @@ export default function SmartTravel() {
   const origin = journey ? prettyPlace(journey.pickup.name) : prettyPlace(ride.departure.name);
   const destination = journey ? prettyPlace(journey.destination.name) : prettyPlace(ride.arrival.name);
 
-  // Transit money: Miami-Dade Transit is paid at the station; anything else is paid to that
-  // agency. A service whose fare we do not know says so rather than showing a number.
-  const allMdt = transit.every((l) => /miami-?dade/i.test(l.route?.agency ?? ''));
+  // Transit money belongs to the transit provider, regardless of market. The UI must not
+  // encode a home agency: fare amount and agency identity come from the regional feed record.
   const transitUnknown = transit.some((l) => l.fareUnknown);
-  // Where the fare is paid depends on the vehicle: a train's at the station, a bus's on board.
-  const allBus = transit.every((l) => l.mode === 'bus');
-  const anyBus = transit.some((l) => l.mode === 'bus');
-  const transitLabel = !allMdt
-    ? t('traveler.transitPaidToAgency')
-    : allBus
-      ? t('traveler.transitPaidOnBoard')
-      : anyBus
-        ? t('traveler.transitPaidAtStationOrOnBoard')
-        : t('traveler.transitPaidAtStation');
+  const agencies = [...new Set(transit.map((l) => l.route?.agency).filter(Boolean))];
+  const transitLabel = agencies.length === 1
+    ? t('traveler.transitPaidToNamedAgency', { agency: agencies[0] as string })
+    : t('traveler.transitPaidToAgency');
   // The server names the journey's ends "Pickup" and "Destination"; the traveler's own
   // names for them are on this screen already.
   const endName = (name: string) =>
@@ -177,8 +183,8 @@ export default function SmartTravel() {
     if (ride.beginSmartLeg(which)) router.navigate('/reserve');
   };
 
-  // Which action the journey is at. A second car travel cannot begin while the first is
-  // still under way — the app carries one live travel — so leg 2 waits for leg 1 to finish.
+  // Which action the journey is at. A second car Travel cannot begin while the first is
+  // still under way — the app carries one live Travel — so leg 2 waits for leg 1 to finish.
   let action: React.ReactNode;
   if (!journey) {
     if (cars.length === 0) {
@@ -215,10 +221,27 @@ export default function SmartTravel() {
           <OutlineButton label={t('traveler.viewTravel')} onPress={() => router.navigate('/ride')} />
         ) : lastIsCar ? (
           <>
-            <Text style={styles.actionNote}>
-              {t('traveler.lastTravelTo', { from: placeName(plan.to.name), to: destination })}
-            </Text>
-            <PrimaryButton label={t('traveler.reserveLastTravel')} onPress={() => reserve(2)} />
+            {checkingTransit ? (
+              <Text style={styles.actionNote}>{t('traveler.checkingTransit')}</Text>
+            ) : revalidation?.status === 'ok' && !revalidation.changed ? (
+              <>
+                <Text style={styles.actionNote}>
+                  {t('traveler.lastTravelTo', { from: placeName(plan.to.name), to: destination })}
+                </Text>
+                <PrimaryButton label={t('traveler.reserveLastTravel')} onPress={() => reserve(2)} />
+              </>
+            ) : (
+              <>
+                <Text style={styles.actionNote}>
+                  {revalidation?.status === 'ok' && revalidation.changed
+                    ? t('traveler.transitChanged')
+                    : revalidation?.status === 'none'
+                      ? t('traveler.transitNoLongerAvailable')
+                      : t('traveler.transitVerificationUnavailable')}
+                </Text>
+                <PrimaryButton label={t('traveler.checkTransitAgain')} onPress={() => { setRevalidation(null); void checkTransit(); }} />
+              </>
+            )}
           </>
         ) : (
           <PrimaryButton label={t('traveler.complete')} onPress={() => { ride.endSmartJourney(); router.dismissTo('/'); }} />

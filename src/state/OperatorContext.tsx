@@ -1,11 +1,7 @@
 // American Rider — the OPERATOR side's single store. Role flag, qualification
-// checklist, commissioned state, availability, the simulated operation loop, and
-// revenue math (99% of every travel fare, a flat 1% commission — same math as
-// src/data.ts coordinationFee).
-//
-// TEST PROGRAM, honestly: document review, screening, operations, and transfers are
-// all simulated on-device (nothing touches the real Firestore ride flow). Screens
-// carry a quiet "Test program" line wherever the theater runs.
+// checklist, commissioned state, availability, real assigned-Travel loop, and
+// revenue presentation. Server authority governs qualification, duty, Travel progression,
+// settlement and institutional records; device storage here is presentation/cache state.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, {
   createContext,
@@ -33,6 +29,7 @@ import {
 import { announceTravel, answerCheckIn } from '../backend/checkin';
 import { submitDocument, type DocKind, type DocReview } from '../backend/documentUpload';
 import { reportPosition } from '../backend/telemetry';
+import { sendTravelMessage, watchTravelThread } from '../backend/messages';
 import { resolveCurrentDeparture } from '../location';
 import { useAuth } from './AuthContext';
 // Aliased: this module has local bindings named `t` (a message string, a timer).
@@ -105,6 +102,10 @@ const TODO_DOCS: Record<DocKey, DocState> = {
 // far away a pickup is is telling an operator something nobody knows.
 export type SimRequest = {
   traveler: string;
+  bookedForAnother?: boolean;
+  teen?: boolean;
+  guardianName?: string | null;
+  pinRequired?: boolean;
   tInit: string;
   tRating?: number;
   pickup: string;
@@ -314,10 +315,10 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
   const [vehicle, setVehicleState] = useState<{ car: string; plate: string } | null>(null);
   // THE DATE THE COMMERCIAL POLICY RUNS OUT, as printed on the certificate.
   //
-  // Florida requires an operator carrying a traveler to hold $1,000,000 of commercial
-  // liability, and American Rider provides none of it — so the operator's own policy is the
-  // only coverage there is. Nothing recorded when it ended, which meant nothing could stop a
-  // travel being assigned to somebody whose coverage had run out weeks earlier.
+  // The Operator's qualifying commercial coverage is a mandatory duty gate. Any separate
+  // contingency coverage maintained by the TNC under applicable law does not replace that
+  // Operator obligation. Nothing recorded when the Operator policy ended, which meant nothing
+  // could stop a Travel being assigned after that policy had run out.
   //
   // An expiry date is on the certificate and can be checked without asking anybody anything.
   // It does not catch a policy cancelled mid-term, which needs a carrier feed; it does catch
@@ -357,7 +358,6 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
   const [msgs, setMsgs] = useState<OpMsg[]>([]);
   const [revenue, setRevenue] = useState<RevenueBlob>(EMPTY_REVENUE);
 
-  const msgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Mirror of the revenue blob so mutations never nest setState inside an updater
   // (React updaters must stay pure — StrictMode runs them twice).
   const revRef = useRef<RevenueBlob>(EMPTY_REVENUE);
@@ -413,9 +413,6 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
       })
       .catch(() => {})
       .finally(() => setReady(true));
-    return () => {
-      if (msgTimer.current) clearTimeout(msgTimer.current);
-    };
   }, []);
 
   const setRole = useCallback((r: Role) => {
@@ -571,6 +568,9 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
       tripNo: t.tripNo,
       travelerUid: t.travelerUid,
       traveler: t.travelerName,
+      bookedForAnother: t.bookedForAnother,
+      teen: t.teen,
+      guardianName: t.guardianName,
       tInit: initialsOf(t.travelerName),
       pickup: t.dep,
       dest: t.dest,
@@ -761,6 +761,9 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
           tripNo: underway.tripNo,
           travelerUid: underway.travelerUid,
           traveler: underway.travelerName,
+          bookedForAnother: underway.bookedForAnother,
+          teen: underway.teen,
+          guardianName: underway.guardianName,
           tInit: initialsOf(underway.travelerName),
           pickup: underway.dep,
           dest: underway.dest,
@@ -928,15 +931,36 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
     setArrived(false);
   }, [op, commitRevenue]);
 
-  // Communicate — the demo's reply theater (1.5s).
+  // Keep the Operator's conversation on the same Travel-scoped record the Traveler sees.
+  useEffect(() => {
+    const current = op;
+    if (!current?.tripNo || !current.rideId) {
+      setMsgs([]);
+      return;
+    }
+    return watchTravelThread(
+      current.tripNo,
+      'operator',
+      (items) => setMsgs(items.map((m) => ({ me: m.from === 'operator', text: m.text }))),
+      () => {},
+    );
+  }, [op?.tripNo, op?.rideId]);
+
+  // Communicate on the authoritative Travel thread. No scripted counterparty reply: a message
+  // from a real Traveler appears only when that Traveler actually sends it.
   const sendMsg = useCallback((text: string) => {
-    const t = text.trim();
-    if (!t) return;
-    setMsgs((m) => [...m, { me: true, text: t }]);
-    if (msgTimer.current) clearTimeout(msgTimer.current);
-    msgTimer.current = setTimeout(() => {
-      setMsgs((m) => [...m, { me: false, text: tr('traveler.replySeeShortly') }]);
-    }, 1500);
+    const body = text.trim();
+    const current = opRef.current;
+    if (!body || !current?.rideId || !current.tripNo) return;
+    sendTravelMessage({
+      rideId: current.rideId,
+      tripNo: current.tripNo,
+      text: body,
+      from: 'operator',
+      travelerUid: current.travelerUid,
+    }).then((stored) => {
+      if (stored) setMsgs((m) => [...m, { me: true, text: body }]);
+    });
   }, []);
 
   // ---- revenue, derived from the operations this operator actually completed ----
@@ -1136,10 +1160,10 @@ tr('traveler.blockCoverage'),
         );
         return;
       }
-      // COVERAGE IS THE ONLY COVERAGE THERE IS. American Rider carries no policy, so a travel
-      // assigned to an operator whose commercial insurance has run out has nothing behind it.
-      // Same posture as the payout and vehicle gates: we do not assign what we cannot stand
-      // behind. An expiry date is on the certificate and needs nobody's cooperation to check.
+      // OPERATOR COVERAGE REMAINS A DUTY GATE. Any separate TNC contingency coverage required by
+      // law does not substitute for the Operator's own qualifying policy. Same posture as the
+      // payout and vehicle gates: we do not assign Travel when the Operator coverage gate fails.
+      // An expiry date is on the certificate and needs nobody's cooperation to check.
       if (!coverageRef.current) {
         setOnlineState(false);
         setOnlineError(tr('traveler.gateCoverageDate'));

@@ -1,5 +1,12 @@
 # Platform economics and infrastructure at scale
 
+> **SUPERSEDED FOR PRICING AS OF 25 SEPTEMBER 2026.** The historical sections below record
+> prior decisions and evidence but do not define the current Platform Fee. Current pricing is
+> governed by `docs/FARE-MODEL.md` and `backend/economics.js`. In particular, the old
+> $1.50/5% and $2/3.25%/5.5% schedules are retired; pass-through processing, Connect costs,
+> reserve, operating allowance and minimum contribution are now solved directly in cents.
+>
+
 Prepared 9 September 2026 for Adrian and Chad, extended 10 September with the answers to
 Chad's follow-up (national scale, card origin, independent fare evidence, the hosting stack,
 and what was built overnight). It answers Chad's questions of 9 September:

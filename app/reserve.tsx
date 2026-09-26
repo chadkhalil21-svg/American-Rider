@@ -57,6 +57,7 @@ import { useRide } from '../src/state/RideContext';
 import { paymentModeNote, usePaymentConfig } from '../src/state/PaymentConfigContext';
 import { useLanguage } from '../src/state/LanguageContext';
 import { colors, fmt } from '../src/theme';
+import { fetchFamily, type FamilyLink } from '../src/backend/family';
 
 // The demo's search-field magnifier: 18px, muted stroke 1.7.
 function Magnifier() {
@@ -100,6 +101,10 @@ export default function TravelConfirmation() {
   const [searchingDep, setSearchingDep] = useState(false);
   const [query, setQuery] = useState('');
   const [queryDep, setQueryDep] = useState('');
+  const [partyOpen, setPartyOpen] = useState(false);
+  const [partyName, setPartyName] = useState(ride.travelParty.travelerName || '');
+  const [familyLinks,setFamilyLinks]=useState<FamilyLink[]>([]);
+  useEffect(()=>{fetchFamily().then(x=>setFamilyLinks(x.filter(f=>f.role==='guardian'&&f.status==='active'&&f.eligible))).catch(()=>setFamilyLinks([]));},[]);
 
   // navigate() can update params on an already-mounted screen — reopen search then too.
   useEffect(() => {
@@ -328,7 +333,8 @@ export default function TravelConfirmation() {
   // sheet happens to be showing while the server is computing a different one. And a travel
   // that cannot be charged, or that American Rider does not make, is not one to confirm.
   const busy = pricing || ride.repricing;
-  const canReserve = payConfig.canTakePayment && !busy && !priceFailed && !unavailable;
+  const partyReady = ride.travelParty.mode === 'self' || (ride.travelParty.mode === 'other_adult' && ride.travelParty.travelerName.trim().length > 0);
+  const canReserve = payConfig.canTakePayment && partyReady && !busy && !priceFailed && !unavailable;
   const confirm = () => {
     if (!canReserve) return;
     ride.confirmRide();
@@ -362,6 +368,37 @@ export default function TravelConfirmation() {
         >
           <Title>{t('traveler.travelConfirmation')}</Title>
           {!editing && <Sub>{t('traveler.reviewAndConfirm')}</Sub>}
+
+          {!editing && !smartLeg && (
+            <>
+              <SectionLabel style={{ marginTop: 20, marginBottom: 10 }}>{t('traveler.travelerLabel')}</SectionLabel>
+              <Card style={{ paddingHorizontal: 20, paddingVertical: 4 }}>
+                <Pressable onPress={() => setPartyOpen(!partyOpen)}>
+                  <View style={[styles.slotRow]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.slotLabel}>{t('traveler.whoIsTraveling')}</Text>
+                      <Text style={styles.slotValue}>
+                        {ride.travelParty.mode === 'self' ? t('traveler.me') : ride.travelParty.travelerName || t('traveler.anotherAdult')}
+                      </Text>
+                    </View>
+                    <Chev />
+                  </View>
+                </Pressable>
+                {partyOpen && (
+                  <View style={[styles.slot, styles.hair]}>
+                    <Pressable onPress={() => { ride.setTravelParty({ mode: 'self', travelerName: '' }); setPartyOpen(false); }}>
+                      <Text style={styles.modify}>{t('traveler.me')}</Text>
+                    </Pressable>
+                    <Pressable onPress={() => ride.setTravelParty({ mode: 'other_adult', travelerName: partyName })}>
+                      <Text style={[styles.modify,{marginTop:14}]}>{t('traveler.anotherAdult')}</Text>
+                    </Pressable>
+                    <TextInput value={partyName} onChangeText={(v) => { setPartyName(v); if (ride.travelParty.mode === 'other_adult') ride.setTravelParty({ mode: 'other_adult', travelerName: v }); }} placeholder={t('traveler.travelerName')} placeholderTextColor={colors.muted} style={styles.input} />
+                    {familyLinks.map(f=><Pressable key={f.id} onPress={()=>{ride.setTravelParty({mode:'teen',travelerName:f.teenName||t('traveler.familyTeenTraveler'),familyLinkId:f.id});setPartyOpen(false);}}><Text style={[styles.modify,{marginTop:14}]}>{t('traveler.familyTeenTravel')} · {f.teenName||t('traveler.familyTeenTraveler')}</Text></Pressable>)}
+                  </View>
+                )}
+              </Card>
+            </>
+          )}
 
           {!editing && (
             <RouteMap pickup={ride.tripCoords?.pickup} dest={ride.tripCoords?.dest} route={ride.route} />

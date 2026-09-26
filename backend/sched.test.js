@@ -65,7 +65,7 @@ const tickets = [];
 function inject(dbHandle) {
   for (const [rel, exports] of [
     ['./firebase-admin.js', { adminDb: () => dbHandle, adminStatus: () => ({ ok: true, reason: null }) }],
-    ['./payments.js', { chargeScheduledTravel: (...a) => charge(...a) }],
+    ['./payments.js', { chargeScheduledTravel: (...a) => charge(...a), connectAccountStatus: async () => ({ payoutsEnabled:true }) }],
     ['./tickets.js', { fileTicket: async (t) => { tickets.push(t); return { caseNo: 'AR-CASE-1' }; } }],
   ]) {
     const p = require.resolve(path.join(ROOT, rel));
@@ -89,9 +89,12 @@ const base = (atMinFromNow, extra = {}) => ({
 // absence is not agreement). These fixtures predate that gate, so every case below failed for
 // a reason unrelated to what it asserts. Repaired, not loosened — the gate is statutory.
 const { DISCLOSURE_VERSION } = require('./disclosure');
+const NOW = Date.now();
+const DOC = (kind) => ({ status:'accepted', verdict:'accept', kind, expiry:'2030-12-31', readAt:NOW, evidence:{ isTheRequestedDocument:true, legible:true, fields: kind==='registration' ? { plate:'ABC123' } : {} } });
+const QUALIFIED_USER = (id) => ({ name:id==='opA'?'Nearby N.':'Far F.', stripeAccountId:`acct_${id}`, insuranceDisclosure:{ version:DISCLOSURE_VERSION, at:NOW }, documents:{ license:DOC('license'), registration:DOC('registration'), insurance:{...DOC('insurance'), evidence:{ isTheRequestedDocument:true, legible:true, fields:{ commercialUse:'yes', limits:'$1,000,000' }, insurance:{ namedInsureds:[id==='opA'?'Nearby N.':'Far F.'], vehicles:[{plate:'ABC123'}], effectiveDate:'2025-01-01', expirationDate:'2030-12-31', tncEndorsement:'yes', rideLimits:{combinedSingleLimit:'$1,000,000'}, loggedOnLimits:{bodilyInjuryPerPerson:'$50,000',bodilyInjuryPerIncident:'$100,000',propertyDamage:'$25,000'}, pip:{shown:'yes',amount:'$10,000'}, uninsuredMotorist:{shown:'yes'} } } } }, screening:{ decision:'pass', completedAt:NOW, recheckDue:NOW + 365*24*60*60*1000 } });
 const FLEET = {
-  opA: { name: 'Nearby N.', lat: 25.7625, lng: -80.1925, available: true, onlineAt: Date.now(), classes: ['Standard'], disclosureVersion: DISCLOSURE_VERSION, commissioned: true },
-  opB: { name: 'Far F.', lat: 25.90, lng: -80.30, available: true, onlineAt: Date.now(), classes: ['Standard'], disclosureVersion: DISCLOSURE_VERSION, commissioned: true },
+  opA: { name: 'Nearby N.', lat: 25.7625, lng: -80.1925, available: true, commissioned: true, onlineAt: NOW, classes: ['Standard'], disclosureVersion: DISCLOSURE_VERSION, insuranceExpiry:'2030-12-31' },
+  opB: { name: 'Far F.', lat: 25.90, lng: -80.30, available: true, commissioned: true, onlineAt: NOW, classes: ['Standard'], disclosureVersion: DISCLOSURE_VERSION, insuranceExpiry:'2030-12-31' },
 };
 
 const results = [];
@@ -100,14 +103,14 @@ const check = (label, cond, detail) => { results.push({ label, ok: !!cond, detai
 (async () => {
   // 1. A reservation 40 minutes out is NOT touched at all.
   {
-    const h = makeDb({ scheduled_rides: { r1: base(40) }, operators: FLEET });
+    const h = makeDb({ scheduled_rides: { r1: base(40) }, operators: FLEET, users: { opA: QUALIFIED_USER('opA'), opB: QUALIFIED_USER('opB') } });
     const rep = await inject(h.db).sweepScheduled();
     check('40 min out: outside the window, untouched', rep.considered === 0, JSON.stringify(rep));
   }
 
   // 2. 20 minutes out with an operator ~1 min away: HELD, not dispatched.
   {
-    const h = makeDb({ scheduled_rides: { r1: base(20) }, operators: FLEET });
+    const h = makeDb({ scheduled_rides: { r1: base(20) }, operators: FLEET, users: { opA: QUALIFIED_USER('opA'), opB: QUALIFIED_USER('opB') } });
     const rep = await inject(h.db).sweepScheduled();
     check('20 min out, operator 1 min away: held',
       rep.waiting === 1 && rep.dispatched.length === 0,
@@ -116,7 +119,7 @@ const check = (label, cond, detail) => { results.push({ label, ok: !!cond, detai
 
   // 3. 3 minutes out: dispatched, charged, travel created, operator recorded.
   {
-    const h = makeDb({ scheduled_rides: { r1: base(3) }, operators: FLEET });
+    const h = makeDb({ scheduled_rides: { r1: base(3) }, operators: FLEET, users: { opA: QUALIFIED_USER('opA'), opB: QUALIFIED_USER('opB') } });
     const rep = await inject(h.db).sweepScheduled();
     const ride = h.data.rides && Object.values(h.data.rides)[0];
     check('3 min out: dispatched to the NEAREST operator',
@@ -132,7 +135,7 @@ const check = (label, cond, detail) => { results.push({ label, ok: !!cond, detai
 
   // 4. Two reservations at once do not both get the same operator.
   {
-    const h = makeDb({ scheduled_rides: { r1: base(3), r2: base(3, { tripNo: 'AR-2049-MIA' }) }, operators: FLEET });
+    const h = makeDb({ scheduled_rides: { r1: base(3), r2: base(3, { tripNo: 'AR-2049-MIA' }) }, operators: FLEET, users: { opA: QUALIFIED_USER('opA'), opB: QUALIFIED_USER('opB') } });
     const rep = await inject(h.db).sweepScheduled();
     const ops = Object.values(h.data.rides || {}).map((r) => r.operatorId);
     check('two due at once: two different operators',
@@ -158,7 +161,7 @@ const check = (label, cond, detail) => { results.push({ label, ok: !!cond, detai
   // 6. Card declined: NOBODY is sent, and the reservation is released to try again.
   {
     charge = async () => ({ ok: false, code: 'card_declined', error: 'Your card was declined.' });
-    const h = makeDb({ scheduled_rides: { r1: base(3) }, operators: FLEET });
+    const h = makeDb({ scheduled_rides: { r1: base(3) }, operators: FLEET, users: { opA: QUALIFIED_USER('opA'), opB: QUALIFIED_USER('opB') } });
     await inject(h.db).sweepScheduled();
     const r = h.data.scheduled_rides.r1;
     check('card declined: no travel created',
@@ -166,7 +169,7 @@ const check = (label, cond, detail) => { results.push({ label, ok: !!cond, detai
     check('  the reason is on the record for the traveler', r.paymentError === 'Your card was declined.', r.paymentError);
 
     // Past the grace it stops retrying and says so.
-    const h2 = makeDb({ scheduled_rides: { r1: base(-15) }, operators: FLEET });
+    const h2 = makeDb({ scheduled_rides: { r1: base(-15) }, operators: FLEET, users: { opA: QUALIFIED_USER('opA'), opB: QUALIFIED_USER('opB') } });
     await inject(h2.db).sweepScheduled();
     check('  past grace: payment_failed', h2.data.scheduled_rides.r1.status === 'payment_failed',
       h2.data.scheduled_rides.r1.status);
@@ -175,7 +178,7 @@ const check = (label, cond, detail) => { results.push({ label, ok: !!cond, detai
 
   // 7. Charged but the travel could not be written: flagged AND a case opened.
   {
-    const h = makeDb({ scheduled_rides: { r1: base(3) }, operators: FLEET });
+    const h = makeDb({ scheduled_rides: { r1: base(3) }, operators: FLEET, users: { opA: QUALIFIED_USER('opA'), opB: QUALIFIED_USER('opB') } });
     h.failAdds();
     const rep = await inject(h.db).sweepScheduled();
     const r = h.data.scheduled_rides.r1;
@@ -188,7 +191,7 @@ const check = (label, cond, detail) => { results.push({ label, ok: !!cond, detai
   // 8. A legacy reservation with no pickup is closed, not retried forever.
   {
     const legacy = base(3); delete legacy.pickupLat; delete legacy.pickupLng;
-    const h = makeDb({ scheduled_rides: { r1: legacy }, operators: FLEET });
+    const h = makeDb({ scheduled_rides: { r1: legacy }, operators: FLEET, users: { opA: QUALIFIED_USER('opA'), opB: QUALIFIED_USER('opB') } });
     await inject(h.db).sweepScheduled();
     check('pre-dispatch reservation: closed with a reason',
       h.data.scheduled_rides.r1.status === 'unmatched', h.data.scheduled_rides.r1.closedReason);
@@ -196,7 +199,7 @@ const check = (label, cond, detail) => { results.push({ label, ok: !!cond, detai
 
   // 9. A class nobody offers is not fobbed off on a Standard operator.
   {
-    const h = makeDb({ scheduled_rides: { r1: base(-15, { travelClass: 'Pet Friendly' }) }, operators: FLEET });
+    const h = makeDb({ scheduled_rides: { r1: base(-15, { travelClass: 'Pet Friendly' }) }, operators: FLEET, users: { opA: QUALIFIED_USER('opA'), opB: QUALIFIED_USER('opB') } });
     await inject(h.db).sweepScheduled();
     check('unserved class: unmatched, not substituted',
       h.data.scheduled_rides.r1.status === 'unmatched' && !h.data.rides,
@@ -208,6 +211,7 @@ const check = (label, cond, detail) => { results.push({ label, ok: !!cond, detai
     const h = makeDb({
       scheduled_rides: { r1: base(3) },
       operators: { opA: { ...FLEET.opA, insuranceExpiry: '2020-01-01' } },
+      users: { opA: QUALIFIED_USER('opA') },
     });
     const rep = await inject(h.db).sweepScheduled();
     check('lapsed coverage: not dispatched', rep.dispatched.length === 0 && !h.data.rides, JSON.stringify(rep));

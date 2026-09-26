@@ -30,6 +30,7 @@ const rides = {
   rideAssigned: { tripNo: 'AR-1003-MIA', travelerUid: 'travA', operatorId: 'opA', status: 'assigned' },
   rideDone: { tripNo: 'AR-1004-MIA', travelerUid: 'travA', operatorId: 'opA', status: 'completed' },
   rideCancelled: { tripNo: 'AR-1005-MIA', travelerUid: 'travA', operatorId: 'opA', status: 'cancelled' },
+  rideTeen: { tripNo: 'AR-1006-MIA', travelerUid: 'teenA', operatorId: 'opA', status: 'accepted', party: { teen: true, guardianUid: 'guardA' } },
 };
 const seed = async (overrides = {}) => {
   await env.clearFirestore();
@@ -40,9 +41,11 @@ const seed = async (overrides = {}) => {
 const as = (uid) => env.authenticatedContext(uid).firestore();
 const msg = (over) => ({ lostItemId: null, text: 'Hello', createdAt: 1, ...over });
 const fromTraveler = (rideId, r, uid = r.travelerUid, over = {}) =>
-  msg({ rideId, tripNo: r.tripNo, from: 'traveler', travelerUid: uid, operatorId: r.operatorId, ...over });
+  msg({ rideId, tripNo: r.tripNo, from: 'traveler', travelerUid: uid, operatorId: r.operatorId, guardianUid: r.party?.guardianUid ?? null, ...over });
 const fromOperator = (rideId, r, uid = r.operatorId, over = {}) =>
-  msg({ rideId, tripNo: r.tripNo, from: 'operator', travelerUid: r.travelerUid, operatorId: uid, ...over });
+  msg({ rideId, tripNo: r.tripNo, from: 'operator', travelerUid: r.travelerUid, operatorId: uid, guardianUid: r.party?.guardianUid ?? null, ...over });
+const fromGuardian = (rideId, r, uid = r.party?.guardianUid, over = {}) =>
+  msg({ rideId, tripNo: r.tripNo, from: 'guardian', travelerUid: r.travelerUid, operatorId: r.operatorId, guardianUid: uid, ...over });
 const write = (uid, data) => addDoc(collection(as(uid), 'messages'), data);
 
 await seed();
@@ -52,6 +55,13 @@ await check('assigned traveler can write on their travel', () => assertSucceeds(
 await check('assigned operator can write on their travel', () => assertSucceeds(write('opA', fromOperator('rideA', rides.rideA))));
 await check('traveler reads their thread', () => assertSucceeds(getDocs(query(collection(as('travA'), 'messages'), where('tripNo', '==', 'AR-1001-MIA'), where('travelerUid', '==', 'travA')))));
 await check('operator reads their thread', () => assertSucceeds(getDocs(query(collection(as('opA'), 'messages'), where('tripNo', '==', 'AR-1001-MIA'), where('operatorId', '==', 'opA')))));
+
+// ——— Family / Teen three-party conversation boundary ———————————————————————————————
+await check('authorized guardian can write in Teen Travel', () => assertSucceeds(write('guardA', fromGuardian('rideTeen', rides.rideTeen))));
+await check('authorized guardian can read Teen Travel thread', () => assertSucceeds(getDocs(query(collection(as('guardA'), 'messages'), where('tripNo','==','AR-1006-MIA'), where('guardianUid','==','guardA')))));
+await check('unrelated account cannot pose as Teen guardian', () => assertFails(write('mallory', fromGuardian('rideTeen', rides.rideTeen, 'mallory'))));
+await check('traveler cannot pose as guardian', () => assertFails(write('teenA', fromGuardian('rideTeen', rides.rideTeen, 'guardA'))));
+await check('guardian cannot enter ordinary adult Travel', () => assertFails(write('guardA', fromGuardian('rideA', rides.rideA, 'guardA'))));
 
 // ——— Traveler A cannot reach Traveler B's travel ——————————————————————————————————————
 await check("traveler A cannot write into traveler B's travel as a traveler", () =>
@@ -119,10 +129,10 @@ await check("rides: the operator's phone cannot write 'accepted'", () =>
   assertFails(updateDoc(doc(as('opA'), 'rides', 'rideAssigned'), { status: 'accepted', statusAt: 2 })));
 await check("rides: the operator's phone cannot jump from 'assigned' to 'arrived'", () =>
   assertFails(updateDoc(doc(as('opA'), 'rides', 'rideAssigned'), { status: 'arrived', statusAt: 2, arrivedAt: 2 })));
-await check('rides: the operator may decline an open offer', () =>
-  assertSucceeds(updateDoc(doc(as('opA'), 'rides', 'rideAssigned'), { status: 'declined', statusAt: 2, declinedAt: 2 })));
-await check('rides: the operator moves an accepted travel to arrived', () =>
-  assertSucceeds(updateDoc(doc(as('opA'), 'rides', 'rideA'), { status: 'arrived', statusAt: 2, arrivedAt: 2 })));
+await check('rides: the operator phone cannot decline directly', () =>
+  assertFails(updateDoc(doc(as('opA'), 'rides', 'rideAssigned'), { status: 'declined', statusAt: 2, declinedAt: 2 })));
+await check('rides: the operator phone cannot mark arrival directly', () =>
+  assertFails(updateDoc(doc(as('opA'), 'rides', 'rideA'), { status: 'arrived', statusAt: 2, arrivedAt: 2 })));
 await check('rides: another operator cannot touch it', () =>
   assertFails(updateDoc(doc(as('opB'), 'rides', 'rideA'), { status: 'arrived', statusAt: 3 })));
 await check('rides: nobody reassigns a travel from a phone', () =>
@@ -140,8 +150,8 @@ for (const st of ['assigned', 'accepted', 'arrived', 'onboard']) {
 await seed();
 await check("rides: the traveler cannot reopen a cancelled travel", () =>
   assertFails(updateDoc(doc(as('travA'), 'rides', 'rideCancelled'), { status: 'completed', statusAt: 5 })));
-await check('rides: the traveler may rate and tip a COMPLETED travel', () =>
-  assertSucceeds(updateDoc(doc(as('travA'), 'rides', 'rideDone'), { rating: 5, tipCents: 200, reviewedAt: 5 })));
+await check('rides: the traveler may rate a COMPLETED travel', () =>
+  assertSucceeds(updateDoc(doc(as('travA'), 'rides', 'rideDone'), { rating: 5, reviewedAt: 5 })));
 await check('rides: …but not one that is still under way', () =>
   assertFails(updateDoc(doc(as('travA'), 'rides', 'rideA'), { rating: 5, reviewedAt: 5 })));
 await check('rides: …nor a cancelled one', () =>
@@ -152,85 +162,43 @@ await check('rides: the review cannot carry a status change', () =>
   assertFails(updateDoc(doc(as('travA'), 'rides', 'rideDone'), { rating: 4, status: 'cancelled' })));
 await check("rides: another traveler cannot review someone else's travel", () =>
   assertFails(updateDoc(doc(as('travB'), 'rides', 'rideDone'), { rating: 1, reviewedAt: 5 })));
-await check('rides: the operator still records completion from onboard (the app\'s exact write)', () =>
-  assertSucceeds(updateDoc(doc(as('opB'), 'rides', 'rideB'), operatorStatusWrite('completed', 6))));
+await check('rides: the operator phone cannot create a payable completion', () =>
+  assertFails(updateDoc(doc(as('opB'), 'rides', 'rideB'), operatorStatusWrite('completed', 6))));
 await check('rides: nobody writes payment, refund or payout fields from a phone', async () => {
   await assertFails(updateDoc(doc(as('travA'), 'rides', 'rideDone'), { paymentIntentId: 'pi_x' }));
   await assertFails(updateDoc(doc(as('travA'), 'rides', 'rideDone'), { refundId: 're_x' }));
   await assertFails(updateDoc(doc(as('opA'), 'rides', 'rideDone'), { transferId: 'tr_x' }));
 });
 
-// ——— the operator's status writes, EXACTLY as setStatus() sends them (audit of f6ef88d) ——————
+// ——— direct Operator status writes are all denied; /travel/progress owns them ————————————
 {
   const seedOne = (r) => seed({ rideX: { tripNo: 'AR-3000-MIA', travelerUid: 'travA', operatorId: 'opA', ...r } });
   const opWrite = (data) => updateDoc(doc(as('opA'), 'rides', 'rideX'), data);
-  const shape = (st) => Object.keys(operatorStatusWrite(st, 1)).sort().join(',');
-  await check('the app\'s write shapes are the ones the audit read', async () => {
-    if (shape('arrived') !== 'arrivedAt,status,statusAt') throw new Error(shape('arrived'));
-    if (shape('onboard') !== 'onboardAt,status,statusAt') throw new Error(shape('onboard'));
-    if (shape('completed') !== 'completedAt,needsPayout,status,statusAt') throw new Error(shape('completed'));
-    if (shape('declined') !== 'declinedAt,status,statusAt') throw new Error(shape('declined'));
-  });
-
-  await seedOne({ status: 'accepted' });
-  await check('accepted → arrived with arrivedAt: succeeds', () => assertSucceeds(opWrite(operatorStatusWrite('arrived', 10))));
-  await check('arrived → onboard with onboardAt (markOnboard): succeeds', () => assertSucceeds(opWrite(operatorStatusWrite('onboard', 20))));
-  await check('onboard → completed with completedAt + needsPayout:true (markCompleted): succeeds', () =>
-    assertSucceeds(opWrite(operatorStatusWrite('completed', 30))));
-  await check('completedAt cannot be rewritten afterwards', () => assertFails(opWrite({ completedAt: 99 })));
-  await check('…nor with a repeated "completed"', () => assertFails(opWrite(operatorStatusWrite('completed', 99))));
-  await check('onboardAt cannot be rewritten after completion', () => assertFails(opWrite({ onboardAt: 99 })));
-  await check('needsPayout cannot be set again once the server has paid and cleared it', async () => {
-    await seedOne({ status: 'completed', completedAt: 30, needsPayout: false, transferId: 'tr_1' });
-    await assertFails(opWrite({ needsPayout: true }));
-  });
-
-  await seedOne({ status: 'accepted' });
-  await check('accepted → onboard with onboardAt: succeeds (the operator may skip "arrived")', () => assertSucceeds(opWrite(operatorStatusWrite('onboard', 20))));
-  await check('onboardAt cannot be rewritten while onboard', () => assertFails(opWrite({ onboardAt: 99 })));
-  await check('…nor alongside a later move to completed', () => assertFails(opWrite({ ...operatorStatusWrite('completed', 30), onboardAt: 99 })));
-  await check('completedAt cannot be written without entering completed', () => assertFails(opWrite({ completedAt: 30 })));
-  await check('needsPayout cannot be set before completion', () => assertFails(opWrite({ needsPayout: true })));
-  await check('a timestamp for another status cannot ride along (arrivedAt on the move to completed)', () =>
-    assertFails(opWrite({ ...operatorStatusWrite('completed', 30), arrivedAt: 30 })));
-  await check('arrivedAt cannot be rewritten afterwards', async () => {
-    await seedOne({ status: 'arrived', arrivedAt: 10 });
-    await assertFails(opWrite({ arrivedAt: 99 }));
-  });
-
-  await seedOne({ status: 'assigned' });
-  await check('assigned → declined with declinedAt (declineTravel): succeeds', () => assertSucceeds(opWrite(operatorStatusWrite('declined', 5))));
-  await seedOne({ status: 'assigned' });
-  await check('assigned → onboard is still refused, stamp or no stamp', () => assertFails(opWrite(operatorStatusWrite('onboard', 5))));
-
-  // The traveler may write none of the operator's fields, in any state.
-  for (const st of ['assigned', 'accepted', 'arrived', 'onboard', 'completed']) {
-    await seedOne({ status: st });
-    await check(`traveler writing operational fields on a ${st} travel: fails`, async () => {
-      const t = (data) => updateDoc(doc(as('travA'), 'rides', 'rideX'), data);
-      await assertFails(t({ arrivedAt: 1 }));
-      await assertFails(t({ onboardAt: 1 }));
-      await assertFails(t({ completedAt: 1 }));
-      await assertFails(t({ needsPayout: true }));
-      await assertFails(t(operatorStatusWrite('completed', 1)));
-      await assertFails(t(operatorStatusWrite('onboard', 1)));
-    });
+  for (const [from, to] of [['assigned','declined'],['accepted','arrived'],['arrived','onboard'],['onboard','completed']]) {
+    await seedOne({ status: from });
+    await check(`phone cannot author ${from} → ${to}`, () => assertFails(opWrite(operatorStatusWrite(to, 10))));
   }
+  await seedOne({ status: 'onboard' });
+  await check('phone cannot set needsPayout directly', () => assertFails(opWrite({ needsPayout: true })));
+  await check('phone cannot write server status timestamps directly', () => assertFails(opWrite({ completedAt: 30 })));
+  // Telemetry remains the one direct Operator write: it is an input to server progression,
+  // never an authorization to pay.
+  await check('assigned Operator may publish Travel telemetry', () =>
+    assertSucceeds(opWrite({ opLat: 25.76, opLng: -80.19, opAt: Date.now(), stillSince: Date.now() })));
 }
 
-// markOnboard() and markCompleted() really are setStatus() with this write.
-await check('markOnboard/markCompleted send operatorStatusWrite — no other shape exists in the app', async () => {
+// The app requests every progression through the authenticated server endpoint.
+await check('Operator progression calls /travel/progress — no direct ride update remains', async () => {
   const inbox = fs.readFileSync(path.join(here, '..', '..', 'src', 'backend', 'operatorInbox.ts'), 'utf8');
   const need = [
-    /export const markOnboard = \(rideId: string\) => setStatus\(rideId, 'onboard'\);/,
-    /export const markCompleted = \(rideId: string\) => setStatus\(rideId, 'completed'\);/,
-    /export const markArrived = \(rideId: string\) => setStatus\(rideId, 'arrived'\);/,
-    /export const declineTravel = \(rideId: string\) => setStatus\(rideId, 'declined'\);/,
-    /updateDoc\(doc\(db, 'rides', rideId\), operatorStatusWrite\(status, Date\.now\(\)\)\)/,
+    /\/travel\/progress/,
+    /Authorization: `Bearer \$\{token\}`/,
+    /body: JSON\.stringify\(\{ rideId, status \}\)/,
+    /return setStatus\(rideId, 'onboard'\);/,
+    /markCompleted = \(rideId: string\) => setStatus\(rideId, 'completed'\)/,
   ];
   for (const re of need) if (!re.test(inbox)) throw new Error(`operatorInbox.ts does not match ${re}`);
-  const updates = inbox.match(/updateDoc\(/g) || [];
-  if (updates.length !== 1) throw new Error(`expected one updateDoc in operatorInbox.ts, found ${updates.length}`);
+  if (/updateDoc\(doc\(db, 'rides'/.test(inbox)) throw new Error('operatorInbox.ts still writes ride state directly');
 });
 
 await env.cleanup();

@@ -111,16 +111,12 @@ export default function OperatorInsurance() {
         />
       </Card>
 
-      {/* HOW AMERICAN RIDER LEARNS A POLICY HAS ENDED. An expiry date is on the certificate
-          and can be checked by arithmetic. A mid-term cancellation is on no document at all —
-          only the carrier knows, and only the carrier can say. Naming us as certificate
-          holder is the standard instrument for exactly that, and it is free.
-
-          CERTIFICATE HOLDER, NOT ADDITIONAL INSURED. The two are routinely confused and the
-          difference is money. A certificate holder receives the certificate and notice of
-          cancellation — information, nothing more. An additional insured is granted coverage
-          under the policy, which raises the premium and would say American Rider is insured
-          under it. We are not, and we do not ask to be. */}
+      {/* CONTINUING COVERAGE. The expiry date is deterministic and gates duty/acceptance.
+          Mid-term cancellation is harder: a standard certificate-holder designation is only
+          evidence and does NOT by itself guarantee cancellation notice. Where the underlying
+          policy offers a notice-of-cancellation/non-renewal endorsement, the broker/carrier
+          should issue that evidence to American Rider. Otherwise renewal/periodic verification
+          remains necessary. Never tell an Operator that a plain COI creates notice rights. */}
       {/* THE REQUIREMENT STAYS, THE ADVICE MOVES (Chad, 18 Sept 2026). What an operator must
           do to this policy is one line and belongs here; what to buy, what it costs at each
           age and how to ask for it is a page for somebody buying their first livery policy,

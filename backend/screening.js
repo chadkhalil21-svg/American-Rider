@@ -21,9 +21,11 @@
 //
 // HOW MOST OF THEM ARE DECIDED IN A SECOND. Checkr returns `clear`, `consider` or `suspended`.
 // `clear` passes instantly with nobody involved. `consider` is put through the statutory
-// standard below, which is deterministic and resolves the great majority on its own. Only a
-// record the rules genuinely cannot place reaches a person, and the model writes the summary
-// they read — it never decides.
+// standard below, which is deterministic and resolves every case the authoritative data can
+// place. American Rider adds no discretionary criminal-history exclusions beyond the statutory standard
+// jurisdiction's rule set. If source data is missing, contradictory or under dispute, the
+// operator remains blocked while the source is clarified; nobody is asked to guess. Human
+// review is the last exception path for a genuine source conflict, not a routine approval step.
 const { readKey } = require('./env');
 const { adminDb } = require('./firebase-admin');
 const { fileTicket } = require('./tickets');
@@ -283,14 +285,14 @@ function adjudicate(report, { now = Date.now() } = {}) {
     return {
       decision: 'review',
       reasons: ['The screening company flagged this report, but its findings could not be read by the standard.'],
-      summary: 'Flagged by the screening company; findings unreadable. A person must decide.',
+      summary: 'Flagged by the screening company; authoritative findings are unavailable. Source clarification is required before qualification can continue.',
     };
   }
   if (unplaceable.length) {
     return {
       decision: 'review',
       reasons: unplaceable.map((r) => `${r.charge || 'record'} — no date on the record.`),
-      summary: 'A record on this report has no date and cannot be placed in a statutory window.',
+      summary: 'A record on this report has no usable date and cannot be placed in a statutory window. Source clarification is required.',
     };
   }
   return { decision: 'pass', reasons: [], summary: 'Meets Florida’s requirements.' };
@@ -309,16 +311,18 @@ function adjudicate(report, { now = Date.now() } = {}) {
  *                 it is what the three-year clock runs from, not the day we read it. A report
  *                 conducted two years ago is two years into its life, not starting one.
  */
-async function recordDecision({ uid, decision, reasons, summary, reportId, provider, issuedAt }) {
+async function recordDecision({ uid, decision, reasons, summary, reportId, provider, issuedAt, adverseAction = null }) {
   const db = adminDb();
   if (!db) return { ok: false, reason: 'no database' };
   const now = Date.now();
   const conductedAt = Number(issuedAt) > 0 ? Number(issuedAt) : now;
+  const storedDecision = decision === 'refuse' ? 'pre_adverse' : decision;
   try {
     await db.collection('users').doc(String(uid)).set(
       {
         screening: {
-          decision,
+          decision: storedDecision,
+          proposedDecision: decision === 'refuse' ? 'refuse' : null,
           reasons: reasons || [],
           summary: summary || '',
           reportId: reportId || null,
@@ -327,12 +331,13 @@ async function recordDecision({ uid, decision, reasons, summary, reportId, provi
           conductedAt,
           // §627.748(12)(b), from the date the check was actually conducted.
           recheckDue: conductedAt + RECHECK_MS,
+          ...(adverseAction ? { adverseAction } : {}),
         },
       },
       { merge: true },
     );
     // A refused or held operator must not be dispatchable, whatever else is true of them.
-    if (decision !== 'pass') {
+    if (storedDecision !== 'pass') {
       await db.collection('operators').doc(String(uid)).set(
         { available: false, screeningBlocked: true, screeningReason: summary || '' },
         { merge: true },
@@ -344,38 +349,39 @@ async function recordDecision({ uid, decision, reasons, summary, reportId, provi
       );
     }
 
-    // ADVERSE ACTION IS A PROCESS, NOT A STATUS. The FCRA requires a pre-adverse notice with a
-    // copy of the report and a summary of rights, a waiting period, then the adverse notice.
-    // That is a person's job and a deadline, so it is filed as one rather than left implicit.
-    if (decision === 'refuse') {
-      await fileTicket({
-        uid,
-        kind: 'support',
-        reason: 'Adverse action due — operator screening',
-        description:
-          `Screening refused for operator ${uid}.\n${(reasons || []).join('\n')}\n\n` +
-          `FCRA ADVERSE ACTION IS OWED:\n` +
-          `1. Send the pre-adverse notice with a copy of the report and "A Summary of Your ` +
-          `Rights Under the FCRA".\n2. Wait at least 5 business days for a dispute.\n` +
-          `3. Send the adverse action notice naming the screening company and stating they ` +
-          `did not make the decision.\nReport ${reportId || '—'}.`,
-      });
-    }
     if (decision === 'review') {
       await fileTicket({
         uid,
         kind: 'support',
-        reason: 'Operator screening needs a decision',
+        reason: 'Operator screening needs source clarification',
         description:
-          `A screening result could not be placed by the standard.\n${summary}\n` +
-          `${(reasons || []).join('\n')}\nReport ${reportId || '—'}. Nobody drives until this ` +
-          `is decided.`,
+          `A screening result could not be placed by the statutory standard.\n${summary}\n` +
+          `${(reasons || []).join('\n')}\nReport ${reportId || '—'}. Nobody drives until the ` +
+          `authoritative source is clarified or the exception is resolved.`,
       });
     }
-    return { ok: true, decision };
+    return { ok: true, decision: storedDecision, proposedDecision: decision === 'refuse' ? 'refuse' : null };
   } catch (e) {
     return { ok: false, reason: e.message };
   }
+}
+
+async function recordAdverseState({ uid, state, actionId = null, reportId = null, final = false, note = null }) {
+  const db = adminDb();
+  if (!db) return { ok: false, reason: 'no database' };
+  const now = Date.now();
+  await db.collection('users').doc(String(uid)).set({
+    screening: {
+      adverseAction: { state, actionId, reportId, updatedAt: now, ...(note ? { note } : {}) },
+      ...(final ? { decision: 'refuse', proposedDecision: null, finalizedAt: now } : {}),
+    },
+  }, { merge: true });
+  await db.collection('operators').doc(String(uid)).set({
+    available: false,
+    screeningBlocked: true,
+    screeningReason: note || 'Background screening is not cleared.',
+  }, { merge: true });
+  return { ok: true };
 }
 
 /**
@@ -577,7 +583,7 @@ module.exports = {
   CRIMINAL_ELEMENTS,
   ACCEPT_EXISTING_MAX_AGE_MS,
   REQUIRED_ELEMENTS,
-  recordDecision,
+  recordDecision, recordAdverseState,
   screeningCurrent,
   screeningReady,
   sweepScreening,

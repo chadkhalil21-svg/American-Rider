@@ -38,6 +38,9 @@ service cloud.firestore {
     function drivesExisting() {
       return signedIn() && resource.data.operatorId == request.auth.uid;
     }
+    function guardsExisting() {
+      return signedIn() && resource.data.get('guardianUid', null) == request.auth.uid;
+    }
     // The set of fields this update touches, and nothing more.
     function touchesOnly(fields) {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
@@ -59,12 +62,16 @@ service cloud.firestore {
       return ride.tripNo == d.tripNo
         && d.travelerUid == ride.travelerUid
         && d.operatorId == ride.operatorId
+        && d.get('guardianUid', null) == ride.get('party', {}).get('guardianUid', null)
         && ((d.from == 'traveler' && ride.travelerUid == request.auth.uid
              && (ride.status in ['assigned', 'accepted', 'arrived', 'onboard']
                  || (ride.status == 'completed' && d.lostItemId is string)))
             || (d.from == 'operator' && ride.operatorId == request.auth.uid
              && (ride.status in ['accepted', 'arrived', 'onboard']
-                 || (ride.status == 'completed' && d.lostItemId is string))));
+                 || (ride.status == 'completed' && d.lostItemId is string)))
+            || (d.from == 'guardian' && ride.get('party', {}).get('teen', false) == true
+                && ride.get('party', {}).get('guardianUid', null) == request.auth.uid
+                && ride.status in ['assigned', 'accepted', 'arrived', 'onboard']));
     }
 
     // Does this update move the travel INTO `st` (from any other status)?
@@ -113,75 +120,18 @@ service cloud.firestore {
       // not the trip number, not the status.
       allow update: if ownsExisting()
                     && resource.data.status == 'completed'
-                    && touchesOnly(['rating', 'tipCents', 'reviewedAt'])
+                    && touchesOnly(['rating', 'reviewedAt'])
                     && (!changes('rating')
                         || request.resource.data.rating == null
                         || (request.resource.data.rating >= 1 && request.resource.data.rating <= 5));
 
-      // The operator's own progress through the travel they were given. A separate, narrower
-      // grant than the traveler's: an operator may move the travel along and record when they
-      // arrived, and may touch nothing else. Not the fare, not the traveler, not the rating
-      // of their own work, and not the operator assignment — an operator cannot hand a travel
-      // to somebody else or take one that was not given to them.
-      //
-      // opLat/opLng/opAt/stillSince are the operator's POSITION WHILE CARRYING A TRAVELER —
-      // what route monitoring watches. Writable by the operator because the phone is the only
-      // thing that knows where the car is; `monitor` is NOT, in either direction, because it
-      // decides whether a case is opened and neither party may clear a concern raised about
-      // the other. That field is written only by the server (backend/monitor.js), which
-      // bypasses these rules, and answered only through POST /travel/check-in.
-      // `needsPayout` IS THE QUEUE MARKER THE SETTLEMENT SWEEP READS, and leaving it off this
-      // list cost a real payout on 2 Sept 2026.
-      //
-      // The operator app began stamping it when a travel completes, so the sweep could query
-      // the travels that owe somebody money instead of scanning every completed travel ever.
-      // It was never added here — so touchesOnly() rejected the WHOLE update, and setStatus's
-      // `catch` swallowed the rejection. The effect was not a missing flag: completion itself
-      // stopped being written. The operator saw "Operation Complete" and $17.77, the traveler's
-      // record stayed `onboard`, and nobody was paid. Adding a field to a client write without
-      // adding it here does not fail loudly; it fails silently and takes the rest of the write
-      // with it.
-      //
-      // A CLIENT-SETTABLE "PAY ME" FLAG IS SAFE ONLY BECAUSE IT AUTHORIZES NOTHING. It is a
-      // hint that a travel is ready to be looked at. The sweep still re-reads the travel,
-      // still checks the operator's payout account, and transferToOperator still verifies the
-      // traveler's uid against Stripe's own metadata on the payment before a cent moves. So
-      // the worst an operator can do by setting it is ask to be paid for a travel they were
-      // actually assigned — which is what it means. It is constrained to `true`, and only
-      // alongside a status of `completed`, so it cannot be used to un-queue a payout either.
-      //
-      // ACCEPTANCE IS NOT HERE ANY MORE (22 Sept 2026). 'accepted' and acceptedAt were on this
-      // list, so the phone accepted a travel with no check of anything but operatorId — an
-      // operator whose disclosure, approval, documents, insurance, screening or payouts had
-      // stopped standing after the offer could still take it. POST /travel/accept re-checks all
-      // of them and writes 'accepted' with admin access. And because a phone that cannot write
-      // 'accepted' could otherwise jump straight to 'arrived', every later status now requires
-      // the travel to be under way already; 'declined' is only an answer to an open offer.
-      //
-      // THE WRITE THE APP ACTUALLY SENDS (src/backend/rideStatusWrite.ts, audit of f6ef88d):
-      //   arrived    status, statusAt, arrivedAt
-      //   onboard    status, statusAt, onboardAt
-      //   completed  status, statusAt, completedAt, needsPayout: true
-      //   declined   status, statusAt, declinedAt
-      // onboardAt and completedAt were missing from this list, so the moves to 'onboard' and to
-      // 'completed' were refused. Each timestamp — and needsPayout — is now accepted ONLY in the
-      // update that ENTERS its status (enteringStatus below), so none can be rewritten later.
+      // Operator progression is server-authoritative. A phone may publish only its telemetry
+      // on a Travel already assigned to it; /travel/progress owns status, timestamps and the
+      // payout queue marker. This closes the authenticated-Operator attack in which a client
+      // could legally write arrived -> onboard -> completed without transportation occurring.
       allow update: if drivesExisting()
-                    && touchesOnly(['status', 'statusAt', 'arrivedAt', 'onboardAt', 'completedAt', 'declinedAt',
-                                    'opLat', 'opLng', 'opAt', 'stillSince', 'needsPayout'])
-                    && (!changes('status')
-                        || (request.resource.data.status in ['arrived', 'onboard', 'completed']
-                            && resource.data.status in ['accepted', 'arrived', 'onboard'])
-                        || (request.resource.data.status == 'declined'
-                            && resource.data.status == 'assigned'))
-                    && stampedOnlyEntering('arrivedAt', 'arrived')
-                    && stampedOnlyEntering('onboardAt', 'onboard')
-                    && stampedOnlyEntering('completedAt', 'completed')
-                    && stampedOnlyEntering('declinedAt', 'declined')
-                    && (!changes('needsPayout')
-                        || (request.resource.data.needsPayout == true
-                            && enteringStatus('completed')));
-
+                    && touchesOnly(['opLat', 'opLng', 'opAt', 'stillSince'])
+                    && !changes('status');
       // A travel record is history. It is never deleted from a phone.
       allow delete: if false;
     }
@@ -214,7 +164,7 @@ service cloud.firestore {
     // `from` is checked against the uid doing the writing, so neither party can forge a
     // message from the other. That was the point of the old rule and it survives intact.
     match /messages/{messageId} {
-      allow read: if ownsExisting() || drivesExisting();
+      allow read: if ownsExisting() || drivesExisting() || guardsExisting();
 
       // BOUND TO THE TRAVEL RECORD (22 Sept 2026). This rule used to check only that the writer
       // was who the message said: `from: 'operator'` with operatorId = the writer. Nothing tied
@@ -234,7 +184,7 @@ service cloud.firestore {
       // verified against the ride, so each message is readable by exactly the two parties it
       // was written between.
       allow create: if signedIn()
-                    && request.resource.data.keys().hasOnly(['rideId', 'tripNo', 'from', 'travelerUid', 'operatorId', 'lostItemId', 'text', 'createdAt'])
+                    && request.resource.data.keys().hasOnly(['rideId', 'tripNo', 'from', 'travelerUid', 'operatorId', 'guardianUid', 'lostItemId', 'text', 'createdAt'])
                     && request.resource.data.rideId is string
                     && request.resource.data.tripNo is string
                     && request.resource.data.tripNo.size() <= 24
@@ -263,6 +213,14 @@ service cloud.firestore {
     // these rules. Closed to the app in both directions: a traveler must not be able to
     // read another person's case, and must not be able to close their own.
     match /support_tickets/{caseNo} {
+      allow read, write: if false;
+    }
+
+    // ---- platform messages -------------------------------------------------
+    // American Rider writes these with Admin credentials. The app reads/marks them through
+    // authenticated backend routes, not Firestore directly, so neither an Operator nor another
+    // client can forge, delete or rewrite an institutional notice.
+    match /users/{uid}/platform_messages/{messageId} {
       allow read, write: if false;
     }
 

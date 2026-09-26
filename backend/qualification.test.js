@@ -224,6 +224,10 @@ const codes = (a) => a.blockers.map((b) => b.code);
       codes(A(cleanUser({ screening: { decision: 'refuse', summary: 'x' } }), { liveMoney: false })).includes('screening_refused'));
     check('5. screening held for review: exception, in any mode',
       A(cleanUser({ screening: { decision: 'review' } }), { liveMoney: false }).status === 'exception');
+    check('5. pre-adverse screening is a blocked incomplete state, not a final refusal',
+      !A(cleanUser({ screening: { decision: 'pre_adverse' } }), { liveMoney: false }).qualified && codes(A(cleanUser({ screening: { decision: 'pre_adverse' } }), { liveMoney: false })).includes('screening_pre_adverse'));
+    check('5. provider screening in progress is not qualified',
+      !A(cleanUser({ screening: { decision: 'in_progress' } }), { liveMoney: false }).qualified && codes(A(cleanUser({ screening: { decision: 'in_progress' } }), { liveMoney: false })).includes('screening_incomplete'));
     check('5. test money and no screening: qualified — the line /operator/online has always drawn',
       A(cleanUser({ screening: null }), { liveMoney: false }).qualified);
   }

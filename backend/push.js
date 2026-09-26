@@ -25,6 +25,8 @@ const EXPO_PUSH = 'https://exp.host/--/api/v2/push/send';
 const KINDS = {
   travel_assigned: { pref: null, required: true, channel: 'travel' },
   check_in: { pref: null, required: true, channel: 'travel' },
+  teen_pickup_code: { pref: null, required: true, channel: 'travel' },
+  guardian_travel: { pref: null, required: true, channel: 'travel' },
   // A reservation that could not be filled, or could not be paid for. Not refusable: the
   // traveler is otherwise standing outside at 6:30 AM for a car that is not coming.
   scheduled_failed: { pref: null, required: true, channel: 'travel' },
@@ -35,6 +37,8 @@ const KINDS = {
   // the ability to, is not receiving marketing — they are being told why their income stops.
   screening_expired: { pref: null, required: true, channel: 'travel' },
   screening_due: { pref: null, required: true, channel: 'travel' },
+  operator_account_fee_due: { pref: null, required: true, channel: 'travel' },
+  platform_message: { pref: null, required: true, channel: 'travel' },
 };
 
 /** The token and preferences for one account, or nulls. */

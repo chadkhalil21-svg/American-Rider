@@ -5,7 +5,7 @@
 // behavioural test of the existing calls would ever catch. Read the file, find every create,
 // and require a key on each.
 //
-// Found 19 Sept 2026 during a pre-launch sweep: transfers, tips, scheduled travel and
+// Found 19 Sept 2026 during a product sweep: transfers, tips, scheduled travel and
 // screening were all keyed; the traveler's own fare — the largest and most frequent charge the
 // platform makes — was not. A double-tap on Confirm Travel created a second PaymentIntent for
 // the same journey.
@@ -72,8 +72,10 @@ if (typeof keyFor === 'function') {
   check('idempotencyForTravel is exported for testing', false, 'not exported');
 }
 
-// The fee rule is unchanged by any of this.
-check('platform fee still $1.50 at a $25 fare', platformFeeCents(2500) === 150);
+// Payment idempotency must not bypass canonical pricing.
+const unknown25 = platformFeeCents(2500);
+check('the canonical loss-safe fee still prices a $25 unknown-card Travel',
+  unknown25 >= 200 && Number.isInteger(unknown25), `fee=${unknown25}`);
 
 let bad = 0;
 for (const r of R) { if (!r.ok) bad++; console.log(`${r.ok ? 'PASS' : 'FAIL'}  ${r.l}${r.ok ? '' : '  — ' + (r.d || '')}`); }

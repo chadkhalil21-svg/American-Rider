@@ -20,6 +20,7 @@ const { adminDb, adminStatus } = require('./firebase-admin');
 const { fileTicket } = require('./tickets');
 const { readKey } = require('./env');
 const { money } = require('./email');
+const { recordPayoutActivity } = require('./operatorfees');
 
 /**
  * Handle one verified event. Returns a short report; never throws — Stripe reads a non-2xx as
@@ -83,6 +84,18 @@ async function handleEvent(event) {
     }
 
     // ---- Money to an operator did not arrive. ---------------------------------------
+    case 'payout.paid': {
+      // Stripe's $2 monthly active-account charge is incurred in a month a payout reaches an
+      // Operator's bank/debit card. Record that month from Stripe's own event; do not infer it
+      // merely because American Rider transferred fare into the connected balance.
+      const accountId = event.account || obj.destination || null;
+      const activity = await recordPayoutActivity({
+        accountId,
+        createdAt: Number(event.created || 0) > 0 ? Number(event.created) * 1000 : Date.now(),
+      });
+      return { ok: activity.ok !== false, action: activity.ignored ? 'payout account not ours' : 'operator active month recorded', reason: activity.reason };
+    }
+
     case 'transfer.reversed':
     case 'payout.failed': {
       const caseNo = await open(db, null, {

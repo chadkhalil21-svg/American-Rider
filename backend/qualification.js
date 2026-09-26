@@ -292,6 +292,10 @@ function assessOperator({ user, fleet = null, context = 'qualify', liveMoney = f
     add(finding('qualification', 'refused', 'screening_refused', 'screening', s.summary || 'Background screening refused.'));
   } else if (s?.decision === 'review') {
     add(finding('qualification', 'exception', 'screening_review', 'screening', s.summary || 'Background screening needs a decision.'));
+  } else if (s?.decision === 'pre_adverse') {
+    add(finding('qualification', 'incomplete', 'screening_pre_adverse', 'screening', s.summary || 'Background screening is in the required pre-adverse notice and dispute period.'));
+  } else if (['in_progress','invited','ordered','awaiting_provider','awaiting_agency','expired'].includes(s?.decision)) {
+    add(finding('qualification', 'incomplete', 'screening_incomplete', 'screening', s.summary || 'Background screening is not complete.'));
   } else if (fleet?.screeningBlocked) {
     // Set by a refusal or a hold (both handled above from the account record) and by the
     // three-year sweep, which leaves decision 'pass' in place: that one is a re-check owed.

@@ -24,7 +24,6 @@ const limited = [
   ["delete", "/payment-methods/:id", 'LIMITS.payments'],
   ["post", "/create-payment-intent", 'LIMITS.payments'],
   ["post", "/charge-ride", 'LIMITS.payments'],
-  ["post", "/travel/tip", 'LIMITS.payments'],
   ["post", "/travel/cancel", 'LIMITS.payments'],
   ["post", "/travel/dispatch", 'LIMITS.dispatch'],
   ["post", "/travel/schedule", 'LIMITS.dispatch'],

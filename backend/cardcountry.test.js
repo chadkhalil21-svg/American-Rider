@@ -22,18 +22,18 @@ const read = (p) => fs.readFileSync(path.join(__dirname, p), 'utf8');
 
 // ---- The predicate --------------------------------------------------------------------
 check('US is domestic', isDomesticCard('US'));
-check('a missing country is domestic — the quote must not move once a card is entered',
-  isDomesticCard(undefined) && isDomesticCard(null) && isDomesticCard(''));
+check('a missing country is international-safe — a first foreign card must not be under-priced',
+  !isDomesticCard(undefined) && !isDomesticCard(null) && !isDomesticCard(''));
 check('every other country is international',
   ['GB', 'FR', 'CA', 'MX', 'DE', 'JP', 'BR'].every((c) => !isDomesticCard(c)));
 
 // ---- The schedules actually differ, or none of this wiring is worth anything ------------
-check('the two schedules differ above a $60 fare',
-  platformFeeCents(10000, 'US') === 250 && platformFeeCents(10000, 'GB') === 500);
-check('and agree below $30, where both are the floor',
-  platformFeeCents(2000, 'US') === platformFeeCents(2000, 'GB'));
-check('quote() carries the card through to what the traveler pays',
-  quote(10000, undefined, undefined, 'GB').travelerPays - quote(10000, undefined, undefined, 'US').travelerPays === 250);
+check('the two card-cost schedules produce their audited $100 fees',
+  platformFeeCents(10000, 'US') === 413 && platformFeeCents(10000, 'GB') === 577);
+check('the $2 floor controls only where it really covers both schedules',
+  platformFeeCents(500, 'US') === 200 && platformFeeCents(500, 'GB') === 200);
+check('quote() carries card economics through to the traveler total',
+  quote(10000, undefined, undefined, 'GB').travelerPays - quote(10000, undefined, undefined, 'US').travelerPays === 164);
 
 // ---- Stripe's country survives the trip through our own shape ---------------------------
 const payments = read('payments.js');
@@ -42,13 +42,13 @@ check('describePaymentMethod keeps card.country',
   'payments.js no longer reads card.country onto the method');
 check('defaultCardCountry returns null rather than throwing when Stripe cannot be reached',
   /async function defaultCardCountry[\s\S]{0,700}?catch\s*\{\s*\n?\s*return null;/.test(payments),
-  'a Stripe outage must degrade to a domestic quote, not block the quote');
+  'a Stripe outage must degrade to the international-safe quote, not block the quote');
 
 // ---- The quote endpoint asks who is calling ---------------------------------------------
 const server = read('server.js');
 check("/fare-quote is wrapped in attachAuth",
   /app\.post\('\/fare-quote',\s*attachAuth/.test(server),
-  'without it every quote is anonymous, therefore always domestic');
+  'without it every signed-in quote would lose the known card-country input');
 check('/fare-quote passes the card-country reader into the canonical fare authority',
   /authoritativeFare\(\{[\s\S]{0,250}?cardCountryFor: defaultCardCountry/.test(server),
   'the country is read and then dropped');

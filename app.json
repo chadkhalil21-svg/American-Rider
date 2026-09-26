@@ -21,7 +21,7 @@
       "bundleIdentifier": "com.americanrider.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "CFBundleDisplayName": "American",
+        "CFBundleDisplayName": "American Rider",
         "NSSupportsLiveActivities": true,
         "UIBackgroundModes": [
           "location",
@@ -49,6 +49,9 @@
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
         "android.permission.RECORD_AUDIO"
       ]
     },
@@ -65,7 +68,9 @@
         {
           "locationWhenInUsePermission": "American Rider uses your location to set your pickup point and work out the price of your trip.",
           "locationAlwaysAndWhenInUsePermission": "American Rider keeps you in service while your phone is locked, so travel can be assigned to you without the app open. Location is used only while you are in service and stops when you conclude operations.",
-          "isIosBackgroundLocationEnabled": true
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
         }
       ],
       [

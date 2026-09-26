@@ -1,0 +1,152 @@
+{
+  "schema": 1,
+  "candidateSha": "REPLACE_WITH_FULL_SHA",
+  "environment": "production-validation",
+  "gates": {
+    "insurance": {
+      "result": "pending",
+      "executedAt": null,
+      "executor": null,
+      "reviewer": null,
+      "evidence": [],
+      "details": {
+        "carrier": null,
+        "binderOrPolicyReference": null,
+        "effectiveDate": null,
+        "expirationDate": null,
+        "englishDisclosureReviewed": false,
+        "translationsReviewed": []
+      }
+    },
+    "productionConfiguration": {
+      "result": "pending",
+      "executedAt": null,
+      "executor": null,
+      "reviewer": null,
+      "evidence": [],
+      "details": {
+        "deployedSha": null,
+        "healthOperationalReady": false,
+        "operationalMissing": []
+      }
+    },
+    "stripe": {
+      "result": "pending",
+      "executedAt": null,
+      "executor": null,
+      "reviewer": null,
+      "evidence": []
+    },
+    "checkr": {
+      "result": "pending",
+      "executedAt": null,
+      "executor": null,
+      "reviewer": null,
+      "evidence": []
+    },
+    "firebase": {
+      "result": "pending",
+      "executedAt": null,
+      "executor": null,
+      "reviewer": null,
+      "evidence": []
+    },
+    "scheduler": {
+      "result": "pending",
+      "executedAt": null,
+      "executor": null,
+      "reviewer": null,
+      "evidence": []
+    },
+    "routingTolls": {
+      "result": "pending",
+      "executedAt": null,
+      "executor": null,
+      "reviewer": null,
+      "evidence": []
+    },
+    "transit": {
+      "result": "pending",
+      "executedAt": null,
+      "executor": null,
+      "reviewer": null,
+      "evidence": []
+    },
+    "emailSupport": {
+      "result": "pending",
+      "executedAt": null,
+      "executor": null,
+      "reviewer": null,
+      "evidence": []
+    },
+    "phoneVerification": {
+      "result": "pending",
+      "executedAt": null,
+      "executor": null,
+      "reviewer": null,
+      "evidence": []
+    },
+    "documentStorage": {
+      "result": "pending",
+      "executedAt": null,
+      "executor": null,
+      "reviewer": null,
+      "evidence": []
+    },
+    "push": {
+      "result": "pending",
+      "executedAt": null,
+      "executor": null,
+      "reviewer": null,
+      "evidence": []
+    },
+    "iosPhysicalDevices": {
+      "result": "pending",
+      "executedAt": null,
+      "executor": null,
+      "reviewer": null,
+      "evidence": []
+    },
+    "androidPhysicalDevice": {
+      "result": "pending",
+      "executedAt": null,
+      "executor": null,
+      "reviewer": null,
+      "evidence": []
+    },
+    "smartTravelLive": {
+      "result": "pending",
+      "executedAt": null,
+      "executor": null,
+      "reviewer": null,
+      "evidence": []
+    },
+    "liveMoneyReconciliation": {
+      "result": "pending",
+      "executedAt": null,
+      "executor": null,
+      "reviewer": null,
+      "evidence": []
+    },
+    "uxRubric": {
+      "result": "pending",
+      "executedAt": null,
+      "executor": null,
+      "reviewer": null,
+      "evidence": [],
+      "details": {
+        "completeScreenInventoryReviewed": false,
+        "travelerCriticalPathsReviewed": false,
+        "operatorCriticalPathsReviewed": false,
+        "familyTeenCriticalPathsReviewed": false,
+        "smartTravelCriticalPathsReviewed": false,
+        "emptyLoadingErrorOfflineRestartStatesReviewed": false,
+        "terminologyAndCopyReviewed": false,
+        "firstClassRubricReviewed": false,
+        "accessibilityReviewed": false,
+        "smallAndLargeDeviceLayoutsReviewed": false,
+        "noPlaceholderOrSimulatedProductionExperience": false
+      }
+    }
+  }
+}

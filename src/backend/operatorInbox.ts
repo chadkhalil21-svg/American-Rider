@@ -13,12 +13,11 @@ import {
   doc,
   onSnapshot,
   query,
-  updateDoc,
   where,
 } from 'firebase/firestore';
 import { fareFromTotal } from '../data';
 import { PAYMENT_SERVER_URL } from '../config';
-import { operatorStatusWrite, type OperatorStatus } from './rideStatusWrite';
+import { type OperatorStatus } from './rideStatusWrite';
 import { auth, db } from '../firebase';
 import { t } from '../i18n';
 
@@ -30,6 +29,11 @@ export type AssignedTravel = {
   travelerUid: string;
   /** Empty when the traveler has not set a name. Never substituted with an invented one. */
   travelerName: string;
+  bookedForAnother?: boolean;
+  minor?: boolean;
+  teen?: boolean;
+  guardianName?: string | null;
+  pinRequired?: boolean;
   tripNo: string;
   dep: string;
   dest: string;
@@ -102,6 +106,10 @@ export function watchAssignedTravel(
               rideId: d.id,
               travelerUid: String(x.travelerUid ?? ''),
               travelerName: String(x.travelerName ?? ''),
+              bookedForAnother: (x.party as any)?.bookedForAnother === true,
+              teen: (x.party as any)?.teen === true,
+              guardianName: typeof (x.party as any)?.guardianName === 'string' ? (x.party as any).guardianName : null,
+              pinRequired: (x.party as any)?.pinRequired === true,
               tripNo: String(x.tripNo ?? ''),
               dep: String(x.dep ?? ''),
               dest: String(x.dest ?? ''),
@@ -147,25 +155,21 @@ export function watchAssignedTravel(
 async function setStatus(rideId: string, status: OperatorStatus): Promise<boolean> {
   if (!rideId) return false;
   try {
-    // The exact write, defined once in rideStatusWrite.ts — the same object the Firestore
-    // emulator tests send (infra/rules-emulator).
-    await updateDoc(doc(db, 'rides', rideId), operatorStatusWrite(status, Date.now()));
+    const token = await auth.currentUser?.getIdToken().catch(() => null);
+    if (!token) return false;
+    const res = await fetch(`${PAYMENT_SERVER_URL}/travel/progress`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ rideId, status }),
+    });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      console.error(`[inbox] server refused travel ${rideId} -> ${status}:`, d?.code || d?.error || res.status);
+      return false;
+    }
     return true;
   } catch (e) {
-    // LOUD, because a silent one cost a payout on 2 Sept 2026.
-    //
-    // The caller already treats `false` correctly — completeOp does not claim a travel
-    // finished if the database refused. What was missing is any way to find out WHY. A
-    // security rule rejected the write (needsPayout was not on the permitted field list),
-    // and a bare `catch { return false }` turned a precise, actionable
-    // "PERMISSION_DENIED: Missing or insufficient permissions" into nothing at all. The
-    // operator saw "Operation Complete", the travel stayed `onboard`, and the only visible
-    // symptom was a payout that never arrived — three layers away from the cause.
-    //
-    // Rules rejections are the likeliest failure here and the hardest to guess at, so the
-    // message is kept. It goes to the console, not to the operator: they are told the
-    // travel did not save, which is their business; which field a rule refused is ours.
-    console.error(`[inbox] could not set travel ${rideId} to ${status}:`, (e as Error)?.message);
+    console.error(`[inbox] could not request travel ${rideId} -> ${status}:`, (e as Error)?.message);
     return false;
   }
 }
@@ -202,5 +206,15 @@ export async function acceptTravel(
 }
 export const declineTravel = (rideId: string) => setStatus(rideId, 'declined');
 export const markArrived = (rideId: string) => setStatus(rideId, 'arrived');
-export const markOnboard = (rideId: string) => setStatus(rideId, 'onboard');
+export async function markOnboard(rideId: string, teenPickupCode?: string): Promise<boolean> {
+  if (!rideId) return false;
+  if (teenPickupCode) {
+    try {
+      const token = await auth.currentUser?.getIdToken().catch(() => null);
+      const res = await fetch(`${PAYMENT_SERVER_URL}/travel/teen-pickup/verify`, { method:'POST', headers:{'Content-Type':'application/json', ...(token?{Authorization:`Bearer ${token}`}:{})}, body:JSON.stringify({rideId,pin:teenPickupCode}) });
+      if (!res.ok) return false;
+    } catch { return false; }
+  }
+  return setStatus(rideId, 'onboard');
+}
 export const markCompleted = (rideId: string) => setStatus(rideId, 'completed');

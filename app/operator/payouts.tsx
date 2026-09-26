@@ -98,6 +98,10 @@ export default function OperatorPayouts() {
 
       <SectionLabel style={styles.lbl}>{t('operator.payoutAccount')}</SectionLabel>
       <Card style={styles.card}>
+        <Text style={styles.accountTitle}>{t('operator.activeAccountCost')}</Text>
+        <Text style={styles.accountBody}>{t('operator.activeAccountCostBody')}</Text>
+      </Card>
+      <Card style={styles.card}>
         {status === null ? (
           <Text style={styles.body}>{t('operator.checking')}</Text>
         ) : payable ? (
@@ -161,6 +165,8 @@ const styles = StyleSheet.create({
   sub: { fontSize: 14.5, color: colors.muted, marginTop: 9, lineHeight: 21.75 },
   lbl: { marginTop: 24, marginBottom: 12 },
   card: { paddingVertical: 18, paddingHorizontal: 20 },
+  accountTitle: { fontSize: 14.5, fontWeight: '600', color: colors.ink },
+  accountBody: { fontSize: 13, color: colors.muted, lineHeight: 19, marginTop: 7 },
   body: { fontSize: 14, color: colors.ink2, lineHeight: 21, marginTop: 8 },
   pending: { fontSize: 15, fontWeight: '600', color: colors.red },
   error: { fontSize: 13.5, color: colors.red, marginTop: 12, lineHeight: 19 },

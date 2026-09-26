@@ -32,6 +32,8 @@
 // still runs on the thresholds alone, and says less.
 const { distanceMiles, matchOperator, coverageLapsed } = require('./matching');
 const { screeningReady } = require('./screening');
+const { assessOperator } = require('./qualification');
+const { connectAccountStatus } = require('./payments');
 const { adminDb, adminStatus } = require('./firebase-admin');
 const { fileTicket } = require('./tickets');
 const { readKey } = require('./env');
@@ -627,7 +629,38 @@ async function sweepAssignments({ now = Date.now() } = {}) {
       continue;
     }
 
-    const next = matchOperator(fleet, from, ride.travelClass || 'Standard', { requireScreening: screeningReady() });
+    // Matching is a candidate filter, not qualification authority. Re-offer candidates are
+    // revalidated against their current user record and Stripe payout state before the Traveler
+    // is told a new Operator has been assigned.
+    let next = null;
+    let candidates = [...fleet];
+    while (candidates.length) {
+      const candidate = matchOperator(candidates, from, ride.travelClass || 'Standard', { requireScreening: screeningReady() });
+      if (!candidate) break;
+      try {
+        const uid = String(candidate.operator.id);
+        const userSnap = await db.collection('users').doc(uid).get();
+        const user = userSnap.exists ? userSnap.data() : null;
+        const payout = await connectAccountStatus(user?.stripeAccountId || null);
+        const a = assessOperator({
+          user,
+          fleet: candidate.operator,
+          context: 'accept',
+          liveMoney: true,
+          account: { disabled: false },
+          payouts: { enabled: !!payout.payoutsEnabled },
+          now,
+        });
+        if (a.eligible) { next = candidate; break; }
+        await db.collection('operators').doc(uid).set(
+          { available: false, offDutyReason: a.blockers[0]?.code || 'ineligible', offDutyAt: now },
+          { merge: true },
+        );
+      } catch {
+        // An unverifiable Operator is not a safe re-offer candidate.
+      }
+      candidates = candidates.filter((o) => String(o.id) !== String(candidate.operator.id));
+    }
     if (!next) {
       // Nobody left. The travel stays with the operator it has rather than being cancelled
       // out from under a traveler who has paid — but it is recorded, so the state is legible.

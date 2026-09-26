@@ -1358,6 +1358,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
         paymentRef.current.tripNo === no ? paymentRef.current.paymentIntentId : undefined;
       const trip: SupportTrip | null = sessionTrip
         ? {
+            rideId: record?.id,
             no: sessionTrip.no,
             dep: sessionTrip.dep,
             arr: sessionTrip.arr,
@@ -1371,6 +1372,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
           }
         : record
           ? {
+              rideId: record.id,
               no: record.tripNo,
               dep: record.dep,
               arr: record.arr,

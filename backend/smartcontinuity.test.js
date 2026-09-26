@@ -2,7 +2,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path');
 const ride=fs.readFileSync(path.join(__dirname,'..','src','state','RideContext.tsx'),'utf8');
 const smart=fs.readFileSync(path.join(__dirname,'smart.js'),'utf8');
-const authority=fs.readFileSync(path.join(__dirname,'fareauthority.js'),'utf8');
+const { journeyFor }=require('./fareauthority');
 const money=fs.readFileSync(path.join(__dirname,'travelmoney.js'),'utf8');
 
 // Process death / restart: journey envelope persists, but it cannot grant authority.
@@ -10,8 +10,15 @@ assert.ok(ride.includes("SMART_JOURNEY_STORAGE_KEY = 'american-rider.smart-journ
 assert.ok(ride.includes('AsyncStorage.getItem(SMART_JOURNEY_STORAGE_KEY)'),'restart must hydrate Smart Travel continuation');
 assert.ok(ride.includes('AsyncStorage.setItem(SMART_JOURNEY_STORAGE_KEY'),'journey mutations must persist');
 assert.ok(ride.includes('AsyncStorage.removeItem(SMART_JOURNEY_STORAGE_KEY'),'completion/cancellation must remove persisted continuation');
-assert.ok(authority.includes("x.status !== 'completed'"),'leg 2 must still require completed leg 1 after client restart');
-assert.ok(authority.includes('!x.paymentIntentId'),'leg 2 must still require paid leg 1 after client restart');
+function dbWith(rows){
+  return { collection(){
+    const q={filters:[],where(k,_op,v){this.filters.push([k,v]);return this;},limit(){return this;},async get(){
+      const matches=rows.filter((x)=>this.filters.every(([k,v])=>String(x[k]||'')===String(v)));
+      return {docs:matches.map((x)=>({data:()=>x}))};
+    }};
+    return q;
+  }};
+}
 
 // Cancellation/replan: a cancelled car Travel destroys the continuation instead of silently
 // continuing an obsolete transit itinerary.
@@ -28,4 +35,10 @@ assert.ok(smart.includes('const q2 = quote(second.cents'));
 assert.ok(ride.includes("journeyNo: smartJourneyRef.current?.stage === 'leg2' ? smartJourneyRef.current.leg1No ?? null : null"));
 assert.ok(money.includes('expectedTripNo: ride.tripNo || null'),'settlement must bind payout to the Travel payment/number');
 
-console.log('all Smart Travel restart/cancellation/authority invariants passed');
+(async()=>{
+  const base={travelerUid:'u',tripNo:'AR-LEG1',paymentIntentId:'pi_1',status:'completed',travelCostCents:1000};
+  assert.ok(await journeyFor({db:dbWith([base]),uid:'u',journeyNo:'AR-LEG1'}),'completed paid leg 1 must authorize continuation after restart');
+  assert.equal(await journeyFor({db:dbWith([{...base,status:'accepted'}]),uid:'u',journeyNo:'AR-LEG1'}),null,'unfinished leg 1 must not authorize continuation after restart');
+  assert.equal(await journeyFor({db:dbWith([{...base,paymentIntentId:null}]),uid:'u',journeyNo:'AR-LEG1'}),null,'unpaid leg 1 must not authorize continuation after restart');
+  console.log('all Smart Travel restart/cancellation/authority invariants passed');
+})().catch((e)=>{console.error(e);process.exitCode=1;});

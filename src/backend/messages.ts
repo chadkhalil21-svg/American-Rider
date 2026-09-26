@@ -25,7 +25,7 @@
 // So a message now carries BOTH uids, and the security rule lets either party read the thread
 // and write only as themselves. `from` is still checked against the writer, so nobody can
 // forge a message from the other side.
-import { addDoc, collection, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { PAYMENT_SERVER_URL } from '../config';
 import { t } from '../i18n';

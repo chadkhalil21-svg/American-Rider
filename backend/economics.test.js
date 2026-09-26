@@ -19,7 +19,7 @@ check('foreign cards use the international-card rate', processingBps('GB') === 4
 check('unknown cards are international-safe, never domestic by assumption',
   !isDomesticCard(null) && processingBps(null) === 440);
 
-// Exact audited examples under the launch cost model. The $2 active-account cost is operator-side, not in this fee.
+// Exact audited examples under the cost model. The $2 active-account cost is operator-side, not in this fee.
 const examples = [
   // fare, domestic fee, international/unknown fee
   [500, 200, 200],

@@ -8,7 +8,7 @@
 > Operator's required policy.
 >
 > Florida counsel must approve the final disclosure against the then-current text of Fla. Stat.
-> §627.748, including subsection (7)(d), before launch. The application must never imply that an
+> §627.748, including subsection (7)(d), before an Operator provides Travel. The application must never imply that an
 > uploaded certificate overrides the statute or the underlying policy.
 
 ## Operator coverage requirement

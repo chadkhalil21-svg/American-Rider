@@ -2847,6 +2847,24 @@ app.post('/travel/accept', requireAuth, requireOperationalReadiness, async (req,
   }
 });
 
+// Operator progression is server-authoritative. Firestore rules no longer permit a phone to
+// manufacture arrived/onboard/completed states or the payout queue marker.
+app.post('/travel/progress', requireAuth, requireOperationalReadiness, async (req, res) => {
+  const db = adminDb();
+  if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
+  try {
+    const out = await progressTravel({
+      db,
+      uid: req.uid,
+      rideId: req.body?.rideId,
+      status: req.body?.status,
+    });
+    return res.status(out.status).json(out.body);
+  } catch (e) {
+    return res.status(502).json({ error: e.message });
+  }
+});
+
 app.post('/travel/return-operator', requireAuth, LIMITS.dispatch, requireOperationalReadiness, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });

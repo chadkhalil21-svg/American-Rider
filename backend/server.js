@@ -624,6 +624,11 @@ app.get('/support/cases', requireAuth, async (req, res) => {
 
 // Family / Teen Travel: guardian-created relationship, accepted by the teen account.
 app.get('/family', requireAuth, async (req,res)=>{const out=await family.listFamilyLinks({uid:req.uid});return res.status(out.ok?200:503).json(out);});
+app.get('/family/travels', requireAuth, async (req,res)=>{
+ const out=await family.listGuardianActiveTravels({guardianUid:req.uid});if(!out.ok)return res.status(503).json(out);
+ const travels=[];for(const r of out.travels){const token=await issueFollowToken({rideId:r.id,travelerUid:req.uid,guardianUid:req.uid});travels.push({...r,followUrl:token?`${PUBLIC_ORIGIN}/follow/${token}`:null});}
+ return res.json({ok:true,travels});
+});
 app.post('/family/invite', requireAuth, requireVerifiedEmail, async (req,res)=>{
   const b=req.body||{};
   const out=await family.createFamilyInvite({guardianUid:req.uid,guardianName:req.name||b.guardianName,teenName:b.teenName,teenEmail:b.teenEmail,teenDob:b.teenDob});

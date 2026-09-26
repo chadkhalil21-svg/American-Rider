@@ -47,6 +47,10 @@ assert.equal(familyScreen.includes('Invitation code'), false, 'Family UI must no
 const rideContext=read('src/state/RideContext.tsx');
 assert.ok(rideContext.includes('party: {...travelPartyRef.current}'), 'Smart Travel must freeze the party at journey start');
 assert.ok(rideContext.includes('setTravelParty({...next.party})'), 'Smart Travel leg two must restore the frozen party');
+assert.ok(server.includes("app.post('/travel/message'"), 'Travel messages must be server-stamped from the authoritative Travel parties');
+assert.ok(server.includes("app.get('/family/travels'"), 'guardian must have an authenticated active Teen Travel view');
+assert.ok(family.includes('listGuardianActiveTravels'), 'Family service must expose only guardian-authorized active Teen Travel');
+assert.ok(server.includes("screen: '/family'"), 'guardian Travel alerts must open Family monitoring');
 assert.ok(scheduler.includes('party: r.party || null'), 'scheduled reservation party must reach dispatched Travel');
 
 console.log('✓ one-transfer Stripe architecture');

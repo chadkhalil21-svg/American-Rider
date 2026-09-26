@@ -183,6 +183,18 @@ app.post('/stripe/webhook', express.raw({ type: 'application/json' }), async (re
   return acceptDurableProviderEvent('stripe', event, res);
 });
 
+app.post('/stripe/connect-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  const secret = readKey('STRIPE_CONNECT_WEBHOOK_SECRET');
+  if (!secret) return res.status(503).json({ error: 'STRIPE_CONNECT_WEBHOOK_SECRET is not set' });
+  let event;
+  try {
+    event = stripeClient().webhooks.constructEvent(req.body, req.get('stripe-signature'), secret);
+  } catch (e) {
+    return res.status(400).json({ error: `Signature verification failed: ${e.message}` });
+  }
+  return acceptDurableProviderEvent('stripe', event, res);
+});
+
 
 app.post('/checkr/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   if (!readKey('CHECKR_WEBHOOK_SECRET')) return res.status(503).json({ error: 'CHECKR_WEBHOOK_SECRET is not set' });
@@ -215,6 +227,7 @@ function productionReadiness() {
   if (keyMode !== 'live') missing.push('stripe_live_key');
   if (!readKey('STRIPE_PUBLISHABLE_KEY')) missing.push('stripe_publishable_key');
   if (!readKey('STRIPE_WEBHOOK_SECRET')) missing.push('stripe_webhook_secret');
+  if (!readKey('STRIPE_CONNECT_WEBHOOK_SECRET')) missing.push('stripe_connect_webhook_secret');
   if (!readKey('CHECKR_WEBHOOK_SECRET') || !screeningReady()) missing.push('screening_provider');
   if (!readKey('HERE_API_KEY')) missing.push('toll_provider');
   if (!readKey('TNC_INSURANCE_DISCLOSURE')) missing.push('tnc_contingency_insurance');

@@ -92,7 +92,7 @@ check('nobody free is an ordinary answer, not an error',
 
 // The demonstration fleet moved here from the phone. It must never appear with live keys.
 check('stand-in operators are used only when the collection is empty',
-  /if \(!fleet\.length && keyMode !== 'live'\)/.test(route));
+  /if \(!fleet\.length && !operationalMode\)/.test(route));
 check('stand-ins carry the CURRENT disclosure version, so they pass the same gate',
   /disclosureVersion: DISCLOSURE_VERSION/.test(route));
 

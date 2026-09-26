@@ -1,4 +1,5 @@
 // The §627.748(8)(a) insurance disclosure, and the record that it was made.
+const { readKey } = require('./env');
 //
 // WHAT THE STATUTE REQUIRES, exactly. "Before a TNC driver is allowed to accept a request for
 // a prearranged ride on the digital network, the TNC must disclose in writing to the TNC
@@ -21,11 +22,9 @@
 // one is out of date and is asked again, rather than being silently treated as having agreed
 // to words they never saw.
 //
-// WHAT AMERICAN RIDER PROVIDES IS NOTHING, and the statute is satisfied by saying so plainly.
-// §627.748(7) permits the required coverage to be maintained by the driver rather than the
-// TNC (verified against the statute 23 Aug 2026, after I had first overstated it). A
-// disclosure whose honest content is "none" is still a disclosure; what it must not do is
-// leave an operator guessing.
+// American Rider still requires each Operator to carry qualifying coverage. Separately, the
+// platform must not represent its own statutory contingency layer as nonexistent. Production
+// readiness therefore requires the bound policy's disclosure text from deployment config.
 
 // Bump this whenever the TEXT below changes in substance. Formatting fixes do not count;
 // anything that changes what an operator is agreeing to does.
@@ -38,7 +37,8 @@
 // This bump is not free and is made deliberately now: every operator who acknowledged
 // 2026-08-29.1 is asked to read and acknowledge again before going on duty. Today that is a
 // handful of test accounts; after the operator program opens on 28 Sept it would be everyone.
-const DISCLOSURE_VERSION = '2026-09-18.1';
+const DISCLOSURE_VERSION = '2026-09-25.1';
+const TNC_COVERAGE_TEXT = String(readKey('TNC_INSURANCE_DISCLOSURE') || '').trim();
 
 /**
  * The disclosure itself. Served from here rather than written into the app so that the words
@@ -51,12 +51,8 @@ const DISCLOSURE = {
   // (8)(a)1 — the coverage the TNC provides, with types and limits.
   provided: {
     heading: 'What American Rider provides',
-    body:
-      'American Rider does not provide automobile liability insurance, uninsured or ' +
-      'underinsured motorist coverage, or personal injury protection for any period. Not while ' +
-      'you are logged on to the network, not while you are travelling to a pickup, and not ' +
-      'while a traveler is in your vehicle. There are no coverage types and no limits to state ' +
-      'because there is no coverage.',
+    body: TNC_COVERAGE_TEXT ||
+      'American Rider production operations are not enabled until the platform contingency insurance is bound and its coverage types and limits are stated here.',
   },
   // (8)(a)2 — that the driver's own policy might not cover them.
   // (8)(a)2 — that the driver's own policy might not cover them.
@@ -98,12 +94,11 @@ const DISCLOSURE = {
     heading: 'What you must carry',
     body:
       'Florida requires the coverage in §627.748(7) to be in force whenever you are logged on. ' +
-      'Because American Rider provides none of it, all of it must come from a policy you hold ' +
-      'yourself — commercial, for-hire or livery. American Rider verifies that policy and its ' +
+      'American Rider requires you to maintain qualifying commercial, for-hire or livery coverage in your own name. American Rider verifies that policy and its ' +
       'expiry date, and will not assign travel to an operator whose coverage has lapsed.',
   },
   acknowledgement:
-    'I have read this disclosure. I understand American Rider provides no insurance, and that ' +
+    'I have read this disclosure, including the coverage American Rider provides and the warning that ' +
     'my own policy might not cover me while I am logged on or carrying a traveler.',
 };
 

@@ -17,8 +17,9 @@ function distanceMiles(a, b) {
 // Rough pickup ETA from distance (city driving ~22 mph).
 function etaMinutes(miles, mph = 22) { return Math.max(1, Math.round((miles / mph) * 60)); }
 
-// Has this operator's commercial policy run out? American Rider carries no automobile
-// coverage, so an operator whose own policy has lapsed is a travel with nothing behind it.
+// Has this operator's required commercial policy run out? The Operator's qualifying coverage
+// remains a mandatory dispatch gate. Separate TNC-maintained contingency coverage required by
+// applicable law is not a substitute for an Operator satisfying that qualification gate.
 //
 // IT LIVES HERE BECAUSE IT WAS LIVING IN TWO PLACES AND CALLED IN THREE. scheduler.js
 // defined it — under a comment saying it "mirrors dispatch.ts coverageLapsed()", which is
@@ -74,11 +75,9 @@ function disclosureStale(o, current = DISCLOSURE_VERSION) {
 // re-offer sweep then hands to somebody else. Too long and a traveler pays for a car that
 // does not exist. Those are not comparable, so this errs short.
 //
-// WHAT IT DOES NOT SOLVE: iOS suspends timers for a backgrounded app, so an operator who
-// leaves the app will go stale even though they are there. The real answer is background
-// location, which needs a native capability we have not built. Until then an operator has to
-// keep the app open to receive travel — which is what the screen already implies by saying
-// "Matching you with nearby travelers", and is true rather than flattering.
+// The mobile app now renews presence from the native background-location task on supported
+// iOS/Android builds. This server cutoff remains authoritative: background execution is never
+// assumed merely because a handset once said it was available.
 const PRESENCE_STALE_MS = 5 * 60 * 1000;
 
 /** Has this operator's phone said anything recently enough to be believed? */

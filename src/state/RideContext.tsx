@@ -1,4 +1,5 @@
 import type { SmartPlan } from '../backend/smart';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { FeeLine } from '../data';
 import React, {
   createContext,
@@ -37,7 +38,7 @@ import {
 } from '../backend/dispatch';
 import { Coords, fetchQuote, isUnavailable } from '../backend/fares';
 import { sendTravelMessage } from '../backend/messages';
-import { cancelTravel, payForRide, settleTravel, tipTravel } from '../backend/payments';
+import { cancelTravel, payForRide, settleTravel } from '../backend/payments';
 import { announceTravel, answerCheckIn } from '../backend/checkin';
 import {
   endTravelActivity,
@@ -117,9 +118,11 @@ export type SmartStatus = 'idle' | 'checking' | 'ok' | 'none' | 'unavailable';
 // three legs on a 4.2-second cadence under a made-up Travel Number, and a screen labelled
 // "Total Charged" showed an amount nobody had charged (release review, 6 Sept 2026, P0).
 // Chad's instruction (9 Sept 2026) is to build it real: two dispatched car travels around a
-// transit leg the traveler rides on their own ticket. This is the record that ties them
-// together. The platform fee is charged ONCE for the journey — on the combined car fare —
-// which is why leg 2 has to know leg 1's number (see feeFor).
+// transit leg the traveler rides on their own ticket. This record ties them together. The
+// journey has one combined platform-fee requirement sized for BOTH car PaymentIntents; leg 1
+// carries the ordinary first-leg amount and leg 2 carries only the incremental remainder.
+const SMART_JOURNEY_STORAGE_KEY = 'american-rider.smart-journey.v1';
+
 export type SmartJourney = {
   plan: SmartPlan;
   /** Where the journey began and where it ends — the endpoints leg 2 needs to restore. */
@@ -129,6 +132,8 @@ export type SmartJourney = {
   stage: 'leg1' | 'leg2';
   leg1No?: string;
   leg2No?: string;
+  /** Booker/Teen identity is frozen for the journey; leg 2 cannot silently become another party. */
+  party: { mode: 'self' | 'other_adult' | 'teen'; travelerName: string; familyLinkId?: string };
 };
 
 export type RideStore = {
@@ -142,6 +147,8 @@ export type RideStore = {
   setPay: (p: PayKey) => void;
 
   // booking
+  travelParty: { mode: 'self' | 'other_adult' | 'teen'; travelerName: string; familyLinkId?: string };
+  setTravelParty: (p: { mode: 'self' | 'other_adult' | 'teen'; travelerName: string; familyLinkId?: string }) => void;
   arrival: Place;
   departure: DepPlace;
   setArrival: (p: Place) => void;
@@ -217,10 +224,8 @@ export type RideStore = {
   setViewTrip: (t: (Trip & { sub?: string }) | null) => void;
   pastTrips: (Trip & { sub: string; credit: boolean })[];
   stats: { trips: number; spent: number };
-  /** Write the rating and tip for the travel that just finished. False if nothing was written. */
-  submitReview: (stars: number, tipCents: number) => Promise<boolean>;
-  /** Whether the tip actually reached the operator. Null until one is offered. */
-  tipResult: { ok: boolean; cents?: number; error?: string } | null;
+  /** Write the traveler's rating for the Travel that just finished. American Rider does not offer tipping. */
+  submitReview: (stars: number) => Promise<boolean>;
 
   // messaging — one thread per travel, so an operator always knows which journey a
   // message concerns (and a lost item thread is not mixed into the live ride's).
@@ -299,23 +304,62 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   const payRef = useRef(pay);
   payRef.current = pay;
   const [travelClass, setTravelClass] = useState('standard');
+  const [travelParty, setTravelParty] = useState<{ mode: 'self' | 'other_adult' | 'teen'; travelerName: string; familyLinkId?: string }>({ mode: 'self', travelerName: '' });
   const [smartPlan, setSmartPlan] = useState<import('../backend/smart').SmartPlan | null>(null);
   const [smartStatus, setSmartStatus] = useState<SmartStatus>('idle');
   const [smartJourney, setSmartJourney] = useState<SmartJourney | null>(null);
   const smartJourneyRef = useRef<SmartJourney | null>(null);
   smartJourneyRef.current = smartJourney;
+  const smartJourneyHydrated = useRef(false);
+
+  // A coordinated journey must survive a process death between its two car Travels. Persist only
+  // the journey envelope; authoritative Travel/payment state is still reconstructed from the
+  // server and leg 2 remains server-gated by the paid/completed first Travel.
+  useEffect(() => {
+    let live = true;
+    AsyncStorage.getItem(SMART_JOURNEY_STORAGE_KEY)
+      .then((raw) => {
+        if (!live || !raw) return;
+        try {
+          const saved = JSON.parse(raw) as SmartJourney;
+          if (
+            saved &&
+            (saved.stage === 'leg1' || saved.stage === 'leg2') &&
+            saved.plan?.status === 'ok' &&
+            Array.isArray(saved.plan.legs) &&
+            saved.destination &&
+            saved.destCoords &&
+            saved.party
+          ) {
+            smartJourneyRef.current = saved;
+            setSmartJourney(saved);
+            setSmartPlan(saved.plan);
+            setSmartStatus('ok');
+            setTravelParty({ ...saved.party });
+          }
+        } catch { /* corrupt local continuation is ignored; server authority is never reconstructed from it */ }
+      })
+      .finally(() => { smartJourneyHydrated.current = true; });
+    return () => { live = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!smartJourneyHydrated.current) return;
+    if (smartJourney) AsyncStorage.setItem(SMART_JOURNEY_STORAGE_KEY, JSON.stringify(smartJourney)).catch(() => {});
+    else AsyncStorage.removeItem(SMART_JOURNEY_STORAGE_KEY).catch(() => {});
+  }, [smartJourney]);
   // The fare of the journey's first car travel, in dollars — what leg 2's fee is computed
   // against. Zero when the boarding stop was within walking distance and there was no leg 1.
   const smartLeg1Fare = (j: SmartJourney | null) =>
     (j?.plan.legs.find((l) => l.kind === 'car')?.cents ?? 0) / 100;
-  // ONE PLATFORM FEE PER JOURNEY. Leg 1 is charged exactly as any travel is. Leg 2 pays the
-  // difference between the fee on the combined car fare and the fee leg 1 already carried —
-  // never below zero. backend/payments.js applies the same rule from `journeyNo`; the two
+  // ONE COMBINED FEE REQUIREMENT PER JOURNEY. Leg 1 is charged exactly as any Travel is. Leg 2
+  // pays the difference between the TWO-transaction fee on the combined car fare and the fee
+  // leg 1 already carried — never below zero. backend/payments.js applies the same rule; the two
   // must never disagree, or the traveler is quoted one amount and charged another.
   const feeFor = (fare: number, j: SmartJourney | null) => {
     if (j && j.stage === 'leg2' && j.leg1No) {
       const leg1 = smartLeg1Fare(j);
-      return Math.max(0, +(platformFee(leg1 + fare) - platformFee(leg1)).toFixed(2));
+      return Math.max(0, +(platformFee(leg1 + fare, null, 0, 0, 2) - platformFee(leg1, null, 0, 0, 1)).toFixed(2));
     }
     return platformFee(fare);
   };
@@ -479,7 +523,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   // Read by sendMsgTo, which must not re-create itself every time the watched ride changes.
   const watchedRideIdRef = useRef<string | null>(null);
   watchedRideIdRef.current = watchedRideId;
-  // The travel that just finished, so its rating and tip can be written to the same record.
+  // The travel that just finished, so its rating can be written to the same record.
   const reviewedRideId = useRef<string | null>(null);
   // The PaymentIntent this travel was charged on. Held so the operator's 99% can be released
   // against that exact charge when the travel completes — see settleTravel.
@@ -538,8 +582,6 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   const [schedPeriod, setSchedPeriod] = useState<'AM' | 'PM'>('AM');
   const [schedTime, setSchedTime] = useState('6:00');
   const [customTime, setCustomTime] = useState('');
-  // What became of the tip, so Travel Complete can state it rather than assume it.
-  const [tipResult, setTipResult] = useState<{ ok: boolean; cents?: number; error?: string } | null>(null);
   const [scheduled, setScheduled] = useState(false);
   // What route monitoring makes of the travel underway. Null on an ordinary journey — this is
   // never furniture; it appears only when the platform has something to say.
@@ -713,9 +755,11 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   // memoised and retried from the ride screen — reading state directly would dispatch last
   // booking's class after a retry.
   const travelClassRef = useRef('standard');
+  const travelPartyRef = useRef(travelParty);
   useEffect(() => {
     travelClassRef.current = travelClass;
   }, [travelClass]);
+  useEffect(() => { travelPartyRef.current = travelParty; }, [travelParty]);
 
   // Match the nearest available operator for the ride already staged in lastTripRef.
   // Tracks a real state so the live screen can show progress, a "none available" message,
@@ -758,6 +802,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       // Nobody is offered the same travel twice.
       excludeIds: declinedByRef.current,
       journeyNo: smartJourneyRef.current?.stage === 'leg2' ? smartJourneyRef.current.leg1No ?? null : null,
+      party: travelPartyRef.current,
     })
       .then((res) => {
         if (res) {
@@ -831,6 +876,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
           destination: arrival,
           destCoords: tripCoords.dest,
           stage: 'leg1',
+          party: {...travelPartyRef.current},
         });
         setArrival(dest);
         setTripCoords({ pickup: tripCoords.pickup, dest: { lat: plan.from.lat, lng: plan.from.lng } });
@@ -849,9 +895,10 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       if (!destCoords) return false;
       const next: SmartJourney = journey
         ? { ...journey, stage: 'leg2' }
-        : { plan, pickup: departure, destination, destCoords, stage: 'leg2' };
+        : { plan, pickup: departure, destination, destCoords, stage: 'leg2', party: {...travelPartyRef.current} };
       smartJourneyRef.current = next;
       setSmartJourney(next);
+      setTravelParty({...next.party});
       setDeparture({ name: plan.to.name, short: plan.to.name, lat: from.lat, lng: from.lng, resolved: true });
       setArrival({ ...destination, cost: leg.cents / 100 });
       setTripCoords({ pickup: from, dest: destCoords });
@@ -1024,7 +1071,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     // is not their business to succeed or fail at.
     settleRideRef.current = ridePaid;
     trySettle();
-    // Kept, not cleared: the Travel Complete screen writes the rating and tip against this
+    // Kept, not cleared: the Travel Complete screen writes the rating against this
     // same record a moment later, and it needs the handle to do it.
     reviewedRideId.current = ridePaid;
     activeRideId.current = null;
@@ -1352,6 +1399,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
         paymentRef.current.tripNo === no ? paymentRef.current.paymentIntentId : undefined;
       const trip: SupportTrip | null = sessionTrip
         ? {
+            rideId: record?.id,
             no: sessionTrip.no,
             dep: sessionTrip.dep,
             arr: sessionTrip.arr,
@@ -1365,6 +1413,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
           }
         : record
           ? {
+              rideId: record.id,
               no: record.tripNo,
               dep: record.dep,
               arr: record.arr,
@@ -1395,28 +1444,19 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   );
 
   /**
-   * Write the traveler's rating and tip to the travel that just finished.
+   * Write the traveler's rating to the travel that just finished.
    *
    * Returns false when there is nothing to write to — a seeded demo travel, or a record the
    * database never accepted. The screen shows that answer rather than a check mark it has
    * not earned.
    */
-  const submitReview = useCallback(async (stars: number, tipCents: number) => {
+  const submitReview = useCallback(async (stars: number) => {
     const rideId = reviewedRideId.current;
     if (!rideId) return false;
-    const ok = await recordTravelReview(rideId, { stars, tipCents });
-    // A TIP IS MONEY, NOT A FIELD. recordTravelReview writes tipCents to the travel and
-    // nothing in the backend has ever read it — the traveler was not charged and the operator
-    // was not paid, under a screen reading "The operator keeps 100% of every tip". The charge
-    // and the transfer happen here. Failure is reported, never swallowed: a tip that did not
-    // reach anybody must not be shown as though it had.
-    if (tipCents > 0) {
-      const paid = await tipTravel({ rideId, tipCents });
-      setTipResult(paid.ok ? { ok: true, cents: paid.chargedCents ?? tipCents } : { ok: false, error: paid.error });
-    }
-    if (ok) refreshMyRides();
-    return ok;
-  }, [refreshMyRides]);
+    // Ratings are feedback only. American Rider deliberately has no gratuity/tip product,
+    // endpoint, stored tip amount or post-Travel money path.
+    return recordTravelReview(rideId, { stars });
+  }, []);
 
   // The reservation is written to the traveler's account, not just to this screen's memory.
   // It shows immediately either way — losing the write must not lose what they chose — but
@@ -1449,13 +1489,14 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
         destinationLat: tripCoords?.dest?.lat ?? arrival.lat,
         destinationLng: tripCoords?.dest?.lng ?? arrival.lng,
         travelClass: operatorClassFor(travelClass),
+        party: travelParty,
       }).then((saved) => {
         schedIdRef.current = saved?.id ?? null;
         setSchedId(saved?.id ?? null);
         setSchedSaved(!!saved);
       });
     },
-    [arrival, departure, travelClass, tripCoords],
+    [arrival, departure, travelClass, tripCoords, travelParty],
   );
 
   const cancelScheduled = useCallback(() => {
@@ -1542,6 +1583,8 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     setPay,
     travelClass,
     setTravelClass,
+    travelParty,
+    setTravelParty,
     smartPlan,
     setSmartPlan,
     smartStatus,
@@ -1602,7 +1645,6 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     setSchedTime,
     customTime,
     setCustomTime,
-    tipResult,
     scheduled,
     schedState,
     travelMonitor,

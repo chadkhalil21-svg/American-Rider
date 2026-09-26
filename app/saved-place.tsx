@@ -105,7 +105,7 @@ export default function SavedPlace() {
               style={styles.input}
               value={text}
               onChangeText={setText}
-              placeholder={existing ?? '1200 Brickell Ave'}
+              placeholder={existing ?? t('traveler.savedPlaceExample')}
               placeholderTextColor={colors.faint}
               selectionColor={colors.ink}
               autoCorrect={false}

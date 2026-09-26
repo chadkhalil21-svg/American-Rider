@@ -188,6 +188,7 @@ export function OperatorDrawer({
     },
     { label: 'Documents', onPress: () => go(() => router.navigate('/operator/documents')) },
     { label: 'Insurance', onPress: () => go(() => router.navigate('/operator/insurance')) },
+    { label: 'Communications', onPress: () => go(() => router.navigate('/operator/inbox')) },
     // About opens the real company page. §10A of the founders' brief puts the
     // operator-retention statement in a permanent company-information section, said once
     // as an institutional fact — this is that section, and the only place in the operator

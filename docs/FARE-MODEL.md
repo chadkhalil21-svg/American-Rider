@@ -1,63 +1,135 @@
-# American Rider — Consolidated Fare Model
+# American Rider — Fare and Unit-Economics Model
 
-Source: Chad's WhatsApp consolidation (2026-07-10). This is the OFFICIAL pricing
-methodology — the demo's fixed destination prices are placeholders standing in for
-formula #1; the backend implements the formula for real.
+Status: **current model, audited 25 September 2026**.
 
-> **Corrections since this was written (15 Sept 2026).** (1) §2's fixed $1.50 became, on
-> 9 Sept 2026 (Chad: "five percent"; Adrian in writing, 13 Sept), **the greater of $2.00 and the card-cost schedule: 3.25% of the travel fare for a US-issued card,
-> or 5.5% for an international card, rounded up to the cent**. This 25 Sept 2026 revision funds
-> ordinary Stripe Connect account/payout overhead and preserves a 25¢ operating reserve in the
-> launch model rather than pricing only to card-processing break-even. (2) §3's 1% commission has **no cap** (Chad, 16 Aug 2026). (3) The formula in §1 is
-> not what `backend/fares.js` implements today: $3.00 base + $1.80 per mile, $9.00 minimum,
-> no time term (open P1; proposal in docs/ECONOMICS-AND-INFRASTRUCTURE.md §8). The margin
-> table in §4 is at the old flat fee; current margins per fare are in that document's §2.
-> The product contract in `.claude/skills/american-rider-release-review/references/` is the
-> authority.
+The server is authoritative. Request clients provide route inputs; they do not provide a price.
 
-## 1. Fare formula (sets the Travel Cost — the operator's base fare)
-> **Travel Cost = $2.00 base + ($0.85 × miles) + ($0.20 × minutes)**, floor of **$6.00** minimum
+## 1. Travel Fare
 
-## 2. What the traveler sees
-> **Total = Travel Cost + the platform fee** — minimum $2.00; above the floor, 3.25% of Travel Cost
-> on a US-issued card or 5.5% on an international card (25 Sept 2026 Connect-cost audit). The fee is embedded and **absorbs payment
-> processing**; it is never itemized and processing is never billed on top.
-> One number, one blue box: *"Operator retains 99% of the travel cost — $X."*
-> No Travel Cost sub-line, no Platform Fee line, no Payment Processing line. Ever.
+Standard Travel Fare:
 
-## 3. What the operator receives
-> **Operator Payout = 99% × Travel Cost** (1% commission, no cap).
-> The platform fee never touches the operator's math.
+```
+Travel Fare = $1.00 + ($0.85 × routed miles) + ($0.15 × routed minutes)
+minimum Travel Fare = $3.00
+```
 
-## 4. Platform's real net margin per ride (internal — invisible to the traveler)
-> Margin = (platform fee + 1% of Travel Cost) − actual Stripe processing cost
-> (the table below is at the old flat $1.50)
+The operator retains 99% of Travel Fare. American Rider's coordination commission is 1% of
+Travel Fare, floored to whole cents and uncapped.
 
-| Payment method | Platform receives | Real Stripe cost (on ~$36 total) | Actual net margin |
-|---|---|---|---|
-| Card | $1.50 + $0.35 commission | ~$1.35 (2.9% + $0.30) | **~$0.50** |
-| ACH | $1.50 + $0.35 commission | ~$0.29 (0.8%, cap $5) | **~$1.56** |
+Travel classes apply to Travel Fare before the 99%/1% split.
 
-**Why ACH steering matters:** ~3× the margin on the identical trip. This is the
-dollars-and-cents case behind the "Preferred" ACH nudge in the Wallet (the rider-facing
-label says only "Preferred" — no fee talk on the rider surface).
+## 2. Traveler Total
 
-## Worked example — the calibration check
-12-mile, 24-minute trip:
+The Traveler sees one Total. Internally:
 
-| Step | Calculation | Result |
-|---|---|---|
-| Travel Cost | $2.00 + (12 × $0.85) + (24 × $0.20) | $17.00 |
-| Total charged to traveler | $17.00 + $1.50 | **$18.50** |
-| Operator receives | 99% × $17.00 | **$16.83** |
-| Platform margin (card) | $1.50 + $0.17 − ~$0.84 | ~$0.83 |
-| Platform margin (ACH) | $1.50 + $0.17 − ~$0.15 | ~$1.52 |
+```
+Traveler Total = Travel Fare + Platform Fee + Government Pass-throughs + Toll Reimbursement
+```
 
-$18.50 lands exactly on the average-fare figure used in the volume projections —
-the formula is calibrated against the existing forecast math.
+Government fees and tolls are not American Rider revenue. Government fees are remitted to the
+public body. Tolls are reimbursed to the operator in full.
 
-## Demo status (2026-07-10)
-The traveler demo implements #2 and #3 exactly: `PROC=0` (absorbed), `APP_FEE=1.50`,
-all-in display everywhere (airport Standard $26.00, Premium $36.29 — Chad's exact
-numbers), Smart Travel total $20.25 vs $46.50 direct. Formula #1 is backend work —
-demo destination prices are hand-set placeholders.
+The fact that they are pass-throughs does **not** make them free to process. Their induced
+Stripe/Connect cost is funded by the Platform Fee.
+
+## 3. Platform Fee — economic invariant
+
+The Platform Fee is **not** "$2 or X percent." Percentages were removed because they hid fixed
+Stripe costs, Connect costs, pass-through processing and rounding.
+
+`backend/economics.js` computes the smallest whole-cent Platform Fee satisfying all of these:
+
+- Stripe card processing on the entire Traveler Total;
+- international-card surcharge when the issuing country is not the United States;
+- Stripe Connect variable payout and funds-routing charges;
+- a conservative fixed Connect allowance;
+- 25 cents contingency reserve per separately charged Travel;
+- 25 cents operating/infrastructure allowance per separately charged Travel; and
+- at least 75 cents modeled platform contribution per separately charged Travel.
+
+The absolute Platform Fee floor is $2.00.
+
+Unknown card country is priced on the international-safe schedule. A first foreign card is not
+allowed to become a deliberately loss-making exception.
+
+Payment presentment and settlement are USD-only. Therefore the normal formula
+does not assume Stripe FX conversion. A future non-USD path must add the actual FX cost before
+it can be enabled.
+
+### Audited examples, no toll/government fee
+
+| Travel Fare | US-issued card | International/unknown card |
+|---:|---:|---:|
+| $5 | $2.00 | $2.00 |
+| $10 | $2.01 | $2.20 |
+| $20 | $2.26 | $2.61 |
+| $30 | $2.51 | $3.02 |
+| $40 | $2.75 | $3.43 |
+| $50 | $3.00 | $3.83 |
+| $61 | $3.28 | $4.29 |
+| $75 | $3.62 | $4.86 |
+| $100 | $4.24 | $5.87 |
+| $150 | $5.47 | $7.91 |
+
+These are outputs of the integer-cent economic model, not manually selected tiers.
+
+## 4. Pass-throughs
+
+A $2.00 MIA pickup fee remains exactly $2.00 owed to Miami-Dade Aviation. The Platform Fee may
+rise by several cents because Stripe charges its percentage on the government money as well.
+
+A toll remains exactly the amount owed back to the operator. The Platform Fee funds the
+processing and Connect cost induced by collecting and forwarding it.
+
+The beneficiary receives 100% of the underlying pass-through.
+
+## 5. Smart Travel
+
+Smart Travel may contain two separately charged car Travels. Two PaymentIntents mean two fixed
+Stripe charges and two operating/reserve units.
+
+The Traveler still pays one journey-level Platform Fee, but that fee is calculated with
+`transactionCount = 2`. Leg 2 carries only the incremental amount not already collected on
+leg 1.
+
+A one-fee policy must never be implemented by pretending two charges have one charge's costs.
+
+## 6. Operator payout
+
+For a normal Travel:
+
+```
+Operator payout = Travel Fare − 1% commission + toll reimbursement
+```
+
+Government fees are never included in the operator share.
+
+The separate Stripe Connect active-account economics are budgeted in the unit model.
+Any future Operator account-service charge must be disclosed separately and must never be
+described as a reduction of the 99% Travel Fare share.
+
+## 7. Cost controls and unresolved corporate costs
+
+The per-Travel model includes explicit operating/infrastructure allowance, but it cannot invent
+unknown corporate invoices. Actual TNC-level insurance, CPA compliance, legal/accounting,
+support labor and other fixed corporate expenses must be entered into the operating budget as
+they are quoted.
+
+The pricing engine must then raise the operating-overhead allowance if conservative volume is
+insufficient to carry those costs.
+
+**No projection may be labeled fully loaded until the Florida TNC insurance/backstop structure
+has an authoritative coverage opinion and actual quote.**
+
+## 8. Release invariant
+
+The release gate must prove, exhaustively across the tested fare domain, that:
+
+1. app and server pricing agree to the cent;
+2. every selected fee meets the modeled contribution target;
+3. one cent less fails whenever the $2 floor is not controlling;
+4. government fees and tolls cannot create a hidden subsidy;
+5. unknown cards are internationally safe; and
+6. Smart Travel funds each separately charged leg's fixed economics.
+
+The authoritative tests are `backend/economics.test.js` and `backend/payments.test.js`.

@@ -935,6 +935,21 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
     setArrived(false);
   }, [op, commitRevenue]);
 
+  // Keep the Operator's conversation on the same Travel-scoped record the Traveler sees.
+  useEffect(() => {
+    const current = op;
+    if (!current?.tripNo || !current.rideId) {
+      setMsgs([]);
+      return;
+    }
+    return watchTravelThread(
+      current.tripNo,
+      'operator',
+      (items) => setMsgs(items.map((m) => ({ me: m.from === 'operator', text: m.text }))),
+      () => {},
+    );
+  }, [op?.tripNo, op?.rideId]);
+
   // Communicate on the authoritative Travel thread. No scripted counterparty reply: a message
   // from a real Traveler appears only when that Traveler actually sends it.
   const sendMsg = useCallback((text: string) => {

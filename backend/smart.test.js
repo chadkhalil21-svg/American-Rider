@@ -103,12 +103,12 @@ const planner = (...answers) => {
   const previewQ1 = require('./payments').quote(first.travelCostCents, null, plan.legs[0].feeLines || [], null, 0);
   const previewQ2 = require('./payments').quote(last.travelCostCents, { journeyNo: 'preview', leg1FareCents: first.travelCostCents, leg1GovernmentFeeCents: plan.legs[0].governmentFeeCents || 0, leg1TollCents: 0 }, plan.legs[2].feeLines || [], null, 0);
   check('feeCents funds the two actual car-payment transactions', plan && plan.feeCents === previewQ1.appFee + previewQ2.appFee);
-  check('smartCents equals the two actual American Rider charges', plan && plan.smartCents === previewQ1.total + previewQ2.total);
+  check('smartCents equals the two actual American Rider charges', plan && plan.smartCents === previewQ1.travelerPays + previewQ2.travelerPays);
   check('transitFareCents is the Metrorail fare, reported and not charged by us',
     plan && plan.transitFareCents === 225 && plan.smartCents === plan.journeyCents - plan.transitFareCents);
   check('railFareCents is kept as an alias for older clients', plan && plan.railFareCents === plan.transitFareCents);
   check('directCents is the direct fare plus its own platform fee',
-    plan && plan.directCents === direct.travelCostCents + platformFeeCents(direct.travelCostCents));
+    plan && plan.directCents === require('./payments').quote(direct.travelCostCents, null, [], null, 0).travelerPays);
   check('the saving compares journey against journey', plan && plan.saveCents === plan.directCents - plan.journeyCents);
 
   // Time.

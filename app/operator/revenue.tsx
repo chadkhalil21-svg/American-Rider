@@ -98,10 +98,6 @@ export default function OperatorRevenue() {
         </>
       )}
 
-      <Text style={styles.testNote}>
-        {t('traveler.revenueSimulated')}
-      </Text>
-
       <OperatorDrawer open={menuOpen} onClose={() => setMenuOpen(false)} onNote={showNote} />
     </OperatorScreen>
   );

@@ -11,17 +11,28 @@ export default function OperatorInbox() {
   const router = useRouter();
   const [items, setItems] = useState<PlatformMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [opening, setOpening] = useState<string | null>(null);
   const load = useCallback(() => {
     fetchOperatorInbox().then((x) => { setItems(x); setError(null); }).catch((e) => setError(e.message));
   }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const open = async (m: PlatformMessage) => {
-    if (!m.readAt) {
-      await markOperatorMessageRead(m.id);
-      setItems((xs) => xs.map((x) => x.id === m.id ? { ...x, readAt: Date.now() } : x));
+    if (opening) return;
+    setOpening(m.id);
+    try {
+      if (!m.readAt) {
+        const recorded = await markOperatorMessageRead(m.id);
+        if (!recorded) {
+          setError(t('operator.inboxReadFailed'));
+          return;
+        }
+        setItems((xs) => xs.map((x) => x.id === m.id ? { ...x, readAt: Date.now() } : x));
+      }
+      if (m.action?.screen) router.navigate(m.action.screen as never);
+    } finally {
+      setOpening(null);
     }
-    if (m.action?.screen) router.navigate(m.action.screen as never);
   };
 
   return (
@@ -33,7 +44,7 @@ export default function OperatorInbox() {
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {!error && items.length === 0 ? <Text style={styles.empty}>{t('operator.noCommunications')}</Text> : null}
       {items.map((m) => (
-        <Pressable key={m.id} onPress={() => open(m)}>
+        <Pressable key={m.id} onPress={() => open(m)} disabled={opening === m.id}>
           <Card style={styles.card}>
             <View style={styles.head}>
               <Text style={[styles.title, !m.readAt && styles.unread]}>{m.title}</Text>

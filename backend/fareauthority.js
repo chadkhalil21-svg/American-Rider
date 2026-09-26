@@ -4,6 +4,7 @@ const { quote } = require('./payments');
 const { fareCentsFor, fareCentsForCoords, applyTravelClass } = require('./fares');
 const { outsideMarket, outsideMarketMessage } = require('./market');
 const { governmentFeesFor, permitRequired, permitRequiredMessage } = require('./fees');
+const { resolveTolls } = require('./tolls');
 
 function priceRoute(body) {
   const withClass = (cents) => applyTravelClass(cents, body?.travelClass || body?.cls);
@@ -54,9 +55,13 @@ async function authoritativeFare({ body, uid = null, email = null, db = null, ca
   const route = priceRoute(body);
   if (!route || route.outsideMarket || route.permitRequired) return route;
   const requestedJourneyNo = String(body?.journeyNo || '').trim();
-  const [cardCountry, journey] = await Promise.all([
+  const tollPromise = body?.pickup && body?.dest
+    ? resolveTolls(body.pickup, body.dest)
+    : Promise.resolve({ status: 'unknown', tollCents: null, reason: 'coordinates_required' });
+  const [cardCountry, journey, toll] = await Promise.all([
     uid && cardCountryFor ? cardCountryFor({ uid, email }) : null,
     journeyFor({ db, uid, journeyNo: requestedJourneyNo }),
+    tollPromise,
   ]);
   // A caller that names a Smart Travel first leg does not get ordinary single-Travel pricing
   // merely because the reference is invalid. That would let an unpaid/foreign/chained leg
@@ -64,12 +69,19 @@ async function authoritativeFare({ body, uid = null, email = null, db = null, ca
   if (requestedJourneyNo && !journey) {
     return { invalidJourney: true, reason: 'The Smart Travel first leg is not a paid completed Travel on this account.' };
   }
+  // Toll resolution is authoritative and server-side. Unknown is distinct from zero.
+  // Callers decide whether an unknown toll state blocks the operation; it must never be
+  // converted into an assumed $0 pass-through.
+  route.tollStatus = toll.status;
+  route.tollCents = toll.tollCents;
+  route.tollProvider = toll.provider || null;
+  route.tollReason = toll.reason || null;
   const breakdown = quote(
     route.travelCostCents,
     journey,
     route.governmentFees,
     cardCountry,
-    route.tollCents || 0,
+    toll.status === 'unknown' ? 0 : toll.tollCents,
   );
   return { ...route, ...breakdown, journey, cardCountry: cardCountry || null };
 }

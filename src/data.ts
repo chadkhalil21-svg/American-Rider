@@ -1,5 +1,5 @@
 import { t } from './i18n';
-// Demo data — Miami launch market (platform is national by design; market code MIA).
+// Demo data — Miami operating market (platform is national by design; market code MIA).
 
 // `cost` is the travel fare in dollars, BEFORE the platform fee. It is a placeholder until the
 // server quotes the trip: the price the traveler actually pays always comes from the server
@@ -191,7 +191,7 @@ export const DEP_PLACES: DepPlace[] = [
 // Where exactly to stand at big venues — shown on the ride screen while the operator is
 // heading over, keyed by the pickup's `short` name. Airports and stadiums have designated
 // rideshare zones and a bad meeting spot wastes everyone's time.
-// ⚠️ These are sensible defaults, NOT verified venue data. Before launch, someone must
+// ⚠️ These are sensible defaults, NOT verified venue data. Before production use, someone must
 // confirm each one on the ground (venues move their rideshare zones around).
 // NO OPERATOR IS NAMED HERE. Two of these read "Meet Miguel…" and "…ready for Miguel" —
 // the demo operator, printed to every traveler whichever operator dispatch actually matched.
@@ -246,7 +246,7 @@ export const RIDER = {
 // per-class prices with the same math the server will charge.
 export const TRAVEL_CLASSES = [
   { key: 'standard', label: 'Standard', sub: 'traveler.classStandardSub', mult: 1.0, extraCents: 0, bookable: true },
-  // NOT BOOKABLE AT LAUNCH — nothing behind them yet. Kept in the list so pricing, receipts
+  // NOT BOOKABLE — nothing behind them yet. Kept in the list so pricing, receipts
   // and the Travel Log still resolve any travel already booked under one.
   //   premium    — "Highest-rated operators", and no operator carries a rating at all
   //   shared     — there is no pooling; it was a private travel at a 32% discount, which the
@@ -415,7 +415,7 @@ export const INSURERS: {
 
 export const APP_FEE = 2.0;
 
-// Internal launch-economics constants. The server remains authoritative; these mirror
+// Internal economics constants. The server remains authoritative; these mirror
 // backend/economics.js so local display fallbacks cannot quote a different amount.
 // Stripe's $2 monthly active-account cost is recovered separately from low-volume Operators
 // and waived at 20 completed Travels; it is not a Traveler transaction cost.
@@ -437,7 +437,7 @@ const ceilBps = (cents: number, bps: number) =>
   cents > 0 && bps > 0 ? Math.ceil((cents * bps) / 10000) : 0;
 
 /**
- * The smallest whole-cent fee that preserves the complete launch unit-economic invariant.
+ * The smallest whole-cent fee that preserves the complete unit-economic invariant.
  *
  * This is NOT "$2 or a percentage". It directly funds card processing on the whole charge,
  * both variable Connect charges, the per-payout fixed Connect allowance, 25c contingency,

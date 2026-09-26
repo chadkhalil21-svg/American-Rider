@@ -42,3 +42,8 @@ console.log('✓ another-person identity is server authoritative');
 console.log('✓ Teen Travel is bound to Family authorization');
 console.log('✓ Smart Travel two-charge economics is explicit');
 console.log('✓ Operator platform communications are durable and reachable');
+
+const appConfig = require('../app.json');
+assert.equal(appConfig.expo.name, 'American Rider', 'product name is American Rider');
+assert.equal(appConfig.expo.ios.infoPlist.CFBundleDisplayName, 'American Rider', 'iOS display name matches product name');
+console.log('✓ native display name is consistent');

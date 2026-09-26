@@ -129,6 +129,8 @@ export type SmartJourney = {
   stage: 'leg1' | 'leg2';
   leg1No?: string;
   leg2No?: string;
+  /** Booker/Teen identity is frozen for the journey; leg 2 cannot silently become another party. */
+  party: { mode: 'self' | 'other_adult' | 'teen'; travelerName: string; familyLinkId?: string };
 };
 
 export type RideStore = {
@@ -833,6 +835,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
           destination: arrival,
           destCoords: tripCoords.dest,
           stage: 'leg1',
+          party: {...travelPartyRef.current},
         });
         setArrival(dest);
         setTripCoords({ pickup: tripCoords.pickup, dest: { lat: plan.from.lat, lng: plan.from.lng } });
@@ -851,9 +854,10 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       if (!destCoords) return false;
       const next: SmartJourney = journey
         ? { ...journey, stage: 'leg2' }
-        : { plan, pickup: departure, destination, destCoords, stage: 'leg2' };
+        : { plan, pickup: departure, destination, destCoords, stage: 'leg2', party: {...travelPartyRef.current} };
       smartJourneyRef.current = next;
       setSmartJourney(next);
+      setTravelParty({...next.party});
       setDeparture({ name: plan.to.name, short: plan.to.name, lat: from.lat, lng: from.lng, resolved: true });
       setArrival({ ...destination, cost: leg.cents / 100 });
       setTripCoords({ pickup: from, dest: destCoords });

@@ -149,7 +149,7 @@ async function handleCheckrProviderEvent(event) {
   const out = await checkr.handleEvent(event);
   const db = adminDb();
   if (out?.uid && db && ['decided', 'dispute cleared operator', 'dispute remains pre-adverse', 'adverse action finalized'].includes(out.action)) {
-    await assessAndRecord({ db, uid: out.uid, checks: qualificationChecks, liveMoney: keyMode === 'live' });
+    await assessAndRecord({ db, uid: out.uid, checks: qualificationChecks, liveMoney: operationalMode });
   }
   return out;
 }
@@ -200,6 +200,9 @@ app.use(express.json()); // parse JSON request bodies — everything BELOW the w
 // money while /health reported "test" and the app told travelers nothing was being charged.
 const KEY = readKey('STRIPE_SECRET_KEY');
 const keyMode = /^(sk|rk)_live_/.test(KEY) ? 'live' : /^(sk|rk)_test_/.test(KEY) ? 'test' : 'no-key';
+const DEPLOYMENT_MODE = String(readKey('DEPLOYMENT_MODE') || 'development').toLowerCase();
+const productionMode = DEPLOYMENT_MODE === 'production';
+const operationalMode = productionMode || keyMode === 'live';
 
 // Stripe, for signature verification only. The payment logic has its own client in
 // payments.js; this avoids importing that whole module's state to check one header.
@@ -328,6 +331,7 @@ app.get('/health', async (req, res) => {
     // Stripe can reach us, and we can reach a traveler's inbox. Both were absent and both
     // were invisible; a field on a URL is how that stops happening.
     webhook: webhookReady() ? 'on' : 'off',
+    deployment: DEPLOYMENT_MODE,
     scheduler: readKey('SCHEDULER_TOKEN') ? 'authenticated' : 'off',
     tolls: readKey('HERE_API_KEY') ? 'on' : 'off',
     receipts: mailReady() ? 'on' : 'off',
@@ -875,7 +879,7 @@ app.post('/operator/online', requireAuth, async (req, res) => {
       user,
       fleet: fleetNow,
       context: 'online',
-      liveMoney: keyMode === 'live',
+      liveMoney: operationalMode,
       account: { disabled: false }, // checked above
       payouts: { enabled: true }, // checked above, with Stripe's list of what is still due
     });
@@ -1820,7 +1824,7 @@ app.post('/operator/document', requireAuth, LIMITS.document, async (req, res) =>
     // required: a failure here is re-assessed at the next status check and at every gate.
     let qualification = null;
     try {
-      const a = await assessAndRecord({ db, uid: req.uid, checks: qualificationChecks, liveMoney: keyMode === 'live' });
+      const a = await assessAndRecord({ db, uid: req.uid, checks: qualificationChecks, liveMoney: operationalMode });
       qualification = { status: a.status, qualified: a.qualified };
     } catch (e) {
       console.error('[qualification] after document', e.message);
@@ -1986,7 +1990,7 @@ app.get('/operator/qualification', requireAuth, LIMITS.qualification, async (req
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   try {
-    const a = await assessAndRecord({ db, uid: req.uid, checks: qualificationChecks, liveMoney: keyMode === 'live' });
+    const a = await assessAndRecord({ db, uid: req.uid, checks: qualificationChecks, liveMoney: operationalMode });
     res.json(qualificationBody(a));
   } catch (e) {
     res.status(502).json({ error: e.message });
@@ -1998,7 +2002,7 @@ app.get('/operator/commission', requireAuth, LIMITS.qualification, async (req, r
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   try {
-    const a = await assessAndRecord({ db, uid: req.uid, checks: qualificationChecks, liveMoney: keyMode === 'live' });
+    const a = await assessAndRecord({ db, uid: req.uid, checks: qualificationChecks, liveMoney: operationalMode });
     const legacy = { qualified: 'approved', exception: 'pending', refused: 'refused', suspended: 'refused', incomplete: 'none' };
     res.json({ status: legacy[a.status], reason: a.qualified ? null : a.blockers[0]?.reason || null });
   } catch (e) {
@@ -2012,7 +2016,7 @@ app.post('/operator/qualification/submit', requireAuth, LIMITS.qualification, as
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   try {
-    const a = await assessAndRecord({ db, uid: req.uid, checks: qualificationChecks, liveMoney: keyMode === 'live' });
+    const a = await assessAndRecord({ db, uid: req.uid, checks: qualificationChecks, liveMoney: operationalMode });
     if (a.status === 'incomplete') {
       const first = a.blockers.find((x) => x.gate === 'qualification');
       return res.status(409).json({ code: first?.code || 'incomplete', error: first?.reason || 'Qualification is not complete.', ...qualificationBody(a) });
@@ -2532,7 +2536,7 @@ app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, async (req, res) => {
   // EMPTY COLLECTION ONLY, AND NEVER WITH LIVE KEYS. A stand-in is for a database with nobody
   // in it, which is a development environment and a founder demonstration. The moment real
   // money is in play there is no such thing as a stand-in operator.
-  if (!fleet.length && keyMode !== 'live') {
+  if (!fleet.length && !operationalMode) {
     // An empty availability query is not the same as an empty fleet. Only synthesize the
     // demonstration fleet when the collection itself has no Operator records at all.
     const anyOperator = await db.collection('operators').limit(1).get();
@@ -2808,7 +2812,7 @@ app.post('/travel/accept', requireAuth, async (req, res) => {
   }
 
   try {
-    const out = await acceptOffer({ db, uid, rideId, externals, liveMoney: keyMode === 'live' });
+    const out = await acceptOffer({ db, uid, rideId, externals, liveMoney: operationalMode });
     res.status(out.status).json(out.body);
   } catch (e) {
     res.status(502).json({ error: e.message });

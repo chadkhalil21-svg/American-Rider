@@ -17,8 +17,9 @@ function distanceMiles(a, b) {
 // Rough pickup ETA from distance (city driving ~22 mph).
 function etaMinutes(miles, mph = 22) { return Math.max(1, Math.round((miles / mph) * 60)); }
 
-// Has this operator's commercial policy run out? American Rider carries no automobile
-// coverage, so an operator whose own policy has lapsed is a travel with nothing behind it.
+// Has this operator's required commercial policy run out? The Operator's qualifying coverage
+// remains a mandatory dispatch gate. Separate TNC-maintained contingency coverage required by
+// applicable law is not a substitute for an Operator satisfying that qualification gate.
 //
 // IT LIVES HERE BECAUSE IT WAS LIVING IN TWO PLACES AND CALLED IN THREE. scheduler.js
 // defined it — under a comment saying it "mirrors dispatch.ts coverageLapsed()", which is

@@ -196,7 +196,11 @@ await check('rides: nobody writes payment, refund or payout fields from a phone'
   });
 
   await seedOne({ status: 'accepted' });
-  await check('accepted → onboard with onboardAt: succeeds (the operator may skip "arrived")', () => assertSucceeds(opWrite(operatorStatusWrite('onboard', 20))));
+  await check('accepted → onboard is refused; arrival is an exact predecessor', () => assertFails(opWrite(operatorStatusWrite('onboard', 20))));
+  await check('accepted → completed is refused; payout cannot skip the Travel state machine', () => assertFails(opWrite(operatorStatusWrite('completed', 20))));
+  await seedOne({ status: 'arrived', arrivedAt: 10 });
+  await check('arrived → completed is refused; onboard is required before completion', () => assertFails(opWrite(operatorStatusWrite('completed', 20))));
+  await check('arrived → onboard remains the required progression', () => assertSucceeds(opWrite(operatorStatusWrite('onboard', 20))));
   await check('onboardAt cannot be rewritten while onboard', () => assertFails(opWrite({ onboardAt: 99 })));
   await check('…nor alongside a later move to completed', () => assertFails(opWrite({ ...operatorStatusWrite('completed', 30), onboardAt: 99 })));
   await check('completedAt cannot be written without entering completed', () => assertFails(opWrite({ completedAt: 30 })));

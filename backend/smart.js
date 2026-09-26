@@ -331,7 +331,7 @@ function buildPlan(pickup, dest, itinerary, direct) {
   if (carLegs.length === 1) {
     const q = quote(carLegs[0].cents, null, carLegs[0].feeLines || [], null, 0);
     feeCents = q.appFee;
-    smartCents = q.total;
+    smartCents = q.travelerPays;
   } else if (carLegs.length >= 2) {
     const first = carLegs[0];
     const second = carLegs[carLegs.length - 1];
@@ -343,12 +343,12 @@ function buildPlan(pickup, dest, itinerary, direct) {
       leg1TollCents: 0,
     }, second.feeLines || [], null, 0);
     feeCents = q1.appFee + q2.appFee;
-    smartCents = q1.total + q2.total;
+    smartCents = q1.travelerPays + q2.travelerPays;
   }
   const transitFareCents = sum(ours, (l) => (l.kind === 'transit' ? l.cents : 0));
   const transitFareUnknown = ours.some((l) => l.fareUnknown);
   const journeyCents = smartCents + transitFareCents;
-  const directCents = quote(direct.travelCostCents, null, governmentFeesFor(pickup, dest), null, 0).total;
+  const directCents = quote(direct.travelCostCents, null, governmentFeesFor(pickup, dest), null, 0).travelerPays;
   const saveCents = directCents - journeyCents;
 
   // Time. The transit part is OTP's timetable; our ends are added on either side of it.

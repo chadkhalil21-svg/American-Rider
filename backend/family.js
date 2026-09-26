@@ -32,7 +32,16 @@ async function acceptFamilyInvite({id,inviteToken,teenUid,now=Date.now()}){
 }
 async function revokeFamilyLink({id,guardianUid,now=Date.now()}){
  const db=adminDb();if(!db)return {ok:false,reason:adminStatus().reason};const ref=db.collection(COLLECTION).doc(String(id));const s=await ref.get();if(!s.exists||String(s.data()?.guardianUid)!==String(guardianUid))return {ok:false,reason:'not authorized'};
- await ref.set({status:'revoked',revokedAt:now,updatedAt:now},{merge:true});return {ok:true};
+ await ref.set({status:'revoked',revokedAt:now,updatedAt:now},{merge:true});
+ // Revocation governs future Teen Travel. A Teen already onboard is never stranded by
+ // administrative relationship changes; underway Travels retain their existing safety envelope.
+ const q=await db.collection('scheduled_rides').where('status','==','reserved').get();
+ let cancelledScheduledTravels=0;
+ for(const d of q.docs){const r=d.data()||{};if(r.party?.teen===true&&String(r.party?.familyLinkId)===String(id)){
+   await d.ref.set({status:'cancelled',cancelledAt:now,closedReason:'Family authorization revoked.'},{merge:true});
+   cancelledScheduledTravels++;
+ }}
+ return {ok:true,cancelledScheduledTravels};
 }
 async function activeFamilyLink({id,guardianUid=null,teenUid=null,now=Date.now()}){
  const db=adminDb();if(!db)return null;const s=await db.collection(COLLECTION).doc(String(id)).get();if(!s.exists)return null;const x={id:s.id,...s.data()};

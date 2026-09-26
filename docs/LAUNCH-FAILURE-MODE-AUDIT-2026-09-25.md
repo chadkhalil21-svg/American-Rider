@@ -15,6 +15,7 @@ Do not merge while a Critical item is open. High items require either a fix or a
 - **Cross-module regression coverage.** `backend/launchfailure.test.js` now pins these failure boundaries and exhaustively checks the modeled contribution floor from $3 through $500 for domestic, international and unknown card country.
 - **Webhook durability — High.** Verified Stripe and Checkr events are written to `provider_events` before HTTP acknowledgement. Processing is leased, idempotently reclaimed after worker failure, retried with backoff, and swept periodically.
 - **Scheduler single-instance behavior — High.** Every server may keep its local 60-second clock, but `operations_sweep` is protected by a transactional Firestore leader lease with renewal and owner-checked release, preventing horizontally scaled instances from concurrently executing the sweep.
+- **Payout wording and cadence — Medium.** Public copy now distinguishes American Rider’s transfer of the Operator’s 99% fare share to the Stripe connected account on Travel completion from Stripe’s separate bank-payout schedule.
 
 ## Screening policy: minimum-human-intervention design
 
@@ -36,10 +37,9 @@ The 25-cent contingency reserve and 25-cent operating-overhead allowance are pla
 2. **FCRA adverse-action workflow — compliance/engineering.** A refusal currently creates a support ticket describing the notice process. Replace the ticket dependency with an auditable notice-state machine before using third-party consumer reports for live adverse decisions.
 3. **Operator background execution — engineering.** Foreground timers are not a durable production presence mechanism on iOS/Android. Verify native background location/presence behavior under lock, suspension, network loss, force-quit and reboot.
 4. **Low-volume Connect economics — business/economics.** Resolve the 16-cent allocation assumption before representing the 75-cent floor as fully loaded.
-5. **Payout wording and cadence — product/payments.** Distinguish transfer to the connected account on Travel completion from Stripe's bank payout schedule. Public copy must not imply bank settlement is instantaneous.
-6. **Dispatch scale — engineering/cost.** Re-offer paths can read the fleet collection. Replace full-fleet scans with indexed/geospatial partitioning before fleet scale makes read cost/latency material.
-7. **Disaster tests — operations.** Exercise Firestore quota exhaustion, Stripe outage, Checkr outage, routing outage, push failure, email/support failure, stale GPS, device clock skew, duplicate requests, out-of-order webhooks, process restart mid-settlement and partial region outage.
-8. **Secrets/production configuration — operations.** Production configuration must verify restricted Stripe keys, webhook secrets, scheduler token, ops authentication, private object storage, support delivery, production Firebase project and no test-mode bypass.
+5. **Dispatch scale — engineering/cost.** Re-offer paths can read the fleet collection. Replace full-fleet scans with indexed/geospatial partitioning before fleet scale makes read cost/latency material.
+6. **Disaster tests — operations.** Exercise Firestore quota exhaustion, Stripe outage, Checkr outage, routing outage, push failure, email/support failure, stale GPS, device clock skew, duplicate requests, out-of-order webhooks, process restart mid-settlement and partial region outage.
+7. **Secrets/production configuration — operations.** Production configuration must verify restricted Stripe keys, webhook secrets, scheduler token, ops authentication, private object storage, support delivery, production Firebase project and no test-mode bypass.
 
 ## Definition of done
 

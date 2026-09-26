@@ -974,6 +974,7 @@ export default {
     viewTravelReceipt: 'Voir le Reçu',
     leaveWithoutSaving: 'Quitter sans enregistrer',
     operator: 'Opérateur',
+      inboxReadFailed: 'Cette communication n’a pas pu être enregistrée comme lue. Réessayez.',
     paymentMethod: 'Moyen de Paiement',
     operatorRetainedNote: 'L’Opérateur a conservé 99 % du tarif du trajet.',
     contactPatronSupport: 'Contacter l’Assistance Voyageurs',

@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict');const fs=require('node:fs');const path=require('node:path');
 const pkg=require('../package.json');const tpl=require('../release-evidence.template.json');
 assert.equal(pkg.scripts['release:evidence'],'node scripts/verify-release-evidence.mjs','release evidence has an executable validator');
-const required=['insurance','productionConfiguration','stripe','checkr','firebase','scheduler','routingTolls','transit','emailSupport','phoneVerification','documentStorage','push','iosPhysicalDevices','androidPhysicalDevice','smartTravelLive','liveMoneyReconciliation'];
+const required=['insurance','productionConfiguration','stripe','checkr','firebase','scheduler','routingTolls','transit','emailSupport','phoneVerification','documentStorage','push','iosPhysicalDevices','androidPhysicalDevice','smartTravelLive','liveMoneyReconciliation','uxRubric'];
 for(const k of required)assert.ok(tpl.gates[k],k+' external gate is represented');
 const verifier=fs.readFileSync(path.join(__dirname,'..','scripts','verify-release-evidence.mjs'),'utf8');
 assert.ok(verifier.includes("m.candidateSha !== expectedSha"),'evidence from another build cannot release this candidate');
@@ -9,4 +9,5 @@ assert.ok(verifier.includes("g.result !== 'pass'"),'pending/failing external gat
 assert.ok(verifier.includes("independent reviewer missing"),'external evidence requires review');
 assert.ok(verifier.includes("operationalMissing must be []"),'production readiness must be clean');
 assert.ok(verifier.includes("English disclosure not reviewed"),'insurance disclosure review is mandatory');
+assert.ok(verifier.includes("uxRubric: "+"'+k+'" )||verifier.includes("uxRubric:"),'whole-product UX doctrine is enforced by the release verifier');
 console.log('all external release-evidence contract tests passed');

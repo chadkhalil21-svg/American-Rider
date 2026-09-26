@@ -43,7 +43,7 @@ const PACKAGE_CRIMINAL_ONLY = () => readKey('CHECKR_PACKAGE_BASIC') || 'american
 const packageFor = (tier) =>
   tier === 'mvr' ? PACKAGE_MVR_ONLY() : tier === 'criminal' ? PACKAGE_CRIMINAL_ONLY() : PACKAGE_FULL();
 
-// Where the work is. §627.748 is Florida law and the launch market is Florida; the state
+// Where the work is. §627.748 is Florida law and the configured operating jurisdiction is Florida; the state
 // also decides which DMV the MVR pulls from.
 const WORK_STATE = () => readKey('CHECKR_WORK_STATE') || 'FL';
 

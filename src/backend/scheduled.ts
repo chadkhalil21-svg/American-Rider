@@ -59,7 +59,7 @@ export type ScheduledRide = {
   tripNo?: string;
   travelerName?: string;
   travelerEmail?: string;
-  party?: { mode: 'self' | 'other_adult'; travelerName?: string };
+  party?: { mode: 'self' | 'other_adult' | 'teen'; travelerName?: string; familyLinkId?: string };
 
   // ---- What the sweep writes back. ------------------------------------------------------
   status?: SchedStatus;
@@ -92,6 +92,7 @@ export async function saveScheduledRide(
         travelerName: info.party?.travelerName || auth.currentUser?.displayName || '',
         bookerName: auth.currentUser?.displayName || '',
         partyMode: info.party?.mode || 'self',
+        familyLinkId: info.party?.familyLinkId,
         pickup: { lat: info.pickupLat, lng: info.pickupLng },
         destinationPoint: { lat: info.destinationLat, lng: info.destinationLng },
       }),

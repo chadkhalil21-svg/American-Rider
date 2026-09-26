@@ -177,8 +177,8 @@ export default function SmartTravel() {
     if (ride.beginSmartLeg(which)) router.navigate('/reserve');
   };
 
-  // Which action the journey is at. A second car travel cannot begin while the first is
-  // still under way — the app carries one live travel — so leg 2 waits for leg 1 to finish.
+  // Which action the journey is at. A second car Travel cannot begin while the first is
+  // still under way — the app carries one live Travel — so leg 2 waits for leg 1 to finish.
   let action: React.ReactNode;
   if (!journey) {
     if (cars.length === 0) {

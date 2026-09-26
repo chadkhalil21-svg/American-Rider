@@ -70,8 +70,8 @@ service cloud.firestore {
              && (ride.status in ['accepted', 'arrived', 'onboard']
                  || (ride.status == 'completed' && d.lostItemId is string)))
             || (d.from == 'guardian' && ride.party.teen == true
-                && ride.get('party', {}).get('guardianUid', null) == request.auth.uid
-                && ride.status in ['assigned', 'accepted', 'arrived', 'onboard'])));
+                && ride.party.guardianUid == request.auth.uid
+                && ride.status in ['assigned', 'accepted', 'arrived', 'onboard']));
     }
 
     // Does this update move the travel INTO `st` (from any other status)?

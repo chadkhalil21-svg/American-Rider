@@ -450,6 +450,7 @@ app.post('/travel/follow-link', requireAuth, LIMITS.announce, async (req, res) =
     const token = await issueFollowToken({
       rideId: String(req.body?.rideId || ''),
       travelerUid: req.uid,
+      guardianUid: req.uid,
     });
     if (!token) return res.status(409).json({ error: 'That travel cannot be shared right now' });
     res.json({ ok: true, url: `${PUBLIC_ORIGIN}/follow/${token}` });

@@ -183,12 +183,6 @@ app.post('/stripe/webhook', express.raw({ type: 'application/json' }), async (re
   return acceptDurableProviderEvent('stripe', event, res);
 });
 
-app.post('/smart-revalidate', requireOperationalReadiness, async (req, res) => {
-  const plan = req.body?.plan;
-  const out = await revalidateTransit(plan);
-  if (out.status === 'unavailable') return res.status(503).json(out);
-  return res.json(out);
-});
 
 app.post('/checkr/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   if (!readKey('CHECKR_WEBHOOK_SECRET')) return res.status(503).json({ error: 'CHECKR_WEBHOOK_SECRET is not set' });
@@ -1413,7 +1407,7 @@ app.post('/route', LIMITS.routeIp, async (req, res) => {
 //   503 { status: 'unavailable' }     the planner is not answering — the app says so
 // This used to 404 when rail "did not win", and the app read 404 as "do not show". That gate
 // is withdrawn: the server reports; the client decides emphasis.
-app.post('/smart-quote', LIMITS.routeIp, async (req, res) => {
+app.post('/smart-quote', LIMITS.routeIp, requireOperationalReadiness, async (req, res) => {
   // OLDER APPS GET THE OLDER ANSWER. TestFlight build 36 reads any 200 as a plan and would
   // render `{ status: 'none' }` as a card reading "Save $NaN", then crash on its legs. An app
   // that does not name the new contract (header X-AR-Smart: 2) is answered the way the old
@@ -1424,6 +1418,13 @@ app.post('/smart-quote', LIMITS.routeIp, async (req, res) => {
   if (out.status === 'unavailable') return res.status(503).json({ status: 'unavailable' });
   if (out.status !== 'ok') return res.json({ status: 'none' });
   res.json(out.plan);
+});
+
+app.post('/smart-revalidate', LIMITS.routeIp, requireOperationalReadiness, async (req, res) => {
+  const plan = req.body?.plan;
+  const out = await revalidateTransit(plan);
+  if (out.status === 'unavailable') return res.status(503).json(out);
+  return res.json(out);
 });
 
 // --- Where can I go from here? The app asks; the server answers for the REGION. -----------

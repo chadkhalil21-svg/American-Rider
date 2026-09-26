@@ -596,7 +596,7 @@ async function refundableFor({ paymentIntentId, expectUid }) {
 //
 // Returns { ok, refundId, amountCents } or { ok:false, error }. The caller must NOT tell the
 // traveler money moved unless ok is true; server.js routes a failed refund to a person.
-async function refundTravel({ paymentIntentId, amountCents, expectUid }) {
+async function refundTravel({ paymentIntentId, amountCents, expectUid, idempotencyKey = null }) {
   if (!paymentIntentId) return { ok: false, error: 'no payment on record for that travel' };
   if (!Number.isInteger(amountCents) || amountCents <= 0) {
     return { ok: false, error: 'refund amount must be a positive whole number of cents' };
@@ -657,7 +657,7 @@ async function refundTravel({ paymentIntentId, amountCents, expectUid }) {
         // Stamped on the refund itself so the cost is legible in Stripe, not only in our logs.
         outOfPocketCents: String(outOfPocketCents),
       },
-    });
+    }, idempotencyKey ? { idempotencyKey: String(idempotencyKey) } : undefined);
     // 'pending' is a normal ACH outcome and still means the refund is real and issued.
     const ok = refund.status === 'succeeded' || refund.status === 'pending';
     return ok

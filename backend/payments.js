@@ -57,7 +57,7 @@ function getStripe() {
 // US-issued cards use the domestic processing rate. Every other card, INCLUDING UNKNOWN,
 // uses the international-safe rate. A first foreign card is never deliberately under-priced.
 //
-// Launch charges and settlement are USD-only; there is no ordinary Stripe FX branch in this
+// Charges and settlement are USD-only; there is no ordinary Stripe FX branch in this
 // formula. If a future product permits non-USD presentment/settlement, that must add an
 // explicit FX cost before it may be enabled.
 //

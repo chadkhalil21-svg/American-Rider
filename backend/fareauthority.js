@@ -48,6 +48,9 @@ async function journeyFor({ db, uid, journeyNo }) {
     leg1FareCents: Number(leg.travelCostCents),
     leg1GovernmentFeeCents: Math.max(0, Number(leg.governmentFeeCents) || 0),
     leg1TollCents: Math.max(0, Number(leg.tollCents) || 0),
+    // The physical Traveler/guardian envelope is frozen by the first Travel. Leg 2 must not
+    // trust a restarted or modified client to name a different party.
+    party: leg.party || null,
   };
 }
 

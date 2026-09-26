@@ -5,6 +5,7 @@ import { Text } from '../../src/components/AppText';
 import { Card, LetterheadBar, Screen, SectionLabel, Title } from '../../src/components/UI';
 import { fetchOperatorInbox, markOperatorMessageRead, type PlatformMessage } from '../../src/backend/platformInbox';
 import { colors } from '../../src/theme';
+import { t } from '../../src/i18n';
 
 export default function OperatorInbox() {
   const router = useRouter();

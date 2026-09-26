@@ -72,4 +72,4 @@ t('75c modeled transaction contribution still holds every cent $3-$500', () => {
   }
 });
 
-console.log(`\n${pass} launch-hardening tests passed`);
+console.log(`\n${pass} material-hardening tests passed`);

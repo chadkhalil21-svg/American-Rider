@@ -511,7 +511,6 @@ export default {
     qualBgSub: 'Organisée par American Rider · payée au prix coûtant',
     inboxNotSignedIn: 'Cet appareil n’est pas connecté, il ne peut donc pas recevoir de courses.',
     inboxNotCommissioned: 'Ce compte n’est pas encore habilité, aucune course ne peut lui être attribuée.',
-    replySeeShortly: 'Merci — à tout de suite.',
     noLongerInService: 'Vous n’êtes plus en service.',
     blockNameVehicle: 'Le voyageur reçoit le nom, le véhicule et la plaque de l’opérateur avant l’arrivée de la voiture, et les vérifie au bord du trottoir.',
     blockCoverage: 'American Rider ne fournit aucune assurance automobile : la police que détient l’opérateur est la seule couverture d’un trajet. Enregistrez sa date d’échéance.',

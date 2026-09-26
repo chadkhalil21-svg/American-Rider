@@ -14,6 +14,7 @@ const scheduler=read('backend/scheduler.js');
 const smart=read('backend/smart.js');
 const inbox=read('backend/platforminbox.js');
 const opInboxScreen=read('app/operator/inbox.tsx');
+const operatorContext=read('src/state/OperatorContext.tsx');
 const appConfig=JSON.parse(read('app.json'));
 
 assert.equal(/transfer_data\s*:/.test(payments), false, 'payments.js must not create destination charges');
@@ -60,6 +61,9 @@ assert.ok(smart.includes("const q1 = quote(first.cents"), 'Smart Travel preview 
 assert.ok(smart.includes("const q2 = quote(second.cents"), 'Smart Travel preview must price second real car Travel as journey continuation');
 assert.ok(inbox.includes("if (!snap.data()?.readAt)"), 'Operator Inbox must preserve first-read timestamp');
 assert.ok(opInboxScreen.includes("if (!recorded)"), 'Operator Inbox UI must fail closed when read acknowledgement fails');
+assert.ok(operatorContext.includes("watchTravelThread("), 'Operator Travel chat must read the authoritative Travel thread');
+assert.ok(operatorContext.includes("sendTravelMessage({"), 'Operator Travel chat must send through server-authoritative messaging');
+assert.equal(operatorContext.includes("replySeeShortly"), false, 'Operator Travel chat must not fabricate Traveler replies');
 assert.equal(appConfig.expo.ios.infoPlist.CFBundleDisplayName, 'American Rider', 'iOS display name must carry full brand');
 
 console.log('✓ one-transfer Stripe architecture');
@@ -69,4 +73,5 @@ console.log('✓ renewable scheduler leadership');
 console.log('✓ scheduled Family/Teen authorization propagation');
 console.log('✓ Smart Travel preview/payment alignment');
 console.log('✓ Operator Inbox durable read semantics');
+console.log('✓ real Operator↔Traveler Travel chat');
 console.log('✓ full iOS brand name');

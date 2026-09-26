@@ -14,7 +14,7 @@ assert.ok(server.indexOf('await enqueueProviderEvent') < server.indexOf("res.jso
 assert.ok(server.includes("const name = 'operations_sweep'") && server.includes('await acquireLease(name,'),'sweeps have a single-leader lease');
 assert.ok(server.includes("scheduler: readKey('SCHEDULER_TOKEN') ? 'authenticated' : 'off'"), 'health exposes scheduler authorization readiness');
 assert.ok(server.includes("tolls: readKey('HERE_API_KEY') ? 'on' : 'off'"), 'health exposes toll authority readiness');
-assert.ok(server.includes("const productionMode = DEPLOYMENT_MODE === 'production'"), 'server has explicit production posture');
+assert.ok(server.includes("const declaredProduction = DEPLOYMENT_MODE === 'production'") && server.includes("const productionMode = declaredProduction || keyMode === 'live'"), 'server has explicit production posture and live money implies it');
 assert.ok(server.includes("if (!fleet.length && !operationalMode)"), 'demonstration fleet is impossible in production posture');
 assert.ok(server.includes('function productionReadiness()'), 'production readiness is centralized');
 assert.ok(server.includes("code: 'production_not_ready'"), 'production operations fail closed when dependencies are incomplete');

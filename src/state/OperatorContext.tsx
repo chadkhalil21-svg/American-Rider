@@ -1,11 +1,7 @@
 // American Rider — the OPERATOR side's single store. Role flag, qualification
-// checklist, commissioned state, availability, the simulated operation loop, and
-// revenue math (99% of every travel fare, a flat 1% commission — same math as
-// src/data.ts coordinationFee).
-//
-// TEST PROGRAM, honestly: document review, screening, operations, and transfers are
-// all simulated on-device (nothing touches the real Firestore ride flow). Screens
-// carry a quiet "Test program" line wherever the theater runs.
+// checklist, commissioned state, availability, real assigned-Travel loop, and
+// revenue presentation. Server authority governs qualification, duty, Travel progression,
+// settlement and institutional records; device storage here is presentation/cache state.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, {
   createContext,
@@ -33,6 +29,7 @@ import {
 import { announceTravel, answerCheckIn } from '../backend/checkin';
 import { submitDocument, type DocKind, type DocReview } from '../backend/documentUpload';
 import { reportPosition } from '../backend/telemetry';
+import { sendTravelMessage, watchTravelThread } from '../backend/messages';
 import { resolveCurrentDeparture } from '../location';
 import { useAuth } from './AuthContext';
 // Aliased: this module has local bindings named `t` (a message string, a timer).
@@ -938,15 +935,21 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
     setArrived(false);
   }, [op, commitRevenue]);
 
-  // Communicate — the demo's reply theater (1.5s).
+  // Communicate on the authoritative Travel thread. No scripted counterparty reply: a message
+  // from a real Traveler appears only when that Traveler actually sends it.
   const sendMsg = useCallback((text: string) => {
-    const t = text.trim();
-    if (!t) return;
-    setMsgs((m) => [...m, { me: true, text: t }]);
-    if (msgTimer.current) clearTimeout(msgTimer.current);
-    msgTimer.current = setTimeout(() => {
-      setMsgs((m) => [...m, { me: false, text: tr('traveler.replySeeShortly') }]);
-    }, 1500);
+    const body = text.trim();
+    const current = opRef.current;
+    if (!body || !current?.rideId || !current.tripNo) return;
+    sendTravelMessage({
+      rideId: current.rideId,
+      tripNo: current.tripNo,
+      text: body,
+      from: 'operator',
+      travelerUid: current.travelerUid,
+    }).then((stored) => {
+      if (stored) setMsgs((m) => [...m, { me: true, text: body }]);
+    });
   }, []);
 
   // ---- revenue, derived from the operations this operator actually completed ----

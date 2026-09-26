@@ -952,6 +952,7 @@ export default {
     oneCarTravel: 'American Rider · 1 car travel',
     nCarTravels: 'American Rider · %{n} car travels',
     transitPaidToAgency: 'Transit · paid to the transit agency',
+    transitPaidToNamedAgency: "Paid to {agency}",
     transitFareNote: 'Transit fares are paid at the station or on board. American Rider does not issue transit tickets and takes no part of the fare.',
     fareSetBy: 'Fare not shown · set by %{agency}',
     reserveFirstTravel: 'Reserve first travel',

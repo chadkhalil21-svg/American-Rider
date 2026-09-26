@@ -155,8 +155,10 @@ const accept = (db, extra = {}) => acceptOffer({ db, uid: 'op', rideId: 'r1', ex
   check('rules: the operator update rule was found', opRule.length > 0);
   check("rules: a phone cannot write 'accepted'", opRule.length > 0 && !/'accepted', 'arrived'/.test(opRule.split('resource.data.status in')[0]) && !/request\.resource\.data\.status in\s*\[\s*'accepted'/.test(opRule));
   check('rules: a phone cannot write acceptedAt', !/'acceptedAt'/.test(opRule));
-  check('rules: arrived/onboard/completed require a travel already under way',
-    /resource\.data\.status in \['accepted', 'arrived', 'onboard'\]/.test(opRule));
+  check('rules: Operator progress is an exact accepted → arrived → onboard → completed state machine',
+    /status == 'arrived' && resource\.data\.status == 'accepted'/.test(opRule) &&
+    /status == 'onboard' && resource\.data\.status == 'arrived'/.test(opRule) &&
+    /status == 'completed' && resource\.data\.status == 'onboard'/.test(opRule));
   check("rules: 'declined' only answers an open offer", /status == 'declined'\s*&& resource\.data\.status == 'assigned'/.test(opRule));
 
   const server = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');

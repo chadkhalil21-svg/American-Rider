@@ -32,7 +32,9 @@ export type AssignedTravel = {
   travelerName: string;
   bookedForAnother?: boolean;
   minor?: boolean;
+  teen?: boolean;
   guardianName?: string | null;
+  pinRequired?: boolean;
   tripNo: string;
   dep: string;
   dest: string;
@@ -106,8 +108,9 @@ export function watchAssignedTravel(
               travelerUid: String(x.travelerUid ?? ''),
               travelerName: String(x.travelerName ?? ''),
               bookedForAnother: (x.party as any)?.bookedForAnother === true,
-              minor: (x.party as any)?.minor === true,
-              guardianName: typeof (x.party as any)?.guardian?.name === 'string' ? (x.party as any).guardian.name : null,
+              teen: (x.party as any)?.teen === true,
+              guardianName: typeof (x.party as any)?.guardianName === 'string' ? (x.party as any).guardianName : null,
+              pinRequired: (x.party as any)?.pinRequired === true,
               tripNo: String(x.tripNo ?? ''),
               dep: String(x.dep ?? ''),
               dest: String(x.dest ?? ''),

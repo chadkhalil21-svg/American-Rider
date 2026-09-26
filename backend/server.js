@@ -213,6 +213,7 @@ function productionReadiness() {
   if (!readKey('CHECKR_WEBHOOK_SECRET') || !screeningReady()) missing.push('screening_provider');
   if (!readKey('HERE_API_KEY')) missing.push('toll_provider');
   if (!readKey('TNC_INSURANCE_DISCLOSURE')) missing.push('tnc_contingency_insurance');
+  if (!['ES','FR','IT','DE'].every((lang) => readKey(`TNC_INSURANCE_DISCLOSURE_${lang}`))) missing.push('tnc_insurance_translations');
   if (!readKey('SCHEDULER_TOKEN')) missing.push('scheduler_token');
   if (!adminStatus().ok) missing.push('firebase_admin');
   if (opsAuthMode() !== 'named') missing.push('ops_auth');

@@ -204,6 +204,29 @@ const DEPLOYMENT_MODE = String(readKey('DEPLOYMENT_MODE') || 'development').toLo
 const productionMode = DEPLOYMENT_MODE === 'production';
 const operationalMode = productionMode || keyMode === 'live';
 
+function productionReadiness() {
+  const missing = [];
+  if (keyMode !== 'live') missing.push('stripe_live_key');
+  if (!readKey('STRIPE_PUBLISHABLE_KEY')) missing.push('stripe_publishable_key');
+  if (!readKey('STRIPE_WEBHOOK_SECRET')) missing.push('stripe_webhook_secret');
+  if (!readKey('CHECKR_WEBHOOK_SECRET') || !screeningReady()) missing.push('screening_provider');
+  if (!readKey('HERE_API_KEY')) missing.push('toll_provider');
+  if (!readKey('SCHEDULER_TOKEN')) missing.push('scheduler_token');
+  if (!adminStatus().ok) missing.push('firebase_admin');
+  if (opsAuthMode() !== 'named') missing.push('ops_auth');
+  return { ready: !productionMode || missing.length === 0, missing };
+}
+
+function requireOperationalReadiness(req, res, next) {
+  const state = productionReadiness();
+  if (!state.ready) return res.status(503).json({
+    error: 'American Rider production services are not operationally ready.',
+    code: 'production_not_ready',
+    missing: state.missing,
+  });
+  return next();
+}
+
 // Stripe, for signature verification only. The payment logic has its own client in
 // payments.js; this avoids importing that whole module's state to check one header.
 let _sigClient = null;
@@ -251,6 +274,7 @@ app.get('/healthz', (req, res) => res.json({ ok: true, service: 'american-rider-
 
 app.get('/health', async (req, res) => {
   const tickets = adminStatus();
+  const readiness = productionReadiness();
 
   // WHO IS ACTUALLY ON DUTY. Counts only — no name, no position, nothing about a person.
   //
@@ -332,6 +356,8 @@ app.get('/health', async (req, res) => {
     // were invisible; a field on a URL is how that stops happening.
     webhook: webhookReady() ? 'on' : 'off',
     deployment: DEPLOYMENT_MODE,
+    operationalReady: readiness.ready,
+    operationalMissing: readiness.missing,
     scheduler: readKey('SCHEDULER_TOKEN') ? 'authenticated' : 'off',
     tolls: readKey('HERE_API_KEY') ? 'on' : 'off',
     receipts: mailReady() ? 'on' : 'off',
@@ -388,11 +414,13 @@ app.get('/health', async (req, res) => {
 // `mode` is what the app's payment copy reads, so no screen can claim payments are simulated
 // while real money is moving, or the reverse.
 app.get('/config', (req, res) => {
+  const readiness = productionReadiness();
   res.json({
     stripePublishableKey: readKey('STRIPE_PUBLISHABLE_KEY') || null,
     mode: keyMode,
     // false means the app must not offer to charge anybody.
-    canTakePayment: keyMode !== 'no-key' && !!readKey('STRIPE_PUBLISHABLE_KEY'),
+    canTakePayment: readiness.ready && keyMode !== 'no-key' && !!readKey('STRIPE_PUBLISHABLE_KEY'),
+    operationalReady: readiness.ready,
   });
 });
 
@@ -787,7 +815,7 @@ app.get('/connect/done', (req, res) =>
 //
 // This is docs/OPEN-DECISIONS.md §4 answered for the payout case: operator identity is the
 // account, not the handset.
-app.post('/operator/online', requireAuth, async (req, res) => {
+app.post('/operator/online', requireAuth, requireOperationalReadiness, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
 

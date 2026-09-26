@@ -57,6 +57,7 @@ import { useRide } from '../src/state/RideContext';
 import { paymentModeNote, usePaymentConfig } from '../src/state/PaymentConfigContext';
 import { useLanguage } from '../src/state/LanguageContext';
 import { colors, fmt } from '../src/theme';
+import { fetchFamily, type FamilyLink } from '../src/backend/family';
 
 // The demo's search-field magnifier: 18px, muted stroke 1.7.
 function Magnifier() {
@@ -102,6 +103,8 @@ export default function TravelConfirmation() {
   const [queryDep, setQueryDep] = useState('');
   const [partyOpen, setPartyOpen] = useState(false);
   const [partyName, setPartyName] = useState(ride.travelParty.travelerName || '');
+  const [familyLinks,setFamilyLinks]=useState<FamilyLink[]>([]);
+  useEffect(()=>{fetchFamily().then(x=>setFamilyLinks(x.filter(f=>f.role==='guardian'&&f.status==='active'&&f.eligible))).catch(()=>setFamilyLinks([]));},[]);
 
   // navigate() can update params on an already-mounted screen — reopen search then too.
   useEffect(() => {
@@ -390,6 +393,7 @@ export default function TravelConfirmation() {
                       <Text style={[styles.modify,{marginTop:14}]}>{t('traveler.anotherAdult')}</Text>
                     </Pressable>
                     <TextInput value={partyName} onChangeText={(v) => { setPartyName(v); if (ride.travelParty.mode === 'other_adult') ride.setTravelParty({ mode: 'other_adult', travelerName: v }); }} placeholder={t('traveler.travelerName')} placeholderTextColor={colors.muted} style={styles.input} />
+                    {familyLinks.map(f=><Pressable key={f.id} onPress={()=>{ride.setTravelParty({mode:'teen',travelerName:f.teenName||'Teen Traveler',familyLinkId:f.id});setPartyOpen(false);}}><Text style={[styles.modify,{marginTop:14}]}>Teen Travel · {f.teenName||'Teen Traveler'}</Text></Pressable>)}
                   </View>
                 )}
               </Card>

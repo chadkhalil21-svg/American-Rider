@@ -20,7 +20,7 @@ Verify actual Connect invoice lines against the economic constants. If Stripe's 
 
 ## Checkr production validation
 
-Checkr staging does not support post-adverse action. Before launch, validate with Checkr the exact package slugs, report fields and adverse-action events used here. Confirm pre-adverse delivery, dispute pause, dispute completion/correction, cancellation on cleared evidence, post-adverse completion, undeliverable notice, duplicate webhook and delayed webhook. American Rider remains blocked on ambiguous evidence and never turns provider `consider` into its own refusal automatically.
+Checkr staging does not support post-adverse action. Before production use, validate with Checkr the exact package slugs, report fields and adverse-action events used here. Confirm pre-adverse delivery, dispute pause, dispute completion/correction, cancellation on cleared evidence, post-adverse completion, undeliverable notice, duplicate webhook and delayed webhook. American Rider remains blocked on ambiguous evidence and never turns provider `consider` into its own refusal automatically.
 
 ## Infrastructure fault injection
 

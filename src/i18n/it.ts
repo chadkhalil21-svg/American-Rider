@@ -967,6 +967,7 @@ export default {
     viewTravelReceipt: 'Vedere la Ricevuta',
     leaveWithoutSaving: 'Esci senza salvare',
     operator: 'Operatore',
+      inboxReadFailed: 'Non è stato possibile registrare questa comunicazione come letta. Riprovi.',
     paymentMethod: 'Metodo di Pagamento',
     operatorRetainedNote: 'L’Operatore ha trattenuto il 99 % della tariffa del viaggio.',
     contactPatronSupport: 'Contattare l’Assistenza Viaggiatori',

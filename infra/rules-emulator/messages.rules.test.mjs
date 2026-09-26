@@ -232,7 +232,8 @@ await check('rides: nobody writes payment, refund or payout fields from a phone'
 await check('markOnboard/markCompleted send operatorStatusWrite — no other shape exists in the app', async () => {
   const inbox = fs.readFileSync(path.join(here, '..', '..', 'src', 'backend', 'operatorInbox.ts'), 'utf8');
   const need = [
-    /export const markOnboard = \(rideId: string\) => setStatus\(rideId, 'onboard'\);/,
+    /export async function markOnboard\(rideId: string, teenPickupCode\?: string\): Promise<boolean>/,
+    /return setStatus\(rideId, 'onboard'\);/,
     /export const markCompleted = \(rideId: string\) => setStatus\(rideId, 'completed'\);/,
     /export const markArrived = \(rideId: string\) => setStatus\(rideId, 'arrived'\);/,
     /export const declineTravel = \(rideId: string\) => setStatus\(rideId, 'declined'\);/,

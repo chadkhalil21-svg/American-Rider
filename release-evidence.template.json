@@ -127,6 +127,26 @@
       "executor": null,
       "reviewer": null,
       "evidence": []
+    },
+    "uxRubric": {
+      "result": "pending",
+      "executedAt": null,
+      "executor": null,
+      "reviewer": null,
+      "evidence": [],
+      "details": {
+        "completeScreenInventoryReviewed": false,
+        "travelerCriticalPathsReviewed": false,
+        "operatorCriticalPathsReviewed": false,
+        "familyTeenCriticalPathsReviewed": false,
+        "smartTravelCriticalPathsReviewed": false,
+        "emptyLoadingErrorOfflineRestartStatesReviewed": false,
+        "terminologyAndCopyReviewed": false,
+        "firstClassRubricReviewed": false,
+        "accessibilityReviewed": false,
+        "smallAndLargeDeviceLayoutsReviewed": false,
+        "noPlaceholderOrSimulatedProductionExperience": false
+      }
     }
   }
 }

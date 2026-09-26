@@ -139,8 +139,11 @@ const check = (l, ok, d) => R.push({ l, ok: !!ok, d });
   // Moved into travelmoney.js payForTravel (audit of e26adcb): the ride is proved first, then
   // the payment is stamped onto it with an update.
   const moneySrc = require('fs').readFileSync(path.join(ROOT, 'travelmoney.js'), 'utf8');
-  check('/create-payment-intent stamps the payment onto the travel',
-    /payForTravel\(/.test(serverSrc) && /paymentIntentId: result\.paymentIntentId/.test(moneySrc) && /rideRef\.update\(/.test(moneySrc));
+  check('/create-payment-intent stamps the payment onto the travel transactionally',
+    /payForTravel\(/.test(serverSrc) &&
+    /paymentIntentId: result\.paymentIntentId/.test(moneySrc) &&
+    /db\.runTransaction\(/.test(moneySrc) &&
+    /tx\.update\(rideRef,\s*\{[\s\S]*paymentIntentId: result\.paymentIntentId/.test(moneySrc));
 
 
 let bad = 0;

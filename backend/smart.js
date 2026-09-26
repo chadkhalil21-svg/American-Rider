@@ -9,9 +9,7 @@
 // what the traveler saves against driving the whole way.
 //
 // MONEY, THE RULES (founders, 9 Sept 2026):
-//   - We charge for the car legs we operate, plus ONE platform fee for the journey — the same
-//     platformFeeCents() the rest of the company charges, applied once, to the car total.
-//     Never per leg. The formula lives in payments.js and is imported, not copied.
+//   - We charge for the car legs we operate, with coordinated platform pricing across the journey. Each real car Travel is charged\n//     separately, and the combined fee funds the actual transaction count. The formula lives in\n//     payments.js and is imported, not copied.
 //   - Transit fares are paid by the traveler to the agency. They are never charged by us and
 //     never inside smartCents; they are REPORTED (transitFareCents) so the traveler sees what
 //     the journey actually costs, and the saving is journey against journey.

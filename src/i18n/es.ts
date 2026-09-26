@@ -521,7 +521,6 @@ export default {
     qualBgSub: 'Gestionada por American Rider · se paga a precio de coste',
     inboxNotSignedIn: 'Este dispositivo no tiene la sesión iniciada, por lo que no puede recibir viajes.',
     inboxNotCommissioned: 'Esta cuenta aún no está comisionada, por lo que no se le pueden asignar viajes.',
-    replySeeShortly: 'Gracias, nos vemos en un momento.',
     noLongerInService: 'Ya no está en servicio.',
     blockNameVehicle: 'Al viajero se le facilitan el nombre, el vehículo y la matrícula del operador antes de que llegue el coche, y los comprueba en la acera.',
     blockCoverage: 'American Rider no proporciona seguro de automóvil, por lo que la póliza que tiene el operador es la única cobertura de un viaje. Registre su fecha de vencimiento.',

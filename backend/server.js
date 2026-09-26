@@ -2448,6 +2448,16 @@ app.post('/scheduled/sweep', runSweep);
 // The match now happens here, once, against the fleet read with admin access, through the same
 // matchOperator every other caller uses — so a gate added to that function protects every path
 // at once, which is the whole reason it is a function.
+// Dispatch reads only Operators who currently claim availability. This is a Firestore-indexed
+// prefilter, not an eligibility decision: matchOperator() remains the final authority for
+// presence freshness, insurance, disclosure, screening, commissioning, documents, Travel
+// class and distance. Keeping those rules in one gate prevents query optimization from becoming
+// a second qualification system.
+async function availableOperatorCandidates(db) {
+  const snap = await db.collection('operators').where('available', '==', true).get();
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
 // Human-facing Travel Numbers identify the authoritative pickup market, never a client label.
 // The pickup market is resolved from Census county geometry in markets.js.
 function travelNumberFor(documentId, pickup) {
@@ -2495,8 +2505,7 @@ app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, async (req, res) => {
 
   let fleet;
   try {
-    const snap = await db.collection('operators').get();
-    fleet = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    fleet = await availableOperatorCandidates(db);
   } catch (e) {
     // "We could not read the fleet" and "nobody is on duty" are different answers and must not
     // render the same — the client draws a retry for one and a wait for the other.
@@ -2514,6 +2523,10 @@ app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, async (req, res) => {
   // in it, which is a development environment and a founder demonstration. The moment real
   // money is in play there is no such thing as a stand-in operator.
   if (!fleet.length && keyMode !== 'live') {
+    // An empty availability query is not the same as an empty fleet. Only synthesize the
+    // demonstration fleet when the collection itself has no Operator records at all.
+    const anyOperator = await db.collection('operators').limit(1).get();
+    if (!anyOperator.empty) return res.json({ matched: null });
     const at = Date.now();
     fleet = [
       { id: 'op1', name: 'Miguel D.', lat: 25.768, lng: -80.1955, car: 'Gray Toyota Camry', plate: 'KTR 4821', classes: ['Standard', 'Pet Friendly'] },

@@ -2717,6 +2717,7 @@ app.post('/travel/schedule', requireAuth, LIMITS.dispatch, requireOperationalRea
     uid: req.uid, email: req.email, db, cardCountryFor: defaultCardCountry,
   });
   if (priced?.invalidJourney) return res.status(409).json({ error: priced.reason, code: 'invalid_smart_journey' });
+  if (priced?.route?.tollStatus === 'unknown') return res.status(503).json({ error: 'Toll pricing is temporarily unavailable.', code: 'toll_unavailable' });
   if (!priced || priced.outsideMarket || priced.permitRequired) {
     return res.status(409).json({ error: priced?.reason || 'The scheduled travel cannot be priced' });
   }

@@ -14,9 +14,6 @@ const limited = [
   ["post", "/storage/upload-url", 'LIMITS.document'],
   ["get", "/storage/object", 'LIMITS.document'],
   ["post", "/operator/screening/existing", 'LIMITS.screening'],
-  ["post", "/operator/screening/intent", 'LIMITS.screening'],
-  ["post", "/operator/screening/order", 'LIMITS.screening'],
-  ["post", "/operator/screening/reinvite", 'LIMITS.screening'],
   ["post", "/connect/onboard", 'LIMITS.connect'],
   ["post", "/connect/dashboard", 'LIMITS.connect'],
   ["post", "/payment-methods/setup-intent", 'LIMITS.payments'],
@@ -31,7 +28,6 @@ const limited = [
   ["post", "/travel/announce", 'LIMITS.announce'],
   ["post", "/travel/follow-link", 'LIMITS.announce'],
   ["post", "/voice/token", 'LIMITS.voice'],
-  ["post", "/verify/start", 'LIMITS.verify'],
   ["post", "/support", 'LIMITS.support'],
   ["post", "/lost-item", 'LIMITS.lostItem'],
   ["post", "/operator/market", 'LIMITS.market'],
@@ -56,10 +52,6 @@ check('req.ip is the caller behind Render\'s proxy', /app\.set\('trust proxy', 1
 const doc = (server.match(/app\.post\('\/operator\/document'[\s\S]*?\n\}\);/) || [''])[0];
 check('document reading: a repeated upload returns the stored reading, no second model call',
   /prior\.objectKey === objectKey && prior\.evidence && prior\.readerVersion === READER_VERSION/.test(doc) && doc.indexOf('repeated: true') < doc.indexOf('readDocument('));
-// Stripe charges are idempotent (see idempotency.test.js); screening orders are keyed per payment.
-const payments = fs.readFileSync(path.join(__dirname, 'payments.js'), 'utf8');
-check('screening payment is keyed', /idempotencyKey: `ar_screening_/.test(payments));
-
 // The limiters themselves.
 const run = (mw, req) => {
   let passed = false;

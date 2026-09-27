@@ -43,7 +43,7 @@ export default {
     signInToAccount: 'Sign in to your account.',
     pleaseWait: 'Please wait…',
     alreadyHave: 'Already have an account? ',
-    newHere: 'New here? ',
+    newHere: 'New to American Rider? ',
     signInLink: 'Sign in',
     createAccountLink: 'Create an account',
     fullNameLabel: 'FULL NAME',

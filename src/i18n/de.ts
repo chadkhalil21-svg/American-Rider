@@ -452,7 +452,7 @@ export default {
     notifReceipt: 'Hinweise an Ihr Telefon, wenn die Fahrt endet und der Fahrpreis abgerechnet ist.',
     notifBrowserNo: 'Dieser Browser empfängt keine Benachrichtigungen. Verwenden Sie die App.',
     notifAlwaysSent: 'Sicherheitsabfragen während der Fahrt und Hinweise zur laufenden Disposition sind dauerhaft aktiviert. Eine geplante Fahrt, die nicht durchgeführt werden kann, wird immer gemeldet.',
-    notifChannels: 'Diese Einstellungen gelten für App-Benachrichtigungen. Nach jeder abgeschlossenen Reise wird ein Beleg per E-Mail gesendet.'
+    notifChannels: 'Diese Einstellungen gelten für App-Benachrichtigungen. Nach jeder abgeschlossenen Reise wird ein Beleg per E-Mail gesendet.',
     totalPaymentInProgress: 'Gesamt · Zahlung läuft',
     delSavedPrefs: 'Gespeicherte Einstellungen, Vertrauenskontakte und jede auf diesem Gerät hinterlegte Betreiberqualifizierung werden gelöscht.',
     lostReportNotSaved: 'Die Meldung konnte nicht gespeichert werden. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.',
@@ -809,7 +809,7 @@ export default {
     changeTravel: 'Fahrt Ändern',
     dispatchUnavailable: 'Disposition nicht erreichbar. Prüfen Sie Ihre Verbindung.',
     emergencyAssistance: 'Notfallhilfe',
-    shareTravelSub: 'Teilen Sie während einer aktiven Reise einen privaten Live-Link mit einer Vertrauensperson. Der Link läuft mit dem Ende der Reise ab.'
+    shareTravelSub: 'Teilen Sie während einer aktiven Reise einen privaten Live-Link mit einer Vertrauensperson. Der Link läuft mit dem Ende der Reise ab.',
     smartTravelTitle: 'Intelligente Fahrt',
     checkingTransit: "Aktueller Transitverkehr wird geprüft…",
     transitChanged: "Der Transitverkehr hat sich seit der Planung dieser Reise geändert. Der zweite Travel mit dem Auto bleibt zurückgehalten, bis der aktuelle Dienst bestätigt ist.",
@@ -873,7 +873,7 @@ export default {
     modifyCabin: 'Kabinenpräferenzen anpassen',
     mapAttribution: '© OpenStreetMap-Mitwirkende',
     paymentSettlement: 'Zahlungsmethoden',
-    paymentSettlementSub: 'Verwalten Sie, wie Sie Reisen bezahlen.'
+    paymentSettlementSub: 'Verwalten Sie, wie Sie Reisen bezahlen.',
     noPaymentMethodSaved: 'Keine Zahlungsmethode gespeichert.',
     methodsUnreadable: 'Die gespeicherten Zahlungsmethoden konnten nicht gelesen werden.',
     addPaymentMethod: 'Zahlungsmethode hinzufügen',
@@ -916,9 +916,9 @@ export default {
     enterATime: 'Geben Sie eine Uhrzeit ein, zum Beispiel 6:45.',
     scheduleTravel: 'Fahrt Planen',
     notifications: 'Betriebs- und Dispositionshinweise',
-    notificationsSub: 'Wählen Sie aus, welche Reise-Updates Sie erhalten möchten.'
+    notificationsSub: 'Wählen Sie aus, welche Reise-Updates Sie erhalten möchten.',
     inviteFriends: 'Einen Reisenden Einladen',
-    inviteSub: 'Laden Sie jemanden ein, mit American Rider zu reisen. Sie können die Einladung vor dem Senden prüfen.'
+    inviteSub: 'Laden Sie jemanden ein, mit American Rider zu reisen. Sie können die Einladung vor dem Senden prüfen.',
     theInvitation: 'Die Einladung',
     sendInvitation: 'Eine Einladung senden',
     operateWithUs: 'Mit American Rider Operieren',
@@ -932,7 +932,7 @@ export default {
     yourNumbers: 'Nettoertrags-Prognosemodell',
     averageTravelCost: 'Durchschnittliche Fahrtkosten',
     travelsPerWeek: 'Fahrten pro Woche',
-    safetySub: 'Während einer aktiven Reise überwacht American Rider die Route auf ungewöhnliche Unterbrechungen. Vertrauenspersonen können die Reise verfolgen, und die Fahrzeugverifizierung hilft, vor dem Einsteigen das richtige Fahrzeug zu bestätigen.'
+    safetySub: 'Während einer aktiven Reise überwacht American Rider die Route auf ungewöhnliche Unterbrechungen. Vertrauenspersonen können die Reise verfolgen, und die Fahrzeugverifizierung hilft, vor dem Einsteigen das richtige Fahrzeug zu bestätigen.',
     shareUnavailable: 'Verfügbar, sobald ein Operator zugewiesen ist.',
     verifyCodeIntro: 'Fragen Sie Ihren Operator vor dem Einsteigen nach diesem Code.',
     verifyCodeIdle: 'Jede Fahrt erhält einen Code, sobald ein Operator zugewiesen ist. Fragen Sie Ihren Operator vor dem Einsteigen danach.',

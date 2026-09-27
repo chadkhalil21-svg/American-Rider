@@ -3,7 +3,7 @@
 // Plain German, precisely used — the same instruction as the English.
 export default {
   auth: {
-    tagline: 'Nationale Verkehrsinfrastruktur, gegründet auf Sicherheit, Zuverlässigkeit und Präzision.',
+    tagline: 'Safe. Reliable. American.',
     continueWithApple: 'Mit Apple fortfahren',
     continueWithGoogle: 'Mit Google fortfahren',
     orDivider: 'oder',

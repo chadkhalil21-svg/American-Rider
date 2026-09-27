@@ -2690,23 +2690,19 @@ app.post('/operator/disclosure/acknowledge', requireAuth, async (req, res) => {
 // exactly what the screening costs, we pay the screening company.
 app.get('/operator/screening', requireAuth, async (req, res) => {
   const db = adminDb();
-  // The quote is ITEMIZED (Chad, 27 Aug): cost + card processing = total. The operator sees
-  // all three numbers; the app never shows a total whose parts it cannot name.
-  const out = { feeCents: SCREENING_FEE_CENTS, quote: screeningQuote(SCREENING_FEE_CENTS), provider: screeningReady() ? 'checkr' : null };
-  if (!db) return res.json({ ...out, screening: null, reason: adminStatus().reason });
+  if (!db) return res.json({ ok: false, provider: 'external', screening: null, reason: adminStatus().reason });
   try {
     const snap = await db.collection('users').doc(String(req.uid)).get();
-    const screening = snap.exists ? snap.data().screening || null : null;
-    // A PARTIAL TIER IS QUOTED AT ITS OWN PRICE. Both directions: the MVR alone when the
-    // criminal half is already in hand, and Basic alone when the driving record is.
-    const cost = Number(screening?.feeCents);
-    if (cost === MVR_ONLY_FEE_CENTS || cost === BASIC_ONLY_FEE_CENTS) {
-      out.feeCents = cost;
-      out.quote = screeningQuote(cost);
-    }
-    res.json({ ...out, screening });
+    const user = snap.exists ? snap.data() : {};
+    const market = operatingMarketOf(user);
+    res.json({
+      ok: true,
+      provider: 'external',
+      jurisdiction: market?.state ? { state: market.state } : null,
+      screening: user.screening || null,
+    });
   } catch (e) {
-    res.json({ ...out, screening: null, reason: e.message });
+    res.json({ ok: false, provider: 'external', screening: null, reason: e.message });
   }
 });
 
@@ -2730,16 +2726,10 @@ app.post('/operator/screening/existing', requireAuth, LIMITS.screening, requireA
   const elements = Array.isArray(req.body?.elements) ? req.body.elements.slice(0, 6) : [];
   const consent = req.body?.consent === true;
   if (!agency || !consent) {
-    return res.status(400).json({ error: 'The company name and your written instruction are required' });
+    return res.status(400).json({ error: 'The screening company and your written instruction are required.' });
   }
 
-  // Priced as though it arrives from the agency, because that is what we are asking them to do.
-  const verdict = evaluateExistingReport({ source: 'agency', issuedAt, elements });
-
   try {
-    // A real place to send it and a reference to put on it — "ask them to send it to us"
-    // was an instruction with no address (Chad, 27 Aug). The agency emails the report to
-    // the screening inbox citing the case number; support matches it by that number.
     const transferTo = 'support@americanrider.app';
     await db.collection('users').doc(String(req.uid)).set(
       {
@@ -2749,41 +2739,27 @@ app.post('/operator/screening/existing', requireAuth, LIMITS.screening, requireA
           transferTo,
           declaredIssuedAt: issuedAt || null,
           declaredElements: elements,
-          // The instruction itself, stamped. This is the permissible purpose, so it is a
-          // record we keep rather than a checkbox we forget.
           consentAt: Date.now(),
           consentText:
-            'I instruct the named screening company to release my most recent background ' +
-            'screening report to American Rider.',
-          feeCents: verdict.feeCents,
-          // WHICH PACKAGE THIS BUYS, stored alongside the price rather than re-derived from
-          // it later. See the note at the order route.
-          tier: verdict.tier || 'full',
-          partial: !!verdict.partial,
-          summary: verdict.reason,
+            'I instruct the named screening company to release my most recent background screening report to American Rider.',
+          summary: 'Waiting for the screening provider to send the authoritative report for review.',
         },
       },
       { merge: true },
     );
+
     const filed = await fileTicket({
       uid: req.uid,
       email: req.email,
       kind: 'support',
-      reason: 'Operator screening — request an existing report',
+      reason: 'Operator screening — review existing provider report',
       description:
-        `Operator ${req.uid} has instructed ${agency} to release their screening report to ` +
-        `American Rider (FCRA §604(a)(2), written instruction on file, stamped ` +
-        `${new Date().toISOString()}).
-` +
-        `Declared issue date: ${issuedAt ? new Date(issuedAt).toISOString().slice(0, 10) : 'not given'}
-` +
-        `Declared contents: ${elements.join(', ') || 'not given'}
-` +
-        `If it arrives complete and under twelve months old, the operator pays nothing. If only ` +
-        `the driving history is missing, they pay ${(MVR_ONLY_FEE_CENTS / 100).toFixed(2)}.
-` +
-        `NOTHING IS ACCEPTED FROM THE OPERATOR — it must arrive from ${agency} directly.`,
+        'The Operator instructed ' + agency + ' to release the existing screening report directly to American Rider. ' +
+        'Declared issue date: ' + (issuedAt ? new Date(issuedAt).toISOString().slice(0, 10) : 'not provided') + '. ' +
+        'Declared components: ' + (elements.join(', ') || 'not provided') + '. ' +
+        'Do not qualify from the Operator declaration. Authenticate the provider report, compare each component with the active jurisdiction requirements, preserve every qualifying component, and request only any missing or expired component.',
     });
+
     const caseNo = filed?.caseNo || null;
     if (caseNo) {
       await db.collection('users').doc(String(req.uid)).set(
@@ -2791,11 +2767,17 @@ app.post('/operator/screening/existing', requireAuth, LIMITS.screening, requireA
         { merge: true },
       );
     }
-    res.json({ ok: true, feeCents: verdict.feeCents, note: verdict.reason, transferTo, transferCaseNo: caseNo });
+    res.json({
+      ok: true,
+      note: 'Request recorded. We will preserve every qualifying component and ask only for anything still required.',
+      transferTo,
+      transferCaseNo: caseNo,
+    });
   } catch (e) {
     res.status(502).json({ error: e.message });
   }
 });
+
 
 app.post('/operator/screening/intent', requireAuth, LIMITS.screening, requireActiveOperatingMarket, async (req, res) => {
   if (keyMode === 'no-key') return res.status(500).json({ error: 'No Stripe key configured' });

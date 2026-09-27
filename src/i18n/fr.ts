@@ -24,7 +24,7 @@ export default {
     roleTraveler: 'Voyageur',
     roleTravelerSub: 'Organisez et gérez votre Voyage.',
     roleOperator: 'Opérateur',
-    roleOperatorSub: 'Conservez 99 % de chaque Travel Fare. Une qualification est requise pour opérer avec American Rider.',
+    roleOperatorSub: 'Conservez 99 % de chaque Travel Fare. Commencez la qualification pour opérer avec American Rider.',
     accountReady: 'Votre compte est prêt, %{name}',
     paymentLater: 'Le paiement pourra être ajouté lors de votre première réservation.',
     back: '‹ Retour',

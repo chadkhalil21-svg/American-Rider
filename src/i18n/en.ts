@@ -469,7 +469,7 @@ export default {
     notifReceipt: 'Alerts dispatched to your phone when travel concludes and the fare is settled.',
     notifBrowserNo: 'This browser does not receive notifications. Use the app.',
     notifAlwaysSent: 'Safety check-ins during travel and active dispatch advisories are permanently enabled. A scheduled travel that cannot be filled is always reported.',
-    notifChannels: 'These preferences apply to app notifications. A receipt is emailed after each completed Travel.'
+    notifChannels: 'These preferences apply to app notifications. A receipt is emailed after each completed Travel.',
     totalPaymentInProgress: 'Total · payment in progress',
     delSavedPrefs: 'Saved preferences, trusted contacts, and any operator qualification held on this device will be cleared.',
     lostReportNotSaved: 'The report could not be saved. Check your connection and try again.',
@@ -826,7 +826,7 @@ export default {
     changeTravel: 'Change Travel',
     dispatchUnavailable: 'Dispatch unavailable. Check your connection.',
     emergencyAssistance: 'Emergency Assistance',
-    shareTravelSub: 'Share a private live link with a trusted contact during an active Travel. The link expires when the Travel ends.'
+    shareTravelSub: 'Share a private live link with a trusted contact during an active Travel. The link expires when the Travel ends.',
     smartTravelTitle: 'Smart Travel',
     checkingTransit: "Checking current transit service…",
     transitChanged: "Transit service has changed since this journey was planned. The second car Travel is held until the current service is verified.",
@@ -892,7 +892,7 @@ export default {
     modifyCabin: 'Adjust cabin preferences',
     mapAttribution: '© OpenStreetMap contributors',
     paymentSettlement: 'Payment Methods',
-    paymentSettlementSub: 'Manage how you pay for Travel.'
+    paymentSettlementSub: 'Manage how you pay for Travel.',
     noPaymentMethodSaved: 'No payment method saved.',
     methodsUnreadable: 'Saved payment methods could not be read.',
     addPaymentMethod: 'Add payment method',
@@ -936,9 +936,9 @@ export default {
     enterATime: 'Enter a time, for example 6:45.',
     scheduleTravel: 'Schedule Travel',
     notifications: 'Dispatch & Operational Advisories',
-    notificationsSub: 'Choose which Travel updates you would like to receive.'
+    notificationsSub: 'Choose which Travel updates you would like to receive.',
     inviteFriends: 'Invite a Traveler',
-    inviteSub: 'Invite someone to travel with American Rider. You can review the invitation before sending it.'
+    inviteSub: 'Invite someone to travel with American Rider. You can review the invitation before sending it.',
     theInvitation: 'The Invitation',
     sendInvitation: 'Send an invitation',
     operateWithUs: 'Operate with American Rider',
@@ -954,7 +954,7 @@ export default {
     travelsPerWeek: 'Travels per week',
     // ---- body prose. Longer strings live here for the same reason the short ones do: a
     // translator must be able to see the whole surface without reading React. ------------
-    safetySub: 'During an active Travel, American Rider monitors the route for unusual interruptions. Trusted contacts can follow the Travel, and vehicle verification helps confirm the correct vehicle before boarding.'
+    safetySub: 'During an active Travel, American Rider monitors the route for unusual interruptions. Trusted contacts can follow the Travel, and vehicle verification helps confirm the correct vehicle before boarding.',
     shareUnavailable: 'Available once an operator is assigned.',
     verifyCodeIntro: 'Ask your operator for this code before you board.',
     verifyCodeIdle: 'Each travel is issued a code once an operator is assigned. Ask your operator for it before you board.',

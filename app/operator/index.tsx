@@ -570,13 +570,5 @@ const styles = StyleSheet.create({
   dot: { width: 9, height: 9, borderRadius: 5, backgroundColor: colors.ink },
   routeMeta: { fontSize: 12, color: colors.muted },
   routePlace: { fontSize: 15, color: colors.ink, marginTop: 2 },
-  cabinSummary: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.hairline,
-  },
-  cabinLabel: { fontSize: 10.5, fontWeight: '600', letterSpacing: 1.2, color: colors.muted, textTransform: 'uppercase' },
-  cabinText: { fontSize: 12.5, color: colors.ink2, lineHeight: 18, marginTop: 5 },
   requestButtons: { flexDirection: 'row', gap: 10, marginTop: 18 },
 });

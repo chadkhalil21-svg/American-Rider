@@ -2099,7 +2099,7 @@ async function issueInsuranceConfirmationRequest({ uid, user, contact, now = Dat
   });
 
   const sent = await send({
-    from: 'American Rider Operator Relations <relations@americanrider.app>',
+    from: 'American Rider Insurance Verification <insurance@americanrider.app>',
     replyTo: 'insurance@americanrider.app',
     to: email,
     subject: 'American Rider · Insurance status confirmation',

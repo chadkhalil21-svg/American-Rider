@@ -239,6 +239,7 @@ export function AuthScreen() {
   const [mobile, setMobile] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [resetNotice, setResetNotice] = useState('');
 
   const firstName = name.trim().split(/\s+/)[0] || 'Traveler';
   const digits = mobile.replace(/\D/g, '');
@@ -248,13 +249,14 @@ export function AuthScreen() {
     !busy &&
     (step !== 'signup' || (name.trim().length >= 2 && digits.length >= 10));
   const forgotPassword = async () => {
+    setResetNotice('');
     if (!emailOk(email)) {
-      Alert.alert(t('traveler.enterEmailFirst'), t('traveler.typeAddressThenTap'));
+      setResetNotice(t('traveler.typeAddressThenTap'));
       return;
     }
     const accepted = await resetPassword(email);
     if (!accepted) return;
-    Alert.alert(t('traveler.checkYourEmail'), t('traveler.resetLinkSent', { email: email.trim() }));
+    setResetNotice(t('traveler.resetLinkSent', { email: email.trim() }));
   };
 
   const submit = async () => {
@@ -581,7 +583,10 @@ export function AuthScreen() {
               autoComplete="email"
               textContentType="username"
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(value) => {
+                setEmail(value);
+                if (resetNotice) setResetNotice('');
+              }}
             />
           </View>
           <View style={[s.fieldWrap, s.fieldWrapLast, isSignup ? s.signupFieldWrap : s.signInFieldWrap]}>
@@ -605,9 +610,18 @@ export function AuthScreen() {
         {isSignup && <Text style={[s.helper, s.signupHelper]}>{t('auth.usedToReach')}</Text>}
         {/* The demo's sign-in carries this link; here it really sends the reset email. */}
         {!isSignup && (
-          <Pressable onPress={forgotPassword} hitSlop={8}>
-            <Text style={s.forgot}>{t('auth.forgotPassword')}</Text>
-          </Pressable>
+          <>
+            <Pressable
+              onPress={forgotPassword}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={t('auth.forgotPassword')}
+              style={s.forgotAction}
+            >
+              <Text style={s.forgot}>{t('auth.forgotPassword')}</Text>
+            </Pressable>
+            {resetNotice ? <Text style={s.resetNotice}>{resetNotice}</Text> : null}
+          </>
         )}
         {error ? <Text style={s.error}>{error}</Text> : null}
 
@@ -830,8 +844,10 @@ const s = StyleSheet.create({
   error: { color: colors.red, fontSize: 13.5, marginTop: 14, textAlign: 'center' },
   switch: { textAlign: 'center', fontSize: 13, color: colors.muted },
   helper: { fontSize: 12.5, color: colors.faint, marginTop: 10 },
-  // The demo's "Forgot password?" sits muted under the field card.
-  forgot: { fontSize: 12.5, color: colors.muted, marginTop: 12 },
+  // Password recovery is intentionally quiet, but never visually inert.
+  forgotAction: { alignSelf: 'flex-start', marginTop: 8, paddingVertical: 4 },
+  forgot: { fontSize: 12.5, color: colors.muted },
+  resetNotice: { fontSize: 12, color: colors.ink2, marginTop: 6, lineHeight: 17 },
   selectTitle: {
     fontSize: 22,
     letterSpacing: -0.25,

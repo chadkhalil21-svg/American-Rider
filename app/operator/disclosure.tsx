@@ -40,12 +40,14 @@ export default function OperatorDisclosure() {
   // inside the bodies where the server put them (§627.748(7) in "What you must carry").
   //
   // EVERY PART MUST BE OPENED BEFORE THE OPERATOR CAN AGREE (Adrian, 18 Sept 2026).
-  // §627.748(8)(a) requires TWO things in writing: what the TNC provides, and that the
-  // operator's own policy might not cover them. When the card first shipped, one row opened
-  // and the others stayed shut, so an operator could acknowledge text that never appeared on
-  // their screen — and the record would then hold words they never read, which is worse than
-  // no record. `seen` is the set of rows they have opened. The control stays off until it
-  // holds all three, and says which condition is unmet, exactly as the qualification screen
+  // §627.748(8)(a) requires three disclosures in writing: what the TNC provides, that the
+  // operator's own policy might not cover them, and the financial-responsibility consequence
+  // of compensated passenger transportation outside a prearranged TNC Travel. The additional
+  // "What you must carry" row explains American Rider's own qualification rule. When the card
+  // first shipped, one row opened and the others stayed shut, so an operator could acknowledge
+  // text that never appeared on their screen — and the record would then hold words they never
+  // read, which is worse than no record. `seen` is the set of rows they have opened. The
+  // control stays off until it holds every row, and says which condition is unmet, exactly as the qualification screen
   // says "Verify all 5 to continue".
   const [open, setOpen] = useState<number | null>(0);
   const [seen, setSeen] = useState<number[]>([0]);
@@ -68,7 +70,7 @@ export default function OperatorDisclosure() {
     setAcknowledgedAt(Date.now());
   };
 
-  const sections = doc ? [doc.provided, doc.ownPolicy, doc.required] : [];
+  const sections = doc ? [doc.provided, doc.ownPolicy, doc.outsidePrearranged, doc.required] : [];
   const allSeen = sections.length > 0 && sections.every((_, i) => seen.includes(i));
 
   return (

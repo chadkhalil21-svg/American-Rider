@@ -386,29 +386,50 @@ export const INSURERS: {
   secondary?: boolean;
   unverified?: boolean;
 }[] = [
+  // ONE-FORM COMPARISON FIRST. Stanford's marketplace research points to reducing search
+  // friction while preserving seller price competition. This service sends one livery
+  // application to three specialist agents in the operator's state; it is not an insurer.
+  {
+    name: 'Limousine Insurance HQ',
+    note: 'traveler.insurerLimoHQNote',
+    url: 'https://www.limousineinsurancehq.com/',
+  },
+  // Florida is a specialty-agent state for Progressive livery. The operator is sent to the
+  // livery product, not to a personal rideshare endorsement.
   {
     name: 'Progressive Commercial',
     note: 'traveler.insurerProgressiveNote',
-    url: 'https://www.progressivecommercial.com/commercial-auto-insurance/livery-insurance/rideshare-insurance/',
+    url: 'https://www.progressivecommercial.com/commercial-auto-insurance/livery-insurance/',
   },
+  // Miami-based Florida livery specialist: black car, executive sedan, SUV, limo and shuttle.
   {
-    name: 'Coverage Insurance Agency',
-    note: 'traveler.insurerCoverageNote',
-    phone: '(305) 239-8833',
+    name: 'American US Insurance',
+    note: 'traveler.insurerAmericanUSNote',
+    url: 'https://amerinsured.com/business-insurance/limo-insurance',
     secondary: true,
-    unverified: true,
   },
+  // Florida passenger-transport specialist. Publicly states it shops livery programs and
+  // represents Progressive among other markets.
   {
-    name: 'InsureLimos',
-    note: 'traveler.insurerInsureLimosNote',
-    phone: '1-888-254-0089',
+    name: 'Transportation Insurance of Central Florida',
+    note: 'traveler.insurerTICFNote',
+    url: 'https://www.ticfinsurance.com/',
     secondary: true,
-    unverified: true,
   },
+  // All-50-state commercial agency with livery / black-car / limousine specialty markets.
   {
-    name: 'Insurify',
-    note: 'traveler.insurerInsurifyNote',
-    url: 'https://insurify.com/car-insurance/florida/rideshare-insurance/',
+    name: 'Casurance',
+    note: 'traveler.insurerCasuranceNote',
+    url: 'https://casurance.com/livery-insurance',
+    secondary: true,
+  },
+  // General commercial marketplace. Included as a broad-market cross-check, not as proof that
+  // every quoted carrier will write Florida TNC/livery. The operator must still apply the
+  // policy-standard checklist before binding.
+  {
+    name: 'Insureon',
+    note: 'traveler.insurerInsureonNote',
+    url: 'https://www.insureon.com/livery-business-insurance/limousine-insurance',
     secondary: true,
   },
 ];

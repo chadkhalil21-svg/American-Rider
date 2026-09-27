@@ -278,6 +278,7 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
         'name', 'mobile', 'email',
         'pushToken', 'pushPlatform', 'pushUpdatedAt', 'pushPrefs',
+        'cabinPreferences', 'savedPlaces', 'trustedContacts',
       ]);
     }
     match /users/{uid} {
@@ -288,6 +289,7 @@ service cloud.firestore {
                     && request.resource.data.keys().hasOnly([
                          'name', 'mobile', 'email',
                          'pushToken', 'pushPlatform', 'pushUpdatedAt', 'pushPrefs',
+                         'cabinPreferences', 'savedPlaces', 'trustedContacts',
                        ]);
       allow update: if signedIn() && request.auth.uid == uid && userFieldsAreOwn();
       // A person may close their account. AuthContext.deleteAccount deletes this document as

@@ -10,8 +10,7 @@ for (const [rel, exports] of [
   const p = require.resolve(path.join(ROOT, rel));
   require.cache[p] = { id: p, filename: p, loaded: true, exports, children: [], paths: [] };
 }
-const { adjudicate, evaluateExistingReport, SCREENING_FEE_CENTS, MVR_ONLY_FEE_CENTS,
-  BASIC_ONLY_FEE_CENTS } = require(path.join(ROOT, 'screening.js'));
+const { adjudicate, evaluateExistingReport } = require(path.join(ROOT, 'screening.js'));
 
 const now = Date.parse('2026-08-23T12:00:00Z');
 const yearsAgo = (y) => new Date(now - y * 365 * 24 * 3600 * 1000).toISOString().slice(0, 10);
@@ -85,63 +84,48 @@ check('NOTHING disqualifying ever returns pass',
 check('a held result is never a pass',
   decide(base({ status: 'suspended' })).decision !== 'pass');
 
-// ---- AN EXISTING REPORT, AND WHAT IT SPARES THE OPERATOR PAYING FOR TWICE. ----------------
+// ---- EXISTING REPORT EVIDENCE --------------------------------------------------------------
 //
-// "We do not want to force a package that is not required, ever" (Chad, 27 Aug 2026) has to
-// hold in BOTH directions. Until 29 Aug the adjudication knew the case where the criminal
-// half was already done, and sent the mirror case — driving record in hand, criminal half
-// missing — to the full $47.49, charging for the MVR it had just been given.
+// An outside report is evidence for review, never an automatic qualification or a platform
+// purchase. Preserve qualifying components so the Operator need not repeat them unnecessarily,
+// but provenance, permissible purpose, jurisdiction and freshness remain authoritative gates.
 const recent = now - 30 * 24 * 3600 * 1000;
 const ALL = ['nationwide_criminal', 'sex_offender', 'driving_history'];
-// Both partial packages provisioned, so the tiers are reachable.
-const both = { now, mvrOnlyAvailable: true, criminalOnlyAvailable: true };
-const ex = (elements, o = {}) =>
-  evaluateExistingReport({ source: 'agency', issuedAt: recent, elements }, { ...both, ...o });
+const ex = (elements, source = 'agency', issuedAt = recent) =>
+  evaluateExistingReport({ source, issuedAt, elements });
 
-check('a complete recent report costs nothing',
-  ex(ALL).accept === true && ex(ALL).feeCents === 0, JSON.stringify(ex(ALL)));
+const complete = ex(ALL);
+check('a complete declared report still requires authoritative review',
+  complete.accept === false && complete.review === true && complete.missing.length === 0,
+  JSON.stringify(complete));
 
-check('criminal half in hand: only the driving history is bought',
-  ex(['nationwide_criminal', 'sex_offender']).tier === 'mvr'
-  && ex(['nationwide_criminal', 'sex_offender']).feeCents === MVR_ONLY_FEE_CENTS,
+check('criminal evidence in hand preserves it and identifies only driving history as missing',
+  JSON.stringify(ex(['nationwide_criminal', 'sex_offender']).missing) === JSON.stringify(['driving_history']),
   JSON.stringify(ex(['nationwide_criminal', 'sex_offender'])));
 
-check('driving history in hand: only the criminal check is bought',
-  ex(['driving_history']).tier === 'criminal'
-  && ex(['driving_history']).feeCents === BASIC_ONLY_FEE_CENTS,
+check('driving history in hand preserves it and identifies the criminal searches as missing',
+  JSON.stringify(ex(['driving_history']).missing) === JSON.stringify(['nationwide_criminal', 'sex_offender']),
   JSON.stringify(ex(['driving_history'])));
 
-check('driving history plus one criminal element still buys only the criminal package',
-  ex(['driving_history', 'sex_offender']).tier === 'criminal'
-  && ex(['driving_history', 'sex_offender']).feeCents === BASIC_ONLY_FEE_CENTS,
+check('driving history plus sex-offender evidence identifies only nationwide criminal as missing',
+  JSON.stringify(ex(['driving_history', 'sex_offender']).missing) === JSON.stringify(['nationwide_criminal']),
   JSON.stringify(ex(['driving_history', 'sex_offender'])));
 
-check('a partial price is never cheaper than what it buys',
-  MVR_ONLY_FEE_CENTS + BASIC_ONLY_FEE_CENTS >= SCREENING_FEE_CENTS,
-  `${MVR_ONLY_FEE_CENTS} + ${BASIC_ONLY_FEE_CENTS} vs ${SCREENING_FEE_CENTS}`);
+check('nothing declared identifies all required components as missing',
+  JSON.stringify(ex([]).missing) === JSON.stringify(ALL), JSON.stringify(ex([])));
 
-check('nothing in hand is the full price',
-  ex([]).tier === 'full' && ex([]).feeCents === SCREENING_FEE_CENTS, JSON.stringify(ex([])));
+check('an older report is never automatically accepted',
+  evaluateExistingReport({ source:'agency', issuedAt:now - 4*365*24*3600*1000, elements:ALL }).accept === false);
 
-// ---- THE LOOPHOLES. ----------------------------------------------------------------------
-check('a report older than three years buys nothing, whatever it contains',
-  evaluateExistingReport(
-    { source: 'agency', issuedAt: now - 4 * 365 * 24 * 3600 * 1000, elements: ALL }, both,
-  ).feeCents === SCREENING_FEE_CENTS);
+check('a report with no date is never automatically accepted',
+  evaluateExistingReport({ source:'agency', issuedAt:null, elements:ALL }).accept === false);
 
-check('a report with no date is not accepted',
-  evaluateExistingReport({ source: 'agency', issuedAt: null, elements: ALL }, both).accept === false);
+check('an Operator declaration is never authoritative evidence',
+  evaluateExistingReport({ source:'operator', issuedAt:recent, elements:ALL }).accept === false);
 
-check('a report the OPERATOR hands us is not accepted, at any price',
-  evaluateExistingReport({ source: 'operator', issuedAt: recent, elements: ALL }, both).accept === false);
-
-check('an unprovisioned partial package is never quoted, in either direction',
-  ex(['nationwide_criminal', 'sex_offender'], { mvrOnlyAvailable: false }).feeCents === SCREENING_FEE_CENTS
-  && ex(['driving_history'], { criminalOnlyAvailable: false }).feeCents === SCREENING_FEE_CENTS);
-
-check('no partial tier is ever an acceptance',
-  [ex(['nationwide_criminal', 'sex_offender']), ex(['driving_history'])]
-    .every((v) => v.accept === false));
+check('no partial evidence state is ever an acceptance',
+  [ex(['nationwide_criminal','sex_offender']), ex(['driving_history'])]
+    .every((v) => v.accept === false && v.review === true));
 
 let bad = 0;
 for (const r of R) { if (!r.ok) bad++; console.log(`${r.ok ? 'PASS' : 'FAIL'}  ${r.l}${r.ok ? '' : '  <-- ' + r.d}`); }

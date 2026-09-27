@@ -800,7 +800,7 @@ export default {
     processing: 'Traitement…',
     homeAddress: 'Adresse du Domicile',
     workAddress: 'Adresse du Travail',
-    savedPlaceSub: 'Enregistré de façon privée sur cet appareil pour faciliter la préparation de vos Voyages.',
+    savedPlaceSub: 'Enregistré sur votre compte et disponible lorsque vous vous connectez sur un autre appareil.',
     addressOrPlace: 'Adresse ou lieu',
     saveAddress: 'Enregistrer l’adresse',
     saveDestination: 'Enregistrer la destination',

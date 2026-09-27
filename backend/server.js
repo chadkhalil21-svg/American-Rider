@@ -2703,7 +2703,12 @@ app.post('/operator/screening/order', requireAuth, LIMITS.screening, requireActi
 
     const userRef = db.collection('users').doc(String(req.uid));
     const snap = await userRef.get();
-    const existing = snap.exists ? snap.data().screening || {} : {};
+    const user = snap.exists ? snap.data() : {};
+    const existing = user.screening || {};
+    const screeningMarket = operatingMarketOf(user);
+    if (!screeningMarket?.state) {
+      return res.status(409).json({ error: 'Choose an active operating market before screening.', code: 'screening_market_required' });
+    }
 
     // ORDERING TWICE MUST NOT SCREEN TWICE. A double-tap, a retried request, or an app that
     // lost the response and asked again all land here — and each Checkr invitation is a real
@@ -2747,7 +2752,7 @@ app.post('/operator/screening/order', requireAuth, LIMITS.screening, requireActi
     // and one comparison; evaluateExistingReport now states the tier and it is stored with
     // the record. `full` for anything written before this existed.
     const tier = existing.tier || 'full';
-    const order = await checkr.invite({ uid: req.uid, email: req.email, tier });
+    const order = await checkr.invite({ uid: req.uid, email: req.email, tier, workState: screeningMarket.state });
 
     await userRef.set(
       {
@@ -2787,7 +2792,12 @@ app.post('/operator/screening/reinvite', requireAuth, LIMITS.screening, requireA
   try {
     const userRef = db.collection('users').doc(String(req.uid));
     const snap = await userRef.get();
-    const s = snap.exists ? snap.data().screening || {} : {};
+    const user = snap.exists ? snap.data() : {};
+    const s = user.screening || {};
+    const screeningMarket = operatingMarketOf(user);
+    if (!screeningMarket?.state) {
+      return res.status(409).json({ error: 'Choose an active operating market before screening.', code: 'screening_market_required' });
+    }
 
     if (!s.paymentIntentId) return res.status(402).json({ error: 'No paid screening on this account' });
     const expired = s.decision === 'expired'
@@ -2795,8 +2805,8 @@ app.post('/operator/screening/reinvite', requireAuth, LIMITS.screening, requireA
     if (!expired) return res.status(409).json({ error: 'The current screening link is still usable', decision: s.decision || null });
 
     const order = s.candidateId
-      ? { candidateId: s.candidateId, ...(await checkr.reinvite({ candidateId: s.candidateId, tier: s.tier || 'full' })) }
-      : await checkr.invite({ uid: req.uid, email: req.email, tier: s.tier || 'full' });
+      ? { candidateId: s.candidateId, ...(await checkr.reinvite({ candidateId: s.candidateId, tier: s.tier || 'full', workState: screeningMarket.state })) }
+      : await checkr.invite({ uid: req.uid, email: req.email, tier: s.tier || 'full', workState: screeningMarket.state });
 
     await userRef.set(
       {

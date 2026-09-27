@@ -47,8 +47,8 @@ export default {
     mobileNumberLabel: 'NUMÉRO DE MOBILE',
     emailLabel: 'ADRESSE E-MAIL',
     passwordLabel: 'MOT DE PASSE',
-    pwNewPh: '6 caractères ou plus',
-    usedToReach: 'Utilisé pour vous joindre au sujet de votre voyage.',
+    pwNewPh: 'Au moins 6 caractères',
+    usedToReach: 'Utilisé pour les communications relatives au compte et au Voyage.',
     forgotPassword: 'Mot de passe oublié ?',
   },
   common: {

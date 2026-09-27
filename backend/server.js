@@ -202,7 +202,7 @@ app.post('/stripe/connect-webhook', express.raw({ type: 'application/json' }), a
 
 
 app.post('/checkr/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-  if (!readKey('CHECKR_WEBHOOK_SECRET')) return res.status(503).json({ error: 'CHECKR_WEBHOOK_SECRET is not set' });
+  if (!checkr.webhookReady()) return res.status(503).json({ error: 'Checkr webhook signing key is not configured' });
   if (!checkr.verifySignature(req.body, req.get('x-checkr-signature'))) return res.status(403).json({ error: 'Bad signature' });
   let event;
   try { event = JSON.parse(req.body.toString('utf8')); }
@@ -233,7 +233,7 @@ function productionReadiness() {
   if (!readKey('STRIPE_PUBLISHABLE_KEY')) missing.push('stripe_publishable_key');
   if (!readKey('STRIPE_WEBHOOK_SECRET')) missing.push('stripe_webhook_secret');
   if (!readKey('STRIPE_CONNECT_WEBHOOK_SECRET')) missing.push('stripe_connect_webhook_secret');
-  if (!readKey('CHECKR_WEBHOOK_SECRET') || !screeningReady()) missing.push('screening_provider');
+  if (!checkr.webhookReady() || !screeningReady()) missing.push('screening_provider');
   if (!readKey('HERE_API_KEY')) missing.push('toll_provider');
   if (!readKey('TNC_INSURANCE_DISCLOSURE')) missing.push('tnc_contingency_insurance');
   if (!['ES','FR','IT','DE'].every((lang) => readKey(`TNC_INSURANCE_DISCLOSURE_${lang}`))) missing.push('tnc_insurance_translations');

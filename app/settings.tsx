@@ -27,7 +27,7 @@ export default function Settings() {
   return (
     <Screen note={note}>
       <LetterheadBar onBack={goBack} />
-      <Title>{t('traveler.settings')}</Title>
+      <Title size={24}>{t('traveler.settings')}</Title>
 
       {/* NO APPEARANCE SECTION — removed 15 Aug 2026 for App Store review (founders).
           The demo's Light/Dark segmented control was transcribed here, but the theme
@@ -144,13 +144,13 @@ export default function Settings() {
 }
 
 const styles = StyleSheet.create({
-  card: { marginTop: 12, paddingHorizontal: 20, paddingVertical: 2 },
+  card: { marginTop: 10, paddingHorizontal: 18, paddingVertical: 1 },
   buildLine: { fontSize: 11.5, color: colors.muted, marginTop: 22, textAlign: 'center' },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingVertical: 13.5,
   },
   hair: { borderTopWidth: 1, borderTopColor: colors.hairline },
   langChip: {
@@ -165,7 +165,7 @@ const styles = StyleSheet.create({
   },
   langChipOn: { color: '#FFFFFF', backgroundColor: colors.ink, borderColor: colors.ink },
 
-  rowTitle: { fontSize: 15, color: colors.ink },
+  rowTitle: { fontSize: 14.5, color: colors.ink },
   // The Notifications row names the screen it opens, and that name is now a phrase rather than
   // a word. It flexes and wraps so the chevron keeps its place instead of being pushed off the
   // card — the language row above keeps the old intrinsic width, where the chips take the rest.

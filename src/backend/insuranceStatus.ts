@@ -1,6 +1,7 @@
 // Operator-facing continuing insurance-status workflow.
 import { PAYMENT_SERVER_URL } from '../config';
 import { auth } from '../firebase';
+import { t } from '../i18n';
 
 export type InsuranceConfig = {
   state: string;
@@ -70,7 +71,7 @@ export async function requestInsuranceConfirmation(contact: {
     const d = await r.json().catch(() => ({}));
     return r.ok ? { ok: true } : { ok: false, error: d?.error || `Server error ${r.status}` };
   } catch {
-    return { ok: false, error: 'American Rider could not reach the insurance-status service.' };
+    return { ok: false, error: t('traveler.errReachARNoStop') };
   }
 }
 
@@ -89,6 +90,6 @@ export async function authorizeInsuranceStatusVerification(): Promise<{ ok: bool
     const d = await r.json().catch(() => ({}));
     return r.ok ? { ok: true } : { ok: false, error: d?.error || `Server error ${r.status}` };
   } catch {
-    return { ok: false, error: 'American Rider could not record the authorization.' };
+    return { ok: false, error: t('traveler.errReachARNoStop') };
   }
 }

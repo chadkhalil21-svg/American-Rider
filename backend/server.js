@@ -46,11 +46,8 @@ const LIMITS = {
   // COUNTED, NEVER REFUSED. See ratelimit.js — an alarm that answers "too many times" to
   // somebody in trouble has failed at the one thing it must not fail at.
   emergency: countOnly({ name: 'emergency', limit: 6, windowMs: 60 * 60 * 1000 }),
-  // Each of these bills us for an SMS and puts a message on somebody's handset. Tight on
-  // purpose: a real traveler verifies once, twice if the first is slow.
-  verify: perAccount({ name: 'verify', limit: 5, windowMs: 60 * 60 * 1000 }),
   // COST CONTROLS (22 Sept 2026). Each of these calls something that costs money or reaches a
-  // third party: the document reader (a model call), Checkr, Stripe, Twilio, push notifications,
+  // third party: the document reader (a model call), Checkr, Stripe, push notifications,
   // the routers. The client cannot be trusted to hold back, so the server does. Generous for a
   // real person — nobody photographs a licence 20 times an hour — and a hard stop for a loop.
   document: perAccount({ name: 'document', limit: 20, windowMs: 60 * 60 * 1000 }),
@@ -117,9 +114,6 @@ const { sweepOperatorAccountFees } = require('./operatorfees');
 const crypto = require('node:crypto');
 const WORKER_ID = crypto.randomUUID();
 const { send, receiptEmail, emailReady: mailReady } = require('./email');
-const {
-  ready: verifyReady, startVerification, checkVerification, toE164,
-} = require('./verify');
 const { mount: mountOps, opsAuthMode } = require('./ops');
 const { readDocument, documentsReady, READER_VERSION } = require('./documents');
 const { ready: r2Ready, uploadUrl: r2UploadUrl, readUrl: r2ReadUrl, owns: r2Owns } = require('./r2');
@@ -394,9 +388,6 @@ app.get('/health', async (req, res) => {
     // document falls to 'review' — never to 'accept'.
     documents: documentsReady() ? 'on' : 'off',
     insuranceDisclosure: DISCLOSURE_VERSION,
-    // Phone verification. `off` means sign-up cannot check a number, and the app is told so
-    // rather than showing a step that answers 503.
-    phoneVerification: verifyReady() ? 'on' : 'off',
     // How /ops is signed in to: 'named' is the production answer.
     opsAuth: opsAuthMode(),
     // Where travel is sold and operators are onboarded (backend/markets.js).
@@ -3479,71 +3470,6 @@ app.post('/travel/return-operator', requireAuth, LIMITS.dispatch, requireOperati
     return res.status(409).json({ error: 'The return travel cannot be priced' });
   }
   res.json(strip(next.operator, 'any-operator', priced.travelerPays));
-});
-
-// --- Verifying a mobile number. ------------------------------------------------------------
-//
-// POST /verify/start  { phone }          -> { ok } | { error, code }
-// POST /verify/check  { phone, code }    -> { ok, phone } | { error, code }
-//
-// AUTHENTICATED, DELIBERATELY. A traveler verifies their OWN number after signing in, which is
-// what makes this cheap to protect: an open endpoint that sends an SMS on request is somebody
-// else's phone bill and a way to harass a stranger's handset.
-//
-// THIS COMMENT USED TO END "Twilio rate-limits per number; requireAuth rate-limits per
-// account." THE SECOND HALF WAS FALSE. requireAuth authenticates and does nothing else, so
-// one signed-in account could ask for unlimited SMS — each one billed to us at about six
-// cents, and each one a message somebody did not ask for. A comment asserting a control that
-// does not exist is the most dangerous shape a comment can take: it answers the question
-// nobody then goes and checks.
-//
-// Twilio does rate-limit per number, which is real and is the half that was true. The per
-// account limit now exists as well, and it is deliberately tight — a real traveler verifies
-// once, twice if the first message is slow.
-//
-// THE RESULT IS WRITTEN BY THE SERVER, never by the phone. `users/{uid}.phoneVerified` is
-// exactly the shape of field that firestore.rules now refuses a client (see the users block
-// there, and docs/SWEEP-2026-09-19.md F-D): a value the gated party could write is not a gate.
-app.post('/verify/start', requireAuth, LIMITS.verify, async (req, res) => {
-  if (!verifyReady()) {
-    return res.status(503).json({ error: 'Phone verification is not configured.', code: 'not_configured' });
-  }
-  const out = await startVerification(req.body?.phone);
-  if (!out.ok) {
-    if (out.detail) console.error('[verify] start', out.code, out.detail);
-    return res.status(out.code === 'bad_number' ? 400 : 502).json({ error: out.reason, code: out.code });
-  }
-  res.json({ ok: true });
-});
-
-app.post('/verify/check', requireAuth, LIMITS.verify, async (req, res) => {
-  if (!verifyReady()) {
-    return res.status(503).json({ error: 'Phone verification is not configured.', code: 'not_configured' });
-  }
-  const out = await checkVerification(req.body?.phone, req.body?.code);
-  if (!out.ok) {
-    if (out.detail) console.error('[verify] check', out.code, out.detail);
-    return res.status(out.code === 'wrong_code' || out.code === 'expired' ? 400 : 502)
-      .json({ error: out.reason, code: out.code });
-  }
-
-  // RECORDED AGAINST THE ACCOUNT, in the normalised form. Storing what the person typed would
-  // mean two records of the same number in different shapes, and the one an operator rings
-  // would be whichever was written last.
-  const db = adminDb();
-  if (db) {
-    try {
-      await db.collection('users').doc(String(req.uid)).set(
-        { mobile: out.to, phoneVerified: true, phoneVerifiedAt: Date.now() },
-        { merge: true },
-      );
-    } catch (e) {
-      // The number IS verified — Twilio said so. Failing to write that down is our problem to
-      // log, not a reason to tell the traveler their correct code was wrong.
-      console.error('[verify] could not record verification', e.message);
-    }
-  }
-  res.json({ ok: true, phone: out.to });
 });
 
 app.post('/travel/announce', requireAuth, LIMITS.announce, async (req, res) => {

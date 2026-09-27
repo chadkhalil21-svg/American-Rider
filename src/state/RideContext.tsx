@@ -90,7 +90,7 @@ export type PaymentState = {
 // live screen can offer a retry instead of spinning on "Finding your operator…" forever).
 export type DispatchState = 'idle' | 'searching' | 'matched' | 'none' | 'error';
 
-const DEFAULT_PREFS: Prefs = { quiet: true, charging: false, luggage: true, pet: false };
+const DEFAULT_PREFS: Prefs = { quiet: true, charging: false, luggage: false, pet: false };
 
 const INITIAL_TRIP: Trip = {
   arr: 'Miami International Airport', dep: 'Brickell', cost: 24.5, proc: 0, total: 26.0, opRev: 24.26,

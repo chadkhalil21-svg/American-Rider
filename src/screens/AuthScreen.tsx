@@ -252,9 +252,8 @@ export function AuthScreen() {
       Alert.alert(t('traveler.enterEmailFirst'), t('traveler.typeAddressThenTap'));
       return;
     }
-    await resetPassword(email);
-    // Firebase answers the same way whether or not the address has an account, so this
-    // confirmation deliberately doesn't reveal which it was.
+    const accepted = await resetPassword(email);
+    if (!accepted) return;
     Alert.alert(t('traveler.checkYourEmail'), t('traveler.resetLinkSent', { email: email.trim() }));
   };
 
@@ -262,15 +261,13 @@ export function AuthScreen() {
     if (!canSubmit) return;
     if (step === 'signup') {
       setOnboarding(true); // keep the front door up through code → role → ready
-      try {
-        await signUp(email, password, name, mobile);
-        // Mobile verification is not represented until a real verification provider
-        // is active. A production institution must never accept arbitrary digits and
-        // present that as verification.
-        setStep('select');
-      } catch {
+      const created = await signUp(email, password, name, mobile);
+      if (!created) {
         setOnboarding(false);
+        return;
       }
+      // Mobile verification is not represented until a real verification provider is active.
+      setStep('select');
     } else {
       signIn(email, password);
     }

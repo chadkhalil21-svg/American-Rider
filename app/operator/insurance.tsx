@@ -35,12 +35,16 @@ export default function OperatorInsurance() {
   const op = useOperator();
   const [liveStatus, setLiveStatus] = useState<InsuranceStatus | null>(null);
   const [config, setConfig] = useState<InsuranceConfig | null>(null);
+  const [configResolved, setConfigResolved] = useState(false);
   const [brokerEmail, setBrokerEmail] = useState('');
   const [statusBusy, setStatusBusy] = useState(false);
   const [monthlyPremium, setMonthlyPremium] = useState('600');
 
   useEffect(() => {
-    insuranceConfig().then((x) => { if (x) setConfig(x); });
+    insuranceConfig().then((x) => {
+      setConfig(x);
+      setConfigResolved(true);
+    });
     insuranceStatus().then((s) => {
       if (!s) return;
       setLiveStatus(s);
@@ -85,6 +89,10 @@ export default function OperatorInsurance() {
   // already recorded the verdict and the Documents screen reads it; this only surfaces the
   // failures a row cannot show, and the refusal reason, which an operator needs immediately.
   const submitPolicy = async (fromCamera: boolean) => {
+    if (!config) {
+      Alert.alert(t('operator.commercialInsurance'), t('traveler.insJurisdictionUnavailable'));
+      return;
+    }
     const uri = await pickDocument(fromCamera);
     if (!uri) return;
     const out = await op.reviewDoc('insurance', uri);
@@ -122,8 +130,9 @@ export default function OperatorInsurance() {
   const advantageOffsetHigh = premiumN / (AR_SHARE - BENCH_DRIVER_HIGH);
   const money = (n: number) => String.fromCharCode(36) + n.toFixed(0);
   const rangeMoney = (a: number, b: number) => money(a) + '–' + money(b);
-  const marketState = config?.state || 'FL';
-  const marketInsurers = INSURERS.filter((x) => !x.states || x.states.includes(marketState));
+  const marketState = config?.state || null;
+  const nationalInsurers = config ? INSURERS.filter((x) => !x.states) : [];
+  const stateInsurers = config ? INSURERS.filter((x) => x.states?.includes(config.state)) : [];
 
   return (
     <Screen>
@@ -143,6 +152,12 @@ export default function OperatorInsurance() {
       <Sub style={{ marginTop: 8 }}>
         {t('traveler.liveryVerifyNotSell')}
       </Sub>
+      {configResolved && !config && (
+        <Card style={[styles.statusCard, { marginTop: 16 }]}>
+          <Text style={styles.statusTitle}>{t('operator.commercialInsurance')}</Text>
+          <Text style={styles.body}>{t('traveler.insJurisdictionUnavailable')}</Text>
+        </Card>
+      )}
       {st === 'ok' && (
         <View style={styles.badgeRow}>
           <BadgeOk label={t('operator.verified')} />
@@ -337,7 +352,7 @@ export default function OperatorInsurance() {
       {/* THE ONE CALL, ahead of the national quote pages, because it is the one where
           somebody is expecting this operator. Absent entirely until a broker is engaged —
           a referral to nobody is worse than no referral. */}
-      {BROKER && (() => {
+      {config?.state === 'FL' && BROKER && (() => {
         // Bound once so the closures below cannot be narrowed away by the compiler.
         const broker = BROKER;
         return (
@@ -382,9 +397,15 @@ export default function OperatorInsurance() {
           whoever wants the words. Both say the same thing, which is the point — the short one
           has to be right on its own. */}
       <Text style={styles.fixedInstruction}>{t('traveler.insFixedInstruction')}</Text>
-      <Card style={styles.scriptCard}>
-        <Text style={styles.script}>{config?.script || t('traveler.insCallScript')}</Text>
-      </Card>
+      {config ? (
+        <Card style={styles.scriptCard}>
+          <Text style={styles.script}>{config.script}</Text>
+        </Card>
+      ) : (
+        <Card style={styles.scriptCard}>
+          <Text style={styles.body}>{t('traveler.insJurisdictionUnavailable')}</Text>
+        </Card>
+      )}
       {/* THE SCRIPT STAYS IN ENGLISH IN ALL FIVE CATALOGUES, ON PURPOSE. It is read aloud to a
           Florida insurance agent, so a Spanish or German rendering would be a script that does
           not work at the counter — the one place it has a job to do. The instruction ABOUT it
@@ -392,33 +413,47 @@ export default function OperatorInsurance() {
       <Text style={styles.disclaimer}>{t('traveler.insCallScriptNote')}</Text>
 
       <SectionLabel style={styles.lbl}>{t('operator.compareProviders')}</SectionLabel>
-      <Card style={styles.listCard}>
-        {marketInsurers.filter((x) => !x.secondary).map((x, i) => (
-          <Pressable key={x.name} onPress={() => (x.url ? Linking.openURL(x.url) : Linking.openURL(`tel:${(x.phone || '').replace(/[^0-9+]/g, '')}`))}>
-            <View style={[styles.insurerRow, i > 0 && styles.hair]}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.insurerName}>{x.name}</Text>
-                <Text style={styles.insurerNote}>{t(x.note)}</Text>
-              </View>
-              <Text style={styles.insurerLink}>{x.url ? t('traveler.quote') : t('traveler.call')} ›</Text>
-            </View>
-          </Pressable>
-        ))}
-        {showMore && marketInsurers.filter((x) => x.secondary).map((x) => (
-          <Pressable key={x.name} onPress={() => (x.url ? Linking.openURL(x.url) : Linking.openURL(`tel:${(x.phone || '').replace(/[^0-9+]/g, '')}`))}>
-            <View style={[styles.insurerRow, styles.hair]}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.insurerName}>{x.name}</Text>
-                <Text style={styles.insurerNote}>{t(x.note)}</Text>
-                {/* Said on the row rather than in a footnote: it is the difference between a
-                    name we checked and a name we did not. */}
-                {!!x.unverified && <Text style={styles.insurerUnverified}>{t('traveler.insNotLicenceChecked')}</Text>}
-              </View>
-              <Text style={styles.insurerLink}>{x.url ? t('traveler.quote') : t('traveler.call')} ›</Text>
-            </View>
-          </Pressable>
-        ))}
-      </Card>
+      {config ? (
+        <>
+          <Text style={styles.coverLabel}>{t('traveler.insNationalSources')}</Text>
+          <Card style={styles.listCard}>
+            {nationalInsurers.filter((x) => !x.secondary || showMore).map((x, i) => (
+              <Pressable key={x.name} onPress={() => (x.url ? Linking.openURL(x.url) : Linking.openURL(`tel:${(x.phone || '').replace(/[^0-9+]/g, '')}`))}>
+                <View style={[styles.insurerRow, i > 0 && styles.hair]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.insurerName}>{x.name}</Text>
+                    <Text style={styles.insurerNote}>{t(x.note)}</Text>
+                  </View>
+                  <Text style={styles.insurerLink}>{x.url ? t('traveler.quote') : t('traveler.call')} ›</Text>
+                </View>
+              </Pressable>
+            ))}
+          </Card>
+          {stateInsurers.length > 0 && (
+            <>
+              <Text style={[styles.coverLabel, { marginTop: 16 }]}>{t('traveler.insStateSources', { state: config.stateName })}</Text>
+              <Card style={styles.listCard}>
+                {stateInsurers.map((x, i) => (
+                  <Pressable key={x.name} onPress={() => (x.url ? Linking.openURL(x.url) : Linking.openURL(`tel:${(x.phone || '').replace(/[^0-9+]/g, '')}`))}>
+                    <View style={[styles.insurerRow, i > 0 && styles.hair]}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.insurerName}>{x.name}</Text>
+                        <Text style={styles.insurerNote}>{t(x.note)}</Text>
+                        {!!x.unverified && <Text style={styles.insurerUnverified}>{t('traveler.insNotLicenceChecked')}</Text>}
+                      </View>
+                      <Text style={styles.insurerLink}>{x.url ? t('traveler.quote') : t('traveler.call')} ›</Text>
+                    </View>
+                  </Pressable>
+                ))}
+              </Card>
+            </>
+          )}
+        </>
+      ) : (
+        <Card style={styles.listCard}>
+          <Text style={[styles.body, { paddingVertical: 16 }]}>{t('traveler.insJurisdictionUnavailable')}</Text>
+        </Card>
+      )}
       {!showMore && (
         <Pressable onPress={() => setShowMore(true)} hitSlop={8}>
           <Text style={styles.guidelinesLink}>{t('operator.compareMoreOptions')} ›</Text>
@@ -448,7 +483,7 @@ export default function OperatorInsurance() {
           </Text>
           <PrimaryButton
             label={st === 'checking' ? t('traveler.busyReading') : t('traveler.submitMyPolicy')}
-            disabled={st === 'checking'}
+            disabled={st === 'checking' || !config}
             onPress={() =>
               Alert.alert('Commercial Insurance', t('traveler.insWhereDecPage'), [
                 { text: 'Take a photograph', onPress: () => submitPolicy(true) },

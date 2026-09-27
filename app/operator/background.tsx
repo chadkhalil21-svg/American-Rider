@@ -9,18 +9,18 @@ import { useOperator } from '../../src/state/OperatorContext';
 import { useLanguage } from '../../src/state/LanguageContext';
 import { colors } from '../../src/theme';
 
-const PROVIDER_URL = String(process.env.EXPO_PUBLIC_SCREENING_PROVIDER_URL || '').trim();
 const dateLabel = (when: string | number) =>
   new Date(when).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
 export default function OperatorBackground() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const goBack = useGoBack();
   const op = useOperator();
   const [status, setStatus] = React.useState<ScreeningStatus | null>(null);
   const [showExisting, setShowExisting] = React.useState(false);
   const [showRequirements, setShowRequirements] = React.useState(false);
   const [agency, setAgency] = React.useState('');
+  const [reportDate, setReportDate] = React.useState('');
   const [criminalIncluded, setCriminalIncluded] = React.useState(true);
   const [drivingIncluded, setDrivingIncluded] = React.useState(true);
   const [declared, setDeclared] = React.useState<string | null>(null);
@@ -44,10 +44,16 @@ export default function OperatorBackground() {
       setError(t('traveler.bgNameCompanyFirst'));
       return;
     }
+    const parsedDate = Date.parse(reportDate.trim());
+    if (!reportDate.trim() || Number.isNaN(parsedDate) || parsedDate > Date.now()) {
+      setError(t('traveler.bgReportDateInvalid'));
+      return;
+    }
     setBusy(true);
     setError(null);
     const out = await declareExistingScreening({
       agency: agency.trim(),
+      issuedAt: parsedDate,
       criminalIncluded,
       drivingIncluded,
     });
@@ -69,11 +75,8 @@ export default function OperatorBackground() {
   return (
     <Screen>
       <BackLink label={t('common.back')} onPress={goBack} />
-      <Title size={26}>Screening</Title>
-      <Sub style={styles.intro}>
-        Complete the screening required for the market where you operate. You pay the screening
-        provider directly; American Rider does not charge a screening fee.
-      </Sub>
+      <Title size={26}>{t('traveler.bgScreeningTitle')}</Title>
+      <Sub style={styles.intro}>{t('traveler.bgScreeningIntro')}</Sub>
 
       {passed ? (
         <>
@@ -108,23 +111,22 @@ export default function OperatorBackground() {
 
           <SectionLabel style={styles.section}>COMPLETE SCREENING</SectionLabel>
           <Card style={styles.providerCard}>
-            <Text style={styles.providerName}>BackgroundChecks.com</Text>
-            <Text style={styles.providerMeta}>Preferred external provider</Text>
+            <Text style={styles.providerName}>{t('traveler.bgApprovedProvider')}</Text>
+            <Text style={styles.providerMeta}>{t('traveler.bgExternalProvider')}</Text>
             <Text style={styles.body}>
               Complete the required criminal-record, sex-offender and driving-history searches
               through the provider’s secure process. Sensitive screening information stays with
               the screening provider.
             </Text>
-            {PROVIDER_URL ? (
+            {status?.providerUrl ? (
               <PrimaryButton
-                label="Continue with provider"
-                onPress={() => Linking.openURL(PROVIDER_URL)}
+                label={t('traveler.bgContinueProvider')}
+                onPress={() => Linking.openURL(status.providerUrl!)}
                 style={styles.primary}
               />
             ) : (
               <Text style={styles.pending}>
-                American Rider’s provider-specific screening link is being configured. Do not
-                purchase a personal background report; it may not qualify for this purpose.
+                {t('traveler.bgProviderPending')}
               </Text>
             )}
           </Card>
@@ -161,6 +163,14 @@ export default function OperatorBackground() {
                     placeholderTextColor={colors.faint}
                     style={styles.input}
                   />
+                  <Text style={[styles.fieldLabel, { marginTop: 13 }]}>{t('traveler.bgReportDate')}</Text>
+                  <TextInput
+                    value={reportDate}
+                    onChangeText={setReportDate}
+                    placeholder={t('traveler.bgReportDatePlaceholder')}
+                    placeholderTextColor={colors.faint}
+                    style={styles.input}
+                  />
                   <Pressable style={styles.checkRow} onPress={() => setCriminalIncluded((v) => !v)}>
                     <Text style={styles.check}>{criminalIncluded ? '✓' : '○'}</Text>
                     <Text style={styles.checkLabel}>Criminal record and sex-offender searches</Text>
@@ -174,7 +184,7 @@ export default function OperatorBackground() {
                     and review the provider’s authoritative report.
                   </Text>
                   <PrimaryButton
-                    label={busy ? t('traveler.busyRecording') : 'Request provider review'}
+                    label={busy ? t('traveler.busyRecording') : t('traveler.bgRequestReview')}
                     disabled={busy}
                     onPress={submitExisting}
                     style={styles.primary}

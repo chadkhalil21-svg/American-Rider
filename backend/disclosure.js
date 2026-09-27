@@ -1,5 +1,4 @@
 // The §627.748(8)(a) insurance disclosure, and the record that it was made.
-const { readKey } = require('./env');
 //
 // WHAT THE STATUTE REQUIRES, exactly. "Before a TNC driver is allowed to accept a request for
 // a prearranged ride on the digital network, the TNC must disclose in writing to the TNC
@@ -8,7 +7,9 @@ const { readKey } = require('./env');
 // the TNC's digital network. 2. That the TNC driver's own automobile insurance policy might
 // not provide any coverage while the TNC driver is logged on to the digital network or is
 // engaged in a prearranged ride, depending on the terms of the TNC driver's own automobile
-// insurance policy."
+// insurance policy. 3. That compensated passenger transportation outside a prearranged TNC
+// ride is subject to the financial-responsibility requirements in §324.032(1), with penalties
+// under §324.221."
 //
 // TWO THINGS FOLLOW FROM THAT WORDING, and both shape this file.
 //
@@ -22,9 +23,10 @@ const { readKey } = require('./env');
 // one is out of date and is asked again, rather than being silently treated as having agreed
 // to words they never saw.
 //
-// American Rider still requires each Operator to carry qualifying coverage. Separately, the
-// platform must not represent its own statutory contingency layer as nonexistent. Production
-// readiness therefore requires the bound policy's disclosure text from deployment config.
+// American Rider's product rule is explicit: each Operator must carry qualifying commercial
+// coverage and remain continuously verified. American Rider does not sell or provide automobile
+// insurance. The disclosure states that fact directly; qualification and continuing-status gates
+// decide whether an Operator may operate.
 
 // Bump this whenever the TEXT below changes in substance. Formatting fixes do not count;
 // anything that changes what an operator is agreeing to does.
@@ -37,8 +39,7 @@ const { readKey } = require('./env');
 // This bump is not free and is made deliberately now: every operator who acknowledged
 // 2026-08-29.1 is asked to read and acknowledge again before going on duty. Today that is a
 // handful of test accounts; after the operator program opens on 28 Sept it would be everyone.
-const DISCLOSURE_VERSION = '2026-09-25.1';
-const TNC_COVERAGE_TEXT = String(readKey('TNC_INSURANCE_DISCLOSURE') || '').trim();
+const DISCLOSURE_VERSION = '2026-09-27.1';
 
 /**
  * The disclosure itself. Served from here rather than written into the app so that the words
@@ -51,8 +52,9 @@ const DISCLOSURE = {
   // (8)(a)1 — the coverage the TNC provides, with types and limits.
   provided: {
     heading: 'What American Rider provides',
-    body: TNC_COVERAGE_TEXT ||
-      'American Rider production operations are not enabled until the platform contingency insurance is bound and its coverage types and limits are stated here.',
+    body:
+      'American Rider does not provide automobile liability insurance, uninsured or underinsured motorist coverage, or personal injury protection for an Operator or vehicle. ' +
+      'Each Operator must maintain qualifying commercial, for-hire, livery, or TNC coverage that satisfies the requirements of the jurisdiction in which the Operator serves.',
   },
   // (8)(a)2 — that the driver's own policy might not cover them.
   // (8)(a)2 — that the driver's own policy might not cover them.
@@ -78,6 +80,15 @@ const DISCLOSURE = {
       'policies exclude carrying passengers for payment. Read your policy, or ask your insurer ' +
       'directly whether it covers you while you operate for a transportation network company.',
   },
+  // (8)(a)3 — compensated passenger transportation outside a prearranged TNC Travel.
+  outsidePrearranged: {
+    heading: 'Travel must be prearranged through American Rider',
+    body:
+      'Florida law distinguishes prearranged TNC Travel from other compensated passenger transportation. ' +
+      'If you provide transportation for compensation that was not prearranged through the American Rider digital network, ' +
+      'the financial-responsibility requirements in Fla. Stat. §324.032(1) apply. Failure to satisfy those requirements ' +
+      'is subject to the penalties in §324.221.',
+  },
   /** Shown instead of `ownPolicy` once a commercial policy has been verified. */
   ownPolicyVerified: {
     heading: 'The policy you have provided',
@@ -98,8 +109,9 @@ const DISCLOSURE = {
       'expiry date, and will not assign travel to an operator whose coverage has lapsed.',
   },
   acknowledgement:
-    'I have read this disclosure, including the coverage American Rider provides and the warning that ' +
-    'my own policy might not cover me while I am logged on or carrying a traveler.',
+    'I have read this disclosure, including that American Rider does not provide automobile insurance, ' +
+    'the warning that my own policy might not cover me while I am logged on or carrying a traveler, and ' +
+    'the requirements that apply to compensated passenger transportation outside a prearranged American Rider Travel.',
 };
 
 /**

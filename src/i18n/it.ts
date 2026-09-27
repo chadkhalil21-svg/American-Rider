@@ -451,7 +451,7 @@ export default {
     notifReceipt: 'Avvisi inviati al suo telefono quando il viaggio si conclude e la tariffa viene liquidata.',
     notifBrowserNo: 'Questo browser non riceve notifiche. Usi l’applicazione.',
     notifAlwaysSent: 'I controlli di sicurezza durante il viaggio e gli avvisi di assegnazione attiva sono sempre attivi. Un viaggio programmato che non può essere effettuato viene sempre comunicato.',
-    notifChannels: 'Queste preferenze si applicano alle notifiche dell’app. Una ricevuta viene inviata per e-mail dopo ogni Viaggio completato.'
+    notifChannels: 'Queste preferenze si applicano alle notifiche dell’app. Una ricevuta viene inviata per e-mail dopo ogni Viaggio completato.',
     totalPaymentInProgress: 'Totale · pagamento in corso',
     delSavedPrefs: 'Saranno cancellate le preferenze salvate, i contatti fidati e qualsiasi qualificazione da operatore conservata su questo dispositivo.',
     lostReportNotSaved: 'Non è stato possibile salvare la segnalazione. Verifichi la connessione e riprovi.',
@@ -808,7 +808,7 @@ export default {
     changeTravel: 'Modificare il Viaggio',
     dispatchUnavailable: 'Centrale non disponibile. Verifichi la connessione.',
     emergencyAssistance: 'Assistenza di Emergenza',
-    shareTravelSub: 'Condivida un link privato in tempo reale con un contatto fidato durante un Viaggio attivo. Il link scade al termine del Viaggio.'
+    shareTravelSub: 'Condivida un link privato in tempo reale con un contatto fidato durante un Viaggio attivo. Il link scade al termine del Viaggio.',
     smartTravelTitle: 'Viaggio Intelligente',
     checkingTransit: "Verifica del servizio di trasporto attuale…",
     transitChanged: "Il servizio di trasporto è cambiato da quando è stato pianificato questo viaggio. Il secondo Travel in auto resta sospeso finché il servizio attuale non viene verificato.",
@@ -872,7 +872,7 @@ export default {
     modifyCabin: 'Regolare le preferenze di cabina',
     mapAttribution: '© Contributori di OpenStreetMap',
     paymentSettlement: 'Metodi di pagamento',
-    paymentSettlementSub: 'Gestisca come paga i suoi Viaggi.'
+    paymentSettlementSub: 'Gestisca come paga i suoi Viaggi.',
     noPaymentMethodSaved: 'Nessun metodo di pagamento salvato.',
     methodsUnreadable: 'Impossibile leggere i metodi di pagamento salvati.',
     addPaymentMethod: 'Aggiungere un metodo di pagamento',
@@ -915,9 +915,9 @@ export default {
     enterATime: 'Inserisca un orario, per esempio 6:45.',
     scheduleTravel: 'Programmare il Viaggio',
     notifications: 'Avvisi Operativi e di Assegnazione',
-    notificationsSub: 'Scelga quali aggiornamenti sul Viaggio desidera ricevere.'
+    notificationsSub: 'Scelga quali aggiornamenti sul Viaggio desidera ricevere.',
     inviteFriends: 'Invitare un Viaggiatore',
-    inviteSub: 'Inviti qualcuno a viaggiare con American Rider. Può rivedere l’invito prima di inviarlo.'
+    inviteSub: 'Inviti qualcuno a viaggiare con American Rider. Può rivedere l’invito prima di inviarlo.',
     theInvitation: 'L’invito',
     sendInvitation: 'Inviare un invito',
     operateWithUs: 'Operare con American Rider',
@@ -931,7 +931,7 @@ export default {
     yourNumbers: 'Modello di proiezione del rendimento netto',
     averageTravelCost: 'Costo medio del viaggio',
     travelsPerWeek: 'Viaggi a settimana',
-    safetySub: 'Durante un Viaggio attivo, American Rider monitora il percorso per rilevare interruzioni insolite. I contatti fidati possono seguire il Viaggio e la verifica del veicolo aiuta a confermare il veicolo corretto prima di salire.'
+    safetySub: 'Durante un Viaggio attivo, American Rider monitora il percorso per rilevare interruzioni insolite. I contatti fidati possono seguire il Viaggio e la verifica del veicolo aiuta a confermare il veicolo corretto prima di salire.',
     shareUnavailable: 'Disponibile una volta assegnato un operatore.',
     verifyCodeIntro: 'Chieda questo codice al suo operatore prima di salire.',
     verifyCodeIdle: 'A ogni viaggio viene assegnato un codice non appena c’è un operatore assegnato. Lo chieda al suo operatore prima di salire.',

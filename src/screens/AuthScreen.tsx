@@ -581,6 +581,8 @@ export function AuthScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="email-address"
+              autoComplete="email"
+              textContentType="username"
               value={email}
               onChangeText={setEmail}
             />
@@ -592,6 +594,8 @@ export function AuthScreen() {
               placeholder={isSignup ? t('auth.pwNewPh') : t('traveler.yourPasswordPh')}
               placeholderTextColor={colors.faint}
               secureTextEntry
+              autoComplete={isSignup ? 'new-password' : 'current-password'}
+              textContentType={isSignup ? 'newPassword' : 'password'}
               value={password}
               onChangeText={setPassword}
               onSubmitEditing={submit}

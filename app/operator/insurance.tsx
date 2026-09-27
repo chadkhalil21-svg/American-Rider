@@ -118,6 +118,8 @@ export default function OperatorInsurance() {
   const fareNeededAR = premiumN / AR_SHARE;
   const fareNeededBenchmarkLow = premiumN / BENCH_DRIVER_HIGH;
   const fareNeededBenchmarkHigh = premiumN / BENCH_DRIVER_LOW;
+  const advantageOffsetLow = premiumN / (AR_SHARE - BENCH_DRIVER_LOW);
+  const advantageOffsetHigh = premiumN / (AR_SHARE - BENCH_DRIVER_HIGH);
   const money = (n: number) => String.fromCharCode(36) + n.toFixed(0);
   const rangeMoney = (a: number, b: number) => money(a) + '–' + money(b);
   const marketState = config?.state || 'FL';
@@ -300,6 +302,14 @@ export default function OperatorInsurance() {
             <Text style={styles.econValue}>{rangeMoney(fareNeededBenchmarkLow, fareNeededBenchmarkHigh)}</Text>
           </View>
         </View>
+        <Text style={[styles.coverLabel, { marginTop: 18 }]}>{t('traveler.insAdvantageOffset')}</Text>
+        <View style={styles.econRows}>
+          <View style={styles.econRow}>
+            <Text style={styles.body}>{t('traveler.insAdvantageOffsetRange')}</Text>
+            <Text style={styles.econValue}>{rangeMoney(advantageOffsetLow, advantageOffsetHigh)}</Text>
+          </View>
+        </View>
+
         <Text style={styles.disclaimer}>{t('traveler.insBenchmarkSource')}</Text>
       </Card>
 

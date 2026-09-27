@@ -340,7 +340,6 @@ export function AuthScreen() {
             />
             <Text style={s.wordmark}>AMERICAN RIDER</Text>
             <Text style={s.lockupTag}>NATIONAL TRANSPORTATION</Text>
-            <Text style={s.tagline}>{t('auth.tagline')}</Text>
           </View>
           {/* A MEASURED GAP, NOT A SECOND SPRING. This was `flex: 1`, which is the one
               thing Chad's directive above rules out — an elastic gap in the middle of the
@@ -352,7 +351,7 @@ export function AuthScreen() {
               every remaining pixel above the logo where the directive says it belongs, and
               — unlike a spring — does not silently re-tune itself when the button count
               changes. Sign in with Apple can return without this needing a thought. */}
-          <View style={{ height: 56 }} />
+          <View style={{ height: 40 }} />
 
           {/* CHAD'S ENTRY ARCHITECTURE (13 Sept 2026): Apple, Google, then one field.
               Each control is offered only when it can actually be served — Apple when the
@@ -459,13 +458,11 @@ export function AuthScreen() {
               same defect as a LIVE badge over a simulated car: a claim the system has not
               established. This asks the server and prints what it answered, including when
               the answer is that it cannot be reached. */}
-          <Text style={[s.network, netUp === false && s.networkDown]}>
-            {netUp === null
-              ? t('auth.networkChecking')
-              : netUp
-                ? t('auth.networkActive')
-                : t('auth.networkUnreachable')}
-          </Text>
+          {netUp === false && (
+            <Text style={[s.network, s.networkDown]}>
+              {t('auth.networkUnreachable')}
+            </Text>
+          )}
         </View>
       </Screen>
     );
@@ -756,15 +753,15 @@ const s = StyleSheet.create({
   legal: {
     marginTop: 18,
     textAlign: 'center',
-    fontSize: 11,
-    lineHeight: 16.5,
-    color: colors.faint,
+    fontSize: 12,
+    lineHeight: 18,
+    color: colors.ink2,
   },
   // NO UNDERLINE AND NO WEIGHT SHIFT (Chad, 13 Sept 2026) — the bolding read as an awkward
   // inline jump. Tone alone carries the link, which is allowed: charcoal on the muted body
   // measures 3.04:1, over the 3:1 that WCAG requires when nothing but colour separates a
   // link from its sentence, and the press state below is the second cue it also asks for.
-  legalLink: { color: colors.ink2 },
+  legalLink: { color: colors.ink, fontWeight: '500' },
   legalLinkPressed: { color: colors.ink, textDecorationLine: 'underline' },
   // A single-sign-on control: the same geometry as the ghost button, mark beside the label.
   btnSso: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
@@ -797,7 +794,7 @@ const s = StyleSheet.create({
   ssoError: { marginTop: 12, fontSize: 13, color: colors.ink2, textAlign: 'center', lineHeight: 19 },
   langBar: { alignItems: 'flex-end' },
   langTrigger: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 6 },
-  langTriggerText: { fontSize: 13, color: colors.muted },
+  langTriggerText: { fontSize: 13, color: colors.ink2 },
   langPanel: {
     alignSelf: 'flex-end',
     marginTop: 2,
@@ -813,11 +810,11 @@ const s = StyleSheet.create({
   network: {
     marginTop: 14,
     textAlign: 'center',
-    fontSize: 10.5,
-    letterSpacing: 0.9,
-    color: colors.faint,
+    fontSize: 11.5,
+    letterSpacing: 0.6,
+    color: colors.ink2,
   },
-  networkDown: { color: colors.muted },
+  networkDown: { color: colors.ink2 },
   back: { fontSize: 15, fontWeight: '500', color: colors.blue, paddingVertical: 4 },
   title: {
     fontSize: 26,

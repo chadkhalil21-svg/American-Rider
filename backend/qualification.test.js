@@ -217,7 +217,7 @@ const codes = (a) => a.blockers.map((b) => b.code);
     process.env.INSURANCE_UM_REJECTION_ACCEPTED = '1';
     check('4b. …and accepted once configured', A(withPolicy({ uninsuredMotorist: { shown: 'rejected', amount: '' } })).qualified);
     delete process.env.INSURANCE_UM_REJECTION_ACCEPTED;
-    check('4b. structured ride-period evidence governs the statutory limit', !C({}, { limits: '$300,000' }).includes('insurance_limits_insufficient'));
+    check('4b. the legacy summary limit remains a conservative pre-check while structured statutory evidence is also enforced', C({}, { limits: '$300,000' }).includes('insurance_limits_insufficient'));
     const src = fs.readFileSync(path.join(__dirname, 'documents.js'), 'utf8');
     check('4b. the reader is not asked whether the policy complies', !/compliant|complies with|meets florida/i.test(src.slice(src.indexOf('const INSURANCE'), src.indexOf('const SCHEMA'))));
   }

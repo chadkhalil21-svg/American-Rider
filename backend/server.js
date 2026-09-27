@@ -2123,7 +2123,10 @@ async function issueInsuranceConfirmationRequest({ uid, user, contact, now = Dat
       verificationRequestedAt: now,
       verificationRequestedTo: email,
       verificationRequestReason: reason,
-      verificationRequestCount: Math.max(0, Number(m.verificationRequestCount) || 0) + 1,
+      verificationRequestCount:
+        String(m.contact?.email || '').trim().toLowerCase() === email
+          ? Math.max(0, Number(m.verificationRequestCount) || 0) + 1
+          : 1,
     },
   }, { merge: true });
   return { ok: true, expiresAt };

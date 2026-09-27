@@ -14,7 +14,7 @@
 // bus destination board says, which is the whole reason the English says In Service.
 export default {
   auth: {
-    tagline: 'Infraestructura nacional de transporte construida sobre seguridad, fiabilidad y precisión.',
+    tagline: 'Safe. Reliable. American.',
     continueWithApple: 'Continuar con Apple',
     continueWithGoogle: 'Continuar con Google',
     orDivider: 'o',

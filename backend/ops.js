@@ -22,6 +22,7 @@ const { screeningReady } = require('./screening');
 const { monthlyRemittance } = require('./remittance');
 const { REQUIRED_DOCS, resolveDocument, setSuspension, assessAndRecord } = require('./qualification');
 const { disclosureStale } = require('./matching');
+const { applyIndependentConfirmation, continuingStatus } = require('./insurance-monitoring');
 
 const COOKIE = 'ar_ops';
 
@@ -322,6 +323,25 @@ ${alarms.length
     — held documents, refusals to reconsider, suspensions — appears here. Every decision is
     recorded with a note and the name of the person who made it.${shared() ? ` <strong>Signed in with the shared password (${esc(sharedMode())}): decisions are recorded as “${esc(opsAccounts()[0]?.name || 'ops')}”, not a named person. Set OPS_USERS.</strong>` : ''}</p>
   ${pending.length ? pending.map(exceptionCard).join('') : '<p>No operator exceptions.</p>'}
+  <div style="margin-top:20px;">
+    <strong>Insurance status confirmation</strong>
+    <p style="color:${T.muted};font-size:13px;">After reviewing a carrier, agent, broker, or monitoring-provider confirmation, record the current status here. A cancellation or material change removes the Operator from service immediately.</p>
+    <form method="post" action="/ops/operators/insurance-status">
+      ${small('uid', 'Operator uid', 'required')}
+      ${small('source', 'broker / carrier / provider', 'required')}
+      <select name="status" style="padding:8px;border:1px solid ${T.border};border-radius:13px;margin:6px 8px 0 0;">
+        <option value="verified_active">Verified active</option>
+        <option value="pending_cancellation">Pending cancellation</option>
+        <option value="cancelled">Cancelled</option>
+        <option value="nonrenewed">Nonrenewed</option>
+        <option value="coverage_reduced">Coverage reduced</option>
+        <option value="vehicle_removed">Vehicle removed</option>
+        <option value="unverified">Unverified</option>
+      </select>
+      ${noteInput}
+      <button type="submit" style="border:1px solid ${T.border};background:#fff;color:${T.ink};border-radius:13px;padding:8px 14px;font-size:14px;cursor:pointer;margin-top:6px;">Record status</button>
+    </form>
+  </div>
   ${decide('/ops/operators/suspension', { action: 'suspend' }, 'Suspend an operator', small('uid', 'Operator uid', 'required'))}
 </section>
 
@@ -483,6 +503,42 @@ function mount(app, express, deps = {}) {
       },
     }),
   );
+
+  // Independent insurance-status evidence. Used after a carrier/broker reply or a
+  // monitoring-provider alert is reviewed. The actor and note are retained on the same record.
+  exceptionRoute('/ops/operators/insurance-status', async ({ db, uid, body, actor }) => {
+    const ref = db.collection('users').doc(uid);
+    const snap = await ref.get();
+    if (!snap.exists) return { ok: false, status: 404, error: 'Operator not found' };
+    const u = snap.data() || {};
+    const status = String(body.status || 'verified_active');
+    const source = String(body.source || 'broker').trim().slice(0, 40);
+    const updated = applyIndependentConfirmation(u.insuranceMonitoring, {
+      status,
+      source,
+      actor,
+      note: String(body.note || '').trim() || null,
+    });
+    await ref.set({ insuranceMonitoring: updated }, { merge: true });
+    const live = continuingStatus({ ...u, insuranceMonitoring: updated });
+    await db.collection('audit_log').add({
+      at: Date.now(),
+      subject: uid,
+      actor,
+      action: 'insurance_status_confirmation',
+      status,
+      source,
+      note: String(body.note || '').trim() || null,
+      resultingCode: live.code || null,
+    });
+    if (!live.ok) {
+      await db.collection('operators').doc(uid).set(
+        { available: false, offDutyReason: live.code, offDutyAt: Date.now() },
+        { merge: true },
+      );
+    }
+    return { ok: true };
+  });
 
   // Suspend (fraud, safety, administrative) or reinstate.
   exceptionRoute('/ops/operators/suspension', ({ db, uid, body, actor }) => {

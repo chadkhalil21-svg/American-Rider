@@ -585,7 +585,7 @@ export default {
     bgIfYouHaveNot: 'If You Have Not',
     bgWhatIsLeft: 'What Is Left To Order',
     qualBasicsSub: 'Legal name, date of birth, address',
-    qualBgSub: 'Arranged by American Rider · paid at cost',
+    qualBgSub: 'Completed with an approved screening provider',
     inboxNotSignedIn: 'This device is not signed in, so travel cannot be received.',
     inboxNotCommissioned: 'This account is not commissioned yet, so travel cannot be assigned to it.',
     noLongerInService: 'You are no longer in service.',

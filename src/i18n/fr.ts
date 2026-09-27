@@ -458,7 +458,7 @@ export default {
     notifReceipt: 'Avis envoyés à votre téléphone lorsque le trajet se termine et que le tarif est réglé.',
     notifBrowserNo: 'Ce navigateur ne reçoit pas de notifications. Utilisez l’application.',
     notifAlwaysSent: 'Les contrôles de sécurité pendant le trajet et les avis de répartition active sont toujours activés. Un trajet planifié qui ne peut être assuré est toujours signalé.',
-    notifChannels: 'Ces préférences s’appliquent aux notifications de l’application. Un reçu est envoyé par courriel après chaque Voyage terminé.'
+    notifChannels: 'Ces préférences s’appliquent aux notifications de l’application. Un reçu est envoyé par courriel après chaque Voyage terminé.',
     totalPaymentInProgress: 'Total · paiement en cours',
     delSavedPrefs: 'Les préférences enregistrées, les contacts de confiance et toute qualification d’opérateur conservée sur cet appareil seront effacés.',
     lostReportNotSaved: 'Le signalement n’a pas pu être enregistré. Vérifiez votre connexion et réessayez.',
@@ -815,7 +815,7 @@ export default {
     changeTravel: 'Modifier le Trajet',
     dispatchUnavailable: 'Répartition indisponible. Vérifiez votre connexion.',
     emergencyAssistance: 'Assistance d’Urgence',
-    shareTravelSub: 'Partagez un lien privé en direct avec un contact de confiance pendant un Voyage actif. Le lien expire à la fin du Voyage.'
+    shareTravelSub: 'Partagez un lien privé en direct avec un contact de confiance pendant un Voyage actif. Le lien expire à la fin du Voyage.',
     smartTravelTitle: 'Trajet Intelligent',
     checkingTransit: "Vérification du service de transport actuel…",
     transitChanged: "Le service de transport a changé depuis la planification de ce trajet. Le second Travel en voiture est retenu jusqu’à vérification du service actuel.",
@@ -879,7 +879,7 @@ export default {
     modifyCabin: 'Ajuster les préférences de cabine',
     mapAttribution: '© Les contributeurs d’OpenStreetMap',
     paymentSettlement: 'Moyens de paiement',
-    paymentSettlementSub: 'Gérez la façon dont vous payez vos Voyages.'
+    paymentSettlementSub: 'Gérez la façon dont vous payez vos Voyages.',
     noPaymentMethodSaved: 'Aucun moyen de paiement enregistré.',
     methodsUnreadable: 'Les moyens de paiement enregistrés n’ont pas pu être lus.',
     addPaymentMethod: 'Ajouter un moyen de paiement',
@@ -922,9 +922,9 @@ export default {
     enterATime: 'Saisissez une heure, par exemple 6:45.',
     scheduleTravel: 'Programmer le Trajet',
     notifications: 'Avis Opérationnels et de Répartition',
-    notificationsSub: 'Choisissez les mises à jour de Voyage que vous souhaitez recevoir.'
+    notificationsSub: 'Choisissez les mises à jour de Voyage que vous souhaitez recevoir.',
     inviteFriends: 'Inviter un Voyageur',
-    inviteSub: 'Invitez quelqu’un à voyager avec American Rider. Vous pouvez relire l’invitation avant de l’envoyer.'
+    inviteSub: 'Invitez quelqu’un à voyager avec American Rider. Vous pouvez relire l’invitation avant de l’envoyer.',
     theInvitation: 'L’invitation',
     sendInvitation: 'Envoyer une invitation',
     operateWithUs: 'Opérer avec American Rider',
@@ -938,7 +938,7 @@ export default {
     yourNumbers: 'Modèle de projection du rendement net',
     averageTravelCost: 'Coût moyen du trajet',
     travelsPerWeek: 'Trajets par semaine',
-    safetySub: 'Pendant un Voyage actif, American Rider surveille l’itinéraire afin de détecter les interruptions inhabituelles. Vos contacts de confiance peuvent suivre le Voyage et la vérification du véhicule aide à confirmer le bon véhicule avant l’embarquement.'
+    safetySub: 'Pendant un Voyage actif, American Rider surveille l’itinéraire afin de détecter les interruptions inhabituelles. Vos contacts de confiance peuvent suivre le Voyage et la vérification du véhicule aide à confirmer le bon véhicule avant l’embarquement.',
     shareUnavailable: 'Disponible dès qu’un opérateur est affecté.',
     verifyCodeIntro: 'Demandez ce code à votre opérateur avant de monter.',
     verifyCodeIdle: 'Un code est attribué à chaque trajet dès qu’un opérateur est affecté. Demandez-le à votre opérateur avant de monter.',

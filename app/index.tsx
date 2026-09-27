@@ -802,7 +802,21 @@ export default function Home() {
           account is held under — a fact, never a username minted from it. No initials disc:
           the letterhead already carries the person mark, and a second one here was
           furniture. The link beneath is monochrome and named for what it opens. */}
-      <Drawer open={menuOpen} onClose={() => setMenuOpen(false)}>
+      <Drawer
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        footer={
+          <DrawerRow
+            label={t('traveler.signOut')}
+            color={colors.ink2}
+            chev={false}
+            onPress={() => {
+              setMenuOpen(false);
+              signOut();
+            }}
+          />
+        }
+      >
         <Pressable onPress={() => go('/profile')} style={styles.drawerHead} accessibilityRole="button">
           <Text style={styles.drawerName} numberOfLines={1}>{headName}</Text>
           <Text style={styles.drawerProfileLink}>{t('traveler.accountDetails')} ›</Text>
@@ -815,25 +829,9 @@ export default function Home() {
             ))}
           </View>
         ))}
-        {/* NO SPRING HERE — deliberate, documented deviation from the demo's markup.
-            The demo puts <div class="spring" style="flex:1"> above Sign Out, which pins it
-            to the bottom of the panel. Chad only ever saw the demo in mobile Safari, where
-            the URL bar and toolbar shorten the viewport enough that the spring collapses to
-            ~0 and Sign Out sits directly under "About American Rider". That tight version is
-            the one he approved (12 Aug 2026, screenshot): "he wanted exactly like this where
-            there's almost no spaces". Full-screen the spring would open to 161px at 390x844.
-            Design authority beats the demo's literal CSS — see docs/EXACTNESS-SWEEP.md. */}
-        {/* INK, NOT RED. Red is reserved for Call 911 (contract: buttons.red); ending a
-            session is not an emergency, and a warning colour on it read as one. */}
-        <DrawerRow
-          label={t('traveler.signOut')}
-          color={colors.ink2}
-          chev={false}
-          onPress={() => {
-            setMenuOpen(false);
-            signOut();
-          }}
-        />
+        {/* Sign Out is held in the drawer footer so it remains visible in short browser
+            viewports and at larger text sizes. A hairline separates session control from navigation;
+            it remains restrained ink because signing out is reversible, not destructive. */}
       </Drawer>
     </Screen>
   );

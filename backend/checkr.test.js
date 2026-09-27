@@ -1,13 +1,9 @@
-// The screening pipeline's failure modes, pinned down.
+// Screening adjudication and dispatch failure modes, pinned down.
 //
-// WHY THIS FILE EXISTS. On 26 Aug 2026 the Checkr integration was found to have four holes,
-// and the worst was silent: a `consider` report whose findings the webhook did not carry
-// matched no disqualifier and PASSED — an operator the screening company flagged, driving.
-// The others: no code ever called Checkr (orders were recorded, never placed), the webhook
-// signature check compared the header to the secret (Checkr sends an HMAC, so every genuine
-// result was a 403), and a paid-but-expired invitation dead-ended with the fee kept.
-//
-// These tests hold the fixes in place. Run: node backend/checkr.test.js
+// Historical Checkr mapping/signature cases remain below as regression tests for reports
+// already handled by that adapter. Current procurement is provider-neutral: American Rider
+// does not sell a screening or charge the Operator for one. Existing external reports are
+// review evidence only and never auto-qualify an Operator.
 
 process.env.CHECKR_WEBHOOK_SECRET = 'test_webhook_secret_for_hmac';
 
@@ -113,39 +109,26 @@ check('one ancient violation → pass', adjudicate(mOldViolation).decision === '
 const mDispute = mapReport({ status: 'dispute' }, {});
 check('a disputed report → review', adjudicate(mDispute).decision === 'review');
 
-// ---- The $17.50 quote exists only when the MVR-only package does --------------------------
+// ---- Existing screening: preserve evidence, never auto-qualify ----------------------------
 
 const { evaluateExistingReport } = require('./screening');
 const goodExisting = {
   source: 'agency',
   issuedAt: Date.now() - 90 * 864e5,
-  elements: ['nationwide_criminal', 'sex_offender'], // driving history missing — the common case
+  elements: ['nationwide_criminal', 'sex_offender'],
 };
+const partialExisting = evaluateExistingReport(goodExisting);
+check('existing provider evidence never auto-qualifies an Operator', partialExisting.accept === false);
+check('a missing driving-history component is identified for review', partialExisting.missing.includes('driving_history'));
+const completeExisting = evaluateExistingReport({
+  ...goodExisting,
+  elements: ['nationwide_criminal', 'sex_offender', 'driving_history'],
+});
+check('even a complete declared report remains under authoritative review', completeExisting.accept === false && completeExisting.review === true);
 check(
-  'driving-history-only quote is $17.50 when the MVR-only package exists',
-  evaluateExistingReport(goodExisting, { mvrOnlyAvailable: true }).feeCents === 1750,
+  'an Operator-uploaded declaration is never authoritative evidence',
+  evaluateExistingReport({ ...goodExisting, source: 'operator' }).accept === false,
 );
-check(
-  'without an MVR-only package the same case quotes the FULL fee (no paid dead ends)',
-  evaluateExistingReport(goodExisting, { mvrOnlyAvailable: false }).feeCents === 4749,
-);
-check(
-  'a complete, recent agency report is still accepted for free',
-  evaluateExistingReport(
-    { ...goodExisting, elements: ['nationwide_criminal', 'sex_offender', 'driving_history'] },
-    { mvrOnlyAvailable: false },
-  ).accept === true,
-);
-
-// ---- The gross-up: the operator pays cost + the processor's exact cut, never a cent more --
-
-const { grossUpCents, screeningQuote } = require('./screening');
-check('gross-up of $47.49 is $49.22 (not the overshooting $49.32)', grossUpCents(4749) === 4922, String(grossUpCents(4749)));
-check('processing line for the full check is $1.73', screeningQuote(4749).processingCents === 173, String(screeningQuote(4749).processingCents));
-// The proof the formula is break-even: net after Stripe's 2.9% + 30c is >= cost by < 1 cent.
-const net = 4922 - Math.round(4922 * 0.029) - 30;
-check('net of the $49.22 charge covers the $47.49 cost within a penny', net >= 4749 && net <= 4750, String(net));
-check('MVR-only gross-up is $18.34', grossUpCents(1750) === 1834, String(grossUpCents(1750)));
 
 // ---- Dispatch: the gate the operator's own phone cannot toggle off ------------------------
 

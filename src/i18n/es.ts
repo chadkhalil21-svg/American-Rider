@@ -561,7 +561,7 @@ export default {
     bgCompany: 'EMPRESA DE VERIFICACIÓN',
     bgProviderName: 'Nombre del proveedor',
     bgReportDate: 'FECHA DEL INFORME',
-    bgReportDatePlaceholder: 'MM/DD/AAAA',
+    bgReportDatePlaceholder: 'YYYY-MM-DD',
     bgReportDateInvalid: 'Indique la fecha que aparece en el informe de verificación.',
     bgCriminalSex: 'Antecedentes penales y registro de delincuentes sexuales',
     bgDrivingHistory: 'Historial de conducción',

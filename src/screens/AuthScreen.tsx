@@ -9,7 +9,7 @@
 // Review opens those links and the free-tier server sleeps. See src/config.ts.
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, Image, Linking, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Image, Linking, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Text } from '../components/AppText';
 import { Screen } from '../components/UI';
 import { LEGAL_URL, PAYMENT_SERVER_URL } from '../config';

@@ -165,12 +165,7 @@ function adjudicate(report, { now = Date.now() } = {}) {
  * us to be able to tell the person what the report said and to give them a chance to dispute
  * it — and because "we simply do not have you" is not an answer anybody can act on.
  */
-/**
- * @param issuedAt when the REPORT was produced. Absent for one we ordered ourselves, since
- *                 that is now. Present for one an operator brought from another company — and
- *                 it is what the three-year clock runs from, not the day we read it. A report
- *                 conducted two years ago is two years into its life, not starting one.
- */
+/** The authoritative provider's conducted date anchors the recurring-check clock. */
 async function recordDecision({ uid, decision, reasons, summary, reportId, provider, issuedAt, adverseAction = null }) {
   const db = adminDb();
   if (!db) return { ok: false, reason: 'no database' };
@@ -186,7 +181,7 @@ async function recordDecision({ uid, decision, reasons, summary, reportId, provi
           reasons: reasons || [],
           summary: summary || '',
           reportId: reportId || null,
-          provider: provider || 'checkr',
+          provider: provider || 'approved_cra',
           checkedAt: now,
           conductedAt,
           // §627.748(12)(b), from the date the check was actually conducted.
@@ -245,23 +240,10 @@ async function recordAdverseState({ uid, state, actionId = null, reportId = null
 }
 
 /**
- * A screening the operator already has, brought from another company.
- *
- * WHY THIS IS LAWFUL, and it is the one route that is. A report cannot be handed to us by the
- * platform that bought it — their permissible purpose was theirs, and Checkr's agreement binds
- * a report to "the end-user's exclusive one-time use". But FCRA §604(a)(2) gives a permissible
- * purpose "in accordance with the written instructions of the consumer to whom it relates". So
- * the operator instructs THEIR screening company to send the report to American Rider, and the
- * screening company may lawfully do so.
- *
- * TWO CONDITIONS THAT ARE NOT NEGOTIABLE:
- *   1. It arrives FROM THE SCREENING COMPANY, never from the operator. A PDF that passed
- *      through the hands of the person it is about is not evidence about that person.
- *   2. It contains all three things the statute names. Many gig checks buy the criminal half
- *      and skip the driving history, which cannot answer two of Florida's own disqualifiers.
- *
- * Returns what it would cost the operator to proceed: nothing when the report is complete,
- * the MVR alone when only the driving half is missing, the full fee otherwise.
+ * Existing screening evidence is a review route, never automatic qualification. The provider
+ * must deliver authoritative evidence to American Rider under a legally appropriate CRA/FCRA
+ * workflow. Compliance review then verifies provenance, permissible purpose, date, required
+ * components and the active jurisdiction before any decision is recorded.
  */
 function evaluateExistingReport({ source, issuedAt, elements }) {
   const has = new Set(Array.isArray(elements) ? elements : []);

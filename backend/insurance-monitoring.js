@@ -177,6 +177,79 @@ function applyIndependentConfirmation(monitoring, {
   };
 }
 
+async function sweepInsuranceMonitoring({ db, send, notify, now = Date.now(), limit = 250 } = {}) {
+  if (!db) return { ok: false, reason: 'no database', considered: 0, requested: 0, reminded: 0 };
+  const report = { ok: true, considered: 0, requested: 0, reminded: 0, failed: [] };
+  const requestWindow = now + 5 * DAY_MS;
+  let snap;
+  try {
+    snap = await db.collection('users')
+      .where('insuranceMonitoring.nextVerificationDueAt', '<=', requestWindow)
+      .limit(Math.max(1, Math.min(500, Number(limit) || 250)))
+      .get();
+  } catch (e) {
+    return { ok: false, reason: e.message, considered: 0, requested: 0, reminded: 0 };
+  }
+
+  for (const doc of snap.docs) {
+    report.considered += 1;
+    const u = doc.data() || {};
+    const m = u.insuranceMonitoring || {};
+    if (cleanStatus(m.status) !== 'verified_active') continue;
+    const due = Number(m.nextVerificationDueAt) || 0;
+    const lastRequest = Number(m.verificationRequestedAt) || 0;
+    const contact = m.contact || null;
+    const operatorName = String(u.legalName || u.name || 'the Operator').slice(0, 100);
+    const policy = String(m.policyNumber || u.documents?.insurance?.evidence?.insurance?.policyNumber || '');
+    const last4 = policy ? policy.slice(-4) : 'not shown';
+
+    // Once a broker/agent/carrier address is known, American Rider initiates the refresh.
+    // The Operator does not have to remember a monthly chore.
+    if (contact?.email && (!lastRequest || now - lastRequest >= 7 * DAY_MS)) {
+      try {
+        const result = await send({
+          from: 'American Rider Operator Relations <relations@americanrider.app>',
+          replyTo: 'insurance@americanrider.app',
+          to: String(contact.email).trim().toLowerCase(),
+          subject: 'American Rider · Insurance status confirmation',
+          text:
+            'AMERICAN RIDER — NATIONAL TRANSPORTATION\n\n' +
+            'Insurance Status Confirmation\n\n' +
+            `Please confirm whether the commercial automobile policy for ${operatorName}, policy ending ${last4}, remains active and unchanged for transportation-network / for-hire passenger operations.\n\n` +
+            'If the policy is pending cancellation, cancelled, nonrenewed, has materially reduced coverage, or the covered vehicle has been removed, please state that status and its effective date.\n\n' +
+            'Reply to insurance@americanrider.app. American Rider uses this confirmation only to determine continuing Operator eligibility.\n',
+        });
+        if (result?.ok) {
+          await doc.ref.set({ insuranceMonitoring: { ...m, verificationRequestedAt: now, verificationRequestedTo: contact.email } }, { merge: true });
+          report.requested += 1;
+        } else {
+          report.failed.push({ uid: doc.id, reason: result?.reason || 'send failed' });
+        }
+      } catch (e) {
+        report.failed.push({ uid: doc.id, reason: e.message });
+      }
+    }
+
+    // Only when independent verification is actually due do we ask the Operator to touch
+    // anything. One tap opens the five-day grace; it never resets the independent clock.
+    if (due && now > due && !(Number(m.operatorAttestedAt) >= due)) {
+      try {
+        await notify?.({
+          uid: doc.id,
+          kind: 'insurance_verification_due',
+          title: 'Insurance status confirmation',
+          body: 'Confirm that your commercial coverage is unchanged while American Rider refreshes it with your insurer or broker.',
+          data: { screen: '/operator/insurance' },
+        });
+        report.reminded += 1;
+      } catch {
+        /* the status gate itself still protects service */
+      }
+    }
+  }
+  return report;
+}
+
 function providerInstructions() {
   return {
     publicOperatorContact: 'relations@americanrider.app',
@@ -205,4 +278,5 @@ module.exports = {
   applyOperatorAttestation,
   applyIndependentConfirmation,
   providerInstructions,
+  sweepInsuranceMonitoring,
 };

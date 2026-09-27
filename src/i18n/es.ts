@@ -573,7 +573,7 @@ export default {
     couldNotEnterService: 'No se pudo entrar en servicio.',
     errEmailInUse: 'Ese correo ya tiene una cuenta: inicie sesión.',
     errWeakPassword: 'La contraseña debe tener al menos 6 caracteres.',
-    errBadCredentials: 'El correo o la contraseña son incorrectos.',
+    errBadCredentials: 'No fue posible iniciar sesión. Compruebe su correo y contraseña, o use ¿Olvidó su contraseña?',
     errNetwork: 'Error de red: compruebe su conexión e inténtelo de nuevo.',
     errGeneric: 'Algo ha fallado. Inténtelo de nuevo.',
     errNoAccount: 'No hay ninguna cuenta con la sesión iniciada.',

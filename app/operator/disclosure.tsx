@@ -6,15 +6,9 @@
 // duty is refused until it is acknowledged, and the acknowledgement is stored on the account
 // with the exact text and the moment — see backend/disclosure.js.
 //
-// WHY THE ANSWER IS "NONE", AND WHY THAT IS FINE. §627.748(7) permits the required coverage to
-// be maintained by the driver rather than the company, so American Rider provides none. The
-// statute does not require a company to carry insurance; it requires a company to SAY what it
-// carries. Saying "none" plainly, once, in a place the operator cannot miss, is what
-// compliance looks like here — and it is also the only honest way to ask somebody to drive.
-//
-// THE VOICE. This is the screen where an operator learns they are uninsured by us. It does not
-// soften that, does not apologise for it, and does not bury it under what they should do
-// instead. The rubric's own words: state the fact and stop.
+// The Operator's own qualifying policy remains a mandatory eligibility layer. The TNC's own
+// coverage disclosure is served by backend/disclosure.js from the bound production policy,
+ // so this screen never hardcodes or invents coverage that must match the actual binder.
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';

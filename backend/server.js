@@ -123,6 +123,9 @@ const { mount: mountOps, opsAuthMode } = require('./ops');
 const { readDocument, documentsReady, READER_VERSION } = require('./documents');
 const { ready: r2Ready, uploadUrl: r2UploadUrl, readUrl: r2ReadUrl, owns: r2Owns } = require('./r2');
 const { assessOperator, assessAndRecord } = require('./qualification');
+const {
+  initialMonitoringFromDocument, continuingStatus, applyOperatorAttestation, providerInstructions,
+} = require('./insurance-monitoring');
 const { normalizeParty, operatorPartyView } = require('./travelparty');
 const family = require('./family');
 const { provisionTeenPin, verifyTeenPin } = require('./teenpickup');
@@ -899,8 +902,8 @@ app.post('/operator/online', requireAuth, requireOperationalReadiness, async (re
     }
     const b = req.body || {};
 
-    // COVERAGE, CHECKED HERE AS WELL AS ON THE PHONE. American Rider carries no automobile
-    // policy, so an operator's own commercial coverage is the only coverage a travel has. A
+    // COVERAGE, CHECKED HERE AS WELL AS ON THE PHONE. The Operator's qualifying commercial
+    // coverage is a mandatory eligibility condition. A
     // date that has passed is a travel with nothing behind it, and a gate that exists only in
     // the app is a gate that runs on a device we do not control.
     // ---- THE SCREENING GATE. ---------------------------------------------------------
@@ -1890,6 +1893,22 @@ app.post('/operator/document', requireAuth, LIMITS.document, async (req, res) =>
       { merge: true },
     );
 
+    // INSURANCE IS VERIFIED TWICE, FOR TWO DIFFERENT QUESTIONS. The document reader and
+    // qualification rules answer "does this policy satisfy the standard today?" This record
+    // starts the continuing-status clock that answers "has it since been cancelled or changed?"
+    // It is refreshed only by fresh evidence, never merely by the passage of time.
+    if (kind === 'insurance' && out.verdict === 'accept') {
+      const monitoringDoc = {
+        verdict: out.verdict,
+        expiry: out.expiry,
+        evidence: out.evidence || null,
+      };
+      await db.collection('users').doc(String(req.uid)).set(
+        { insuranceMonitoring: initialMonitoringFromDocument(monitoringDoc) },
+        { merge: true },
+      );
+    }
+
     // A document that is not accepted must not leave the operator dispatchable on the strength
     // of an earlier one. Taken off duty rather than deleted; the record stands.
     if (out.verdict !== 'accept') {
@@ -2042,6 +2061,90 @@ app.post('/waitlist', requireAuth, LIMITS.waitlist, async (req, res) => {
     res.json({ ok: true, market: marketBody(m) });
   } catch (e) {
     res.status(502).json({ error: e.message });
+  }
+});
+
+// --- Continuing Operator insurance status. ------------------------------------------------
+//
+// The Operator's uploaded declarations page remains the qualification evidence. This layer is
+// deliberately carrier-neutral: a local livery broker, surplus-lines placement, regional
+// commercial carrier, or national carrier may all be used. What matters is compliant coverage
+// plus sufficiently fresh status evidence.
+//
+// A monthly Operator attestation is useful but never refreshes the independent-verification
+// timestamp. Independent confirmation may come from a carrier/broker, a monitoring network, or
+// an authenticated operations review of carrier/broker evidence.
+app.get('/operator/insurance/status', requireAuth, LIMITS.qualification, async (req, res) => {
+  const db = adminDb();
+  if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
+  try {
+    const snap = await db.collection('users').doc(String(req.uid)).get();
+    const u = snap.exists ? snap.data() : {};
+    return res.json({ ...continuingStatus(u), contact: u.insuranceMonitoring?.contact || null, instructions: providerInstructions() });
+  } catch (e) {
+    return res.status(502).json({ error: e.message });
+  }
+});
+
+app.post('/operator/insurance/attest', requireAuth, LIMITS.qualification, async (req, res) => {
+  const db = adminDb();
+  if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
+  try {
+    const ref = db.collection('users').doc(String(req.uid));
+    const snap = await ref.get();
+    const u = snap.exists ? snap.data() : {};
+    if (!u?.documents?.insurance || u.documents.insurance.verdict !== 'accept') {
+      return res.status(409).json({ error: 'A qualifying insurance policy must be verified first.', code: 'insurance_document_required' });
+    }
+    const updated = applyOperatorAttestation(u.insuranceMonitoring);
+    await ref.set({ insuranceMonitoring: updated }, { merge: true });
+    return res.json({ ...continuingStatus({ ...u, insuranceMonitoring: updated }), contact: updated.contact || null });
+  } catch (e) {
+    return res.status(502).json({ error: e.message });
+  }
+});
+
+app.post('/operator/insurance/request-confirmation', requireAuth, LIMITS.document, async (req, res) => {
+  const db = adminDb();
+  if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  const name = String(req.body?.name || '').trim().slice(0, 100);
+  const type = ['agent', 'broker', 'carrier'].includes(String(req.body?.type || '').toLowerCase())
+    ? String(req.body.type).toLowerCase() : 'broker';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: 'Enter the email address of the insurer, agent, or broker.', code: 'insurance_contact_email' });
+  }
+  try {
+    const ref = db.collection('users').doc(String(req.uid));
+    const snap = await ref.get();
+    const u = snap.exists ? snap.data() : {};
+    const m = u.insuranceMonitoring || {};
+    const policy = String(m.policyNumber || u.documents?.insurance?.evidence?.insurance?.policyNumber || '');
+    const last4 = policy ? policy.slice(-4) : 'not shown';
+    const operatorName = String(u.legalName || u.name || req.name || 'the Operator').slice(0, 100);
+    const sent = await send({
+      from: 'American Rider Operator Relations <relations@americanrider.app>',
+      replyTo: 'insurance@americanrider.app',
+      to: email,
+      subject: 'American Rider · Insurance status confirmation',
+      text:
+        'AMERICAN RIDER — NATIONAL TRANSPORTATION\n\n' +
+        'Insurance Status Confirmation\n\n' +
+        `Please confirm whether the commercial automobile policy for ${operatorName}, policy ending ${last4}, remains active and unchanged for transportation-network / for-hire passenger operations.\n\n` +
+        'If the policy is pending cancellation, cancelled, nonrenewed, has materially reduced coverage, or the covered vehicle has been removed, please state that status and its effective date.\n\n' +
+        'Reply to insurance@americanrider.app. American Rider uses this confirmation only to determine continuing Operator eligibility.\n',
+    });
+    if (!sent.ok) return res.status(502).json({ error: sent.reason || 'Confirmation request could not be sent.' });
+    const monitoring = {
+      ...m,
+      contact: { name, email, type },
+      verificationRequestedAt: Date.now(),
+      verificationRequestedTo: email,
+    };
+    await ref.set({ insuranceMonitoring: monitoring }, { merge: true });
+    return res.json({ ok: true });
+  } catch (e) {
+    return res.status(502).json({ error: e.message });
   }
 });
 

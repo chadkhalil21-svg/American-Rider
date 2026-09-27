@@ -10,13 +10,14 @@
 // Favourites were added 14 September 2026 at Adrian's request: any number of destinations
 // (up to eight) a traveler wants one tap away on Home.
 //
-// STORED ON THE DEVICE. A home address is the most sensitive thing a rideshare app holds; it
-// is the one piece of data that says where somebody sleeps. It is not needed on the server —
-// nothing dispatches from it, and a booking sends coordinates like any other pickup — so it
-// does not go there. Deleting the app deletes it.
+// STORED ON THE DEVICE, scoped to the signed-in account. A home address is among the most
+// sensitive places a transportation app holds; it is not needed on the server. One account
+// must never inherit another account's saved places on a shared device.
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { auth } from './firebase';
 
-const KEY = 'ar:saved-places:v1';
+const KEY_PREFIX = 'ar:saved-places:v2:';
+const storageKey = () => KEY_PREFIX + (auth.currentUser?.uid || 'preview');
 export const MAX_FAVORITES = 8;
 
 export type SavedPlace = { label: string; lat: number; lng: number };
@@ -31,7 +32,7 @@ const ok = (p?: SavedPlace | null): SavedPlace | undefined =>
 
 export async function loadSavedPlaces(): Promise<SavedPlaces> {
   try {
-    const raw = await AsyncStorage.getItem(KEY);
+    const raw = await AsyncStorage.getItem(storageKey());
     if (!raw) return { favorites: [] };
     const v = JSON.parse(raw) as Partial<SavedPlaces>;
     const favorites = (Array.isArray(v.favorites) ? v.favorites : [])
@@ -46,7 +47,7 @@ export async function loadSavedPlaces(): Promise<SavedPlaces> {
 
 async function persist(next: SavedPlaces): Promise<SavedPlaces> {
   try {
-    await AsyncStorage.setItem(KEY, JSON.stringify(next));
+    await AsyncStorage.setItem(storageKey(), JSON.stringify(next));
   } catch {
     /* a device that cannot store it still returns the value for this session */
   }

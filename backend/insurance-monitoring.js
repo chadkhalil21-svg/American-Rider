@@ -177,7 +177,7 @@ function applyIndependentConfirmation(monitoring, {
   };
 }
 
-async function sweepInsuranceMonitoring({ db, send, notify, now = Date.now(), limit = 250 } = {}) {
+async function sweepInsuranceMonitoring({ db, requestConfirmation, notify, now = Date.now(), limit = 250 } = {}) {
   if (!db) return { ok: false, reason: 'no database', considered: 0, requested: 0, reminded: 0 };
   const report = { ok: true, considered: 0, requested: 0, reminded: 0, failed: [] };
   const requestWindow = now + 5 * DAY_MS;
@@ -207,23 +207,17 @@ async function sweepInsuranceMonitoring({ db, send, notify, now = Date.now(), li
     // The Operator does not have to remember a monthly chore.
     if (contact?.email && (!lastRequest || now - lastRequest >= 7 * DAY_MS)) {
       try {
-        const result = await send({
-          from: 'American Rider Operator Relations <relations@americanrider.app>',
-          replyTo: 'insurance@americanrider.app',
-          to: String(contact.email).trim().toLowerCase(),
-          subject: 'American Rider · Insurance status confirmation',
-          text:
-            'AMERICAN RIDER — NATIONAL TRANSPORTATION\n\n' +
-            'Insurance Status Confirmation\n\n' +
-            `Please confirm whether the commercial automobile policy for ${operatorName}, policy ending ${last4}, remains active and unchanged for transportation-network / for-hire passenger operations.\n\n` +
-            'If the policy is pending cancellation, cancelled, nonrenewed, has materially reduced coverage, or the covered vehicle has been removed, please state that status and its effective date.\n\n' +
-            'Reply to insurance@americanrider.app. American Rider uses this confirmation only to determine continuing Operator eligibility.\n',
+        const result = await requestConfirmation?.({
+          uid: doc.id,
+          user: u,
+          contact,
+          now,
+          reason: due && now > due ? 'verification_due' : 'scheduled_refresh',
         });
         if (result?.ok) {
-          await doc.ref.set({ insuranceMonitoring: { ...m, verificationRequestedAt: now, verificationRequestedTo: contact.email } }, { merge: true });
           report.requested += 1;
         } else {
-          report.failed.push({ uid: doc.id, reason: result?.reason || 'send failed' });
+          report.failed.push({ uid: doc.id, reason: result?.reason || 'request failed' });
         }
       } catch (e) {
         report.failed.push({ uid: doc.id, reason: e.message });

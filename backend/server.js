@@ -2189,7 +2189,7 @@ app.get('/operator/insurance/status', requireAuth, LIMITS.qualification, async (
   try {
     const snap = await db.collection('users').doc(String(req.uid)).get();
     const u = snap.exists ? snap.data() : {};
-    return res.json({ ...continuingStatus(u), contact: u.insuranceMonitoring?.contact || null, instructions: providerInstructions() });
+    return res.json({ ...continuingStatus(u), contact: u.insuranceMonitoring?.contact || null, authorized: !!u.insuranceMonitoring?.statusAuthorization?.acceptedAt, instructions: providerInstructions() });
   } catch (e) {
     return res.status(502).json({ error: e.message });
   }

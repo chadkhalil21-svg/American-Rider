@@ -27,12 +27,6 @@ import { googleSignInConfigured, useGoogleSignIn } from '../state/googleSignIn';
 // work. Set EXPO_PUBLIC_SSO_PREVIEW=1 on a local simulator build to see the full layout.
 const SSO_PREVIEW = process.env.EXPO_PUBLIC_SSO_PREVIEW === '1';
 
-// The only country whose numbers we dispatch. South Florida today; the prefix becomes a
-// selector the day a second country's numbers are routed, and not before.
-const DEFAULT_DIAL_CODE = '+1';
-
-/** A telephone number as typed: digits and the punctuation people put between them. */
-const looksLikePhone = (v: string) => /^[+\d][\d\s().-]*$/.test(v.trim()) && /\d/.test(v);
 import { useAuth } from '../state/AuthContext';
 import { useLanguage } from '../state/LanguageContext';
 import { colors } from '../theme';
@@ -202,10 +196,14 @@ export function AuthScreen() {
   };
 
 
-  // One field, then the password step. The address is carried across so nobody types it twice.
+  // One email field, then the password step. Phone numbers are contact information only;
+  // offering them here would imply an authentication path that does not exist.
   const onContinue = () => {
     const clean = entry.trim();
-    if (!clean) return;
+    if (!emailOk(clean)) {
+      setSsoError(t('traveler.errInvalidEmail'));
+      return;
+    }
     setSsoError('');
     setEmail(clean);
     setStep('signin');
@@ -213,7 +211,6 @@ export function AuthScreen() {
 
   // null while the answer is unknown, then true or false — never assumed either way.
   const [netUp, setNetUp] = useState<boolean | null>(null);
-  const entryIsPhone = looksLikePhone(entry);
   useEffect(() => {
     let live = true;
     const ctrl = new AbortController();
@@ -362,23 +359,18 @@ export function AuthScreen() {
               nothing to fetchSignInMethodsForEmail, deliberately, so that a stranger cannot
               discover who holds an account. A screen that branched on the answer would
               either leak that or lie about it. */}
-          {/* THE FIELD FOLLOWS WHAT IS BEING TYPED (Chad, 13 Sept 2026). Digits, spaces and
-              the usual punctuation of a telephone number bring the +1 prefix and the number
-              pad; anything with a letter or an @ returns it to the e-mail keyboard. The
-              prefix is a label, not a menu: we route numbers in one country today, and a
-              chevron on something with a single option names a control after what it does
-              not do. It becomes a selector when a second country's numbers are dispatched. */}
-          <View style={[s.entryRow, entryIsPhone && s.entryRowPhone]}>
-            {entryIsPhone && <Text style={s.dialCode}>{DEFAULT_DIAL_CODE}</Text>}
+          {/* Email is the direct credential path. Mobile is account contact information,
+              not an authentication factor, so the front door must not imply phone sign-in. */}
+          <View style={s.entryRow}>
             <TextInput
               value={entry}
               onChangeText={setEntry}
               placeholder={t('auth.emailOrMobileField')}
               placeholderTextColor={colors.faint}
-              keyboardType={entryIsPhone ? 'phone-pad' : 'email-address'}
+              keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
-              autoComplete={entryIsPhone ? 'tel' : 'email'}
+              autoComplete="email"
               textContentType="username"
               returnKeyType="next"
               onSubmitEditing={onContinue}
@@ -388,9 +380,8 @@ export function AuthScreen() {
           <View style={{ height: 10 }} />
           <InkButton label={t('auth.continueLabel')} onPress={onContinue} disabled={!entry.trim()} />
 
-          {/* PRIMARY ENTRY FIRST. Email/mobile and Continue are the institutional default;
-              Apple and Google follow as equivalent alternate entry methods. This keeps the
-              first decision simple while preserving fast SSO for travelers who prefer it. */}
+          {/* PRIMARY ENTRY FIRST. Email and Continue are the institutional default;
+              Apple and Google follow as equivalent alternate entry methods. */}
           {(appleReady || googleSignInConfigured || SSO_PREVIEW) && (
             <View style={s.orRow}>
               <View style={s.orRule} />

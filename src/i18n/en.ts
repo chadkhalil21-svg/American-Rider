@@ -320,6 +320,8 @@ export default {
     insFixedInstruction: 'Request a standalone commercial for-hire livery policy meeting Florida’s TNC requirements, covering all periods — not a personal auto rideshare endorsement.',
     insStatusTitle: "Continuing Insurance Status",
     insAuthorizeTitle: "One-time status authorization",
+    insProviderProcessTitle: "Provider-specific verification",
+    insProviderProcessBody: "Your insurer or broker requires its own authorization form, portal, or verification process. American Rider Operator Relations will handle the exception with you; your existing verification deadline still applies.",
     insAuthorizeBody: "Authorize American Rider to ask your insurer, licensed agent, broker, MGA, or approved monitoring provider only whether this policy remains active and materially unchanged for Operator eligibility. American Rider does not request your payment method, claims history, or unrelated policy information.",
     insAuthorizeButton: "Authorize Status Verification",
     insAuthorized: "Status verification authorized",

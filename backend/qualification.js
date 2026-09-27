@@ -55,6 +55,11 @@ function insuranceRuleForUser(user) {
   return { market, rule: insuranceForState(market?.state) };
 }
 
+// Compatibility exports for existing Florida tests and migration code. Qualification itself
+// resolves the rule from the Operator's declared operating market.
+const FL_TNC_INSURANCE = insuranceForState('FL');
+const FL_CARRYING_LIMIT_DOLLARS = FL_TNC_INSURANCE.ride.primaryLiabilityMinDollars;
+
 /** Every dollar figure in a limits string. Bare small numbers ("50/100/25") are not guessed at. */
 function dollarFigures(text) {
   const out = [];
@@ -232,10 +237,13 @@ function documentFindings(kind, d, now, ctx = {}) {
     if (use !== 'yes') return Q('exception', 'insurance_use_unverified', 'Whether the policy covers carrying passengers for hire is not confirmed.');
     const limit = human ? Number(human.limitDollars) : Math.max(0, ...dollarFigures(ev.fields?.limits));
     if (!(limit > 0)) return Q('exception', 'insurance_limits_unreadable', 'The coverage limits could not be read.');
-    if (limit < FL_CARRYING_LIMIT_DOLLARS) {
-      return Q('refused', 'insurance_limits_insufficient', `Highest limit shown is $${limit.toLocaleString('en-US')}; §627.748(7)(c) requires $1,000,000 during a prearranged ride.`);
+    const { market, rule } = insuranceRuleForUser(ctx.user);
+    if (!market) return Q('incomplete', 'insurance_market_required', 'Choose the market where you will operate before American Rider verifies insurance.');
+    if (!rule) return Q('incomplete', 'insurance_jurisdiction_not_configured', `Insurance requirements for ${market.state} have not yet been activated.`);
+    if (limit < rule.ride.primaryLiabilityMinDollars) {
+      return Q('refused', 'insurance_limits_insufficient', `Highest liability limit shown is ${limit.toLocaleString('en-US')}; ${rule.statute} requires at least ${rule.ride.primaryLiabilityMinDollars.toLocaleString('en-US')} during a prearranged Travel.`);
     }
-    // And the full TNC rule set on the structured reading.
+    // And the full jurisdiction rule set on the structured reading.
     return insuranceFindings(d, human, ctx, now);
   }
   return [];

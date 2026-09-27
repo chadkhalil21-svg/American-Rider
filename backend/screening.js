@@ -30,125 +30,14 @@ const { readKey } = require('./env');
 const { adminDb } = require('./firebase-admin');
 const { fileTicket } = require('./tickets');
 
-// What the operator is charged, in cents. THE PASS-THROUGH, and it must equal what we are
-// actually billed, to the cent. If a vendor price changes this changes the same day — a
-// pass-through that has drifted is a margin nobody agreed to.
+// Screening procurement is deliberately provider-neutral. American Rider does not collect a
+// screening payment or sell a report. The approved CRA workflow is configured externally and
+// the Operator pays that provider directly. Existing reports are never accepted from an
+// Operator declaration alone; authoritative provider evidence must be reviewed first.
 //
-//   Checkr Basic+                      $29.99   the nationwide criminal database and the
-//                                               National Sex Offender Public Website —
-//                                               §627.748(12)(a)2.a and 2.b
-//   Checkr MVR add-on                   $9.50   the driving history research report —
-//                                               §627.748(12)(a)3, a SEPARATE requirement
-//   Florida DHSMV, 3-year record        $8.00   passed through by Checkr at cost. Three years
-//                                               because the statute's own test is "more than
-//                                               three moving violations in the prior 3-year
-//                                               period"; the 7-year record costs $10 and
-//                                               answers a question nobody asked.
-//                                     -------
-//                                      $47.49
-//
-// THE MVR IS NOT AN EXTRA. §627.748(12)(a)3: "The TNC must obtain and review, or have a third
-// party obtain and review, a driving history research report for the applicant." Basic alone
-// cannot answer two of the statute's own disqualifying questions — more than three moving
-// violations in three years, and driving on a suspended or revoked licence — because a
-// criminal database does not hold driving records. Dropping it would leave us unable to apply
-// the standard we are required to apply, and unable to prove we did at the biennial CPA
-// examination §627.748(9) requires.
-const SCREENING_FEE_CENTS = 4749;
+// Florida's three-year interval is the recurrence duty after a qualifying American Rider
+// check. It is not treated as automatic portability for another end user's report.
 
-// WHAT THE OPERATOR IS ASKED FOR, which is not the same number (Chad, 27 Aug 2026).
-//
-// American Rider does not absorb the card processing on a pass-through it earns nothing from.
-// Stripe takes 2.9% + $0.30 of whatever is charged, so the charge is grossed up to leave the
-// screening cost intact:  charge = (cost + $0.30) / (1 − 2.9%)
-//
-//   full screening        $47.49 cost  ->  $49.22 charged   (Stripe $1.73, we keep $0.00)
-//   driving history only  $17.50 cost  ->  $18.34 charged   (Stripe $0.83, we keep $0.00)
-//
-// EVERY LINE OF THIS IS SHOWN TO THE OPERATOR. A person handing over $49.22 is entitled to see
-// the $47.49, the $1.73, and the $0.00 — the whole point of the arrangement is that we take
-// nothing, and a single undifferentiated figure hides exactly that.
-const PROCESSING_PCT = 0.029;
-const PROCESSING_FIXED_CENTS = 30;
-
-/** What to charge so that `costCents` survives Stripe's cut intact. */
-function withProcessing(costCents) {
-  return Math.ceil((costCents + PROCESSING_FIXED_CENTS) / (1 - PROCESSING_PCT));
-}
-
-/** The processing portion of a charge — shown as its own line, never folded in. */
-function processingOn(costCents) {
-  return withProcessing(costCents) - costCents;
-}
-
-// If the operator brings a screening that already covers the criminal half but not the
-// driving half — common, since some gig platforms buy the database check alone — this is all
-// they pay. Checkr's MVR add-on plus Florida's own 3-year record fee.
-const MVR_ONLY_FEE_CENTS = 1750;
-
-// AND THE MIRROR CASE, which was missing until 29 Aug 2026 and Chad found it.
-//
-// An operator may arrive with the DRIVING half already done and the criminal half not — a
-// courier platform buys the MVR, a former employer ran one, an insurer required one. The
-// adjudication handled the opposite case ($17.50 for the MVR alone) and sent this one to the
-// full $47.49, which charges them a second time for the very MVR they had just given us.
-// "We do not want to force a package that is not required, ever" (Chad, 27 Aug) applies in
-// both directions or it is not a rule.
-//
-// $29.99 is Checkr Basic+: the multi-state criminal database search AND the National Sex
-// Offender Public Website, which are §627.748(12)(a)2.a and 2.b — the whole criminal half.
-// No Florida DMV fee, because no driving record is being pulled.
-const BASIC_ONLY_FEE_CENTS = 2999;
-
-/** The criminal half of the statutory check: everything except the driving record. */
-const CRIMINAL_ELEMENTS = ['nationwide_criminal', 'sex_offender'];
-
-// WHY THIS TIER EXISTS AT ALL. Several gig platforms buy the criminal half of a screening and
-// skip the driving record. An operator who brings one of those has already satisfied two of
-// Florida's three requirements, and charging them for all three would be selling them
-// something they demonstrably do not need.
-
-// ---- WHAT THE OPERATOR IS ACTUALLY CHARGED (Chad, 27 Aug 2026) ---------------------------
-//
-// The screening cost is a pass-through, and the card processor's cut is now passed through
-// TOO — itemized, never hidden. Stripe keeps 2.9% + 30¢ of whatever is charged, so charging
-// the bare cost meant American Rider quietly lost ~$1.68 per screening; absorbing it was one
-// option, and Chad chose the other: the operator sees the true, complete cost —
-//
-//   background check        $47.49   (what the screening company bills, to the cent)
-//   payment processing       $1.73   (Stripe's 2.9% + $0.30, computed, never hardcoded)
-//   ------------------------------
-//   total                   $49.22
-//
-// THE MATH, because it is easy to get wrong by a dime: the processor takes its percentage
-// of the CHARGED amount, not of the cost, so the break-even gross is
-//     G = (cost + fixed) / (1 - pct)
-// and anything computed as cost x 1.029 + 0.30 overshoots — at $49.32 American Rider would
-// MAKE ten cents per check, which is margin nobody agreed to, in the other direction.
-// Math.ceil keeps the rounding penny on our side of honesty (we may lose a cent, never gain).
-const STRIPE_PCT = 0.029;
-const STRIPE_FIXED_CENTS = 30;
-
-/** The gross charge whose net, after Stripe's cut, equals the cost. */
-function grossUpCents(costCents) {
-  return Math.ceil((costCents + STRIPE_FIXED_CENTS) / (1 - STRIPE_PCT));
-}
-
-/** One quote, itemized: what it costs, what collection costs, what the operator pays. */
-function screeningQuote(costCents) {
-  const totalCents = grossUpCents(costCents);
-  return { costCents, processingCents: totalCents - costCents, totalCents };
-}
-
-// An external report is not automatically portable merely because it is younger than Florida's
-// three-year recurring-check interval. The three-year rule governs American Rider's recurring
-// duty after a qualifying check; it is not treated here as a blanket safe-harbor for another
-// end user's report. External reports are evidence for compliance review, and qualification
-// occurs only after provenance, permissible purpose, required components and jurisdictional
-// freshness have been established.
-const ACCEPT_EXISTING_MAX_AGE_MS = 3 * 365 * 24 * 60 * 60 * 1000;
-
-// What an accepted report must contain, because the statute names all three.
 const REQUIRED_ELEMENTS = [
   'nationwide_criminal', // §627.748(12)(a)2.a — Multi-State/Multi-Jurisdiction or similar
   'sex_offender',        // §627.748(12)(a)2.b — the National Sex Offender Public Website
@@ -268,12 +157,8 @@ function adjudicate(report, { now = Date.now() } = {}) {
       summary: 'The screening could not be completed.',
     };
   }
-  // A `consider` the parser got NOTHING out of. Checkr says something appeared on this
-  // report; if our mapping produced zero records to test, the something was not read — and
-  // "not read" must never become "pass". This closes the hole where a consider with an
-  // unparsed body matched no disqualifier and sailed through adjudication. A consider whose
-  // records WERE parsed and all fall outside the statute still passes, exactly as designed:
-  // dismissals and aged-out offences are not ours to hold against anybody.
+  // A provider may flag a report even when the normalized findings are unavailable. Never turn
+  // an unreadable flagged result into a pass.
   if (report.status === 'consider' && records.length === 0) {
     return {
       decision: 'review',
@@ -495,23 +380,12 @@ async function sweepScreening({ now = Date.now() } = {}) {
 
 module.exports = {
   adjudicate,
-  withProcessing,
-  processingOn,
-  PROCESSING_PCT,
-  PROCESSING_FIXED_CENTS,
   evaluateExistingReport,
-  MVR_ONLY_FEE_CENTS,
-  BASIC_ONLY_FEE_CENTS,
-  CRIMINAL_ELEMENTS,
-  ACCEPT_EXISTING_MAX_AGE_MS,
   REQUIRED_ELEMENTS,
   recordDecision, recordAdverseState,
   screeningCurrent,
   screeningReady,
   sweepScreening,
-  grossUpCents,
-  screeningQuote,
-  SCREENING_FEE_CENTS,
   RECHECK_MS,
   RECHECK_WARN_MS,
   DISQUALIFIERS,

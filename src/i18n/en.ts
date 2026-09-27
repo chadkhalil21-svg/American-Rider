@@ -50,8 +50,8 @@ export default {
     mobileNumberLabel: 'MOBILE NUMBER',
     emailLabel: 'EMAIL',
     passwordLabel: 'PASSWORD',
-    pwNewPh: '6+ characters',
-    usedToReach: 'Used to reach you about travel.',
+    pwNewPh: 'At least 6 characters',
+    usedToReach: 'Used for account and Travel communications.',
     forgotPassword: 'Forgot password?',
   },
   common: {

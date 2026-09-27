@@ -899,6 +899,7 @@ export default {
     atmosphere: 'Atmosphäre',
     music: 'Musik',
     additionalRequests: 'Zusätzliche Wünsche',
+    noneRequested: 'Keine',
     charger: 'Ladekabel',
     luggage: 'Gepäckhilfe',
     estimatedSearchTime: 'Geschätzte Suchdauer',

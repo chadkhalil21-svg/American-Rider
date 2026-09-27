@@ -444,12 +444,10 @@ export function Drawer({
   open,
   onClose,
   children,
-  footer,
 }: {
   open: boolean;
   onClose: () => void;
   children: React.ReactNode;
-  footer?: React.ReactNode;
 }) {
   const insets = useSafeAreaInsets();
   const [mounted, setMounted] = React.useState(open);
@@ -514,7 +512,6 @@ export function Drawer({
           >
             {children}
           </ScrollView>
-          {footer ? <View style={styles.drawerFooter}>{footer}</View> : null}
         </Animated.View>
       </View>
     </Modal>
@@ -631,11 +628,6 @@ const styles = StyleSheet.create({
   drawerRoot: { flex: 1 },
   drawerScroll: { flex: 1 },
   drawerContent: { paddingBottom: 10 },
-  drawerFooter: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.hairline,
-    paddingTop: 3,
-  },
   scrim: { flex: 1, backgroundColor: 'rgba(20,23,31,0.38)' },
   drawerPanel: {
     position: 'absolute',

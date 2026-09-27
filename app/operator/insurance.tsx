@@ -245,6 +245,42 @@ export default function OperatorInsurance() {
           </View>
         </View>
 
+        <Text style={[styles.statusTitle, { marginTop: 18 }]}>{t('traveler.insScaleTitle')}</Text>
+        {[1000, 5000].map((gross) => {
+          const ar = gross * AR_SHARE;
+          const low = gross * BENCH_DRIVER_LOW;
+          const high = gross * BENCH_DRIVER_HIGH;
+          return (
+            <View key={gross} style={styles.scaleBlock}>
+              <Text style={styles.coverLabel}>
+                {gross === 1000 ? t('traveler.insScale1000') : t('traveler.insScale5000')}
+              </Text>
+              <View style={styles.econRow}>
+                <Text style={styles.body}>{t('traveler.insScaleArKeeps')}</Text>
+                <Text style={styles.econValue}>{money(ar)}</Text>
+              </View>
+              <View style={styles.econRow}>
+                <Text style={styles.body}>{t('traveler.insScaleBenchmarkKeeps')}</Text>
+                <Text style={styles.econValue}>{rangeMoney(low, high)}</Text>
+              </View>
+              <View style={styles.econRow}>
+                <Text style={styles.body}>{t('traveler.insScaleDifference')}</Text>
+                <Text style={styles.econValue}>{rangeMoney(ar - high, ar - low)}</Text>
+              </View>
+            </View>
+          );
+        })}
+        <View style={styles.scaleBlock}>
+          <Text style={styles.coverLabel}>{t('traveler.insScaleAnnual')}</Text>
+          <View style={styles.econRow}>
+            <Text style={styles.body}>{t('traveler.insScaleDifference')}</Text>
+            <Text style={styles.econValue}>
+              {rangeMoney((5000 * AR_SHARE - 5000 * BENCH_DRIVER_HIGH) * 12, (5000 * AR_SHARE - 5000 * BENCH_DRIVER_LOW) * 12)}
+            </Text>
+          </View>
+        </View>
+        <Text style={styles.disclaimer}>{t('traveler.insScaleAnnualNote')}</Text>
+
         <Text style={[styles.body, { marginTop: 16 }]}>{t('traveler.insNoHoursNeeded')}</Text>
         <View style={styles.econInputs}>
           <View style={styles.econField}>
@@ -430,6 +466,7 @@ const styles = StyleSheet.create({
   statusTitle: { fontSize: 15, fontWeight: '600', color: colors.ink, marginBottom: 8 },
   econCard: { paddingVertical: 18, paddingHorizontal: 20 },
   compareBlock: { marginTop: 18 },
+  scaleBlock: { marginTop: 14 },
   econInputs: { marginTop: 16, gap: 12 },
   econField: { gap: 6 },
   econInput: {

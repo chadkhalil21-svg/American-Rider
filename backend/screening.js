@@ -422,7 +422,7 @@ function screeningCurrent(screening, now = Date.now()) {
 }
 
 /** Is a screening provider configured? `/health` and /ops report it. */
-const screeningReady = () => !!readKey('CHECKR_API_KEY');
+const screeningReady = () => /^https:\/\//i.test(String(readKey('SCREENING_PROVIDER_URL') || '').trim());
 
 // How far ahead of the three-year deadline the operator is warned. Thirty days: enough to
 // pay and complete a new check without losing a single day on the road, short enough that

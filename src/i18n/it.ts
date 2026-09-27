@@ -793,7 +793,7 @@ export default {
     processing: 'Elaborazione…',
     homeAddress: 'Indirizzo di Casa',
     workAddress: 'Indirizzo di Lavoro',
-    savedPlaceSub: 'Salvato in modo privato su questo dispositivo per rendere più rapida la pianificazione dei Viaggi.',
+    savedPlaceSub: 'Salvato sul suo account e disponibile quando accede da un altro dispositivo.',
     addressOrPlace: 'Indirizzo o luogo',
     saveAddress: 'Salva indirizzo',
     saveDestination: 'Salva destinazione',

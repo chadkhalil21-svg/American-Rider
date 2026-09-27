@@ -935,7 +935,7 @@ export default {
     pickupTime: 'Pickup Time',
     enterATime: 'Enter a time, for example 6:45.',
     scheduleTravel: 'Schedule Travel',
-    notifications: 'Dispatch & Operational Advisories',
+    notifications: 'Notifications',
     notificationsSub: 'Choose which Travel updates you would like to receive.',
     inviteFriends: 'Invite a Traveler',
     inviteSub: 'Invite someone to travel with American Rider. You can review the invitation before sending it.',

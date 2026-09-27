@@ -562,7 +562,7 @@ export default {
     bgCompany: 'SCREENING COMPANY',
     bgProviderName: 'Provider name',
     bgReportDate: 'REPORT DATE',
-    bgReportDatePlaceholder: 'MM/DD/YYYY',
+    bgReportDatePlaceholder: 'YYYY-MM-DD',
     bgReportDateInvalid: 'Enter the date shown on the screening report.',
     bgCriminalSex: 'Criminal-record and sex-offender searches',
     bgDrivingHistory: 'Driving history',

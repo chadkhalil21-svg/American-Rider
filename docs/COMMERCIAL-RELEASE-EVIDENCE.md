@@ -2,11 +2,13 @@
 
 This package turns every non-code release condition into a binary, reviewable gate. It does not store secrets, card data, identity documents, insurance-policy PDFs or other sensitive artifacts in Git. The repository stores only the attestation metadata and evidence references.
 
-## 1. TNC contingency insurance
+## 1. Operator insurance and jurisdiction compliance
 
-**Pass only when all are true:** a policy/binder is actually bound and effective for American Rider's intended Florida TNC operations; the named insured/legal entity and applicable territory are confirmed; effective/expiration dates cover the release date; the broker/carrier has identified the coverage that satisfies the TNC's applicable statutory obligations, including the contingency that responds when required Operator coverage lapses/fails; the exact English Operator disclosure has been reviewed against the bound policy; ES/FR/IT/DE translations have been reviewed against that English wording; the deployed `TNC_INSURANCE_DISCLOSURE*` values reproduce the approved wording.
+American Rider does not provide or sell automobile insurance. Every Operator must maintain qualifying coverage for the Operator and registered vehicle, and the platform fails closed when coverage is expired, insufficient, adversely changed, stale, or not independently verifiable.
 
-Record only carrier, policy/binder reference (redacted if necessary), effective/expiration dates, reviewer/broker, evidence location and approval date. Do not commit the policy itself unless counsel/operations deliberately approves doing so.
+**Pass only when all are true:** the active launch jurisdiction has a researched and approved rule record; Operator qualification is tested against that jurisdiction; unknown jurisdictions fail closed; expiry and continuing-status monitoring are active; direct carrier/broker confirmation and adverse-status lockout are exercised; the English disclosure states the actual American Rider insurance model and the applicable statutory warnings; ES/FR/IT/DE versions preserve the same meaning; Florida counsel/broker review confirms the launch wording and workflow against then-current Florida law.
+
+Record jurisdiction, statute/version reviewed, reviewer/counsel or broker, execution timestamp, disclosure version, monitoring test identifiers, and durable evidence references. Do not commit Operator policy documents or other sensitive insurance records.
 
 ## 2. Production configuration/provider attestation
 

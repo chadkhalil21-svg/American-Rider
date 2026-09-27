@@ -255,6 +255,8 @@ export default {
     insPremiumOffsetAR: "At American Rider’s 99% retention",
     insPremiumOffsetBenchmark: "At the observed 50.5%–57% range",
     insBenchmarkSource: "Source: Consumer Reports, June 2026. Different platforms classify external fees differently; taxes, tolls, tips and other pass-throughs are not identical across platforms.",
+    insAdvantageOffset: "Fare volume at which the additional retained share offsets this insurance premium",
+    insAdvantageOffsetRange: "Compared with the Consumer Reports observed range",
     insNoHoursNeeded: "No guessed hourly rate, average fare, or promised Travel volume is used. Enter only the insurance quote you actually received.",
     insEconomicsBody: "Use your own quote and expected activity. American Rider does not invent an average fare or a guaranteed number of Travels.",
     insMonthlyPremium: "Monthly insurance premium",

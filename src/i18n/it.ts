@@ -2,7 +2,7 @@
 // Spanish's pull toward warmth; the same discipline applies. State the fare, do not defend it.
 export default {
   auth: {
-    tagline: 'Infrastruttura nazionale di trasporto fondata su sicurezza, affidabilità e precisione.',
+    tagline: 'Safe. Reliable. American.',
     continueWithApple: 'Continua con Apple',
     continueWithGoogle: 'Continua con Google',
     orDivider: 'oppure',

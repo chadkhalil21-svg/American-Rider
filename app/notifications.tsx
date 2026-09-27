@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
     paddingVertical: 13.5,
   },
   hair: { borderTopWidth: 1, borderTopColor: colors.hairline },
-  blocked: { fontSize: 13, color: colors.red, marginTop: 18, lineHeight: 19 },
+  blocked: { fontSize: 13, color: colors.ink2, marginTop: 18, lineHeight: 19 },
   // Title table: the text column flexes and wraps (minWidth 0 so a long German
   // sub wraps instead of squeezing the toggle on web); the 46px toggle never
   // shrinks, so the rows hold their shape at 390pt with the longest sub.

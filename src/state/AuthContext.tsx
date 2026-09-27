@@ -27,7 +27,7 @@ type AuthState = {
   onboarding: boolean;
   setOnboarding: (b: boolean) => void;
   signIn: (email: string, password: string) => Promise<void>;
-  resetPassword: (email: string) => Promise<void>;
+  resetPassword: (email: string) => Promise<boolean>;
   /**
    * Stops future operational work, deletes the profile and device data, and then deletes the
    * login. Records that need a retention policy remain server-side.
@@ -158,7 +158,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // The demo's sign-in screen offers "Forgot password?"; here it really sends the
     // reset email. Firebase deliberately succeeds even for unknown addresses, so the
     // screen's confirmation never reveals whether an account exists.
-    resetPassword: (email) => run(() => sendPasswordResetEmail(auth, email.trim())),
+    resetPassword: async (email) => {
+      setBusy(true);
+      setError(null);
+      try {
+        await sendPasswordResetEmail(auth, email.trim());
+        return true;
+      } catch (e: any) {
+        setError(friendly(e?.code ?? ''));
+        return false;
+      } finally {
+        setBusy(false);
+      }
+    },
     setDisplayName: (name) =>
       run(async () => {
         const u = auth.currentUser;

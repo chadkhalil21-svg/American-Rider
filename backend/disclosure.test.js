@@ -40,14 +40,26 @@ check('names both periods the statute names for that warning',
   /logged on/i.test(DISCLOSURE.ownPolicy.body) && /carrying a traveler/i.test(DISCLOSURE.ownPolicy.body),
   DISCLOSURE.ownPolicy.body);
 
+// (8)(a)3 — compensated passenger transportation outside a prearranged TNC ride.
+check('warns that compensated transportation outside a prearranged Travel has separate coverage requirements',
+  /not prearranged|outside a prearranged/i.test(DISCLOSURE.outsidePrearranged.body) &&
+  /324\.032\(1\)/.test(DISCLOSURE.outsidePrearranged.body),
+  DISCLOSURE.outsidePrearranged.body);
+check('states the statutory penalty reference for non-prearranged compensated transportation',
+  /324\.221/.test(DISCLOSURE.outsidePrearranged.body) &&
+  /second-degree misdemeanor/i.test(DISCLOSURE.outsidePrearranged.body),
+  DISCLOSURE.outsidePrearranged.body);
+
 check('cites the statute it satisfies', DISCLOSURE.statute === 'Fla. Stat. §627.748(8)(a)', DISCLOSURE.statute);
-check('the acknowledgement refers to platform coverage and keeps the own-policy warning',
+check('the acknowledgement covers all three statutory disclosure subjects',
   /coverage American Rider provides/i.test(DISCLOSURE.acknowledgement) &&
-  /might not cover me/i.test(DISCLOSURE.acknowledgement), DISCLOSURE.acknowledgement);
+  /might not cover me/i.test(DISCLOSURE.acknowledgement) &&
+  /outside a prearranged American Rider Travel/i.test(DISCLOSURE.acknowledgement),
+  DISCLOSURE.acknowledgement);
 
 // ---- the rubric ---------------------------------------------------------------------------
 const allText = [DISCLOSURE.provided.body, DISCLOSURE.ownPolicy.body, DISCLOSURE.ownPolicyVerified.body,
-  DISCLOSURE.required.body, DISCLOSURE.acknowledgement].join(' ');
+  DISCLOSURE.outsidePrearranged.body, DISCLOSURE.required.body, DISCLOSURE.acknowledgement].join(' ');
 check('no reassurance, no apology, no exclamation',
   !/don't worry|no need to worry|unfortunately|we're sorry|!|rest assured/i.test(allText), allText.slice(0, 80));
 
@@ -89,10 +101,11 @@ check('neither version leaks the unused variant to the operator',
 // compliant.
 const { TRANSLATIONS, DISCLOSURE_LANGUAGES, translationFor } = require('./disclosure-i18n');
 
-check('every language carries all four sections and the acknowledgement',
+check('every language carries all five sections and the acknowledgement',
   Object.entries(TRANSLATIONS).every(([, t]) =>
     t.title && t.provided?.heading && t.provided?.body && t.ownPolicy?.heading &&
     t.ownPolicy?.body && t.ownPolicyVerified?.heading && t.ownPolicyVerified?.body &&
+    t.outsidePrearranged?.heading && t.outsidePrearranged?.body &&
     t.required?.heading && t.required?.body && t.acknowledgement && t.governing),
   Object.keys(TRANSLATIONS).join(','));
 
@@ -109,6 +122,11 @@ check('every language keeps the personal-policy warning in BOTH variants',
   Object.entries(TRANSLATIONS).every(([, t]) =>
     /personal|personnelle|privat/i.test(t.ownPolicy.body) &&
     /PERSONAL|PERSONNELLE|PRIVATE/.test(t.ownPolicyVerified.body)));
+
+check('every language carries the non-prearranged compensated-transport warning',
+  Object.entries(TRANSLATIONS).every(([, t]) =>
+    /324\.032\(1\)/.test(t.outsidePrearranged.body) &&
+    /324\.221/.test(t.outsidePrearranged.body)));
 
 check('every language states that the English governs',
   Object.entries(TRANSLATIONS).every(([, t]) =>

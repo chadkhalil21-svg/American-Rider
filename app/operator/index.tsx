@@ -404,6 +404,26 @@ export default function OperatorHome() {
                   </View>
                 </View>
               </View>
+              {request.cabinPreferences && (
+                <View style={styles.cabinSummary}>
+                  <Text style={styles.cabinLabel}>{t('traveler.travelPreferences')}</Text>
+                  <Text style={styles.cabinText}>
+                    {[
+                      request.cabinPreferences.climate === 'Cool'
+                        ? t('traveler.prefCool')
+                        : request.cabinPreferences.climate === 'Warm'
+                          ? t('traveler.prefWarm')
+                          : t('traveler.prefModerate'),
+                      request.cabinPreferences.quiet ? t('traveler.prefQuiet') : t('traveler.prefConversation'),
+                      request.cabinPreferences.music === 'Traveler Choice'
+                        ? t('traveler.prefTravelerChoice')
+                        : t('traveler.prefMusicNone'),
+                      request.cabinPreferences.charging ? t('traveler.charger') : null,
+                      request.cabinPreferences.luggage ? t('traveler.luggage') : null,
+                    ].filter(Boolean).join(' · ')}
+                  </Text>
+                </View>
+              )}
               <View style={styles.requestButtons}>
                 <OutlineButton
                   label={t('operator.decline')}
@@ -570,5 +590,13 @@ const styles = StyleSheet.create({
   dot: { width: 9, height: 9, borderRadius: 5, backgroundColor: colors.ink },
   routeMeta: { fontSize: 12, color: colors.muted },
   routePlace: { fontSize: 15, color: colors.ink, marginTop: 2 },
+  cabinSummary: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.hairline,
+  },
+  cabinLabel: { fontSize: 10.5, fontWeight: '600', letterSpacing: 1.2, color: colors.muted, textTransform: 'uppercase' },
+  cabinText: { fontSize: 12.5, color: colors.ink2, lineHeight: 18, marginTop: 5 },
   requestButtons: { flexDirection: 'row', gap: 10, marginTop: 18 },
 });

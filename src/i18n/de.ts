@@ -794,7 +794,7 @@ export default {
     processing: 'Wird verarbeitet…',
     homeAddress: 'Privatadresse',
     workAddress: 'Arbeitsadresse',
-    savedPlaceSub: 'Privat auf diesem Gerät gespeichert, damit Sie Reisen schneller planen können.',
+    savedPlaceSub: 'In Ihrem Konto gespeichert und verfügbar, wenn Sie sich auf einem anderen Gerät anmelden.',
     addressOrPlace: 'Adresse oder Ort',
     saveAddress: 'Adresse speichern',
     saveDestination: 'Ziel speichern',

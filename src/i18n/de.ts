@@ -238,6 +238,8 @@ export default {
     insPremiumOffsetAR: "Bei 99 % Retention von American Rider",
     insPremiumOffsetBenchmark: "Bei der beobachteten Spanne von 50,5 %–57 %",
     insBenchmarkSource: "Quelle: Consumer Reports, Juni 2026. Plattformen klassifizieren externe Kosten unterschiedlich; Steuern, Maut, Trinkgelder und andere Durchlaufposten sind nicht identisch.",
+    insAdvantageOffset: "Fahrpreisvolumen, bei dem der zusätzlich einbehaltene Anteil diese Versicherungsprämie ausgleicht",
+    insAdvantageOffsetRange: "Verglichen mit der von Consumer Reports beobachteten Spanne",
     insNoHoursNeeded: "Es werden weder ein angenommener Stundenlohn noch ein Durchschnittsfahrpreis oder zugesagtes Fahrtvolumen verwendet. Geben Sie nur Ihr tatsächliches Versicherungsangebot ein.",
     insEconomicsBody: "Nutzen Sie Ihr eigenes Angebot und Ihre erwartete Aktivität. American Rider erfindet weder einen Durchschnittsfahrpreis noch eine garantierte Zahl von Fahrten.",
     insMonthlyPremium: "Monatliche Versicherungsprämie",

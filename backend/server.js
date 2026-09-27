@@ -125,6 +125,7 @@ const { readDocument, documentsReady, READER_VERSION } = require('./documents');
 const { ready: r2Ready, uploadUrl: r2UploadUrl, readUrl: r2ReadUrl, owns: r2Owns } = require('./r2');
 const { assessOperator, assessAndRecord } = require('./qualification');
 const {
+  STATUS_DUE_MS, STATUS_MAX_AGE_MS,
   initialMonitoringFromDocument, continuingStatus, applyOperatorAttestation, applyIndependentConfirmation,
   providerInstructions, sweepInsuranceMonitoring,
 } = require('./insurance-monitoring');
@@ -2076,6 +2077,41 @@ async function issueInsuranceConfirmationRequest({ uid, user, contact, now = Dat
   const email = String(contact?.email || '').trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, reason: 'Invalid insurer or broker email.' };
 
+  const sameContact = String(m.contact?.email || '').trim().toLowerCase() === email;
+  const priorAttempts = sameContact ? Math.max(0, Number(m.verificationRequestCount) || 0) : 0;
+  if (priorAttempts >= 3) {
+    const issue = {
+      kind: 'delivery_attempts_exhausted',
+      at: now,
+      source: String(contact?.type || 'broker').slice(0, 20),
+      contactEmail: email,
+      note: 'Three delivery attempts to this verification contact have failed or remained unresolved.',
+    };
+    await db.collection('users').doc(String(uid)).set({
+      insuranceMonitoring: { ...m, verificationIssue: issue },
+    }, { merge: true });
+    await db.collection('audit_log').add({
+      at: now,
+      subject: String(uid),
+      actor: { name: 'American Rider', method: 'insurance_monitor' },
+      action: 'insurance_verification_delivery_exhausted',
+      contactEmail: email,
+      attempts: priorAttempts,
+      resultingEligibility: continuingStatus({ ...(user || {}), insuranceMonitoring: { ...m, verificationIssue: issue } }, now),
+    }).catch(() => {});
+    await fileTicket({
+      uid: String(uid),
+      email: user?.email || null,
+      description: `Insurance status verification could not be delivered after ${priorAttempts} attempts to ${email}. Operator Relations must verify the contact or use the carrier/broker's required process.`,
+      trip: null,
+      reason: 'insurance verification delivery exhausted',
+      kind: 'support',
+      category: 'operator-insurance',
+    }).catch(() => {});
+    return { ok: false, operational: true, reason: 'Insurance verification delivery requires Operator Relations.' };
+  }
+
+  const attempt = priorAttempts + 1;
   const token = crypto.randomBytes(32).toString('base64url');
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
   const expiresAt = now + 14 * 24 * 60 * 60 * 1000;
@@ -2083,8 +2119,9 @@ async function issueInsuranceConfirmationRequest({ uid, user, contact, now = Dat
   const last4 = policy ? policy.slice(-4) : 'not shown';
   const operatorName = String(user?.legalName || user?.name || 'the Operator').slice(0, 100);
   const url = `${PUBLIC_ORIGIN}/insurance/status-confirmation?token=${encodeURIComponent(token)}`;
+  const requestRef = db.collection('insurance_status_requests').doc(tokenHash);
 
-  await db.collection('insurance_status_requests').doc(tokenHash).set({
+  await requestRef.set({
     uid: String(uid),
     email,
     contactName: String(contact?.name || '').slice(0, 100),
@@ -2094,7 +2131,19 @@ async function issueInsuranceConfirmationRequest({ uid, user, contact, now = Dat
     usedAt: null,
     reason,
     policyLast4: last4,
+    attempt,
+    deliveryStatus: 'pending',
   });
+  await db.collection('audit_log').add({
+    at: now,
+    subject: String(uid),
+    actor: { name: 'American Rider', method: 'insurance_monitor' },
+    action: 'insurance_verification_request_created',
+    requestId: tokenHash,
+    contactEmail: email,
+    attempt,
+    reason,
+  }).catch(() => {});
 
   const sent = await send({
     from: 'American Rider Insurance Verification <insurance@americanrider.app>',
@@ -2109,25 +2158,77 @@ async function issueInsuranceConfirmationRequest({ uid, user, contact, now = Dat
       url + '\n\n' +
       'If your organization requires its own authorization form, reply to insurance@americanrider.app and American Rider will use that process instead.\n',
   });
+
+  const nextMonitoring = {
+    ...m,
+    contact: { name: String(contact?.name || '').slice(0, 100), email, type: String(contact?.type || 'broker') },
+    verificationRequestedAt: now,
+    verificationRequestedTo: email,
+    verificationRequestReason: reason,
+    verificationRequestCount: attempt,
+  };
+
   if (!sent.ok) {
-    await db.collection('insurance_status_requests').doc(tokenHash).delete().catch(() => {});
+    const issue = attempt >= 3 ? {
+      kind: 'delivery_attempts_exhausted',
+      at: now,
+      source: String(contact?.type || 'broker').slice(0, 20),
+      contactEmail: email,
+      note: String(sent.reason || 'Delivery failed').slice(0, 500),
+    } : m.verificationIssue || null;
+    await requestRef.set({
+      deliveryStatus: 'failed',
+      deliveryFailedAt: now,
+      deliveryFailure: String(sent.reason || 'Confirmation request could not be sent.').slice(0, 500),
+    }, { merge: true });
+    await db.collection('users').doc(String(uid)).set({
+      insuranceMonitoring: { ...nextMonitoring, verificationIssue: issue },
+    }, { merge: true });
+    await db.collection('audit_log').add({
+      at: now,
+      subject: String(uid),
+      actor: { name: 'American Rider', method: 'insurance_monitor' },
+      action: 'insurance_verification_delivery_failed',
+      requestId: tokenHash,
+      contactEmail: email,
+      attempt,
+      reason: String(sent.reason || '').slice(0, 500),
+      resultingEligibility: continuingStatus({ ...(user || {}), insuranceMonitoring: { ...nextMonitoring, verificationIssue: issue } }, now),
+    }).catch(() => {});
+    if (attempt >= 3) {
+      await fileTicket({
+        uid: String(uid),
+        email: user?.email || null,
+        description: `Insurance status verification failed three times for ${email}. Last delivery result: ${String(sent.reason || 'unknown failure').slice(0, 500)}`,
+        trip: null,
+        reason: 'insurance verification delivery exhausted',
+        kind: 'support',
+        category: 'operator-insurance',
+      }).catch(() => {});
+    }
     return { ok: false, reason: sent.reason || 'Confirmation request could not be sent.' };
   }
 
-  await db.collection('users').doc(String(uid)).set({
-    insuranceMonitoring: {
-      ...m,
-      contact: { name: String(contact?.name || '').slice(0, 100), email, type: String(contact?.type || 'broker') },
-      verificationRequestedAt: now,
-      verificationRequestedTo: email,
-      verificationRequestReason: reason,
-      verificationRequestCount:
-        String(m.contact?.email || '').trim().toLowerCase() === email
-          ? Math.max(0, Number(m.verificationRequestCount) || 0) + 1
-          : 1,
-    },
+  await requestRef.set({
+    deliveryStatus: 'accepted',
+    deliveryAcceptedAt: now,
+    providerMessageId: sent.id || null,
   }, { merge: true });
-  return { ok: true, expiresAt };
+  await db.collection('users').doc(String(uid)).set({
+    insuranceMonitoring: nextMonitoring,
+  }, { merge: true });
+  await db.collection('audit_log').add({
+    at: now,
+    subject: String(uid),
+    actor: { name: 'American Rider', method: 'insurance_monitor' },
+    action: 'insurance_verification_delivery_accepted',
+    requestId: tokenHash,
+    contactEmail: email,
+    attempt,
+    providerMessageId: sent.id || null,
+    resultingEligibility: continuingStatus({ ...(user || {}), insuranceMonitoring: nextMonitoring }, now),
+  }).catch(() => {});
+  return { ok: true, expiresAt, providerMessageId: sent.id || null };
 }
 
 // --- Continuing Operator insurance status. ------------------------------------------------
@@ -2202,14 +2303,39 @@ app.post('/operator/insurance/attest', requireAuth, LIMITS.qualification, async 
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   try {
     const ref = db.collection('users').doc(String(req.uid));
-    const snap = await ref.get();
-    const u = snap.exists ? snap.data() : {};
-    if (!u?.documents?.insurance || u.documents.insurance.verdict !== 'accept') {
-      return res.status(409).json({ error: 'A qualifying insurance policy must be verified first.', code: 'insurance_document_required' });
-    }
-    const updated = applyOperatorAttestation(u.insuranceMonitoring);
-    await ref.set({ insuranceMonitoring: updated }, { merge: true });
-    return res.json({ ...continuingStatus({ ...u, insuranceMonitoring: updated }), contact: updated.contact || null });
+    const auditRef = db.collection('audit_log').doc();
+    const now = Date.now();
+    const result = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      const u = snap.exists ? snap.data() : {};
+      if (!u?.documents?.insurance || u.documents.insurance.verdict !== 'accept') {
+        return { error: 'A qualifying insurance policy must be verified first.', code: 'insurance_document_required', status: 409 };
+      }
+      const m = u.insuranceMonitoring || {};
+      const verifiedAt = Number(m.lastVerifiedAt) || 0;
+      if (!verifiedAt) return { error: 'Current insurance status has not been independently verified.', code: 'insurance_status_unverified', status: 409 };
+      const dueAt = verifiedAt + STATUS_DUE_MS;
+      const graceUntil = verifiedAt + STATUS_MAX_AGE_MS;
+      if (now <= dueAt) return { error: 'No Operator confirmation is required yet.', code: 'insurance_attestation_not_due', status: 409 };
+      if (now > graceUntil) return { error: 'Independent insurance confirmation is overdue.', code: 'insurance_status_stale', status: 409 };
+      if (Number(m.operatorAttestedAt) >= dueAt) return { error: 'This verification cycle has already been confirmed.', code: 'insurance_attestation_already_recorded', status: 409 };
+
+      const updated = applyOperatorAttestation(m, now);
+      const resulting = continuingStatus({ ...u, insuranceMonitoring: updated }, now);
+      tx.set(ref, { insuranceMonitoring: updated }, { merge: true });
+      tx.set(auditRef, {
+        at: now,
+        subject: String(req.uid),
+        actor: { uid: String(req.uid), method: 'operator_session' },
+        action: 'insurance_operator_attestation',
+        verificationDueAt: dueAt,
+        graceUntil,
+        resultingEligibility: resulting,
+      });
+      return { updated, u, resulting };
+    });
+    if (result.error) return res.status(result.status || 409).json({ error: result.error, code: result.code });
+    return res.json({ ...result.resulting, contact: result.updated.contact || null });
   } catch (e) {
     return res.status(502).json({ error: e.message });
   }

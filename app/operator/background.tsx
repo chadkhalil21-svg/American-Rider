@@ -25,20 +25,11 @@ import { BackLink, Card, Mono, PrimaryButton, Screen, SectionLabel, Sub, Title }
 import {
   declareExistingScreening,
   fetchScreening,
-  orderScreening,
-  payScreeningFee,
-  reinviteScreening,
   type ScreeningStatus,
 } from '../../src/backend/screening';
 import { useOperator } from '../../src/state/OperatorContext';
 import { useLanguage } from '../../src/state/LanguageContext';
 import { colors, fmt } from '../../src/theme';
-
-// Mirrors SCREENING_FEE_CENTS in backend/screening.js. THE TWO MUST NEVER DISAGREE: an
-// operator quoted one figure and charged another has been shown two prices for one thing,
-// which is the defect this codebase treats as the most serious there is. (The server's
-// answer wins on this screen; this constant is only the placeholder before it loads.)
-const SCREENING_FEE = 4749;
 
 // KEYS, NOT SENTENCES. A module-level array of translated strings is evaluated once at
 // import time — before the stored language is read — so it would pin this screen to the
@@ -77,11 +68,6 @@ export default function OperatorBackground() {
   const live = !!status?.provider;
   const record = status?.screening || null;
   const decision = record?.decision;
-  const feeCents = status?.feeCents ?? SCREENING_FEE;
-  // The itemized quote: check cost + card processing = what the operator actually pays.
-  // Server-computed; the app never does fee math. Absent (older server), the cost alone shows.
-  const quote = status?.quote;
-  const payTotal = quote?.totalCents ?? feeCents;
 
   // The server's record is the truth about this document, in BOTH directions. A pass marks
   // the checklist ok, dated by the REPORT (not by today). Anything else un-marks it — which
@@ -93,35 +79,6 @@ export default function OperatorBackground() {
     op.syncBackground(decision === 'pass', record?.conductedAt ?? null);
   }, [live, status, decision, record?.conductedAt, op]);
 
-  const payAndOrder = async () => {
-    setBusy(true);
-    setError(null);
-    const paid = await payScreeningFee();
-    if (!paid.ok) {
-      setBusy(false);
-      if (!paid.canceled) setError(paid.error || t('traveler.bgPaymentFailed'));
-      return;
-    }
-    const ordered = await orderScreening(paid.paymentIntentId);
-    setBusy(false);
-    if (!ordered.ok) {
-      setError(
-        (ordered.error || t('traveler.bgOrderFailed')) +
-          t('traveler.bgPaymentRecorded'),
-      );
-      return;
-    }
-    refresh();
-  };
-
-  const newLink = async () => {
-    setBusy(true);
-    setError(null);
-    const out = await reinviteScreening();
-    setBusy(false);
-    if (!out.ok) setError(out.error || t('traveler.bgNoNewLink'));
-    refresh();
-  };
 
   const declare = async () => {
     if (!agency.trim()) {
@@ -191,14 +148,6 @@ export default function OperatorBackground() {
             <Pressable onPress={() => Linking.openURL(record.invitationUrl!)}>
               <Text style={styles.link}>{t('operator.openScreeningForm')}</Text>
             </Pressable>
-          ) : null}
-          {decision === 'expired' ? (
-            <PrimaryButton
-              label={busy ? t('traveler.busySending') : t('traveler.bgEmailNewLink')}
-              disabled={busy}
-              onPress={newLink}
-              style={{ marginTop: 12 }}
-            />
           ) : null}
         </Card>
       )}
@@ -295,50 +244,6 @@ export default function OperatorBackground() {
               </View>
             )}
           </Card>
-        </>
-      )}
-
-      {/* THE AMOUNT, SAID PLAINLY AND ONCE. Mono, because it is money. The server's figure:
-          $47.49 for the whole check, or $17.50 when an accepted report covers the criminal
-          half and only the driving history is missing. */}
-      {showActions && (decision == null || decision === 'awaiting_agency') && (
-        <>
-          <SectionLabel style={styles.lbl}>
-            {feeCents === SCREENING_FEE ? t('traveler.bgIfYouHaveNot') : t('traveler.bgWhatIsLeft')}
-          </SectionLabel>
-          <Card style={styles.feeCard}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.pointTitle}>{t('operator.weOrderYours')}</Text>
-              {/* ITEMIZED, always (Chad, 27 Aug): the check's exact cost, the card
-                  processor's exact cut, nothing else and nothing hidden. */}
-              <View style={styles.quoteRow}>
-                <Text style={styles.quoteLabel}>{t('operator.backgroundCheckLine')}</Text>
-                <Mono size={13}>{fmt((quote?.costCents ?? feeCents) / 100)}</Mono>
-              </View>
-              {quote ? (
-                <View style={styles.quoteRow}>
-                  <Text style={styles.quoteLabel}>{t('operator.cardProcessing')}</Text>
-                  <Mono size={13}>{fmt(quote.processingCents / 100)}</Mono>
-                </View>
-              ) : null}
-              <Text style={styles.feeNote}>
-                The check fee goes to the screening company in full; the processing fee goes
-                to the card network. American Rider keeps neither.
-              </Text>
-            </View>
-            <Mono size={20}>{fmt(payTotal / 100)}</Mono>
-          </Card>
-          <Text style={styles.lawNote}>
-            Florida law (Fla. Stat. §627.748) requires this screening of every operator before
-            they may drive. Our travelers ride on it — full adherence is how American Rider
-            keeps that promise.
-          </Text>
-          <PrimaryButton
-            label={busy ? t('traveler.busyWorking') : `Pay ${fmt(payTotal / 100)} & Begin`}
-            disabled={busy}
-            onPress={payAndOrder}
-            style={{ marginTop: 14 }}
-          />
         </>
       )}
 

@@ -352,7 +352,7 @@ export function AuthScreen() {
               every remaining pixel above the logo where the directive says it belongs, and
               — unlike a spring — does not silently re-tune itself when the button count
               changes. Sign in with Apple can return without this needing a thought. */}
-          <View style={{ height: 40 }} />
+          <View style={{ height: 28 }} />
 
           {/* ONE FIELD, THEN ONE ACTION. The traveler types an address and continues; the
               next screen asks for the password and offers to create the account instead.
@@ -717,41 +717,40 @@ const s = StyleSheet.create({
   },
   langName: { fontSize: 12.5, color: colors.muted },
   langNameOn: { color: colors.ink, fontWeight: '600' },
-  mark: { width: 86, height: 57, tintColor: colors.ink },
+  mark: { width: 72, height: 48, tintColor: colors.ink },
   wordmark: {
-    marginTop: 18,
+    marginTop: 14,
     textAlign: 'center',
-    letterSpacing: 3.92, // .28em at 14px — the demo's enlarged welcome lockup
-    fontSize: 14,
+    letterSpacing: 3.4,
+    fontSize: 12.5,
     color: colors.ink,
     fontWeight: '600',
   },
   lockupTag: {
-    marginTop: 7,
+    marginTop: 6,
     textAlign: 'center',
-    letterSpacing: 3.52, // .32em at 11px
-    fontSize: 11,
+    letterSpacing: 3.0,
+    fontSize: 9.5,
     color: colors.faint,
     fontWeight: '600',
   },
-  // Charcoal, lightly tracked (Chad, 13 Sept 2026): the mission statement was passive grey.
-  tagline: { textAlign: 'center', fontSize: 16.5, color: colors.ink2, letterSpacing: 0.15, marginTop: 28, lineHeight: 24 },
-  btn: { borderRadius: 13, paddingVertical: 17, alignItems: 'center' },
+  tagline: { textAlign: 'center', fontSize: 14.5, color: colors.ink2, letterSpacing: 0.1, marginTop: 20, lineHeight: 20 },
+  btn: { borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   btnRow: { flexDirection: 'row', justifyContent: 'center', gap: 10 },
   btnInk: { backgroundColor: colors.ink },
   btnGhost: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
   // A DISABLED CONTROL SHOULD READ AS WAITING, NOT BROKEN (Chad, 13 Sept 2026). The filled
   // grey slab looked like a failure; an outline on paper reads as an action not yet available.
   btnDisabled: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.border },
-  btnText: { fontSize: 16, fontWeight: '600' },
+  btnText: { fontSize: 15, fontWeight: '600' },
   btnTextInk: { color: '#fff' },
   btnTextGhost: { color: colors.ink, fontWeight: '500' },
   btnTextDisabled: { color: colors.faint },
   legal: {
-    marginTop: 18,
+    marginTop: 16,
     textAlign: 'center',
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 11.5,
+    lineHeight: 17,
     color: colors.ink2,
   },
   // NO UNDERLINE AND NO WEIGHT SHIFT (Chad, 13 Sept 2026) — the bolding read as an awkward
@@ -764,12 +763,12 @@ const s = StyleSheet.create({
   btnSso: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
   btnTextSso: { color: colors.ink },
   ssoInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
-  orRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 14 },
+  orRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 11 },
   orRule: { flex: 1, height: 1, backgroundColor: colors.hairline },
   orText: { fontSize: 12.5, color: colors.muted },
   entryRow: {
-    height: 52,
-    borderRadius: 13,
+    height: 48,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.card,
@@ -787,11 +786,11 @@ const s = StyleSheet.create({
     borderRightColor: colors.hairline,
     paddingVertical: 2,
   },
-  entryInput: { flex: 1, fontSize: 16, color: colors.ink, height: '100%' },
+  entryInput: { flex: 1, fontSize: 15.5, color: colors.ink, height: '100%' },
   ssoError: { marginTop: 12, fontSize: 13, color: colors.ink2, textAlign: 'center', lineHeight: 19 },
   langBar: { alignItems: 'flex-end' },
   langTrigger: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 6 },
-  langTriggerText: { fontSize: 13, color: colors.ink2 },
+  langTriggerText: { fontSize: 12.5, color: colors.ink2 },
   langPanel: {
     alignSelf: 'flex-end',
     marginTop: 2,

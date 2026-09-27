@@ -13,7 +13,7 @@ import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react
 import { geocodePlace } from '../src/backend/fares';
 import { Text } from '../src/components/AppText';
 import { useGoBack } from '../src/components/nav';
-import { BackLink, Card, PrimaryButton, Screen, SectionLabel, Sub, Title } from '../src/components/UI';
+import { Card, LetterheadBar, PrimaryButton, Screen, SectionLabel, Sub, Title } from '../src/components/UI';
 import { loadSavedPlaces, removeFavorite, saveFavorite, saveSavedPlace } from '../src/savedPlaces';
 import { useLanguage } from '../src/state/LanguageContext';
 import { colors } from '../src/theme';
@@ -89,8 +89,8 @@ export default function SavedPlace() {
 
   return (
     <Screen>
-      <BackLink label={t('traveler.accountDetails')} onPress={goBack} />
-      <Title>{title}</Title>
+      <LetterheadBar onBack={goBack} />
+      <Title size={24}>{title}</Title>
       <Sub>{t('traveler.savedPlaceSub')}</Sub>
 
       {editingFavorite ? (
@@ -99,7 +99,7 @@ export default function SavedPlace() {
         </Card>
       ) : (
         <>
-          <SectionLabel style={{ marginTop: 24 }}>{t('traveler.destinationEntry')}</SectionLabel>
+          <SectionLabel style={{ marginTop: 22 }}>{key === 'favorite' ? t('traveler.destinationEntry') : t('traveler.addressOrPlace')}</SectionLabel>
           <Card style={styles.card}>
             <TextInput
               style={styles.input}
@@ -124,7 +124,7 @@ export default function SavedPlace() {
         <PrimaryButton label={t('traveler.removeSavedPlace')} onPress={clear} />
       ) : (
         <>
-          <PrimaryButton label={t('common.done')} onPress={save} disabled={busy || !text.trim()} />
+          <PrimaryButton label={key === 'favorite' ? t('traveler.saveDestination') : t('traveler.saveAddress')} onPress={save} disabled={busy || !text.trim()} />
           {existing ? (
             <Pressable onPress={clear} hitSlop={8} style={{ marginTop: 14, alignSelf: 'center' }}>
               <Text style={styles.clear}>{t('traveler.removeSavedPlace')}</Text>
@@ -137,9 +137,9 @@ export default function SavedPlace() {
 }
 
 const styles = StyleSheet.create({
-  card: { paddingVertical: 4, marginTop: 24 },
-  input: { fontSize: 15.5, color: colors.ink, paddingVertical: 12, paddingHorizontal: 4 },
-  existing: { fontSize: 15.5, color: colors.ink, paddingVertical: 12, paddingHorizontal: 4 },
+  card: { paddingVertical: 3, marginTop: 10, paddingHorizontal: 18 },
+  input: { fontSize: 14.5, color: colors.ink, paddingVertical: 11, paddingHorizontal: 2 },
+  existing: { fontSize: 14.5, color: colors.ink, paddingVertical: 11, paddingHorizontal: 2 },
   // Ink, not red: removing a saved address is a choice, not an emergency.
   error: { fontSize: 13.5, color: colors.ink, marginTop: 12 },
   clear: { fontSize: 14, fontWeight: '600', color: colors.ink2 },

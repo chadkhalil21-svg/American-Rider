@@ -30,6 +30,7 @@ export type ScreeningStatus = {
   ok: boolean;
   jurisdiction?: { state: string; name?: string; statute?: string; recheckYears?: number } | null;
   provider: 'external' | null;
+  providerUrl?: string | null;
   screening: ScreeningRecord;
   error?: string;
 };
@@ -45,6 +46,7 @@ export async function fetchScreening(): Promise<ScreeningStatus> {
       ok: true,
       jurisdiction: data.jurisdiction || null,
       provider: data.provider === 'external' ? 'external' : null,
+      providerUrl: typeof data.providerUrl === 'string' ? data.providerUrl : null,
       screening: data.screening || null,
     };
   } catch {

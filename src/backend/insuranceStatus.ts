@@ -28,6 +28,7 @@ export type InsuranceStatus = {
   operatorActionRequired?: boolean;
   graceUntil?: number | null;
   authorized?: boolean;
+  verificationIssue?: { kind?: string; at?: number; source?: string; contactEmail?: string; note?: string | null } | null;
   contact?: { name?: string; email?: string; type?: string } | null;
 };
 

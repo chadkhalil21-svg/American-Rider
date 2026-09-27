@@ -244,6 +244,8 @@ export default {
     insPremiumOffsetAR: "Avec la rétention de 99 % d’American Rider",
     insPremiumOffsetBenchmark: "Avec la fourchette observée de 50,5 % à 57 %",
     insBenchmarkSource: "Source : Consumer Reports, juin 2026. Les plateformes classent différemment les coûts externes; taxes, péages, pourboires et autres montants transférés ne sont pas identiques.",
+    insAdvantageOffset: "Volume de tarifs à partir duquel la part supplémentaire conservée compense cette prime d’assurance",
+    insAdvantageOffsetRange: "Par rapport à la fourchette observée par Consumer Reports",
     insNoHoursNeeded: "Aucun taux horaire supposé, tarif moyen ou volume de Trajets promis n’est utilisé. Saisissez uniquement le devis d’assurance réellement reçu.",
     insEconomicsBody: "Utilisez votre propre devis et votre activité prévue. American Rider n’invente ni tarif moyen ni nombre garanti de Trajets.",
     insMonthlyPremium: "Prime mensuelle d’assurance",

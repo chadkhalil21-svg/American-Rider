@@ -91,7 +91,7 @@ export default function OperatorInsurance() {
   const retainedMonthly = retainedPerTravel * weeklyN * 4.33;
   const afterInsurance = retainedMonthly - premiumN;
   const breakEvenTravels = retainedPerTravel > 0 ? Math.ceil(premiumN / retainedPerTravel) : 0;
-  const money = (n: number) => '
+  const money = (n: number) => String.fromCharCode(36) + n.toFixed(0);
 
   return (
     <Screen>

@@ -468,7 +468,7 @@ export default {
     notifReceipt: 'Avisos enviados a su teléfono cuando el viaje concluye y se liquida la tarifa.',
     notifBrowserNo: 'Este navegador no recibe notificaciones. Use la aplicación.',
     notifAlwaysSent: 'Las comprobaciones de seguridad durante el viaje y los avisos de despacho activo están siempre activados. Un viaje programado que no se puede cubrir siempre se comunica.',
-    notifChannels: 'Estas preferencias se aplican a las notificaciones de la aplicación. Se envía un recibo por correo electrónico después de cada Viaje completado.'
+    notifChannels: 'Estas preferencias se aplican a las notificaciones de la aplicación. Se envía un recibo por correo electrónico después de cada Viaje completado.',
     totalPaymentInProgress: 'Total · pago en curso',
     delSavedPrefs: 'Se borrarán las preferencias guardadas, los contactos de confianza y cualquier cualificación de operador conservada en este dispositivo.',
     lostReportNotSaved: 'No se pudo guardar el informe. Compruebe su conexión e inténtelo de nuevo.',
@@ -825,7 +825,7 @@ export default {
     changeTravel: 'Cambiar el Viaje',
     dispatchUnavailable: 'Central no disponible. Compruebe su conexión.',
     emergencyAssistance: 'Asistencia de Emergencia',
-    shareTravelSub: 'Comparta un enlace privado en vivo con un contacto de confianza durante un Viaje activo. El enlace caduca cuando termina el Viaje.'
+    shareTravelSub: 'Comparta un enlace privado en vivo con un contacto de confianza durante un Viaje activo. El enlace caduca cuando termina el Viaje.',
     smartTravelTitle: 'Viaje Inteligente',
     checkingTransit: "Verificando el servicio de transporte actual…",
     transitChanged: "El servicio de transporte ha cambiado desde que se planificó este trayecto. El segundo Travel en automóvil queda retenido hasta verificar el servicio actual.",
@@ -889,7 +889,7 @@ export default {
     modifyCabin: 'Ajustar las preferencias de cabina',
     mapAttribution: '© Colaboradores de OpenStreetMap',
     paymentSettlement: 'Métodos de pago',
-    paymentSettlementSub: 'Gestione cómo paga sus Viajes.'
+    paymentSettlementSub: 'Gestione cómo paga sus Viajes.',
     noPaymentMethodSaved: 'Ningún método de pago guardado.',
     methodsUnreadable: 'No se pudieron leer los métodos de pago guardados.',
     addPaymentMethod: 'Añadir método de pago',
@@ -932,9 +932,9 @@ export default {
     enterATime: 'Introduzca una hora, por ejemplo 6:45.',
     scheduleTravel: 'Programar Viaje',
     notifications: 'Avisos Operativos y de Despacho',
-    notificationsSub: 'Elija qué actualizaciones de Viaje desea recibir.'
+    notificationsSub: 'Elija qué actualizaciones de Viaje desea recibir.',
     inviteFriends: 'Invitar a un Viajero',
-    inviteSub: 'Invite a alguien a viajar con American Rider. Puede revisar la invitación antes de enviarla.'
+    inviteSub: 'Invite a alguien a viajar con American Rider. Puede revisar la invitación antes de enviarla.',
     theInvitation: 'La Invitación',
     sendInvitation: 'Enviar una invitación',
     operateWithUs: 'Opere con American Rider',
@@ -948,7 +948,7 @@ export default {
     yourNumbers: 'Modelo de Proyección de Rendimiento Neto',
     averageTravelCost: 'Costo medio del viaje',
     travelsPerWeek: 'Viajes por semana',
-    safetySub: 'Durante un Viaje activo, American Rider supervisa la ruta ante interrupciones inusuales. Sus contactos de confianza pueden seguir el Viaje y la verificación del vehículo ayuda a confirmar el vehículo correcto antes de subir.'
+    safetySub: 'Durante un Viaje activo, American Rider supervisa la ruta ante interrupciones inusuales. Sus contactos de confianza pueden seguir el Viaje y la verificación del vehículo ayuda a confirmar el vehículo correcto antes de subir.',
     shareUnavailable: 'Disponible una vez asignado un operador.',
     verifyCodeIntro: 'Pida este código a su operador antes de subir.',
     verifyCodeIdle: 'A cada viaje se le asigna un código en cuanto hay un operador asignado. Pídaselo a su operador antes de subir.',

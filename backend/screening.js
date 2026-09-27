@@ -1,31 +1,13 @@
-// Operator screening — ordering it, and deciding what the result means.
+// Operator screening — statutory adjudication, renewal and provider-neutral evidence review.
 //
-// THE LAW THIS IMPLEMENTS. Fla. Stat. §627.748 requires American Rider, as the TNC, to conduct
-// or have conducted a criminal background check that includes a Multi-State/Multi-Jurisdiction
-// Criminal Records Locator (or similar COMMERCIAL nationwide database, with any hit validated
-// at the primary source) and the National Sex Offender Public Website, and to obtain and
-// review a driving history report. Again every three years.
+// Florida launch rule set: Fla. Stat. §627.748 requires the TNC to conduct or have conducted
+// the specified criminal-background searches and to obtain/review driving history before
+// authorization, with recurring checks every three years. Procurement is external; this
+// module never treats payment, a vendor brand, or an Operator declaration as qualification.
 //
-// WHY THE OPERATOR CANNOT SIMPLY BRING US ONE THEY ALREADY HAVE. Under the FCRA a screening
-// company may release a report only to an end user with a permissible purpose FOR THAT REPORT.
-// Uber's purpose was Uber's decision; it does not transfer, and Checkr's own agreement binds a
-// report to "the end-user's exclusive one-time use". This is why Uber does not accept Lyft's
-// check either. It is not the vendor being difficult; it is the statute.
-//
-// WHO PAYS (Chad, 23 Aug 2026 — pre-revenue, minimal funding). The operator does. AMERICAN
-// RIDER STILL ORDERS IT, because it must: the account, the permissible purpose and the
-// compliance record are ours, and an operator buying a consumer report about themselves does
-// not satisfy the statute. So the fee is a PASS-THROUGH — the operator pays American Rider
-// exactly what the screening costs, not a cent more, and American Rider pays the screening
-// company. Never described as a fee American Rider charges, because it is not one.
-//
-// HOW MOST OF THEM ARE DECIDED IN A SECOND. Checkr returns `clear`, `consider` or `suspended`.
-// `clear` passes instantly with nobody involved. `consider` is put through the statutory
-// standard below, which is deterministic and resolves every case the authoritative data can
-// place. American Rider adds no discretionary criminal-history exclusions beyond the statutory standard
-// jurisdiction's rule set. If source data is missing, contradictory or under dispute, the
-// operator remains blocked while the source is clarified; nobody is asked to guess. Human
-// review is the last exception path for a genuine source conflict, not a routine approval step.
+// Other states must supply their own activated jurisdiction rule set before operation. Unknown
+// jurisdictions fail closed elsewhere in the qualification/market gates.
+
 const { readKey } = require('./env');
 const { adminDb } = require('./firebase-admin');
 const { fileTicket } = require('./tickets');

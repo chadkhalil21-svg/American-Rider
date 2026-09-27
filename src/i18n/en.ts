@@ -847,7 +847,7 @@ export default {
     deleteAccount: 'Authorize Account Termination',
     whatIsDeleted: 'Purged Data Categories',
     delCredentials: 'Personal Credentials & Profile Data',
-    delTravelRecords: 'Travel Records & Ledgers',
+    delTravelRecords: 'Travel History Access',
     delNeedPassword: 'Enter your password to continue.',
     deleting: 'Deleting…',
     yesDelete: 'Yes, delete',

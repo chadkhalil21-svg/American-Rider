@@ -51,6 +51,7 @@ export default {
     forgotPassword: '¿Olvidó su contraseña?',
   },
   common: {
+    cancel: 'Cancelar',
     back: 'Atrás',
     done: 'Listo',
     language: 'Idioma',

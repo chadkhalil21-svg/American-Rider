@@ -38,6 +38,13 @@ export type AssignedTravel = {
   dep: string;
   dest: string;
   travelClass: string;
+  cabinPreferences?: {
+    climate: 'Cool' | 'Moderate' | 'Warm';
+    music: 'None' | 'Traveler Choice';
+    quiet: boolean;
+    charging: boolean;
+    luggage: boolean;
+  };
   costCents: number;
   status: string;
   createdAt: number;
@@ -114,6 +121,19 @@ export function watchAssignedTravel(
               dep: String(x.dep ?? ''),
               dest: String(x.dest ?? ''),
               travelClass: String(x.travelClass ?? 'Standard'),
+              cabinPreferences: x.cabinPreferences && typeof x.cabinPreferences === 'object'
+                ? {
+                    climate: ['Cool', 'Moderate', 'Warm'].includes(String((x.cabinPreferences as any).climate))
+                      ? (String((x.cabinPreferences as any).climate) as 'Cool' | 'Moderate' | 'Warm')
+                      : 'Moderate',
+                    music: ['None', 'Traveler Choice'].includes(String((x.cabinPreferences as any).music))
+                      ? (String((x.cabinPreferences as any).music) as 'None' | 'Traveler Choice')
+                      : 'None',
+                    quiet: (x.cabinPreferences as any).quiet !== false,
+                    charging: (x.cabinPreferences as any).charging === true,
+                    luggage: (x.cabinPreferences as any).luggage === true,
+                  }
+                : undefined,
               costCents: Number(x.costCents ?? 0),
               status: String(x.status ?? ''),
               createdAt: Number(x.createdAt ?? 0),

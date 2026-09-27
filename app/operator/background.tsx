@@ -9,8 +9,8 @@ import { useOperator } from '../../src/state/OperatorContext';
 import { useLanguage } from '../../src/state/LanguageContext';
 import { colors } from '../../src/theme';
 
-const dateLabel = (when: string | number) =>
-  new Date(when).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+const dateLabel = (when: string | number, language: string) =>
+  new Date(when).toLocaleDateString(language, { month: 'long', day: 'numeric', year: 'numeric' });
 
 export default function OperatorBackground() {
   const { t, language } = useLanguage();
@@ -80,13 +80,13 @@ export default function OperatorBackground() {
 
       {passed ? (
         <>
-          <SectionLabel style={styles.section}>STATUS</SectionLabel>
+          <SectionLabel style={styles.section}>{t('traveler.bgStatus')}</SectionLabel>
           <Card style={styles.statusCard}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.statusTitle}>Screening complete</Text>
+              <Text style={styles.statusTitle}>{t('traveler.bgComplete')}</Text>
               <Text style={styles.body}>
-                Reviewed {dateLabel(record?.conductedAt || op.bgCheckedAt || Date.now())}
-                {record?.recheckDue ? ` · renewal due ${dateLabel(record.recheckDue)}` : ''}
+                {t('traveler.bgReviewed', { date: dateLabel(record?.conductedAt || op.bgCheckedAt || Date.now(), language) })}
+                {record?.recheckDue ? ' · ' + t('traveler.bgRenewalDue', { date: dateLabel(record.recheckDue, language) }) : ''}
               </Text>
             </View>
             <BadgeOk label={t('operator.verified')} />
@@ -96,28 +96,24 @@ export default function OperatorBackground() {
         <>
           {record?.decision ? (
             <>
-              <SectionLabel style={styles.section}>STATUS</SectionLabel>
+              <SectionLabel style={styles.section}>{t('traveler.bgStatus')}</SectionLabel>
               <Card style={styles.statusCard}>
                 <Text style={styles.statusTitle}>
-                  {record.decision === 'awaiting_agency' ? 'Report requested' :
-                   record.decision === 'review' ? 'In review' :
-                   record.decision === 'refuse' ? 'Review complete' :
-                   record.decision === 'expired' ? 'Renewal required' : 'Screening in progress'}
+                  {record.decision === 'awaiting_agency' ? t('traveler.bgReportRequested') :
+                   record.decision === 'review' ? t('traveler.bgInReview') :
+                   record.decision === 'refuse' ? t('traveler.bgReviewComplete') :
+                   record.decision === 'expired' ? t('traveler.bgRenewalRequired') : t('traveler.bgInProgress')}
                 </Text>
-                <Text style={styles.body}>{record.summary || 'We will update this status when the provider report is received.'}</Text>
+                <Text style={styles.body}>{record.summary || t('traveler.bgStatusPending')}</Text>
               </Card>
             </>
           ) : null}
 
-          <SectionLabel style={styles.section}>COMPLETE SCREENING</SectionLabel>
+          <SectionLabel style={styles.section}>{t('traveler.bgCompleteSection')}</SectionLabel>
           <Card style={styles.providerCard}>
             <Text style={styles.providerName}>{t('traveler.bgApprovedProvider')}</Text>
             <Text style={styles.providerMeta}>{t('traveler.bgExternalProvider')}</Text>
-            <Text style={styles.body}>
-              Complete the required criminal-record, sex-offender and driving-history searches
-              through the provider’s secure process. Sensitive screening information stays with
-              the screening provider.
-            </Text>
+            <Text style={styles.body}>{t('traveler.bgProviderBody')}</Text>
             {status?.providerUrl ? (
               <PrimaryButton
                 label={t('traveler.bgContinueProvider')}
@@ -135,11 +131,8 @@ export default function OperatorBackground() {
             <Card style={styles.choiceCard}>
               <View style={styles.choiceRow}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.choiceTitle}>Already screened?</Text>
-                  <Text style={styles.body}>
-                    A current qualifying report may be reviewed if the screening company can
-                    release it directly to American Rider.
-                  </Text>
+                  <Text style={styles.choiceTitle}>{t('traveler.bgAlreadyScreened')}</Text>
+                  <Text style={styles.body}>{t('traveler.bgAlreadyBody')}</Text>
                 </View>
                 <Text style={styles.chev}>{showExisting ? '−' : '+'}</Text>
               </View>
@@ -150,16 +143,16 @@ export default function OperatorBackground() {
             <Card style={styles.formCard}>
               {declared ? (
                 <>
-                  <Text style={styles.choiceTitle}>Request recorded</Text>
+                  <Text style={styles.choiceTitle}>{t('traveler.bgRequestRecorded')}</Text>
                   <Text style={styles.body}>{declared}</Text>
                 </>
               ) : (
                 <>
-                  <Text style={styles.fieldLabel}>SCREENING COMPANY</Text>
+                  <Text style={styles.fieldLabel}>{t('traveler.bgCompany')}</Text>
                   <TextInput
                     value={agency}
                     onChangeText={setAgency}
-                    placeholder="Provider name"
+                    placeholder={t('traveler.bgProviderName')}
                     placeholderTextColor={colors.faint}
                     style={styles.input}
                   />
@@ -173,16 +166,13 @@ export default function OperatorBackground() {
                   />
                   <Pressable style={styles.checkRow} onPress={() => setCriminalIncluded((v) => !v)}>
                     <Text style={styles.check}>{criminalIncluded ? '✓' : '○'}</Text>
-                    <Text style={styles.checkLabel}>Criminal record and sex-offender searches</Text>
+                    <Text style={styles.checkLabel}>{t('traveler.bgCriminalSex')}</Text>
                   </Pressable>
                   <Pressable style={styles.checkRow} onPress={() => setDrivingIncluded((v) => !v)}>
                     <Text style={styles.check}>{drivingIncluded ? '✓' : '○'}</Text>
-                    <Text style={styles.checkLabel}>Driving history</Text>
+                    <Text style={styles.checkLabel}>{t('traveler.bgDrivingHistory')}</Text>
                   </Pressable>
-                  <Text style={styles.note}>
-                    This does not approve the report. It authorizes American Rider to request
-                    and review the provider’s authoritative report.
-                  </Text>
+                  <Text style={styles.note}>{t('traveler.bgReviewNote')}</Text>
                   <PrimaryButton
                     label={busy ? t('traveler.busyRecording') : t('traveler.bgRequestReview')}
                     disabled={busy}
@@ -196,18 +186,13 @@ export default function OperatorBackground() {
 
           <Pressable onPress={() => setShowRequirements((v) => !v)} accessibilityRole="button">
             <View style={styles.disclosureRow}>
-              <Text style={styles.disclosure}>What is required in Florida?</Text>
+              <Text style={styles.disclosure}>{t('traveler.bgFloridaRequirementsTitle')}</Text>
               <Text style={styles.disclosure}>{showRequirements ? '−' : '+'}</Text>
             </View>
           </Pressable>
           {showRequirements ? (
             <View style={styles.requirements}>
-              <Text style={styles.body}>
-                Florida Stat. §627.748(12) requires a multi-state or similar nationwide criminal
-                database search with primary-source validation of identified records, a National
-                Sex Offender Public Website search, and a driving-history research report. The
-                background check is repeated every three years.
-              </Text>
+              <Text style={styles.body}>{t('traveler.bgFloridaRequirementsBody')}</Text>
             </View>
           ) : null}
         </>

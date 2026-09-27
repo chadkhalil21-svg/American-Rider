@@ -39,7 +39,8 @@ async function send({ to, subject, html, text, from: fromOverride, replyTo }) {
       body: JSON.stringify({ from, to: [to], subject, html, text, ...(replyTo ? { reply_to: replyTo } : {}) }),
     });
     if (!r.ok) return { ok: false, reason: `Resend ${r.status}: ${(await r.text()).slice(0, 200)}` };
-    return { ok: true };
+    const out = await r.json().catch(() => ({}));
+    return { ok: true, id: out?.id || null };
   } catch (e) {
     return { ok: false, reason: e.message };
   }

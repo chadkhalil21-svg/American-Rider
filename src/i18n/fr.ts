@@ -309,6 +309,8 @@ export default {
     insFixedInstruction: 'Demandez une police commerciale autonome de transport de personnes conforme aux exigences TNC de Floride et couvrant toutes les périodes — et non un avenant de covoiturage sur une police personnelle.',
     insStatusTitle: "Statut Continu de l’Assurance",
     insAuthorizeTitle: "Autorisation unique de vérification",
+    insProviderProcessTitle: "Vérification propre au fournisseur",
+    insProviderProcessBody: "Votre assureur ou courtier exige son propre formulaire d’autorisation, portail ou processus de vérification. American Rider Operator Relations gérera cette exception avec vous; l’échéance de vérification reste applicable.",
     insAuthorizeBody: "Autorisez American Rider à demander à votre assureur, agent agréé, courtier, MGA ou service de suivi approuvé uniquement si la police reste active et matériellement inchangée aux fins d’éligibilité. American Rider ne demande ni moyen de paiement, ni historique de sinistres, ni informations sans rapport.",
     insAuthorizeButton: "Autoriser la Vérification du Statut",
     insAuthorized: "Vérification du statut autorisée",

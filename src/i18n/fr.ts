@@ -41,6 +41,7 @@ export default {
     forgotPassword: 'Mot de passe oublié ?',
   },
   common: {
+    cancel: 'Annuler',
     back: 'Retour',
     done: 'Terminé',
     language: 'Langue',

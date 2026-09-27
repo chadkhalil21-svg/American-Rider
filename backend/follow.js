@@ -70,7 +70,18 @@ async function travelForToken(token) {
     if (q.empty) return null;
     const d = q.docs[0];
     const r = { id: d.id, ...d.data() };
-    if (Number(r.followIssuedAt || 0) < Date.now() - MAX_LIFE_MS) return null;
+    const now = Date.now();
+    const issuedAt = Number(r.followIssuedAt || 0);
+    if (!issuedAt || issuedAt < now - MAX_LIFE_MS) return null;
+
+    // A contact may see that the Travel ended, but the bearer link does not remain a
+    // long-lived location/itinerary capability. Completed and cancelled Travel get only the
+    // short grace period promised by this module.
+    const status = String(r.status || '');
+    if (!ACTIVE.includes(status)) {
+      const endedAt = Number(r.completedAt || r.statusAt || issuedAt);
+      if (!endedAt || endedAt < now - GRACE_MS) return null;
+    }
     return r;
   } catch {
     return null;

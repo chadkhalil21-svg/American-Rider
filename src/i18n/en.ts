@@ -761,7 +761,7 @@ export default {
     anonymousRecords: 'Service Records',
     yourPasswordPh: 'Your password',
     keepMyAccount: 'Keep my account',
-    configureThisTravel: 'Saved to your account as your preferred cabin environment.'
+    configureThisTravel: 'Saved to your account as your preferred cabin environment.',
     completedTravelAppears: 'Completed travel appears here.',
     mapNeedsApp: 'Choosing a pickup on the map needs the iPhone app',
     searchByNameInstead: 'You can still search for a pickup spot by name.',

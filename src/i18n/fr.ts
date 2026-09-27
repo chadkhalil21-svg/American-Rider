@@ -551,7 +551,7 @@ export default {
     bgCompany: 'SOCIÉTÉ DE VÉRIFICATION',
     bgProviderName: 'Nom du prestataire',
     bgReportDate: 'DATE DU RAPPORT',
-    bgReportDatePlaceholder: 'JJ/MM/AAAA',
+    bgReportDatePlaceholder: 'YYYY-MM-DD',
     bgReportDateInvalid: 'Indiquez la date figurant sur le rapport de vérification.',
     bgCriminalSex: 'Antécédents judiciaires et registre des délinquants sexuels',
     bgDrivingHistory: 'Historique de conduite',

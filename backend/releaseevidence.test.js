@@ -8,6 +8,8 @@ assert.ok(verifier.includes("m.candidateSha !== expectedSha"),'evidence from ano
 assert.ok(verifier.includes("g.result !== 'pass'"),'pending/failing external gates cannot release');
 assert.ok(verifier.includes("independent reviewer missing"),'external evidence requires review');
 assert.ok(verifier.includes("operationalMissing must be []"),'production readiness must be clean');
-assert.ok(verifier.includes("English disclosure not reviewed"),'insurance disclosure review is mandatory');
+assert.ok(verifier.includes("englishDisclosureReviewed"),'insurance disclosure review is mandatory');
+assert.ok(verifier.includes("continuingStatusMonitoringValidated"),'continuing insurance monitoring evidence is mandatory');
+assert.ok(verifier.includes("adverseStatusLockoutValidated"),'adverse insurance status lockout evidence is mandatory');
 assert.ok(verifier.includes("uxRubric:"),'whole-product UX doctrine is enforced by the release verifier');
 console.log('all external release-evidence contract tests passed');

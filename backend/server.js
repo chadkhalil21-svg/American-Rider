@@ -877,7 +877,7 @@ app.post('/operator/online', requireAuth, requireOperationalReadiness, async (re
     // THE DEFECT THIS CLOSES, and it is the worst one left. This route checked Stripe payouts,
     // an insurance expiry date and a position — and never once asked whether the operator had
     // passed a background screening. The whole apparatus behind that question existed:
-    // Florida's standard encoded in screening.js, the Checkr pipeline, the adjudication, the
+    // Florida's standard encoded in screening.js, the screening-provider pipeline, the adjudication, the
     // three-year clock, twenty-eight tests. None of it was consulted at the only moment it
     // decides anything. An operator who had never been screened could carry a passenger
     // provided they had a Stripe account and had typed a date into a box.
@@ -888,7 +888,7 @@ app.post('/operator/online', requireAuth, requireOperationalReadiness, async (re
     // WHY IT IS GATED ON LIVE MODE rather than always. dispatch.ts already draws this line:
     // demonstration stand-ins are acceptable while no real traveler is carried, and never once
     // money is real. Refusing every operator today would stop the founders testing their own
-    // product before Checkr is credentialed. In test mode the travel is a demonstration; in
+    // product before a screening provider is configured. In test mode the travel is a demonstration; in
     // live mode a stranger gets into a car.
     //
     // The unscreened case is STAMPED either way, so /ops shows who is on duty without a
@@ -1914,7 +1914,7 @@ app.post('/operator/document', requireAuth, LIMITS.document, async (req, res) =>
 //   travel     — authorized by the PICKUP (and destination) the traveler asks for, wherever
 //                the traveler happens to be standing. Priced routes check it (market.js); so
 //                does dispatch.
-//   operators  — the costly and regulated steps (document reading, Checkr, Stripe Connect,
+//   operators  — the costly and regulated steps (document reading, screening, Stripe Connect,
 //                going on duty) run only for an operator whose declared operating market is
 //                ACTIVE. The market's CURRENT status is read each time, so switching a county
 //                to WAITLIST stops new work there at once.
@@ -2672,7 +2672,7 @@ app.get('/operator/screening', requireAuth, async (req, res) => {
     res.json({
       ok: true,
       provider: 'external',
-      providerUrl: readKey('SCREENING_PROVIDER_URL') || null,
+      providerUrl: screeningReady() ? readKey('SCREENING_PROVIDER_URL') : null,
       jurisdiction: market?.state ? { state: market.state } : null,
       screening: user.screening || null,
     });

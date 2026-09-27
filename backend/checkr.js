@@ -87,8 +87,22 @@ async function api(method, path, body) {
  * webhook above it in server.js, this needs the raw body, so the route must mount before
  * express.json(); that ordering is load-bearing there and it is load-bearing here.
  */
+function webhookSigningKey() {
+  // Checkr account-level webhooks are signed with the account API key. Partner-application
+  // webhooks are signed with the Partner Application client_secret. Keep the legacy explicit
+  // key as an override for an already-configured deployment, but never require a fabricated
+  // second Checkr secret when the account-level API key is the documented signing key.
+  return readKey('CHECKR_PARTNER_CLIENT_SECRET')
+    || readKey('CHECKR_WEBHOOK_SECRET')
+    || readKey('CHECKR_API_KEY');
+}
+
+function webhookReady() {
+  return !!webhookSigningKey();
+}
+
 function verifySignature(rawBody, signatureHeader) {
-  const secret = readKey('CHECKR_WEBHOOK_SECRET');
+  const secret = webhookSigningKey();
   if (!secret || !signatureHeader) return false;
   const expected = crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
   const got = String(signatureHeader);
@@ -518,7 +532,7 @@ module.exports = {
   ready,
   invite,
   reinvite,
-  verifySignature,
+  verifySignature, webhookReady,
   handleEvent,
   mapReport,
   uidForCandidate,

@@ -22,10 +22,10 @@
 // has failed at the only thing it absolutely must not fail at. The limit exists to make abuse
 // VISIBLE, not to gate the alarm.
 //
-// IN MEMORY, PER INSTANCE, AND HONEST ABOUT IT. Counters reset on deploy and are not shared
-// between instances, so this is a speed bump rather than a wall. It is worth having anyway: it
-// costs nothing, it stops the cheap script, and the expensive script still has to buy cards.
-// A shared counter belongs in Firestore when there is more than one instance to share it.
+// AUTHENTICATED LIMITS ARE DURABLE. Per-account counters use Firestore transactions so deploys
+// and multiple server instances share one boundary. If Firestore is temporarily unavailable,
+// the process-local counter remains as an availability fallback. Anonymous IP limits stay local:
+// they are deliberately loose cost controls, not an authorization boundary.
 
 const WINDOWS = new Map();
 const SHARED_COLLECTION = 'rate_limits';

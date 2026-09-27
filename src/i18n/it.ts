@@ -302,6 +302,8 @@ export default {
     insFixedInstruction: 'Richieda una polizza commerciale autonoma per il trasporto di persone conforme ai requisiti TNC della Florida e valida in tutti i periodi, non un’estensione per il trasporto condiviso su una polizza personale.',
     insStatusTitle: "Stato Continuo dell’Assicurazione",
     insAuthorizeTitle: "Autorizzazione una tantum dello stato",
+    insProviderProcessTitle: "Verifica specifica del fornitore",
+    insProviderProcessBody: "Il suo assicuratore o broker richiede un proprio modulo di autorizzazione, portale o processo di verifica. American Rider Operator Relations gestirà l’eccezione con lei; la scadenza di verifica resta valida.",
     insAuthorizeBody: "Autorizzi American Rider a chiedere al suo assicuratore, agente autorizzato, broker, MGA o servizio di monitoraggio approvato soltanto se la polizza resta attiva e sostanzialmente invariata ai fini dell’idoneità. American Rider non richiede metodo di pagamento, sinistri o informazioni non pertinenti.",
     insAuthorizeButton: "Autorizzare Verifica dello Stato",
     insAuthorized: "Verifica dello stato autorizzata",

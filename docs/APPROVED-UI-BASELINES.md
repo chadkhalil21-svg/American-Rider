@@ -13,6 +13,8 @@ This file records founder-approved interface checkpoints. An approved checkpoint
 | Profile / Account Details / Saved Places / Cabin Environment / Traveler Safety | `approved/profile-account-safety-2026-09-27` | `362b5f7c21642bf6d17c9c6859aca8efe0bc9569` |
 | Sign-in & Security / account identity management | `approved/account-security-2026-09-27` | `6d3bc82c8369a9c01f4045b919b73693710eabd2` |
 
+| Operator Screening | `approved/operator-screening-2026-09-28` | `0ad546210b374e32353f6b56a15b72c3d0f99b0d` |
+
 ## Lock protocol
 
 When a surface is approved:

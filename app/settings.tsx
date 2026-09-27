@@ -19,7 +19,8 @@ import { useLanguage } from '../src/state/LanguageContext';
 import { colors } from '../src/theme';
 
 export default function Settings() {
-  const { t, language, setLanguage, languages } = useLanguage();
+  const { t, language, languages } = useLanguage();
+  const selectedLanguage = languages.find((l) => l.code === language)?.label ?? language;
   const router = useRouter();
   const goBack = useGoBack();
   const { note } = useNote();
@@ -53,24 +54,15 @@ export default function Settings() {
             English headings is how a translated app stays English for the people it was
             translated for. The device's language is already applied on first launch, so this
             is for correcting that guess rather than making it. */}
-        <View style={styles.row}>
-          <Text style={styles.rowTitle}>{t('common.language')}</Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', flex: 1, gap: 6 }}>
-            {languages.map((l) => (
-              <Pressable key={l.code} onPress={() => setLanguage(l.code)} hitSlop={6}>
-                <Text
-                  style={[
-                    styles.langChip,
-                    l.code === language && styles.langChipOn,
-                  ]}
-                >
-                  {/* Endonyms. Somebody looking for Spanish is looking for "Español". */}
-                  {l.label}
-                </Text>
-              </Pressable>
-            ))}
+        <Pressable onPress={() => router.navigate('/language')}>
+          <View style={styles.row}>
+            <Text style={[styles.rowTitle, styles.rowTitleWrap]}>{t('common.language')}</Text>
+            <View style={styles.rowRight}>
+              <Text style={styles.rowValue}>{selectedLanguage}</Text>
+              <Chev />
+            </View>
           </View>
-        </View>
+        </Pressable>
         <Pressable onPress={() => router.navigate('/family')}>
           <View style={[styles.row, styles.hair]}>
             <Text style={[styles.rowTitle, styles.rowTitleWrap]}>{t('traveler.familyTitle')}</Text>
@@ -153,17 +145,8 @@ const styles = StyleSheet.create({
     paddingVertical: 13.5,
   },
   hair: { borderTopWidth: 1, borderTopColor: colors.hairline },
-  langChip: {
-    fontSize: 13,
-    color: colors.muted,
-    borderWidth: 1,
-    borderColor: colors.hairline,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    overflow: 'hidden',
-  },
-  langChipOn: { color: '#FFFFFF', backgroundColor: colors.ink, borderColor: colors.ink },
+  rowRight: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
+  rowValue: { fontSize: 13.5, color: colors.muted, flexShrink: 1, textAlign: 'right' },
 
   rowTitle: { fontSize: 14.5, color: colors.ink },
   // The Notifications row names the screen it opens, and that name is now a phrase rather than

@@ -574,7 +574,7 @@ export default {
     couldNotEnterService: 'Could not enter service.',
     errEmailInUse: 'That email already has an account — try signing in.',
     errWeakPassword: 'Password should be at least 6 characters.',
-    errBadCredentials: 'Email or password is incorrect.',
+    errBadCredentials: 'We could not sign you in. Check your email address and password, or use Forgot password.',
     errNetwork: 'Network error — check your connection and try again.',
     errGeneric: 'Something went wrong. Please try again.',
     errNoAccount: 'No signed-in account.',

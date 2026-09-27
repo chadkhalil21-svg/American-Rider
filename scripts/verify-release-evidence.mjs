@@ -36,8 +36,10 @@ for (const k of [
   'noPlaceholderOrSimulatedProductionExperience'
 ]) if (ux[k] !== true) failures.push('uxRubric: '+k+' was not attested true');
 const ins=m.gates?.insurance?.details||{};
-for (const k of ['carrier','binderOrPolicyReference','effectiveDate','expirationDate']) if (!String(ins[k]||'').trim()) failures.push('insurance: '+k+' missing');
-if (ins.englishDisclosureReviewed !== true) failures.push('insurance: English disclosure not reviewed');
+for (const k of ['jurisdiction','statuteReviewed','disclosureVersion']) if (!String(ins[k]||'').trim()) failures.push('insurance: '+k+' missing');
+for (const k of ['jurisdictionRuleReviewed','continuingStatusMonitoringValidated','adverseStatusLockoutValidated','directProviderConfirmationValidated','englishDisclosureReviewed']) {
+  if (ins[k] !== true) failures.push('insurance: '+k+' was not attested true');
+}
 const langs=new Set(ins.translationsReviewed||[]);
 for (const lang of ['ES','FR','IT','DE']) if (!langs.has(lang)) failures.push('insurance: '+lang+' disclosure not reviewed');
 

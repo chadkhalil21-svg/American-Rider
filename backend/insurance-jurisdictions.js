@@ -13,9 +13,11 @@ const REQUIREMENTS = Object.freeze({
     statute: 'Fla. Stat. §627.748(7)',
     source: 'https://www.flsenate.gov/Laws/Statutes/2025/627.748',
     loggedOn: Object.freeze({ perPerson: 50000, perIncident: 100000, propertyDamage: 25000 }),
-    ridePrimaryLiability: 1000000,
+    ride: Object.freeze({ primaryLiabilityMinDollars: 1000000 }),
     pipRequired: true,
+    pipMinDollars: 10000,
     umUim: 'as required by Fla. Stat. §627.727',
+    umRejectionAccepted: () => process.env.INSURANCE_UM_REJECTION_ACCEPTED === '1',
     policyUse: 'transportation-network / for-hire passenger transportation',
     script:
       "I'm an independent contractor using my own vehicle for prearranged passenger transportation through a transportation network company in Florida. I need a standalone commercial for-hire / livery automobile policy — not a personal auto policy and not a rideshare endorsement. Please quote the lowest-cost policy that recognizes TNC passenger transportation and satisfies Florida Statute 627.748 for every required period, including at least $50,000/$100,000/$25,000 while logged on and not on a prearranged Travel and at least $1,000,000 primary liability during a prearranged Travel, together with the required Florida PIP and UM/UIM treatment. Please confirm the carrier, deductibles, exclusions, whether my vehicle and any airport/private-livery work are covered, and how cancellation, nonrenewal, or policy-status changes can be communicated to American Rider.",
@@ -41,7 +43,7 @@ function publicConfig(rule) {
     policyUse: rule.policyUse,
     limits: {
       loggedOn: rule.loggedOn,
-      ridePrimaryLiability: rule.ridePrimaryLiability,
+      ridePrimaryLiability: rule.ride.primaryLiabilityMinDollars,
       pipRequired: rule.pipRequired,
       umUim: rule.umUim,
     },

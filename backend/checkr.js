@@ -265,15 +265,26 @@ async function fetchReportDetails(reportId) {
   const get = async (path) => {
     try { return await api('GET', path); } catch { return null; }
   };
-  const criminalIds = [
-    report.national_criminal_search_id,
-    ...(Array.isArray(report.county_criminal_search_ids) ? report.county_criminal_search_ids : []),
-    ...(Array.isArray(report.state_criminal_search_ids) ? report.state_criminal_search_ids : []),
-  ].filter(Boolean);
-  const [sexOffender, mvr, ...criminal] = await Promise.all([
+
+  // Each screening ID MUST be retrieved from its own Checkr resource. County and state IDs
+  // are not National Criminal Search IDs. Sending all three kinds to /national_criminal_searches
+  // silently drops authoritative county/state records when those calls 404 — exactly the
+  // records Florida requires us to validate rather than merely observe in a pointer database.
+  const criminalFetches = [];
+  if (report.national_criminal_search_id) {
+    criminalFetches.push(get(`/national_criminal_searches/${report.national_criminal_search_id}`));
+  }
+  for (const id of (Array.isArray(report.county_criminal_search_ids) ? report.county_criminal_search_ids : [])) {
+    criminalFetches.push(get(`/county_criminal_searches/${id}`));
+  }
+  for (const id of (Array.isArray(report.state_criminal_search_ids) ? report.state_criminal_search_ids : [])) {
+    criminalFetches.push(get(`/state_criminal_searches/${id}`));
+  }
+
+  const [sexOffender, mvr, criminal] = await Promise.all([
     report.sex_offender_search_id ? get(`/sex_offender_searches/${report.sex_offender_search_id}`) : null,
     report.motor_vehicle_report_id ? get(`/motor_vehicle_reports/${report.motor_vehicle_report_id}`) : null,
-    ...criminalIds.map((id) => get(`/national_criminal_searches/${id}`)),
+    Promise.all(criminalFetches),
   ]);
   return { report, details: { criminal: criminal.filter(Boolean), sexOffender, mvr } };
 }

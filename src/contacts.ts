@@ -1,5 +1,8 @@
 // Trusted contacts — the up-to-three people who can be told where a traveler is.
 //
+// The list is account-backed with an account-scoped device cache so a safety configuration
+// follows the Traveler to a replacement phone without crossing between accounts on one device.
+//
 // WHY THIS FILE EXISTS: the list used to be `string[]` — names only. Safe Travels then
 // offered "Add a contact" and stored, say, "Ana". A name is not a way of reaching anyone,
 // so the emergency screen could not have messaged a single one of them. Storing a number

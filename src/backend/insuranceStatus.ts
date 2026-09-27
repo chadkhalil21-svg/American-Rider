@@ -10,6 +10,8 @@ export type InsuranceStatus = {
   lastVerifiedAt?: number | null;
   operatorAttestedAt?: number | null;
   nextVerificationDueAt?: number | null;
+  operatorActionRequired?: boolean;
+  graceUntil?: number | null;
   contact?: { name?: string; email?: string; type?: string } | null;
 };
 

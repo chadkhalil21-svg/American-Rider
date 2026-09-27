@@ -30,6 +30,7 @@ function cleanStatus(v) {
   const s = String(v || '').trim().toLowerCase();
   return [
     'verified_active',
+    'verification_due',
     'pending_cancellation',
     'cancelled',
     'nonrenewed',

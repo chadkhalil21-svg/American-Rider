@@ -11,7 +11,7 @@
 // sheet at payment), a portrait (nothing stores one), a corporate billing switch (not built).
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../src/components/AppText';
 import { loadContacts, type TrustedContact } from '../src/contacts';

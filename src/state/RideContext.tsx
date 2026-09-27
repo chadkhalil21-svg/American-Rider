@@ -756,10 +756,12 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   // booking's class after a retry.
   const travelClassRef = useRef('standard');
   const travelPartyRef = useRef(travelParty);
+  const tripPrefsRef = useRef(tripPrefs);
   useEffect(() => {
     travelClassRef.current = travelClass;
   }, [travelClass]);
   useEffect(() => { travelPartyRef.current = travelParty; }, [travelParty]);
+  useEffect(() => { tripPrefsRef.current = tripPrefs; }, [tripPrefs]);
 
   // Match the nearest available operator for the ride already staged in lastTripRef.
   // Tracks a real state so the live screen can show progress, a "none available" message,
@@ -803,6 +805,12 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       excludeIds: declinedByRef.current,
       journeyNo: smartJourneyRef.current?.stage === 'leg2' ? smartJourneyRef.current.leg1No ?? null : null,
       party: travelPartyRef.current,
+      cabinPreferences: {
+        ...getCabinPrefs(),
+        quiet: tripPrefsRef.current.quiet,
+        charging: tripPrefsRef.current.charging,
+        luggage: tripPrefsRef.current.luggage,
+      },
     })
       .then((res) => {
         if (res) {

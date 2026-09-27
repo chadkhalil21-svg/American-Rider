@@ -126,7 +126,7 @@ export default function AccountEmail() {
         <>
           <View style={{ flex: 1, minHeight: 30 }} />
           <PrimaryButton
-            label={busy ? t('traveler.busyChecking') : t('traveler.continue')}
+            label={busy ? t('traveler.busyChecking') : t('auth.continueLabel')}
             disabled={busy || !emailOk(nextEmail) || !password}
             onPress={change}
             style={{ paddingVertical: 16 }}

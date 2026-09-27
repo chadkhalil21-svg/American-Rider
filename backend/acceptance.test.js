@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const { acceptOffer } = require('./eligibility');
 const { assessOperator } = require('./qualification');
+const { initialMonitoringFromDocument } = require('./insurance-monitoring');
 const { DISCLOSURE_VERSION } = require('./disclosure');
 
 const R = [];
@@ -55,12 +56,17 @@ const insuranceDoc = () => {
   };
   return d;
 };
-const goodUser = () => ({
-  name: 'Ana Operator',
-  insuranceDisclosure: { version: DISCLOSURE_VERSION, at: NOW - 1000 },
-  documents: { license: doc(), registration: doc({ plate: 'KTR4821' }), insurance: insuranceDoc() },
-  screening: { decision: 'pass', recheckDue: NOW + 1e10 },
-});
+const goodUser = () => {
+  const insurance = insuranceDoc();
+  return {
+    name: 'Ana Operator',
+    operatingMarket: { id: 'fl-miami-dade' },
+    insuranceDisclosure: { version: DISCLOSURE_VERSION, at: NOW - 1000 },
+    documents: { license: doc(), registration: doc({ plate: 'KTR4821' }), insurance },
+    insuranceMonitoring: initialMonitoringFromDocument(insurance, NOW),
+    screening: { decision: 'pass', recheckDue: NOW + 1e10 },
+  };
+};
 const OK = { account: { disabled: false }, payouts: { enabled: true } };
 const goodFleet = () => ({
   available: true, onlineAt: NOW, commissioned: true, disclosureVersion: DISCLOSURE_VERSION,

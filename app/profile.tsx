@@ -125,7 +125,7 @@ export default function Profile() {
 
         <Pressable onPress={() => router.navigate('/account-mobile')} accessibilityRole="button">
           <View style={[styles.row, styles.hair]}>
-            <Text style={styles.rowTitle}>{t('auth.mobileNumberLabel')}</Text>
+            <Text style={styles.rowTitle}>{t('traveler.mobileNumber')}</Text>
             <View style={styles.valueNav}>
               <View style={styles.valueStack}>
                 <Text style={accountMobile ? styles.statValue : styles.notSet} numberOfLines={1}>

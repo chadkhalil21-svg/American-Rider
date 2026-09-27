@@ -15,6 +15,7 @@ export default function AccountMobile() {
   const { t } = useLanguage();
   const { user } = useAuth();
   const [current, setCurrent] = useState('');
+  const [verified, setVerified] = useState(false);
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [stage, setStage] = useState<'number' | 'code'>('number');
@@ -26,7 +27,10 @@ export default function AccountMobile() {
     getDoc(doc(db, 'users', user.uid))
       .then((snap) => {
         const m = snap.data()?.mobile;
-        if (typeof m === 'string') setCurrent(m.trim());
+        const existing = typeof m === 'string' ? m.trim() : '';
+        setCurrent(existing);
+        setVerified(snap.data()?.phoneVerified === true);
+        if (existing && snap.data()?.phoneVerified !== true) setPhone(existing);
       })
       .catch(() => {});
   }, [user?.uid]);
@@ -63,12 +67,14 @@ export default function AccountMobile() {
   return (
     <Screen>
       <LetterheadBar onBack={goBack} />
-      <Title size={24}>{t('traveler.changeMobileTitle')}</Title>
-      <Sub>{t('traveler.changeMobileSub')}</Sub>
+      <Title size={24}>{verified ? t('traveler.changeMobileTitle') : t('traveler.verifyMobileTitle')}</Title>
+      <Sub>{verified ? t('traveler.changeMobileSub') : t('traveler.verifyMobileSub')}</Sub>
 
       {current ? (
         <>
-          <SectionLabel style={{ marginTop: 22 }}>{t('traveler.currentNumber')}</SectionLabel>
+          <SectionLabel style={{ marginTop: 22 }}>
+            {verified ? t('traveler.currentNumber') : t('traveler.numberToVerify')}
+          </SectionLabel>
           <Card style={styles.currentCard}>
             <Text style={styles.currentValue}>{current}</Text>
           </Card>
@@ -76,7 +82,11 @@ export default function AccountMobile() {
       ) : null}
 
       <SectionLabel style={{ marginTop: 22 }}>
-        {stage === 'number' ? t('traveler.newMobileNumber') : t('traveler.verificationCode')}
+        {stage === 'number'
+          ? verified
+            ? t('traveler.newMobileNumber')
+            : t('traveler.mobileNumber')
+          : t('traveler.verificationCode')}
       </SectionLabel>
       <Card style={styles.fieldCard}>
         <TextInput

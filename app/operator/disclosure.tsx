@@ -23,11 +23,11 @@ import { BackLink, Card, Chev, PrimaryButton, Screen, Sub, Title } from '../../s
 import { useLanguage } from '../../src/state/LanguageContext';
 import { colors } from '../../src/theme';
 
-const dateLabel = (ms: number) =>
-  new Date(ms).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+const dateLabel = (ms: number, language: string) =>
+  new Date(ms).toLocaleDateString(language, { month: 'long', day: 'numeric', year: 'numeric' });
 
 export default function OperatorDisclosure() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const goBack = useGoBack();
   const router = useRouter();
   const [doc, setDoc] = useState<Disclosure | null>(null);
@@ -119,7 +119,7 @@ export default function OperatorDisclosure() {
       {acknowledgedAt ? (
         <Card style={styles.doneCard}>
           <Text style={styles.heading}>
-            {t('traveler.acknowledgedOn', { date: dateLabel(acknowledgedAt) })}
+            {t('traveler.acknowledgedOn', { date: dateLabel(acknowledgedAt, language) })}
           </Text>
           <Text style={[styles.body, { paddingBottom: 0 }]}>
             {t('traveler.disclosureRecorded')}

@@ -120,6 +120,13 @@ export type SimRequest = {
   tripNo?: string;
   /** The traveler's uid, so the operator can write into the thread. */
   travelerUid?: string;
+  cabinPreferences?: {
+    climate: 'Cool' | 'Moderate' | 'Warm';
+    music: 'None' | 'Traveler Choice';
+    quiet: boolean;
+    charging: boolean;
+    luggage: boolean;
+  };
 };
 
 /** Initials from whatever name the traveler set. Empty when they set none. */
@@ -578,6 +585,7 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
       bookedForAnother: t.bookedForAnother,
       teen: t.teen,
       guardianName: t.guardianName,
+      cabinPreferences: t.cabinPreferences,
       tInit: initialsOf(t.travelerName),
       pickup: t.dep,
       dest: t.dest,
@@ -771,6 +779,7 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
           bookedForAnother: underway.bookedForAnother,
           teen: underway.teen,
           guardianName: underway.guardianName,
+          cabinPreferences: underway.cabinPreferences,
           tInit: initialsOf(underway.travelerName),
           pickup: underway.dep,
           dest: underway.dest,

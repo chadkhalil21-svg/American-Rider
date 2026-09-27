@@ -3087,6 +3087,15 @@ app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, requireOperationalRea
   // party fields for presentation, but cannot change the Traveler/Teen/guardian envelope.
   const party = partyResult.party;
 
+  const rawCabin = b.cabinPreferences && typeof b.cabinPreferences === 'object' ? b.cabinPreferences : {};
+  const cabinPreferences = {
+    climate: ['Cool', 'Moderate', 'Warm'].includes(String(rawCabin.climate)) ? String(rawCabin.climate) : 'Moderate',
+    music: ['None', 'Traveler Choice'].includes(String(rawCabin.music)) ? String(rawCabin.music) : 'None',
+    quiet: rawCabin.quiet !== false,
+    charging: rawCabin.charging === true,
+    luggage: rawCabin.luggage === true,
+  };
+
   let fleet;
   try {
     fleet = await availableOperatorCandidates(db);
@@ -3176,6 +3185,7 @@ app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, requireOperationalRea
     pricedBy: priced.pricedBy,
     cardCountry: priced.cardCountry,
     journey: priced.journey || null,
+    cabinPreferences,
     destinationLat: Number.isFinite(Number(b.destinationPoint?.lat)) ? Number(b.destinationPoint.lat) : null,
     destinationLng: Number.isFinite(Number(b.destinationPoint?.lng)) ? Number(b.destinationPoint.lng) : null,
     status: 'assigned',

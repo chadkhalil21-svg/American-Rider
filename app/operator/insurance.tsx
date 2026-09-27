@@ -30,7 +30,6 @@ export default function OperatorInsurance() {
   const [brokerEmail, setBrokerEmail] = useState('');
   const [statusBusy, setStatusBusy] = useState(false);
   const [monthlyPremium, setMonthlyPremium] = useState('600');
-  const [plannedHours, setPlannedHours] = useState('20');
 
   useEffect(() => {
     insuranceConfig().then((x) => { if (x) setConfig(x); });
@@ -96,12 +95,24 @@ export default function OperatorInsurance() {
   const st = op.docs.insurance;
 
   const premiumN = Math.max(0, Number(monthlyPremium) || 0);
-  const plannedHoursN = Math.max(0, Number(plannedHours) || 0);
-  const fareNeeded = premiumN / 0.99;
-  const monthlyPlannedHours = plannedHoursN * 4.33;
-  const insurancePerPlannedHour = monthlyPlannedHours > 0 ? premiumN / monthlyPlannedHours : 0;
+  const AR_SHARE = 0.99;
+  // Consumer Reports, June 2026: observed platform retention of 43%–49.5% in its
+  // matched rider/driver sample, implying driver receipts of 57%–50.5%. Uber and Lyft
+  // dispute that accounting because it includes external costs. This is a benchmark,
+  // not an earnings forecast.
+  const BENCH_DRIVER_HIGH = 0.57;
+  const BENCH_DRIVER_LOW = 0.505;
+  const arPer100 = 100 * AR_SHARE;
+  const benchmarkPer100Low = 100 * BENCH_DRIVER_LOW;
+  const benchmarkPer100High = 100 * BENCH_DRIVER_HIGH;
+  const additionalLow = arPer100 - benchmarkPer100High;
+  const additionalHigh = arPer100 - benchmarkPer100Low;
+  const fareNeededAR = premiumN / AR_SHARE;
+  const fareNeededBenchmarkLow = premiumN / BENCH_DRIVER_HIGH;
+  const fareNeededBenchmarkHigh = premiumN / BENCH_DRIVER_LOW;
   const money = (n: number) => String.fromCharCode(36) + n.toFixed(0);
   const money2 = (n: number) => String.fromCharCode(36) + n.toFixed(2);
+  const rangeMoney = (a: number, b: number) => money(a) + '–' + money(b);
   const marketState = config?.state || 'FL';
   const marketInsurers = INSURERS.filter((x) => !x.states || x.states.includes(marketState));
 
@@ -196,31 +207,47 @@ export default function OperatorInsurance() {
         )}
       </Card>
 
-      <SectionLabel style={styles.lbl}>{t('traveler.insEconomicsTitle')}</SectionLabel>
+      <SectionLabel style={styles.lbl}>{t('traveler.insCompareTitle')}</SectionLabel>
       <Card style={styles.econCard}>
-        <Text style={styles.body}>{t('traveler.insEconomicsBody')}</Text>
-        <Text style={[styles.body, { marginTop: 8 }]}>{t('traveler.insNoDemandForecast')}</Text>
+        <Text style={styles.body}>{t('traveler.insCompareBody')}</Text>
+
+        <View style={styles.compareBlock}>
+          <Text style={styles.coverLabel}>{t('traveler.insPer100')}</Text>
+          <View style={styles.econRow}>
+            <Text style={styles.body}>{t('traveler.insAmericanRider')}</Text>
+            <Text style={styles.econValue}>{money(arPer100)}</Text>
+          </View>
+          <View style={styles.econRow}>
+            <Text style={styles.body}>{t('traveler.insObservedBenchmark')}</Text>
+            <Text style={styles.econValue}>{rangeMoney(benchmarkPer100Low, benchmarkPer100High)}</Text>
+          </View>
+          <View style={styles.econRow}>
+            <Text style={styles.body}>{t('traveler.insDifference')}</Text>
+            <Text style={styles.econValue}>{rangeMoney(additionalLow, additionalHigh)}</Text>
+          </View>
+        </View>
+
+        <Text style={[styles.body, { marginTop: 16 }]}>{t('traveler.insNoHoursNeeded')}</Text>
         <View style={styles.econInputs}>
           <View style={styles.econField}>
             <Text style={styles.coverLabel}>{t('traveler.insMonthlyPremium')}</Text>
             <TextInput value={monthlyPremium} onChangeText={setMonthlyPremium} keyboardType="decimal-pad" style={styles.econInput} />
           </View>
-          <View style={styles.econField}>
-            <Text style={styles.coverLabel}>{t('traveler.insPlannedHours')}</Text>
-            <TextInput value={plannedHours} onChangeText={setPlannedHours} keyboardType="decimal-pad" style={styles.econInput} />
-          </View>
         </View>
+
+        <Text style={[styles.coverLabel, { marginTop: 18 }]}>{t('traveler.insPremiumOffset')}</Text>
         <View style={styles.econRows}>
           <View style={styles.econRow}>
-            <Text style={styles.body}>{t('traveler.insFareNeeded')}</Text>
-            <Text style={styles.econValue}>{money(fareNeeded)}</Text>
+            <Text style={styles.body}>{t('traveler.insPremiumOffsetAR')}</Text>
+            <Text style={styles.econValue}>{money(fareNeededAR)}</Text>
           </View>
           <View style={styles.econRow}>
-            <Text style={styles.body}>{t('traveler.insInsurancePerHour')}</Text>
-            <Text style={styles.econValue}>{money2(insurancePerPlannedHour)}</Text>
+            <Text style={styles.body}>{t('traveler.insPremiumOffsetBenchmark')}</Text>
+            <Text style={styles.econValue}>{rangeMoney(fareNeededBenchmarkLow, fareNeededBenchmarkHigh)}</Text>
           </View>
         </View>
-        <Text style={styles.disclaimer}>{t('traveler.insEstimateNote2')}</Text>
+
+        <Text style={styles.disclaimer}>{t('traveler.insBenchmarkSource')}</Text>
       </Card>
 
       {/* CONTINUING COVERAGE. The expiry date is deterministic and gates duty/acceptance.
@@ -387,6 +414,7 @@ const styles = StyleSheet.create({
   statusCard: { marginTop: 12, paddingVertical: 18, paddingHorizontal: 20 },
   statusTitle: { fontSize: 15, fontWeight: '600', color: colors.ink, marginBottom: 8 },
   econCard: { paddingVertical: 18, paddingHorizontal: 20 },
+  compareBlock: { marginTop: 18 },
   econInputs: { marginTop: 16, gap: 12 },
   econField: { gap: 6 },
   econInput: {

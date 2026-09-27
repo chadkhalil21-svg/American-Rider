@@ -24,6 +24,15 @@ function AppGate() {
   const { user, initializing, onboarding } = useAuth();
   const router = useRouter();
 
+  // DESIGN REVIEW BYPASS — web preview only. This never runs in native builds and is
+  // inert unless the Render preview explicitly enables it. Add ?preview=app to the
+  // preview URL to inspect signed-in surfaces without changing or weakening Firebase.
+  const webPreviewBypass =
+    Platform.OS === 'web' &&
+    process.env.EXPO_PUBLIC_AUTH_PREVIEW_BYPASS === '1' &&
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('preview') === 'app';
+
   // REGISTERED ONCE THERE IS AN ACCOUNT TO REGISTER AGAINST, not at launch. The token is
   // stored on `users/{uid}`, so asking before sign-in would have nowhere to put it — and
   // asking a stranger for permission to notify them is the wrong first impression besides.
@@ -58,7 +67,7 @@ function AppGate() {
       />
       {initializing ? (
         <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.bg, zIndex: 10 }]} />
-      ) : !user || onboarding ? (
+      ) : (!user || onboarding) && !webPreviewBypass ? (
         <View style={[StyleSheet.absoluteFill, { zIndex: 10 }]}>
           <AuthScreen />
         </View>

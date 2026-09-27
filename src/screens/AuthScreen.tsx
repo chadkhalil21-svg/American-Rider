@@ -653,7 +653,7 @@ export function AuthScreen() {
         )}
         {error ? <Text style={s.error}>{error}</Text> : null}
 
-        {isSignup ? <View style={{ flex: 1 }} /> : <View style={{ height: 30 }} />}
+        <View style={{ flex: 1 }} />
 
         {isSignup && (
           <Text style={[s.legal, { marginBottom: 14 }]}>

@@ -14,7 +14,7 @@ import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../src/components/AppText';
 import { useNative } from '../src/components/anim';
 import { useGoBack } from '../src/components/nav';
-import { Chip, LetterheadBar, PrimaryButton, Screen, SectionLabel, Sub, Title } from '../src/components/UI';
+import { Card, LetterheadBar, PrimaryButton, Screen, SectionLabel, Sub, Title } from '../src/components/UI';
 import { CLIMATES, MUSIC, setCabinPrefs, useCabinPrefs, type Climate, type Music } from '../src/state/cabinPrefs';
 import { useRide } from '../src/state/RideContext';
 import { useLanguage } from '../src/state/LanguageContext';
@@ -131,29 +131,44 @@ export default function CabinEnvironment() {
       )}
 
       <SectionLabel style={{ marginTop: 22 }}>{t('traveler.additionalRequests')}</SectionLabel>
-      <View style={styles.chips}>
-        <Chip
-          label={t('traveler.charger')}
-          on={charging}
-          onPress={() => {
-            const next = !charging;
-            setCabinPrefs({ charging: next });
-            if (next !== ride.tripPrefs.charging) ride.togglePref('tripPrefs', 'charging');
-          }}
-        />
-        <Chip
-          label={t('traveler.luggage')}
-          on={luggage}
-          onPress={() => {
-            const next = !luggage;
-            setCabinPrefs({ luggage: next });
-            if (next !== ride.tripPrefs.luggage) ride.togglePref('tripPrefs', 'luggage');
-          }}
-        />
-      </View>
+      <Card style={styles.requestCard}>
+        {[
+          {
+            label: t('traveler.charger'),
+            on: charging,
+            toggle: () => {
+              const next = !charging;
+              setCabinPrefs({ charging: next });
+              if (next !== ride.tripPrefs.charging) ride.togglePref('tripPrefs', 'charging');
+            },
+          },
+          {
+            label: t('traveler.luggage'),
+            on: luggage,
+            toggle: () => {
+              const next = !luggage;
+              setCabinPrefs({ luggage: next });
+              if (next !== ride.tripPrefs.luggage) ride.togglePref('tripPrefs', 'luggage');
+            },
+          },
+        ].map((item, i) => (
+          <Pressable
+            key={item.label}
+            onPress={item.toggle}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: item.on }}
+          >
+            <View style={[styles.requestRow, i > 0 && styles.requestHair]}>
+              <Text style={styles.requestLabel}>{item.label}</Text>
+              <Text style={[styles.requestCheck, !item.on && styles.requestCheckOff]}>✓</Text>
+            </View>
+          </Pressable>
+        ))}
+      </Card>
 
-      {/* DONE, NOT CONTINUE: this screen is reached from the sheet and returns to it. */}
-      <PrimaryButton label={t('common.done')} onPress={goBack} style={{ marginTop: 'auto' }} />
+      <View style={styles.doneSpacer} />
+      {/* DONE, NOT CONTINUE: preferences save as they are selected; Done simply closes the screen. */}
+      <PrimaryButton label={t('common.done')} onPress={goBack} style={styles.doneButton} />
     </Screen>
   );
 }

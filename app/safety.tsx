@@ -100,7 +100,7 @@ export default function SafeTravels() {
   return (
     <Screen>
       <LetterheadBar onBack={goBack} />
-      <Title>{t('traveler.safeTravels')}</Title>
+      <Title size={24}>{t('traveler.safeTravels')}</Title>
       {/* The subtitle states what is true and nothing more (Chad, 17 Sept 2026: state the
           outcome, not the mechanism). Route monitoring IS real now — backend/monitor.js
           reports a delay with a known cause, asks the operator about an unexplained stop,

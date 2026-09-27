@@ -8,7 +8,9 @@ const { readKey } = require('./env');
 // the TNC's digital network. 2. That the TNC driver's own automobile insurance policy might
 // not provide any coverage while the TNC driver is logged on to the digital network or is
 // engaged in a prearranged ride, depending on the terms of the TNC driver's own automobile
-// insurance policy."
+// insurance policy. 3. That compensated passenger transportation which is not a prearranged
+// TNC ride is subject to the financial-responsibility requirements in §324.032(1), and failure
+// to meet them is subject to the penalties in §324.221."
 //
 // TWO THINGS FOLLOW FROM THAT WORDING, and both shape this file.
 //
@@ -37,7 +39,7 @@ const { readKey } = require('./env');
 // This bump is not free and is made deliberately now: every operator who acknowledged
 // 2026-08-29.1 is asked to read and acknowledge again before going on duty. Today that is a
 // handful of test accounts; after the operator program opens on 28 Sept it would be everyone.
-const DISCLOSURE_VERSION = '2026-09-25.1';
+const DISCLOSURE_VERSION = '2026-09-26.1';
 const TNC_COVERAGE_TEXT = String(readKey('TNC_INSURANCE_DISCLOSURE') || '').trim();
 
 /**
@@ -78,6 +80,15 @@ const DISCLOSURE = {
       'policies exclude carrying passengers for payment. Read your policy, or ask your insurer ' +
       'directly whether it covers you while you operate for a transportation network company.',
   },
+  // (8)(a)3 — compensated passenger transportation outside a prearranged TNC Travel.
+  outsidePrearranged: {
+    heading: 'Travel must be prearranged through American Rider',
+    body:
+      'Florida law distinguishes prearranged TNC Travel from other compensated passenger transportation. ' +
+      'If you provide transportation for compensation that was not prearranged through American Rider’s ' +
+      'digital network, the coverage requirements in Fla. Stat. §324.032(1) apply. Failure to meet those ' +
+      'requirements can result in penalties under §324.221, up to and including a second-degree misdemeanor.',
+  },
   /** Shown instead of `ownPolicy` once a commercial policy has been verified. */
   ownPolicyVerified: {
     heading: 'The policy you have provided',
@@ -98,8 +109,9 @@ const DISCLOSURE = {
       'expiry date, and will not assign travel to an operator whose coverage has lapsed.',
   },
   acknowledgement:
-    'I have read this disclosure, including the coverage American Rider provides and the warning that ' +
-    'my own policy might not cover me while I am logged on or carrying a traveler.',
+    'I have read this disclosure, including the coverage American Rider provides, the warning that ' +
+    'my own policy might not cover me while I am logged on or carrying a traveler, and the requirements ' +
+    'that apply if I provide compensated passenger transportation outside a prearranged American Rider Travel.',
 };
 
 /**

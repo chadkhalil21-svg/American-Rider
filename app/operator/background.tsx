@@ -12,6 +12,16 @@ import { colors } from '../../src/theme';
 const dateLabel = (when: string | number, language: string) =>
   new Date(when).toLocaleDateString(language, { month: 'long', day: 'numeric', year: 'numeric' });
 
+const reportDateMs = (value: string) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!m) return NaN;
+  const ms = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12);
+  const d = new Date(ms);
+  return d.getUTCFullYear() === Number(m[1]) &&
+    d.getUTCMonth() === Number(m[2]) - 1 &&
+    d.getUTCDate() === Number(m[3]) ? ms : NaN;
+};
+
 export default function OperatorBackground() {
   const { t, language } = useLanguage();
   const goBack = useGoBack();
@@ -44,7 +54,7 @@ export default function OperatorBackground() {
       setError(t('traveler.bgNameCompanyFirst'));
       return;
     }
-    const parsedDate = Date.parse(reportDate.trim());
+    const parsedDate = reportDateMs(reportDate);
     if (!reportDate.trim() || Number.isNaN(parsedDate) || parsedDate > Date.now()) {
       setError(t('traveler.bgReportDateInvalid'));
       return;

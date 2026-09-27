@@ -43,9 +43,14 @@ const PACKAGE_CRIMINAL_ONLY = () => readKey('CHECKR_PACKAGE_BASIC') || 'american
 const packageFor = (tier) =>
   tier === 'mvr' ? PACKAGE_MVR_ONLY() : tier === 'criminal' ? PACKAGE_CRIMINAL_ONLY() : PACKAGE_FULL();
 
-// Where the work is. §627.748 is Florida law and the configured operating jurisdiction is Florida; the state
-// also decides which DMV the MVR pulls from.
-const WORK_STATE = () => readKey('CHECKR_WORK_STATE') || 'FL';
+// Work location is per Operator, not a deployment-wide constant. Checkr requires a US state
+// in work_locations; the server passes the state from the Operator's declared active market.
+// CHECKR_WORK_STATE is retained only as an explicit compatibility override for old test fixtures.
+function workState(value) {
+  const s = String(value || readKey('CHECKR_WORK_STATE') || '').trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(s)) throw new Error('A valid two-letter Operator work state is required for screening.');
+  return s;
+}
 
 const ready = () => !!readKey('CHECKR_API_KEY');
 
@@ -101,17 +106,17 @@ function verifySignature(rawBody, signatureHeader) {
  * resolves operators through OUR record first — a payload shape Checkr controls is a poor
  * place to keep the only copy of who a report is about.
  */
-async function invite({ uid, email, tier = 'full' }) {
+async function invite({ uid, email, tier = 'full', workState }) {
   const db = adminDb();
   const candidate = await api('POST', '/candidates', {
     email,
     custom_id: String(uid),
-    work_locations: [{ country: 'US', state: WORK_STATE() }],
+    work_locations: [{ country: 'US', state: workState(workState) }],
   });
   const invitation = await api('POST', '/invitations', {
     candidate_id: candidate.id,
     package: packageFor(tier),
-    work_locations: [{ country: 'US', state: WORK_STATE() }],
+    work_locations: [{ country: 'US', state: workState(workState) }],
   });
   if (db) {
     await db.collection('screeningOrders').doc(String(candidate.id)).set({
@@ -132,11 +137,11 @@ async function invite({ uid, email, tier = 'full' }) {
 }
 
 /** Re-send an invitation for a candidate we already created (link expired, same payment). */
-async function reinvite({ candidateId, tier = 'full' }) {
+async function reinvite({ candidateId, tier = 'full', workState }) {
   const invitation = await api('POST', '/invitations', {
     candidate_id: candidateId,
     package: packageFor(tier),
-    work_locations: [{ country: 'US', state: WORK_STATE() }],
+    work_locations: [{ country: 'US', state: workState(workState) }],
   });
   return {
     invitationId: invitation.id || null,

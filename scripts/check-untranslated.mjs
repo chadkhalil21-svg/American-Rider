@@ -31,7 +31,7 @@ const CODEY = /[()=;:]|\w\.\w|^\s*(else|return|const|await|catch|try|finally)\b/
 // real operator would telephone, and the demonstration operator's own name. Hoisted to module
 // scope 20 Sept 2026 — it guarded the object-property rule only, so the SAME company name was
 // waved through there and reported by the prose rule two lines later.
-const PROPER_NOUN = /^(Progressive Commercial|Garzor Insurance LLC|Coverage Insurance Agency|InsureLimos|Insurify|Miguel|American Rider|Metrorail|Metromover|Metrobus|Tri-Rail|Brightline)$/;
+const PROPER_NOUN = /^(Progressive Commercial|Garzor Insurance LLC|Coverage Insurance Agency|InsureLimos|Insurify|Limousine Insurance HQ|American US Insurance|Transportation Insurance of Central Florida|Casurance|Insureon|Miguel|American Rider|Metrorail|Metromover|Metrobus|Tri-Rail|Brightline)$/;
 
 
 // Inside a text node a colon is prose, not code: "American Rider chooses who brings it back:

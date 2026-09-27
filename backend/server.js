@@ -32,6 +32,7 @@ const { readKey } = require('./env');
 const { requireAuth, attachAuth, requireVerifiedEmail } = require('./auth');
 const { perAccount, countOnly, perIp } = require('./ratelimit');
 const { marketFor, servesPoint, listMarkets, markets: allMarkets } = require('./markets');
+const { forMarket: insuranceForMarket, publicConfig: publicInsuranceConfig } = require('./insurance-jurisdictions');
 
 // ——— WHAT A THROWAWAY ACCOUNT MAY DO, AND HOW OFTEN ————————————————————————————
 // Booking was never the exposure: a travel needs a payment method, and a card is far harder to
@@ -124,8 +125,8 @@ const { readDocument, documentsReady, READER_VERSION } = require('./documents');
 const { ready: r2Ready, uploadUrl: r2UploadUrl, readUrl: r2ReadUrl, owns: r2Owns } = require('./r2');
 const { assessOperator, assessAndRecord } = require('./qualification');
 const {
-  initialMonitoringFromDocument, continuingStatus, applyOperatorAttestation, providerInstructions,
-  sweepInsuranceMonitoring,
+  initialMonitoringFromDocument, continuingStatus, applyOperatorAttestation, applyIndependentConfirmation,
+  providerInstructions, sweepInsuranceMonitoring,
 } = require('./insurance-monitoring');
 const { normalizeParty, operatorPartyView } = require('./travelparty');
 const family = require('./family');
@@ -1724,7 +1725,7 @@ async function runAllSweeps() {
       cardCountryFor: async (uid) => defaultCardCountry({ uid }),
     }),
     family.sweepFamilyAgeOut(),
-    sweepInsuranceMonitoring({ db: adminDb(), send, notify }),
+    sweepInsuranceMonitoring({ db: adminDb(), requestConfirmation: issueInsuranceConfirmationRequest, notify }),
   ]);
   const unwrap = (r) => (r.status === 'fulfilled' ? r.value : { ok: false, reason: String(r.reason) });
   return {
@@ -2067,6 +2068,66 @@ app.post('/waitlist', requireAuth, LIMITS.waitlist, async (req, res) => {
   }
 });
 
+async function issueInsuranceConfirmationRequest({ uid, user, contact, now = Date.now(), reason = 'manual' }) {
+  const db = adminDb();
+  if (!db) return { ok: false, reason: adminStatus().reason || 'no database' };
+  const m = user?.insuranceMonitoring || {};
+  if (!m?.statusAuthorization?.acceptedAt) {
+    return { ok: false, reason: 'Operator authorization is required before requesting policy status.' };
+  }
+  const email = String(contact?.email || '').trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, reason: 'Invalid insurer or broker email.' };
+
+  const token = crypto.randomBytes(32).toString('base64url');
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  const expiresAt = now + 14 * 24 * 60 * 60 * 1000;
+  const policy = String(m.policyNumber || user?.documents?.insurance?.evidence?.insurance?.policyNumber || '');
+  const last4 = policy ? policy.slice(-4) : 'not shown';
+  const operatorName = String(user?.legalName || user?.name || 'the Operator').slice(0, 100);
+  const url = `${PUBLIC_ORIGIN}/insurance/status-confirmation?token=${encodeURIComponent(token)}`;
+
+  await db.collection('insurance_status_requests').doc(tokenHash).set({
+    uid: String(uid),
+    email,
+    contactName: String(contact?.name || '').slice(0, 100),
+    contactType: String(contact?.type || 'broker').slice(0, 20),
+    createdAt: now,
+    expiresAt,
+    usedAt: null,
+    reason,
+    policyLast4: last4,
+  });
+
+  const sent = await send({
+    from: 'American Rider Operator Relations <relations@americanrider.app>',
+    replyTo: 'insurance@americanrider.app',
+    to: email,
+    subject: 'American Rider · Insurance status confirmation',
+    text:
+      'AMERICAN RIDER — NATIONAL TRANSPORTATION\n\n' +
+      'Insurance Status Confirmation\n\n' +
+      `The insured has authorized American Rider to request limited policy-status information for eligibility purposes. Please confirm whether the commercial automobile policy for ${operatorName}, policy ending ${last4}, remains active and unchanged for transportation-network / for-hire passenger operations.\n\n` +
+      'Use the secure confirmation link below. It asks only for current status and does not request premium, claims, payment method, or unrelated policy information.\n\n' +
+      url + '\n\n' +
+      'If your organization requires its own authorization form, reply to insurance@americanrider.app and American Rider will use that process instead.\n',
+  });
+  if (!sent.ok) {
+    await db.collection('insurance_status_requests').doc(tokenHash).delete().catch(() => {});
+    return { ok: false, reason: sent.reason || 'Confirmation request could not be sent.' };
+  }
+
+  await db.collection('users').doc(String(uid)).set({
+    insuranceMonitoring: {
+      ...m,
+      contact: { name: String(contact?.name || '').slice(0, 100), email, type: String(contact?.type || 'broker') },
+      verificationRequestedAt: now,
+      verificationRequestedTo: email,
+      verificationRequestReason: reason,
+    },
+  }, { merge: true });
+  return { ok: true, expiresAt };
+}
+
 // --- Continuing Operator insurance status. ------------------------------------------------
 //
 // The Operator's uploaded declarations page remains the qualification evidence. This layer is
@@ -2077,6 +2138,51 @@ app.post('/waitlist', requireAuth, LIMITS.waitlist, async (req, res) => {
 // A monthly Operator attestation is useful but never refreshes the independent-verification
 // timestamp. Independent confirmation may come from a carrier/broker, a monitoring network, or
 // an authenticated operations review of carrier/broker evidence.
+app.get('/operator/insurance/config', requireAuth, LIMITS.qualification, async (req, res) => {
+  const db = adminDb();
+  if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
+  try {
+    const snap = await db.collection('users').doc(String(req.uid)).get();
+    const u = snap.exists ? snap.data() : {};
+    const market = operatingMarketOf(u);
+    const rule = insuranceForMarket(market);
+    if (!rule) {
+      return res.status(409).json({
+        error: market
+          ? `Insurance requirements for ${market.state} have not yet been activated.`
+          : 'Choose your operating market before viewing insurance requirements.',
+        code: 'insurance_jurisdiction_not_configured',
+      });
+    }
+    return res.json(publicInsuranceConfig(rule));
+  } catch (e) {
+    return res.status(502).json({ error: e.message });
+  }
+});
+
+app.post('/operator/insurance/authorize-status', requireAuth, LIMITS.qualification, async (req, res) => {
+  const db = adminDb();
+  if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
+  try {
+    const ref = db.collection('users').doc(String(req.uid));
+    const snap = await ref.get();
+    const u = snap.exists ? snap.data() : {};
+    if (!u?.documents?.insurance || u.documents.insurance.verdict !== 'accept') {
+      return res.status(409).json({ error: 'A qualifying insurance policy must be verified first.', code: 'insurance_document_required' });
+    }
+    const m = u.insuranceMonitoring || {};
+    const authorization = {
+      acceptedAt: Date.now(),
+      version: '2026-09-26-v1',
+      scope: 'American Rider may request from the insurer, licensed agent, broker, MGA, or authorized monitoring provider only the current status, cancellation/nonrenewal status, material coverage changes, covered vehicle status, policy effective dates, and coverage terms needed to confirm Operator eligibility.',
+    };
+    await ref.set({ insuranceMonitoring: { ...m, statusAuthorization: authorization } }, { merge: true });
+    return res.json({ ok: true, authorization });
+  } catch (e) {
+    return res.status(502).json({ error: e.message });
+  }
+});
+
 app.get('/operator/insurance/status', requireAuth, LIMITS.qualification, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
@@ -2112,42 +2218,104 @@ app.post('/operator/insurance/request-confirmation', requireAuth, LIMITS.documen
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   const email = String(req.body?.email || '').trim().toLowerCase();
   const name = String(req.body?.name || '').trim().slice(0, 100);
-  const type = ['agent', 'broker', 'carrier'].includes(String(req.body?.type || '').toLowerCase())
+  const type = ['agent', 'broker', 'carrier', 'mga'].includes(String(req.body?.type || '').toLowerCase())
     ? String(req.body.type).toLowerCase() : 'broker';
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return res.status(400).json({ error: 'Enter the email address of the insurer, agent, or broker.', code: 'insurance_contact_email' });
   }
   try {
-    const ref = db.collection('users').doc(String(req.uid));
-    const snap = await ref.get();
+    const snap = await db.collection('users').doc(String(req.uid)).get();
     const u = snap.exists ? snap.data() : {};
-    const m = u.insuranceMonitoring || {};
-    const policy = String(m.policyNumber || u.documents?.insurance?.evidence?.insurance?.policyNumber || '');
-    const last4 = policy ? policy.slice(-4) : 'not shown';
-    const operatorName = String(u.legalName || u.name || req.name || 'the Operator').slice(0, 100);
-    const sent = await send({
-      from: 'American Rider Operator Relations <relations@americanrider.app>',
-      replyTo: 'insurance@americanrider.app',
-      to: email,
-      subject: 'American Rider · Insurance status confirmation',
-      text:
-        'AMERICAN RIDER — NATIONAL TRANSPORTATION\n\n' +
-        'Insurance Status Confirmation\n\n' +
-        `Please confirm whether the commercial automobile policy for ${operatorName}, policy ending ${last4}, remains active and unchanged for transportation-network / for-hire passenger operations.\n\n` +
-        'If the policy is pending cancellation, cancelled, nonrenewed, has materially reduced coverage, or the covered vehicle has been removed, please state that status and its effective date.\n\n' +
-        'Reply to insurance@americanrider.app. American Rider uses this confirmation only to determine continuing Operator eligibility.\n',
-    });
-    if (!sent.ok) return res.status(502).json({ error: sent.reason || 'Confirmation request could not be sent.' });
-    const monitoring = {
-      ...m,
+    const out = await issueInsuranceConfirmationRequest({
+      uid: req.uid,
+      user: u,
       contact: { name, email, type },
-      verificationRequestedAt: Date.now(),
-      verificationRequestedTo: email,
-    };
-    await ref.set({ insuranceMonitoring: monitoring }, { merge: true });
-    return res.json({ ok: true });
+      reason: 'operator_requested',
+    });
+    if (!out.ok) return res.status(out.reason?.includes('authorization') ? 409 : 502).json({ error: out.reason });
+    return res.json({ ok: true, expiresAt: out.expiresAt });
   } catch (e) {
     return res.status(502).json({ error: e.message });
+  }
+});
+
+// Secure third-party confirmation. Possession of the random, single-use token sent to the
+// stored insurer/broker address is the authentication factor. It exposes only masked policy
+// identity and the minimum status choices needed for eligibility.
+app.get('/insurance/status-confirmation', async (req, res) => {
+  const db = adminDb();
+  if (!db) return res.status(503).type('html').send(page('Insurance status', '<h1>Unavailable</h1>'));
+  const token = String(req.query?.token || '');
+  const hash = token ? crypto.createHash('sha256').update(token).digest('hex') : '';
+  const snap = hash ? await db.collection('insurance_status_requests').doc(hash).get().catch(() => null) : null;
+  const row = snap?.exists ? snap.data() : null;
+  const invalid = !row || row.usedAt || Number(row.expiresAt) < Date.now();
+  if (invalid) {
+    return res.status(410).type('html').send(page('Insurance status', '<h1>This confirmation link is no longer active.</h1>'));
+  }
+  const body =
+    '<h1>Insurance Status Confirmation</h1>' +
+    '<p class="lede">American Rider is requesting only the current status needed to confirm Operator eligibility.</p>' +
+    '<section><p>Policy ending <strong>' + String(row.policyLast4 || '').replace(/[^A-Za-z0-9]/g, '') + '</strong></p>' +
+    '<form method="post" action="/insurance/status-confirmation">' +
+    '<input type="hidden" name="token" value="' + token.replace(/["<>&]/g, '') + '">' +
+    '<label>Status<br><select name="status" required style="margin-top:8px;padding:12px;border-radius:10px;">' +
+    '<option value="verified_active">Active and unchanged</option>' +
+    '<option value="pending_cancellation">Pending cancellation</option>' +
+    '<option value="cancelled">Cancelled</option>' +
+    '<option value="nonrenewed">Nonrenewed</option>' +
+    '<option value="coverage_reduced">Coverage materially changed or reduced</option>' +
+    '<option value="vehicle_removed">Covered vehicle removed</option>' +
+    '</select></label><br><br>' +
+    '<label>Optional note<br><textarea name="note" maxlength="500" rows="4" style="width:100%;margin-top:8px;"></textarea></label>' +
+    '<button type="submit" class="cta" style="border:0;cursor:pointer;">Submit confirmation</button>' +
+    '</form></section>';
+  return res.type('html').send(page('Insurance status', body));
+});
+
+app.post('/insurance/status-confirmation', express.urlencoded({ extended: false }), async (req, res) => {
+  const db = adminDb();
+  if (!db) return res.status(503).type('html').send(page('Insurance status', '<h1>Unavailable</h1>'));
+  const token = String(req.body?.token || '');
+  const hash = token ? crypto.createHash('sha256').update(token).digest('hex') : '';
+  const requestRef = hash ? db.collection('insurance_status_requests').doc(hash) : null;
+  const snap = requestRef ? await requestRef.get().catch(() => null) : null;
+  const row = snap?.exists ? snap.data() : null;
+  const allowed = new Set(['verified_active', 'pending_cancellation', 'cancelled', 'nonrenewed', 'coverage_reduced', 'vehicle_removed']);
+  const status = String(req.body?.status || '');
+  if (!row || row.usedAt || Number(row.expiresAt) < Date.now() || !allowed.has(status)) {
+    return res.status(410).type('html').send(page('Insurance status', '<h1>This confirmation cannot be accepted.</h1>'));
+  }
+  try {
+    const userRef = db.collection('users').doc(String(row.uid));
+    const userSnap = await userRef.get();
+    const u = userSnap.exists ? userSnap.data() : {};
+    const updated = applyIndependentConfirmation(u.insuranceMonitoring, {
+      status,
+      source: row.contactType || 'broker',
+      actor: { name: row.email, method: 'secure_email_link' },
+      note: String(req.body?.note || '').trim().slice(0, 500) || null,
+    });
+    await userRef.set({ insuranceMonitoring: updated }, { merge: true });
+    await requestRef.set({ usedAt: Date.now(), result: status }, { merge: true });
+    await db.collection('audit_log').add({
+      at: Date.now(),
+      subject: String(row.uid),
+      actor: { name: row.email, method: 'secure_email_link' },
+      action: 'insurance_status_confirmation',
+      status,
+      source: row.contactType || 'broker',
+      requestId: hash,
+    });
+    if (status !== 'verified_active') {
+      await db.collection('operators').doc(String(row.uid)).set(
+        { available: false, offDutyReason: `insurance_${status}`, offDutyAt: Date.now() },
+        { merge: true },
+      );
+    }
+    return res.type('html').send(page('Insurance status', '<h1>Confirmation received.</h1><p class="lede">Thank you. No further action is required on this request.</p>'));
+  } catch (e) {
+    return res.status(502).type('html').send(page('Insurance status', '<h1>Could not record confirmation.</h1>'));
   }
 });
 

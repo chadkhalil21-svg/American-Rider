@@ -36,7 +36,6 @@ export default function Profile() {
   const [places, setPlaces] = useState<SavedPlaces>({ favorites: [] });
   const [contacts, setContacts] = useState<TrustedContact[]>([]);
   const [mobile, setMobile] = useState('');
-  const [phoneVerified, setPhoneVerified] = useState(false);
   useFocusEffect(
     useCallback(() => {
       let live = true;
@@ -48,7 +47,6 @@ export default function Profile() {
             if (!live || !snap.exists()) return;
             const value = snap.data()?.mobile;
             setMobile(typeof value === 'string' ? value.trim() : '');
-            setPhoneVerified(snap.data()?.phoneVerified === true);
           })
           .catch(() => {});
       }
@@ -71,7 +69,6 @@ export default function Profile() {
   const accountEmail = user?.email?.trim() || (webPreview ? 'traveler@americanrider.app' : '');
   const accountMobile = mobile || (webPreview ? '+1 (305) 555-0148' : '');
   const emailVerified = user?.emailVerified === true || webPreview;
-  const mobileVerified = phoneVerified || webPreview;
 
   // THE YEAR THIS ACCOUNT WAS ACTUALLY OPENED, from Firebase — not a demonstration traveler's.
   const since = user?.metadata?.creationTime
@@ -109,19 +106,24 @@ export default function Profile() {
           </View>
         </Pressable>
 
-        <View style={[styles.row, styles.hair]}>
-          <Text style={styles.rowTitle}>{t('traveler.emailLabel')}</Text>
-          <View style={styles.valueStack}>
-            <Text style={accountEmail ? styles.statValue : styles.notSet} numberOfLines={1}>
-              {accountEmail || t('traveler.notSet')}
-            </Text>
-            {accountEmail ? (
-              <Text style={styles.verification}>
-                {emailVerified ? t('traveler.verified') : t('traveler.verificationRequired')}
-              </Text>
-            ) : null}
+        <Pressable onPress={() => router.navigate('/account-email')} accessibilityRole="button">
+          <View style={[styles.row, styles.hair]}>
+            <Text style={styles.rowTitle}>{t('traveler.emailLabel')}</Text>
+            <View style={styles.valueNav}>
+              <View style={styles.valueStack}>
+                <Text style={accountEmail ? styles.statValue : styles.notSet} numberOfLines={1}>
+                  {accountEmail || t('traveler.notSet')}
+                </Text>
+                {accountEmail ? (
+                  <Text style={styles.verification}>
+                    {emailVerified ? t('traveler.verified') : t('traveler.verificationRequired')}
+                  </Text>
+                ) : null}
+              </View>
+              <Chev />
+            </View>
           </View>
-        </View>
+        </Pressable>
 
         <Pressable onPress={() => router.navigate('/account-mobile')} accessibilityRole="button">
           <View style={[styles.row, styles.hair]}>
@@ -131,11 +133,6 @@ export default function Profile() {
                 <Text style={accountMobile ? styles.statValue : styles.notSet} numberOfLines={1}>
                   {accountMobile || t('traveler.addNumber')}
                 </Text>
-                {accountMobile ? (
-                  <Text style={styles.verification}>
-                    {mobileVerified ? t('traveler.verified') : t('traveler.verificationRequired')}
-                  </Text>
-                ) : null}
               </View>
               <Chev />
             </View>

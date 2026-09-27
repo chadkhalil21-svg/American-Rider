@@ -2123,6 +2123,7 @@ async function issueInsuranceConfirmationRequest({ uid, user, contact, now = Dat
       verificationRequestedAt: now,
       verificationRequestedTo: email,
       verificationRequestReason: reason,
+      verificationRequestCount: Math.max(0, Number(m.verificationRequestCount) || 0) + 1,
     },
   }, { merge: true });
   return { ok: true, expiresAt };
@@ -2189,7 +2190,7 @@ app.get('/operator/insurance/status', requireAuth, LIMITS.qualification, async (
   try {
     const snap = await db.collection('users').doc(String(req.uid)).get();
     const u = snap.exists ? snap.data() : {};
-    return res.json({ ...continuingStatus(u), contact: u.insuranceMonitoring?.contact || null, authorized: !!u.insuranceMonitoring?.statusAuthorization?.acceptedAt, instructions: providerInstructions() });
+    return res.json({ ...continuingStatus(u), contact: u.insuranceMonitoring?.contact || null, authorized: !!u.insuranceMonitoring?.statusAuthorization?.acceptedAt, verificationIssue: u.insuranceMonitoring?.verificationIssue || null, instructions: providerInstructions() });
   } catch (e) {
     return res.status(502).json({ error: e.message });
   }
@@ -2266,6 +2267,9 @@ app.get('/insurance/status-confirmation', async (req, res) => {
     '<option value="nonrenewed">Nonrenewed</option>' +
     '<option value="coverage_reduced">Coverage materially changed or reduced</option>' +
     '<option value="vehicle_removed">Covered vehicle removed</option>' +
+    '<option value="requires_release">Our organization requires its own signed authorization/release form</option>' +
+    '<option value="requires_portal">Our organization requires verification through its own portal or process</option>' +
+    '<option value="unable_to_verify">We cannot provide status through this request</option>' +
     '</select></label><br><br>' +
     '<label>Optional note<br><textarea name="note" maxlength="500" rows="4" style="width:100%;margin-top:8px;"></textarea></label>' +
     '<button type="submit" class="cta" style="border:0;cursor:pointer;">Submit confirmation</button>' +
@@ -2281,7 +2285,7 @@ app.post('/insurance/status-confirmation', express.urlencoded({ extended: false 
   const requestRef = hash ? db.collection('insurance_status_requests').doc(hash) : null;
   const snap = requestRef ? await requestRef.get().catch(() => null) : null;
   const row = snap?.exists ? snap.data() : null;
-  const allowed = new Set(['verified_active', 'pending_cancellation', 'cancelled', 'nonrenewed', 'coverage_reduced', 'vehicle_removed']);
+  const allowed = new Set(['verified_active', 'pending_cancellation', 'cancelled', 'nonrenewed', 'coverage_reduced', 'vehicle_removed', 'requires_release', 'requires_portal', 'unable_to_verify']);
   const status = String(req.body?.status || '');
   if (!row || row.usedAt || Number(row.expiresAt) < Date.now() || !allowed.has(status)) {
     return res.status(410).type('html').send(page('Insurance status', '<h1>This confirmation cannot be accepted.</h1>'));
@@ -2290,12 +2294,56 @@ app.post('/insurance/status-confirmation', express.urlencoded({ extended: false 
     const userRef = db.collection('users').doc(String(row.uid));
     const userSnap = await userRef.get();
     const u = userSnap.exists ? userSnap.data() : {};
+    const note = String(req.body?.note || '').trim().slice(0, 500) || null;
+    const processStatuses = new Set(['requires_release', 'requires_portal', 'unable_to_verify']);
+
+    if (processStatuses.has(status)) {
+      const issue = {
+        kind: status,
+        at: Date.now(),
+        source: row.contactType || 'broker',
+        contactEmail: row.email,
+        note,
+      };
+      await userRef.set({
+        insuranceMonitoring: {
+          ...(u.insuranceMonitoring || {}),
+          verificationIssue: issue,
+        },
+      }, { merge: true });
+      await requestRef.set({ usedAt: Date.now(), result: status }, { merge: true });
+      await db.collection('audit_log').add({
+        at: Date.now(),
+        subject: String(row.uid),
+        actor: { name: row.email, method: 'secure_email_link' },
+        action: 'insurance_verification_process_exception',
+        status,
+        source: row.contactType || 'broker',
+        requestId: hash,
+        note,
+      });
+      await notify?.({
+        uid: String(row.uid),
+        kind: 'insurance_verification_process',
+        title: 'Insurance verification needs one more step',
+        body: status === 'requires_release'
+          ? 'Your insurer requires its own authorization form. American Rider Operator Relations will guide the next step.'
+          : status === 'requires_portal'
+            ? 'Your insurer requires its own verification process. American Rider Operator Relations will guide the next step.'
+            : 'Your insurer could not confirm status through the standard request. American Rider Operator Relations will guide the next step.',
+        data: { screen: '/operator/insurance' },
+      }).catch(() => {});
+      return res.type('html').send(page('Insurance status', '<h1>Process noted.</h1><p class="lede">Thank you. American Rider will use the verification process you identified.</p>'));
+    }
+
     const updated = applyIndependentConfirmation(u.insuranceMonitoring, {
       status,
       source: row.contactType || 'broker',
       actor: { name: row.email, method: 'secure_email_link' },
-      note: String(req.body?.note || '').trim().slice(0, 500) || null,
+      note,
     });
+    updated.verificationRequestCount = 0;
+    updated.verificationIssue = null;
     await userRef.set({ insuranceMonitoring: updated }, { merge: true });
     await requestRef.set({ usedAt: Date.now(), result: status }, { merge: true });
     await db.collection('audit_log').add({

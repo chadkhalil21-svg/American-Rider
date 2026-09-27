@@ -237,6 +237,8 @@ export default {
     insPremiumOffsetAR: "Con la ritenzione del 99% di American Rider",
     insPremiumOffsetBenchmark: "Con l’intervallo osservato del 50,5%–57%",
     insBenchmarkSource: "Fonte: Consumer Reports, giugno 2026. Le piattaforme classificano diversamente i costi esterni; tasse, pedaggi, mance e altri pass-through non sono identici.",
+    insAdvantageOffset: "Volume di tariffe al quale la quota aggiuntiva trattenuta compensa questo premio assicurativo",
+    insAdvantageOffsetRange: "Rispetto all’intervallo osservato da Consumer Reports",
     insNoHoursNeeded: "Non vengono usati una tariffa oraria ipotizzata, una tariffa media o un volume di Viaggi promesso. Inserisca solo il preventivo assicurativo realmente ricevuto.",
     insEconomicsBody: "Usi il suo preventivo e la sua attività prevista. American Rider non inventa una tariffa media né un numero garantito di Viaggi.",
     insMonthlyPremium: "Premio assicurativo mensile",

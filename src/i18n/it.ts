@@ -38,7 +38,7 @@ export default {
     signInToAccount: 'Acceda al suo account.',
     pleaseWait: 'Un momento…',
     alreadyHave: 'Ha già un account? ',
-    newHere: 'È nuovo qui? ',
+    newHere: 'È nuovo su American Rider? ',
     signInLink: 'Accedere',
     createAccountLink: 'Creare un account',
     fullNameLabel: 'NOME COMPLETO',

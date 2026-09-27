@@ -59,6 +59,7 @@ const run = async (mw, req) => {
   await mw(req, res, () => { passed = true; });
   return passed ? 200 : res.code;
 };
+async function main() {
 const ip = perIp({ name: 't-ip', limit: 3, windowMs: 60000 });
 const codes = [];
 for (const _ of [1, 2, 3, 4]) codes.push(await run(ip, { ip: '198.51.100.7' }));
@@ -70,4 +71,6 @@ check('perAccount: keyed on the signed-in uid', await run(acct, { uid: 'u1' }) =
 let bad = 0;
 for (const r of R) { if (!r.ok) bad++; console.log(`${r.ok ? 'PASS' : 'FAIL'}  ${r.l}${r.ok ? '' : '  — ' + (r.d || '')}`); }
 console.log(`\n${R.length - bad}/${R.length} passed`);
-process.exit(bad ? 1 : 0);
+process.exitCode = bad ? 1 : 0;
+}
+main().catch((e) => { console.error(e); process.exitCode = 1; });

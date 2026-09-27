@@ -404,26 +404,6 @@ export default function OperatorHome() {
                   </View>
                 </View>
               </View>
-              {request.cabinPreferences && (
-                <View style={styles.cabinSummary}>
-                  <Text style={styles.cabinLabel}>{t('traveler.travelPreferences')}</Text>
-                  <Text style={styles.cabinText}>
-                    {[
-                      request.cabinPreferences.climate === 'Cool'
-                        ? t('traveler.prefCool')
-                        : request.cabinPreferences.climate === 'Warm'
-                          ? t('traveler.prefWarm')
-                          : t('traveler.prefModerate'),
-                      request.cabinPreferences.quiet ? t('traveler.prefQuiet') : t('traveler.prefConversation'),
-                      request.cabinPreferences.music === 'Traveler Choice'
-                        ? t('traveler.prefTravelerChoice')
-                        : t('traveler.prefMusicNone'),
-                      request.cabinPreferences.charging ? t('traveler.charger') : null,
-                      request.cabinPreferences.luggage ? t('traveler.luggage') : null,
-                    ].filter(Boolean).join(' · ')}
-                  </Text>
-                </View>
-              )}
               <View style={styles.requestButtons}>
                 <OutlineButton
                   label={t('operator.decline')}

@@ -10,9 +10,9 @@
 // Favourites were added 14 September 2026 at Adrian's request: any number of destinations
 // (up to eight) a traveler wants one tap away on Home.
 //
-// STORED ON THE DEVICE, scoped to the signed-in account. A home address is among the most
-// sensitive places a transportation app holds; it is not needed on the server. One account
-// must never inherit another account's saved places on a shared device.
+// ACCOUNT-BACKED, with an account-scoped device cache. Saved Places follow the Traveler to a
+// replacement phone while the local copy keeps the interface immediate and usable offline.
+// One account must never inherit another account's places on a shared device.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';

@@ -743,7 +743,7 @@ export default {
     anonymousRecords: 'Registri del Servizio',
     yourPasswordPh: 'La sua password',
     keepMyAccount: 'Mantenere il mio account',
-    configureThisTravel: 'Salvate sul suo account come preferenze di cabina.'
+    configureThisTravel: 'Salvate sul suo account come preferenze di cabina.',
     completedTravelAppears: 'I viaggi completati compaiono qui.',
     mapNeedsApp: 'Scegliere il ritiro sulla mappa richiede l’app per iPhone',
     searchByNameInstead: 'Può cercare un punto di ritiro per nome.',

@@ -915,6 +915,7 @@ export default {
     atmosphere: 'Ambiente',
     music: 'Música',
     additionalRequests: 'Peticiones Adicionales',
+    noneRequested: 'Ninguna',
     charger: 'Cable de carga',
     luggage: 'Ayuda con el equipaje',
     estimatedSearchTime: 'Tiempo Estimado de Búsqueda',

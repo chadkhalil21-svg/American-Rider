@@ -19,6 +19,8 @@ This file records founder-approved interface checkpoints. An approved checkpoint
 
 | Production browser-origin security boundary | `approved/security-cors-boundary-2026-09-28` | `27db8dbe3929e81d9ee207f9a54bdc11e9d2f2cf` |
 
+| Durable authenticated abuse controls | `approved/security-durable-abuse-controls-2026-09-28` | `da27e8861c4cdb4deef330fc493184a88e19f859` |
+
 ## Lock protocol
 
 When a surface is approved:

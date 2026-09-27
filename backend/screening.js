@@ -140,19 +140,12 @@ function screeningQuote(costCents) {
   return { costCents, processingCents: totalCents - costCents, totalCents };
 }
 
-// How old a report we already have may be. THREE YEARS — and this is not a guess, it is the
-// statute's own measure of how long a check stays current. §627.748(12)(b): "The TNC shall
-// conduct the background check required under paragraph (a) for a TNC driver every 3 years."
-//
-// I had this at twelve months, which was more cautious than the law and cost operators money
-// for no legal reason. Chad's instruction (23 Aug) is to hold to what the law requires and
-// nothing more, and the law's number is three years.
-//
-// WHAT MAKES IT SAFE RATHER THAN SLACK. The re-check clock runs from the REPORT'S OWN DATE,
-// not from the day we accepted it — see recordDecision. So an operator arriving with a report
-// two years and eleven months old is accepted and re-checked one month later, at our cost of
-// nothing and their cost of the ordinary fee. The blind spot and the re-check move together;
-// the older the report, the sooner it is replaced. Nobody gets three unwatched years.
+// An external report is not automatically portable merely because it is younger than Florida's
+// three-year recurring-check interval. The three-year rule governs American Rider's recurring
+// duty after a qualifying check; it is not treated here as a blanket safe-harbor for another
+// end user's report. External reports are evidence for compliance review, and qualification
+// occurs only after provenance, permissible purpose, required components and jurisdictional
+// freshness have been established.
 const ACCEPT_EXISTING_MAX_AGE_MS = 3 * 365 * 24 * 60 * 60 * 1000;
 
 // What an accepted report must contain, because the statute names all three.
@@ -403,94 +396,23 @@ async function recordAdverseState({ uid, state, actionId = null, reportId = null
  * Returns what it would cost the operator to proceed: nothing when the report is complete,
  * the MVR alone when only the driving half is missing, the full fee otherwise.
  */
-function evaluateExistingReport(
-  { source, issuedAt, elements },
-  // mvrOnlyAvailable: whether an MVR-only package actually exists at the screening company.
-  // Checkr's self-serve package builder cannot make one (confirmed 27 Aug 2026 — the wizard's
-  // floor is Basic+), so until their support provisions it, CHECKR_PACKAGE_MVR is unset and
-  // the driving-history-only price MUST NOT be quoted: a $17.50 fee the order endpoint cannot
-  // place is a paid dead end, which is the exact shape of hole this file exists to prevent.
-  {
-    now = Date.now(),
-    mvrOnlyAvailable = !!readKey('CHECKR_PACKAGE_MVR'),
-    // Basic+ is Checkr's own self-serve default package, so this one is available as soon as
-    // any package is — unlike MVR-only, which their wizard cannot build.
-    criminalOnlyAvailable = !!readKey('CHECKR_PACKAGE_BASIC'),
-  } = {},
-) {
+function evaluateExistingReport({ source, issuedAt, elements }) {
   const has = new Set(Array.isArray(elements) ? elements : []);
   const missing = REQUIRED_ELEMENTS.filter((e) => !has.has(e));
-  const age = now - Number(issuedAt || 0);
-
   if (source !== 'agency') {
-    return {
-      accept: false,
-      tier: 'full',
-      feeCents: SCREENING_FEE_CENTS,
-      reason:
-        'A screening must reach American Rider from the screening company itself. Ask them to ' +
-        'send it to us directly.',
-    };
+    return { accept: false, review: true, missing, reason: 'The authoritative report must come from the screening provider.' };
   }
-  if (!Number.isFinite(Number(issuedAt)) || age > ACCEPT_EXISTING_MAX_AGE_MS) {
-    return {
-      accept: false,
-      tier: 'full',
-      feeCents: SCREENING_FEE_CENTS,
-      reason: 'That screening is more than three years old. Florida requires a new one.',
-    };
+  if (!Number.isFinite(Number(issuedAt)) || Number(issuedAt) <= 0) {
+    return { accept: false, review: true, missing, reason: 'The provider report date must be verified before it can be evaluated.' };
   }
-  if (missing.length === 1 && missing[0] === 'driving_history') {
-    if (!mvrOnlyAvailable) {
-      return {
-        accept: false,
-        tier: 'full',
-        feeCents: SCREENING_FEE_CENTS,
-        partial: true,
-        reason:
-          'The criminal record check is accepted, but the driving history cannot yet be ' +
-          'ordered on its own — a full screening is needed for now.',
-      };
-    }
-    return {
-      accept: false,
-      tier: 'mvr',
-      feeCents: MVR_ONLY_FEE_CENTS,
-      partial: true,
-      reason: 'The criminal record check is accepted. Only the driving history is still needed.',
-    };
-  }
-  // THE MIRROR CASE. The driving record is in hand and some or all of the criminal half is
-  // not, so only the criminal half is bought — never the MVR again.
-  if (missing.length && missing.every((e) => CRIMINAL_ELEMENTS.includes(e))) {
-    if (!criminalOnlyAvailable) {
-      return {
-        accept: false,
-        tier: 'full',
-        feeCents: SCREENING_FEE_CENTS,
-        partial: true,
-        reason:
-          'The driving history is accepted, but the criminal record check cannot yet be ' +
-          'ordered on its own — a full screening is needed for now.',
-      };
-    }
-    return {
-      accept: false,
-      tier: 'criminal',
-      feeCents: BASIC_ONLY_FEE_CENTS,
-      partial: true,
-      reason: 'The driving history is accepted. Only the criminal record check is still needed.',
-    };
-  }
-  if (missing.length) {
-    return {
-      accept: false,
-      tier: 'full',
-      feeCents: SCREENING_FEE_CENTS,
-      reason: 'That screening does not include everything Florida requires.',
-    };
-  }
-  return { accept: true, tier: 'none', feeCents: 0, reason: 'Accepted in full. Nothing to pay.' };
+  return {
+    accept: false,
+    review: true,
+    missing,
+    reason: missing.length
+      ? 'Preserve every qualifying component and obtain only the components still required by the active jurisdiction.'
+      : 'All declared components are present, but the provider report still requires provenance, permissible-purpose, jurisdiction and freshness review before qualification.',
+  };
 }
 
 /** Whether an operator's screening is current. Read at dispatch, not only at onboarding. */

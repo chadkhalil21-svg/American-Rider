@@ -303,6 +303,8 @@ export default {
     insFixedInstruction: 'Verlangen Sie eine eigenständige gewerbliche Police für die Personenbeförderung, die den TNC-Anforderungen Floridas entspricht und alle Zeiträume abdeckt — keinen Mitfahr-Zusatz zu einer privaten Police.',
     insStatusTitle: "Fortlaufender Versicherungsstatus",
     insAuthorizeTitle: "Einmalige Statusfreigabe",
+    insProviderProcessTitle: "Anbieterspezifische Verifizierung",
+    insProviderProcessBody: "Ihr Versicherer oder Makler verlangt ein eigenes Freigabeformular, Portal oder Prüfverfahren. American Rider Operator Relations bearbeitet diese Ausnahme mit Ihnen; die bestehende Prüffrist gilt weiterhin.",
     insAuthorizeBody: "Ermächtigen Sie American Rider, Ihren Versicherer, zugelassenen Agenten, Makler, MGA oder zugelassenen Überwachungsdienst ausschließlich zu fragen, ob die Police für die Operator-Eignung aktiv und materiell unverändert bleibt. Zahlungsdaten, Schadenhistorie oder sachfremde Policendaten werden nicht angefordert.",
     insAuthorizeButton: "Statusprüfung Autorisieren",
     insAuthorized: "Statusprüfung autorisiert",

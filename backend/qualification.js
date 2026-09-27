@@ -30,6 +30,7 @@
 const { disclosureCurrent } = require('./disclosure');
 const { screeningCurrent } = require('./screening');
 const { coverageLapsed } = require('./matching');
+const { continuingStatus } = require('./insurance-monitoring');
 
 /**
  * The documents that gate an operator: the three the app asks for (app/operator/documents.tsx).
@@ -286,6 +287,22 @@ function assessOperator({ user, fleet = null, context = 'qualify', liveMoney = f
     add(finding('qualification', 'suspended', 'suspended', null, u.suspension.note || 'Suspended.'));
   }
   if (u) for (const k of REQUIRED_DOCS) documentFindings(k, u.documents?.[k], now, { user: u }).forEach(add);
+
+  // CONTINUING INSURANCE STATUS. A compliant declarations page is a point-in-time fact.
+  // Monthly independent confirmation and the Operator's own attestation are separate facts.
+  // Any adverse carrier/broker status, or status older than 35 days, blocks qualification.
+  if (u?.documents?.insurance?.verdict === 'accept') {
+    const live = continuingStatus(u, now);
+    if (!live.ok) {
+      add(finding(
+        'qualification',
+        live.status === 'cancelled' || live.status === 'nonrenewed' ? 'refused' : 'incomplete',
+        live.code,
+        'insurance',
+        live.reason,
+      ));
+    }
+  }
 
   const s = u?.screening || null;
   if (s?.decision === 'refuse') {

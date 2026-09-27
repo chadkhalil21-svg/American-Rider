@@ -53,18 +53,19 @@ const doc = (server.match(/app\.post\('\/operator\/document'[\s\S]*?\n\}\);/) ||
 check('document reading: a repeated upload returns the stored reading, no second model call',
   /prior\.objectKey === objectKey && prior\.evidence && prior\.readerVersion === READER_VERSION/.test(doc) && doc.indexOf('repeated: true') < doc.indexOf('readDocument('));
 // The limiters themselves.
-const run = (mw, req) => {
+const run = async (mw, req) => {
   let passed = false;
   const res = { set() {}, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
-  mw(req, res, () => { passed = true; });
+  await mw(req, res, () => { passed = true; });
   return passed ? 200 : res.code;
 };
 const ip = perIp({ name: 't-ip', limit: 3, windowMs: 60000 });
-const codes = [1, 2, 3, 4].map(() => run(ip, { ip: '198.51.100.7' }));
+const codes = [];
+for (const _ of [1, 2, 3, 4]) codes.push(await run(ip, { ip: '198.51.100.7' }));
 check('perIp: the fourth call in the window is refused', codes.join() === '200,200,200,429', codes.join());
-check('perIp: another address is not affected', run(ip, { ip: '198.51.100.8' }) === 200);
+check('perIp: another address is not affected', await run(ip, { ip: '198.51.100.8' }) === 200);
 const acct = perAccount({ name: 't-acct', limit: 1, windowMs: 60000 });
-check('perAccount: keyed on the signed-in uid', run(acct, { uid: 'u1' }) === 200 && run(acct, { uid: 'u1' }) === 429 && run(acct, { uid: 'u2' }) === 200);
+check('perAccount: keyed on the signed-in uid', await run(acct, { uid: 'u1' }) === 200 && await run(acct, { uid: 'u1' }) === 429 && await run(acct, { uid: 'u2' }) === 200);
 
 let bad = 0;
 for (const r of R) { if (!r.ok) bad++; console.log(`${r.ok ? 'PASS' : 'FAIL'}  ${r.l}${r.ok ? '' : '  — ' + (r.d || '')}`); }

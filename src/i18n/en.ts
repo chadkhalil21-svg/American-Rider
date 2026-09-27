@@ -7,7 +7,7 @@
 // good Spanish and bad American Rider.
 export default {
   auth: {
-    tagline: 'National transportation infrastructure built on safety, reliability, and precision.',
+    tagline: 'Safe. Reliable. American.',
     continueWithApple: 'Continue with Apple',
     continueWithGoogle: 'Continue with Google',
     orDivider: 'or',

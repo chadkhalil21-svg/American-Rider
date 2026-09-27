@@ -347,6 +347,14 @@ export default function Home() {
       : operator.verification === 'pending'
         ? { label: t('traveler.finishOperatorQualification'), onPress: () => go('/operator/review') }
         : null;
+
+  // A Traveler can add the Operator role later. The front-door role choice promises this,
+  // so the signed-in account must provide a durable path back to qualification.
+  // "Operate with American Rider" states the relationship without gig-app recruiting language.
+  const operateWithUsRow: Row | null =
+    operator.verification === 'commissioned' || operator.verification === 'pending'
+      ? null
+      : { label: t('traveler.operateWithUs'), onPress: () => go('/operator/qualify') };
   const MENU_GROUPS: { label: string; rows: Row[] }[] = [
     {
       label: t('traveler.account'),
@@ -385,6 +393,7 @@ export default function Home() {
     {
       label: t('traveler.company'),
       rows: [
+        ...(operateWithUsRow ? [operateWithUsRow] : []),
         {
           // Opens the real company page. It is also where the 99% belongs: the founders'
           // brief §10A puts the operator-retention statement in a permanent

@@ -331,7 +331,7 @@ export function AuthScreen() {
             logo → wordmark → eyebrow → tagline → buttons with no gap in the middle.
             The spare space sits ABOVE the logo, so the page reads as a composed whole. */}
         <View style={{ flex: 1 }}>
-          <View style={{ flex: 1 }} />
+          {isSignup ? <View style={{ flex: 1 }} /> : <View style={{ height: 30 }} />}
           <View style={{ alignItems: 'center' }}>
             <Image
               source={require('../../assets/splash-icon.png')}
@@ -477,7 +477,7 @@ export function AuthScreen() {
                 thing on one line and contradict it on the next. */}
             {t('auth.verifyOff')}
           </Text>
-          <View style={s.fieldCard}>
+          <View style={[s.fieldCard, !isSignup && s.signInFieldCard]}>
             <View style={[s.fieldWrap, s.fieldWrapLast]}>
               <Text style={s.fieldLabel}>{t('auth.verificationCode')}</Text>
               <TextInput
@@ -582,17 +582,15 @@ export function AuthScreen() {
           <Text style={s.back}>{t('auth.back')}</Text>
         </Pressable>
 
-        <Text style={s.title}>{isSignup ? t('auth.createYourAccount') : t('auth.welcomeBack')}</Text>
-        <Text style={s.sub}>
-          {isSignup
-            ? t('auth.sameFirstStep')
-            : t('auth.signInToAccount')}
+        <Text style={[s.title, !isSignup && s.signInTitle]}>
+          {isSignup ? t('auth.createYourAccount') : t('auth.welcomeBack')}
         </Text>
+        {isSignup && <Text style={s.sub}>{t('auth.sameFirstStep')}</Text>}
 
         {/* The demo's labeled-field card: uppercase labels, underlined fields, one card. */}
         <View style={s.fieldCard}>
           {isSignup && (
-            <View style={s.fieldWrap}>
+            <View style={[s.fieldWrap, !isSignup && s.signInFieldWrap]}>
               <Text style={s.fieldLabel}>{t('auth.fullNameLabel')}</Text>
               <TextInput
                 style={s.field}
@@ -620,7 +618,7 @@ export function AuthScreen() {
           <View style={s.fieldWrap}>
             <Text style={s.fieldLabel}>{t('auth.emailLabel')}</Text>
             <TextInput
-              style={s.field}
+              style={[s.field, !isSignup && s.signInField]}
               placeholder={t('traveler.emailPh')}
               placeholderTextColor={colors.faint}
               autoCapitalize="none"
@@ -630,10 +628,10 @@ export function AuthScreen() {
               onChangeText={setEmail}
             />
           </View>
-          <View style={[s.fieldWrap, s.fieldWrapLast]}>
+          <View style={[s.fieldWrap, s.fieldWrapLast, !isSignup && s.signInFieldWrap]}>
             <Text style={s.fieldLabel}>{t('auth.passwordLabel')}</Text>
             <TextInput
-              style={s.field}
+              style={[s.field, !isSignup && s.signInField]}
               placeholder={isSignup ? t('auth.pwNewPh') : t('traveler.yourPasswordPh')}
               placeholderTextColor={colors.faint}
               secureTextEntry
@@ -690,7 +688,7 @@ export function AuthScreen() {
 
         <Pressable
           onPress={() => setStep(isSignup ? 'signin' : 'signup')}
-          style={{ marginTop: 18, marginBottom: 6 }}
+          style={{ marginTop: isSignup ? 18 : 15, marginBottom: 6 }}
           hitSlop={8}
         >
           <Text style={s.switch}>
@@ -811,7 +809,7 @@ const s = StyleSheet.create({
     color: colors.ink2,
   },
   networkDown: { color: colors.ink2 },
-  back: { fontSize: 15, fontWeight: '500', color: colors.blue, paddingVertical: 4 },
+  back: { fontSize: 13.5, fontWeight: '500', color: colors.blue, paddingVertical: 4 },
   title: {
     fontSize: 26,
     fontWeight: '600',
@@ -819,7 +817,12 @@ const s = StyleSheet.create({
     color: colors.ink,
     marginTop: 18,
   },
-  sub: { fontSize: 14.5, color: colors.muted, marginTop: 8 },
+  sub: { fontSize: 13.5, color: colors.muted, marginTop: 7 },
+  signInTitle: {
+    fontSize: 22,
+    letterSpacing: -0.25,
+    marginTop: 14,
+  },
   fieldCard: {
     marginTop: 24,
     backgroundColor: colors.card,
@@ -835,6 +838,14 @@ const s = StyleSheet.create({
     borderBottomColor: colors.hairline,
   },
   fieldWrapLast: { borderBottomWidth: 0 },
+  signInFieldCard: {
+    marginTop: 20,
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 0,
+  },
+  signInFieldWrap: { paddingTop: 11 },
+  signInField: { paddingVertical: 10, fontSize: 15.5 },
   fieldLabel: {
     fontSize: 11,
     fontWeight: '600',
@@ -843,10 +854,10 @@ const s = StyleSheet.create({
   },
   field: { paddingVertical: 12, fontSize: 16, color: colors.ink },
   error: { color: colors.red, fontSize: 13.5, marginTop: 14, textAlign: 'center' },
-  switch: { textAlign: 'center', fontSize: 14, color: colors.muted },
+  switch: { textAlign: 'center', fontSize: 13, color: colors.muted },
   helper: { fontSize: 12.5, color: colors.faint, marginTop: 10 },
   // The demo's "Forgot password?" sits muted under the field card.
-  forgot: { fontSize: 13.5, color: colors.muted, marginTop: 14 },
+  forgot: { fontSize: 12.5, color: colors.muted, marginTop: 12 },
   codeField: { fontSize: 28, fontWeight: '600', letterSpacing: 10 },
   demoNote: { fontSize: 12.5, color: colors.faint, marginTop: 12 },
   roleCard: {

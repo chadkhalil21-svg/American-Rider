@@ -385,6 +385,7 @@ export const INSURERS: {
   phone?: string;
   secondary?: boolean;
   unverified?: boolean;
+  states?: string[];
 }[] = [
   // ONE-FORM COMPARISON FIRST. Stanford's marketplace research points to reducing search
   // friction while preserving seller price competition. This service sends one livery
@@ -406,6 +407,7 @@ export const INSURERS: {
     name: 'American US Insurance',
     note: 'traveler.insurerAmericanUSNote',
     url: 'https://amerinsured.com/business-insurance/limo-insurance',
+    states: ['FL'],
     secondary: true,
   },
   // Florida passenger-transport specialist. Publicly states it shops livery programs and
@@ -414,6 +416,7 @@ export const INSURERS: {
     name: 'Transportation Insurance of Central Florida',
     note: 'traveler.insurerTICFNote',
     url: 'https://www.ticfinsurance.com/',
+    states: ['FL'],
     secondary: true,
   },
   // All-50-state commercial agency with livery / black-car / limousine specialty markets.

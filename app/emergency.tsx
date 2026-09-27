@@ -60,9 +60,10 @@ export default function Emergency() {
   // dispatcher writes the plate down. Reading them a car that is not there is worse than
   // telling them we do not know, and it is the one place in this product where that could
   // cost somebody far more than money.
-  const operator = ride.matchedOp?.name || t('traveler.notRecorded');
-  const vehicle = ride.matchedOp?.car || t('traveler.notRecorded');
-  const plate = ride.matchedOp?.plate || t('traveler.notRecorded');
+  const hasOperator = !!ride.matchedOp;
+  const operator = ride.matchedOp?.name || '';
+  const vehicle = ride.matchedOp?.car || '';
+  const plate = ride.matchedOp?.plate || '';
   // AND THE TRAVEL NUMBER, which the rule above missed. `lastTrip` holds the seeded
   // demonstration journey until a real one replaces it, so with no travel underway this screen
   // printed AR-2047-MIA — a journey nobody took — and `alertEmergency` filed the case against
@@ -71,7 +72,10 @@ export default function Emergency() {
   //
   // Empty, not a fallback string: a Travel Number is a key into our records, and a placeholder
   // in that shape invites somebody to read it out.
-  const tripNo = ride.rideActive ? ride.lastTrip.no : '';
+  // Before dispatch succeeds the client has only a provisional local number. Do not present
+  // that as an institutional record identifier in an emergency. The real Travel Number is
+  // shown only after the server has created the Travel and assigned an Operator.
+  const tripNo = ride.rideActive && hasOperator ? ride.lastTrip.no : '';
 
   const [fix, setFix] = useState<Fix | null>(null);
   const [locationDenied, setLocationDenied] = useState(false);
@@ -214,11 +218,19 @@ export default function Emergency() {
     : null;
 
   const contactMessage =
-    t('traveler.emgHelpIntro') + '\n\n' +
+    (ride.status >= 3 && hasOperator
+      ? t('traveler.emgHelpIntro')
+      : ride.rideActive
+        ? t('traveler.emgHelpTravel')
+        : t('traveler.emgHelpGeneral')) +
+    '\n\n' +
     t('traveler.emgWhereIAm', { place: locationLine }) +
     (fix ? ' ' + t('traveler.emgAsOf', { time: clockLabel(fix.at) }) : '') +
-    '\n' + t('traveler.emgVehicleLine', { vehicle, plate }) +
-    '\n' + t('traveler.emgOperatorLine', { name: operator }) +
+    (ride.rideActive
+      ? '\n' + t('traveler.emgRouteLine', { from: ride.lastTrip.dep, to: ride.lastTrip.arr })
+      : '') +
+    (hasOperator ? '\n' + t('traveler.emgVehicleLine', { vehicle, plate }) : '') +
+    (hasOperator ? '\n' + t('traveler.emgOperatorLine', { name: operator }) : '') +
     (tripNo ? '\n' + t('traveler.emgTravelNumberLine', { no: tripNo }) : '') +
     (mapLink ? `\n\n${mapLink}` : '');
 
@@ -300,33 +312,35 @@ export default function Emergency() {
         )}
       </Card>
 
-      {/* 2 · THE VEHICLE — the plate is what a dispatcher writes down. */}
-      <SectionLabel style={styles.lbl}>{t('traveler.vehicle')}</SectionLabel>
-      <Card style={styles.factCard}>
-        <Text style={styles.vehicle}>{vehicle}</Text>
-        <Text style={styles.plateLabel}>{t('traveler.plateCaps')}</Text>
-        <Mono size={34} weight="600" style={styles.plate}>
-          {plate}
-        </Mono>
-      </Card>
+      {hasOperator ? (
+        <>
+          {/* Vehicle and Operator facts do not exist until dispatch succeeds. Omitting the
+              sections before then is clearer than presenting "Not recorded" as if data were
+              missing from an assigned Travel. */}
+          <SectionLabel style={styles.lbl}>{t('traveler.vehicle')}</SectionLabel>
+          <Card style={styles.factCard}>
+            <Text style={styles.vehicle}>{vehicle}</Text>
+            <Text style={styles.plateLabel}>{t('traveler.plateCaps')}</Text>
+            <Mono size={34} weight="600" style={styles.plate}>
+              {plate}
+            </Mono>
+          </Card>
 
-      {/* 3 · THE OPERATOR. */}
-      <SectionLabel style={styles.lbl}>{t('traveler.operator')}</SectionLabel>
-      <Card style={styles.factCard}>
-        <Text style={styles.operator}>{operator}</Text>
-      </Card>
+          <SectionLabel style={styles.lbl}>{t('traveler.operator')}</SectionLabel>
+          <Card style={styles.factCard}>
+            <Text style={styles.operator}>{operator}</Text>
+          </Card>
+        </>
+      ) : null}
 
-      {/* 4 · THE TRAVEL NUMBER — how American Rider finds every record of this journey. */}
-      <SectionLabel style={styles.lbl}>{t('traveler.travelNumber')}</SectionLabel>
-      <Card style={styles.factCard}>
-        {tripNo ? (
-          <Mono size={22} weight="500">
-            {tripNo}
-          </Mono>
-        ) : (
-          <Text style={styles.noTravel}>{t('traveler.notRecorded')}</Text>
-        )}
-      </Card>
+      {tripNo ? (
+        <>
+          <SectionLabel style={styles.lbl}>{t('traveler.travelNumber')}</SectionLabel>
+          <Card style={styles.factCard}>
+            <Mono size={22} weight="500">{tripNo}</Mono>
+          </Card>
+        </>
+      ) : null}
 
       <SectionLabel style={styles.lbl}>{t('traveler.americanRider')}</SectionLabel>
       <Card style={styles.factCard}>

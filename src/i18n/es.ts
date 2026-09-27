@@ -57,6 +57,7 @@ export default {
   },
 
   operator: {
+    verificationCode: 'Código de verificación',
     inboxReadFailed: "No se pudo registrar esta comunicación como leída. Inténtelo de nuevo.",
     inboxBody: "Calificación, cobertura, evaluación, pagos y avisos operativos.",
     communications: "COMUNICACIONES",

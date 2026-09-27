@@ -28,6 +28,7 @@
 // A shared counter belongs in Firestore when there is more than one instance to share it.
 
 const WINDOWS = new Map();
+const SHARED_COLLECTION = 'rate_limits';
 
 /** Strip counters nothing has touched for an hour, so the map cannot grow without bound. */
 function sweep(now) {
@@ -56,6 +57,28 @@ function hit(key, limit, windowMs, now = Date.now()) {
   };
 }
 
+
+async function sharedHit(key, limit, windowMs, now = Date.now()) {
+  const { adminDb } = require('./firebase-admin');
+  const db = adminDb();
+  if (!db) return hit(key, limit, windowMs, now);
+  const id = require('node:crypto').createHash('sha256').update(String(key)).digest('hex');
+  const ref = db.collection(SHARED_COLLECTION).doc(id);
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const rec = snap.exists ? (snap.data() || {}) : null;
+    const expired = !rec || now - Number(rec.start || 0) >= windowMs;
+    const start = expired ? now : Number(rec.start || now);
+    const count = expired ? 1 : Number(rec.count || 0) + 1;
+    tx.set(ref, { start, count, expiresAt: start + windowMs, updatedAt: now }, { merge: false });
+    const ok = count <= limit;
+    return {
+      ok, count, limit,
+      retryAfterSeconds: ok ? 0 : Math.ceil((start + windowMs - now) / 1000),
+    };
+  });
+}
+
 /**
  * Express middleware. `limit` uses per `windowMs`, keyed on the signed-in account.
  *
@@ -64,10 +87,16 @@ function hit(key, limit, windowMs, now = Date.now()) {
  * punishes the wrong people in both directions.
  */
 function perAccount({ name, limit, windowMs }) {
-  return (req, res, next) => {
+  return async (req, res, next) => {
     const uid = req.uid ? String(req.uid) : null;
     if (!uid) return next(); // requireAuth's job, not this one's.
-    const r = hit(`${name}:${uid}`, limit, windowMs);
+    let r;
+    try {
+      r = await sharedHit(`${name}:${uid}`, limit, windowMs);
+    } catch {
+      // Availability fallback: retain the local limiter if Firestore is temporarily unavailable.
+      r = hit(`${name}:${uid}`, limit, windowMs);
+    }
     if (r.ok) return next();
     res.set('Retry-After', String(r.retryAfterSeconds));
     return res.status(429).json({
@@ -109,4 +138,4 @@ function countOnly({ name, limit, windowMs }) {
 /** For tests. */
 function reset() { WINDOWS.clear(); }
 
-module.exports = { perAccount, countOnly, hit, reset, perIp };
+module.exports = { perAccount, countOnly, hit, sharedHit, reset, perIp };

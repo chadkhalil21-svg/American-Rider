@@ -574,7 +574,7 @@ export default {
     bgIfYouHaveNot: 'Si Vous Ne L’Avez Pas Fait',
     bgWhatIsLeft: 'Ce Qu’Il Reste À Commander',
     qualBasicsSub: 'Nom légal, date de naissance, adresse',
-    qualBgSub: 'Organisée par American Rider · payée au prix coûtant',
+    qualBgSub: 'Effectuée auprès d’un prestataire de vérification approuvé',
     inboxNotSignedIn: 'Cet appareil n’est pas connecté, il ne peut donc pas recevoir de courses.',
     inboxNotCommissioned: 'Ce compte n’est pas encore habilité, aucune course ne peut lui être attribuée.',
     noLongerInService: 'Vous n’êtes plus en service.',

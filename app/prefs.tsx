@@ -88,10 +88,10 @@ export default function CabinEnvironment() {
   return (
     <Screen>
       <LetterheadBar onBack={goBack} />
-      <Title>{t('traveler.travelPreferences')}</Title>
+      <Title size={24}>{t('traveler.travelPreferences')}</Title>
       <Sub>{t('traveler.configureThisTravel')}</Sub>
 
-      <SectionLabel style={{ marginTop: 26 }}>{t('traveler.climate')}</SectionLabel>
+      <SectionLabel style={{ marginTop: 22 }}>{t('traveler.climate')}</SectionLabel>
       <View style={styles.segWrap}>
         <Segmented
           options={[...CLIMATES]}
@@ -101,7 +101,7 @@ export default function CabinEnvironment() {
         />
       </View>
 
-      <SectionLabel style={{ marginTop: 24 }}>{t('traveler.atmosphere')}</SectionLabel>
+      <SectionLabel style={{ marginTop: 22 }}>{t('traveler.atmosphere')}</SectionLabel>
       <View style={styles.segWrap}>
         <Segmented
           options={['Quiet', 'Conversation']}
@@ -115,7 +115,7 @@ export default function CabinEnvironment() {
         />
       </View>
 
-      <SectionLabel style={{ marginTop: 24 }}>{t('traveler.music')}</SectionLabel>
+      <SectionLabel style={{ marginTop: 22 }}>{t('traveler.music')}</SectionLabel>
       <View style={styles.segWrap}>
         <Segmented
           options={[...MUSIC]}
@@ -130,7 +130,7 @@ export default function CabinEnvironment() {
         </Text>
       )}
 
-      <SectionLabel style={{ marginTop: 24 }}>{t('traveler.additionalRequests')}</SectionLabel>
+      <SectionLabel style={{ marginTop: 22 }}>{t('traveler.additionalRequests')}</SectionLabel>
       <View style={styles.chips}>
         <Chip
           label={t('traveler.charger')}
@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
   segWrap: { marginTop: 11 },
   seg: {
     flexDirection: 'row',
-    backgroundColor: colors.blueTint,
+    backgroundColor: colors.fill,
     borderRadius: 12,
     padding: 3,
   },
@@ -172,10 +172,10 @@ const styles = StyleSheet.create({
     bottom: 3,
     left: 3,
     borderRadius: 9,
-    backgroundColor: colors.ink,
+    backgroundColor: colors.accent,
   },
-  segOpt: { flex: 1, paddingVertical: 11, paddingHorizontal: 4, alignItems: 'center' },
-  segText: { fontSize: 14, fontWeight: '500', color: colors.ink2 },
+  segOpt: { flex: 1, paddingVertical: 10, paddingHorizontal: 4, alignItems: 'center' },
+  segText: { fontSize: 13.5, fontWeight: '500', color: colors.ink2 },
   segTextOn: { fontWeight: '600', color: '#fff' },
   musicNote: { fontSize: 12.5, color: colors.muted, marginTop: 9, lineHeight: 18.75 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginTop: 11 },

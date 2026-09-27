@@ -585,7 +585,9 @@ export function AuthScreen() {
         <Text style={[s.title, !isSignup && s.signInTitle]}>
           {isSignup ? t('auth.createYourAccount') : t('auth.welcomeBack')}
         </Text>
-        {isSignup && <Text style={s.sub}>{t('auth.sameFirstStep')}</Text>}
+        <Text style={s.sub}>
+          {isSignup ? t('auth.sameFirstStep') : t('auth.signInToAccount')}
+        </Text>
 
         {/* The demo's labeled-field card: uppercase labels, underlined fields, one card. */}
         <View style={[s.fieldCard, !isSignup && s.signInFieldCard]}>

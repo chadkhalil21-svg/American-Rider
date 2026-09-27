@@ -40,6 +40,7 @@ export default {
     forgotPassword: 'Passwort vergessen?',
   },
   common: {
+    cancel: 'Abbrechen',
     back: 'Zurück',
     done: 'Fertig',
     language: 'Sprache',

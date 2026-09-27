@@ -11,7 +11,7 @@ import { insuranceStatus, attestInsuranceUnchanged, requestInsuranceConfirmation
 import { useGoBack } from '../../src/components/nav';
 import { BadgeOk } from '../../src/components/operator';
 import { BackLink, Card, PrimaryButton, Screen, SectionLabel, Sub, Title } from '../../src/components/UI';
-import { BROKER, INSURERS, coordinationFee } from '../../src/data';
+import { BROKER, INSURERS } from '../../src/data';
 import { useOperator } from '../../src/state/OperatorContext';
 import { useLanguage } from '../../src/state/LanguageContext';
 import { colors } from '../../src/theme';
@@ -26,19 +26,30 @@ export default function OperatorInsurance() {
   const goBack = useGoBack();
   const op = useOperator();
   const [liveStatus, setLiveStatus] = useState<InsuranceStatus | null>(null);
+  const [config, setConfig] = useState<InsuranceConfig | null>(null);
   const [brokerEmail, setBrokerEmail] = useState('');
   const [statusBusy, setStatusBusy] = useState(false);
   const [monthlyPremium, setMonthlyPremium] = useState('600');
-  const [averageFare, setAverageFare] = useState('25');
-  const [travelsWeek, setTravelsWeek] = useState('20');
+  const [plannedHours, setPlannedHours] = useState('20');
 
   useEffect(() => {
+    insuranceConfig().then((x) => { if (x) setConfig(x); });
     insuranceStatus().then((s) => {
       if (!s) return;
       setLiveStatus(s);
       if (s.contact?.email) setBrokerEmail(s.contact.email);
     });
   }, [op.docs.insurance]);
+
+  const authorizeStatus = async () => {
+    setStatusBusy(true);
+    const out = await authorizeInsuranceStatusVerification();
+    setStatusBusy(false);
+    if (!out.ok) return Alert.alert(t('traveler.insAuthorizeTitle'), out.error || t('traveler.errReachAR'));
+    const s = await insuranceStatus();
+    if (s) setLiveStatus(s);
+    Alert.alert(t('traveler.insAuthorizeTitle'), t('traveler.insAuthorized'));
+  };
 
   const confirmUnchanged = async () => {
     setStatusBusy(true);
@@ -85,13 +96,14 @@ export default function OperatorInsurance() {
   const st = op.docs.insurance;
 
   const premiumN = Math.max(0, Number(monthlyPremium) || 0);
-  const fareN = Math.max(0, Number(averageFare) || 0);
-  const weeklyN = Math.max(0, Number(travelsWeek) || 0);
-  const retainedPerTravel = Math.max(0, fareN - coordinationFee(fareN));
-  const retainedMonthly = retainedPerTravel * weeklyN * 4.33;
-  const afterInsurance = retainedMonthly - premiumN;
-  const breakEvenTravels = retainedPerTravel > 0 ? Math.ceil(premiumN / retainedPerTravel) : 0;
+  const plannedHoursN = Math.max(0, Number(plannedHours) || 0);
+  const fareNeeded = premiumN / 0.99;
+  const monthlyPlannedHours = plannedHoursN * 4.33;
+  const insurancePerPlannedHour = monthlyPlannedHours > 0 ? premiumN / monthlyPlannedHours : 0;
   const money = (n: number) => String.fromCharCode(36) + n.toFixed(0);
+  const money2 = (n: number) => String.fromCharCode(36) + n.toFixed(2);
+  const marketState = config?.state || 'FL';
+  const marketInsurers = INSURERS.filter((x) => !x.states || x.states.includes(marketState));
 
   return (
     <Screen>
@@ -146,6 +158,18 @@ export default function OperatorInsurance() {
 
         {st === 'ok' && (
           <>
+            <Text style={[styles.statusTitle, { marginTop: 16 }]}>{t('traveler.insAuthorizeTitle')}</Text>
+            <Text style={styles.body}>{t('traveler.insAuthorizeBody')}</Text>
+            {liveStatus?.authorized ? (
+              <Text style={[styles.body, { marginTop: 8 }]}>{t('traveler.insAuthorized')}</Text>
+            ) : (
+              <PrimaryButton
+                label={t('traveler.insAuthorizeButton')}
+                onPress={authorizeStatus}
+                disabled={statusBusy}
+                style={{ marginTop: 14 }}
+              />
+            )}
             <Text style={[styles.coverLabel, { marginTop: 16 }]}>{t('traveler.insBrokerEmail')}</Text>
             <TextInput
               value={brokerEmail}
@@ -160,7 +184,7 @@ export default function OperatorInsurance() {
             <PrimaryButton
               label={t('traveler.insRequestConfirmation')}
               onPress={requestStatus}
-              disabled={statusBusy || !brokerEmail.trim()}
+              disabled={statusBusy || !brokerEmail.trim() || !liveStatus?.authorized}
               style={{ marginTop: 14 }}
             />
             {liveStatus?.operatorActionRequired && (
@@ -175,35 +199,28 @@ export default function OperatorInsurance() {
       <SectionLabel style={styles.lbl}>{t('traveler.insEconomicsTitle')}</SectionLabel>
       <Card style={styles.econCard}>
         <Text style={styles.body}>{t('traveler.insEconomicsBody')}</Text>
+        <Text style={[styles.body, { marginTop: 8 }]}>{t('traveler.insNoDemandForecast')}</Text>
         <View style={styles.econInputs}>
           <View style={styles.econField}>
             <Text style={styles.coverLabel}>{t('traveler.insMonthlyPremium')}</Text>
             <TextInput value={monthlyPremium} onChangeText={setMonthlyPremium} keyboardType="decimal-pad" style={styles.econInput} />
           </View>
           <View style={styles.econField}>
-            <Text style={styles.coverLabel}>{t('traveler.insAverageFare')}</Text>
-            <TextInput value={averageFare} onChangeText={setAverageFare} keyboardType="decimal-pad" style={styles.econInput} />
-          </View>
-          <View style={styles.econField}>
-            <Text style={styles.coverLabel}>{t('traveler.insTravelsWeek')}</Text>
-            <TextInput value={travelsWeek} onChangeText={setTravelsWeek} keyboardType="decimal-pad" style={styles.econInput} />
+            <Text style={styles.coverLabel}>{t('traveler.insPlannedHours')}</Text>
+            <TextInput value={plannedHours} onChangeText={setPlannedHours} keyboardType="decimal-pad" style={styles.econInput} />
           </View>
         </View>
         <View style={styles.econRows}>
           <View style={styles.econRow}>
-            <Text style={styles.body}>{t('traveler.insMonthlyRetained')}</Text>
-            <Text style={styles.econValue}>{money(retainedMonthly)}</Text>
+            <Text style={styles.body}>{t('traveler.insFareNeeded')}</Text>
+            <Text style={styles.econValue}>{money(fareNeeded)}</Text>
           </View>
           <View style={styles.econRow}>
-            <Text style={styles.body}>{t('traveler.insAfterInsurance')}</Text>
-            <Text style={styles.econValue}>{money(afterInsurance)}</Text>
-          </View>
-          <View style={styles.econRow}>
-            <Text style={styles.body}>{t('traveler.insBreakEven')}</Text>
-            <Text style={styles.econValue}>{breakEvenTravels}</Text>
+            <Text style={styles.body}>{t('traveler.insInsurancePerHour')}</Text>
+            <Text style={styles.econValue}>{money2(insurancePerPlannedHour)}</Text>
           </View>
         </View>
-        <Text style={styles.disclaimer}>{t('traveler.insEstimateNote')}</Text>
+        <Text style={styles.disclaimer}>{t('traveler.insEstimateNote2')}</Text>
       </Card>
 
       {/* CONTINUING COVERAGE. The expiry date is deterministic and gates duty/acceptance.
@@ -276,7 +293,7 @@ export default function OperatorInsurance() {
           has to be right on its own. */}
       <Text style={styles.fixedInstruction}>{t('traveler.insFixedInstruction')}</Text>
       <Card style={styles.scriptCard}>
-        <Text style={styles.script}>{t('traveler.insCallScript')}</Text>
+        <Text style={styles.script}>{config?.script || t('traveler.insCallScript')}</Text>
       </Card>
       {/* THE SCRIPT STAYS IN ENGLISH IN ALL FIVE CATALOGUES, ON PURPOSE. It is read aloud to a
           Florida insurance agent, so a Spanish or German rendering would be a script that does
@@ -286,7 +303,7 @@ export default function OperatorInsurance() {
 
       <SectionLabel style={styles.lbl}>{t('operator.compareProviders')}</SectionLabel>
       <Card style={styles.listCard}>
-        {INSURERS.filter((x) => !x.secondary).map((x, i) => (
+        {marketInsurers.filter((x) => !x.secondary).map((x, i) => (
           <Pressable key={x.name} onPress={() => (x.url ? Linking.openURL(x.url) : Linking.openURL(`tel:${(x.phone || '').replace(/[^0-9+]/g, '')}`))}>
             <View style={[styles.insurerRow, i > 0 && styles.hair]}>
               <View style={{ flex: 1 }}>
@@ -297,7 +314,7 @@ export default function OperatorInsurance() {
             </View>
           </Pressable>
         ))}
-        {showMore && INSURERS.filter((x) => x.secondary).map((x) => (
+        {showMore && marketInsurers.filter((x) => x.secondary).map((x) => (
           <Pressable key={x.name} onPress={() => (x.url ? Linking.openURL(x.url) : Linking.openURL(`tel:${(x.phone || '').replace(/[^0-9+]/g, '')}`))}>
             <View style={[styles.insurerRow, styles.hair]}>
               <View style={{ flex: 1 }}>

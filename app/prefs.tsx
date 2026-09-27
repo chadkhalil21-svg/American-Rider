@@ -80,9 +80,10 @@ export default function CabinEnvironment() {
   const { t } = useLanguage();
   const goBack = useGoBack();
   const ride = useRide();
-  const { climate, music } = useCabinPrefs();
+  const cabin = useCabinPrefs();
+  const { climate, music, quiet, charging, luggage } = cabin;
 
-  const atmosphere = ride.tripPrefs.quiet ? 'Quiet' : 'Conversation';
+  const atmosphere = quiet ? 'Quiet' : 'Conversation';
 
   return (
     <Screen>
@@ -107,8 +108,9 @@ export default function CabinEnvironment() {
           labels={{ Quiet: t('traveler.prefQuiet'), Conversation: t('traveler.prefConversation') }}
           value={atmosphere}
           onChange={(v) => {
-            if ((v === 'Quiet') !== ride.tripPrefs.quiet) ride.togglePref('tripPrefs', 'quiet');
-            setCabinPrefs({ quiet: v === 'Quiet' }); // saved for every travel, not only this one
+            const next = v === 'Quiet';
+            setCabinPrefs({ quiet: next });
+            if (next !== ride.tripPrefs.quiet) ride.togglePref('tripPrefs', 'quiet');
           }}
         />
       </View>
@@ -132,18 +134,20 @@ export default function CabinEnvironment() {
       <View style={styles.chips}>
         <Chip
           label={t('traveler.charger')}
-          on={ride.tripPrefs.charging}
+          on={charging}
           onPress={() => {
-            setCabinPrefs({ charging: !ride.tripPrefs.charging });
-            ride.togglePref('tripPrefs', 'charging');
+            const next = !charging;
+            setCabinPrefs({ charging: next });
+            if (next !== ride.tripPrefs.charging) ride.togglePref('tripPrefs', 'charging');
           }}
         />
         <Chip
           label={t('traveler.luggage')}
-          on={ride.tripPrefs.luggage}
+          on={luggage}
           onPress={() => {
-            setCabinPrefs({ luggage: !ride.tripPrefs.luggage });
-            ride.togglePref('tripPrefs', 'luggage');
+            const next = !luggage;
+            setCabinPrefs({ luggage: next });
+            if (next !== ride.tripPrefs.luggage) ride.togglePref('tripPrefs', 'luggage');
           }}
         />
       </View>

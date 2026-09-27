@@ -10,6 +10,7 @@ This file records founder-approved interface checkpoints. An approved checkpoint
 | Authentication recovery | `approved/authentication-recovery-2026-09-27` | `8aa4576e15aa680db2600cbd95d2c8813660cb79` |
 | Home / Arrange Travel | `approved/home-2026-09-27` | `0fa2d12071a2204c05a84e5b81681bfbdf7de382` |
 | Hamburger drawer | `approved/drawer-2026-09-27` | `f3a7c883e879c8d27af461c40c6691f4204c170b` |
+| Profile / Account Details / Saved Places / Cabin Environment / Traveler Safety | `approved/profile-account-safety-2026-09-27` | `362b5f7c21642bf6d17c9c6859aca8efe0bc9569` |
 
 ## Lock protocol
 

@@ -380,6 +380,11 @@ export default function Home() {
           },
         },
         { label: t('traveler.safeTravels'), onPress: () => go('/safety') },
+      ],
+    },
+    {
+      label: t('traveler.company'),
+      rows: [
         {
           // Opens the real company page. It is also where the 99% belongs: the founders'
           // brief §10A puts the operator-retention statement in a permanent
@@ -960,9 +965,9 @@ const styles = StyleSheet.create({
   },
   // The demo's drawer head: avatar · name/link, gap 13, air below — no rule (the
   // first row's top hairline draws the line).
-  drawerHead: { paddingBottom: 18 },
-  drawerName: { fontSize: 17, fontWeight: '600', color: colors.ink },
-  // Monochrome, weight-carried, like every other modify control since 13 Sept 2026.
-  drawerProfileLink: { fontSize: 13, fontWeight: '600', color: colors.ink2, marginTop: 4 },
-  drawerLabel: { marginTop: 18, marginBottom: 4 },
+  drawerHead: { paddingBottom: 16 },
+  drawerName: { fontSize: 16.5, fontWeight: '600', color: colors.ink },
+  // Monochrome, weight-carried; the profile entry remains secondary to the account name.
+  drawerProfileLink: { fontSize: 12.5, fontWeight: '600', color: colors.accent, marginTop: 4 },
+  drawerLabel: { marginTop: 16, marginBottom: 3, fontSize: 10.5, letterSpacing: 1.5 },
 });

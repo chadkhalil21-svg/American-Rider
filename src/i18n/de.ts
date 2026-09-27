@@ -744,7 +744,7 @@ export default {
     anonymousRecords: 'Dienstunterlagen',
     yourPasswordPh: 'Ihr Passwort',
     keepMyAccount: 'Mein Konto behalten',
-    configureThisTravel: 'In Ihrem Konto als Ihre Kabinenpräferenzen gespeichert.'
+    configureThisTravel: 'In Ihrem Konto als Ihre Kabinenpräferenzen gespeichert.',
     completedTravelAppears: 'Abgeschlossene Fahrten erscheinen hier.',
     mapNeedsApp: 'Die Abholung auf der Karte zu wählen erfordert die iPhone-App',
     searchByNameInstead: 'Sie können einen Abholpunkt nach Namen suchen.',

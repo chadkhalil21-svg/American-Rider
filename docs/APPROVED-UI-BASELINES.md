@@ -15,6 +15,8 @@ This file records founder-approved interface checkpoints. An approved checkpoint
 
 | Operator Screening | `approved/operator-screening-2026-09-28` | `0ad546210b374e32353f6b56a15b72c3d0f99b0d` |
 
+| Operator Qualification / Commissioning | `approved/operator-qualification-commissioning-2026-09-28` | `715fadca3e516617934d7752be039a3f6e3ad183` |
+
 ## Lock protocol
 
 When a surface is approved:

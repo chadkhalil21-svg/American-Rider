@@ -206,11 +206,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // 3. Their profile document (name, mobile, email). Transport, payment, safety and
         // qualification records are not deleted from the phone; their retention needs a
         // separate policy and privileged server handling.
-        try {
-          await deleteDoc(doc(db, 'users', u.uid));
-        } catch {
-          // same
-        }
+        // Fail closed. If the profile document cannot be removed, keep the login so the
+        // traveler can retry; deleting authentication while leaving profile PII behind would
+        // make the remaining record harder for its owner to control.
+        await deleteDoc(doc(db, 'users', u.uid));
         // 4. Everything this app kept on the phone — role, operator qualification,
         //    revenue, preferences, trusted contacts, the welcome flag.
         await clearAllStorage();

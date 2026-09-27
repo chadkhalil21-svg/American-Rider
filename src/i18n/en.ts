@@ -918,6 +918,7 @@ export default {
     atmosphere: 'Atmosphere',
     music: 'Music',
     additionalRequests: 'Additional Requests',
+    noneRequested: 'None',
     charger: 'Device charging cable',
     luggage: 'Luggage assistance',
     estimatedSearchTime: 'Estimated Search Time',

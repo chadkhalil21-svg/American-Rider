@@ -8,8 +8,10 @@
 // The old shape is migrated in place rather than discarded: someone who added three names
 // keeps all three, they simply have no number until one is added.
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { auth } from './firebase';
 
-export const CONTACTS_KEY = 'ar:trusted-contacts:v1';
+const CONTACTS_KEY_PREFIX = 'ar:trusted-contacts:v2:';
+const contactsKey = () => CONTACTS_KEY_PREFIX + (auth.currentUser?.uid || 'preview');
 export const MAX_CONTACTS = 3;
 
 export type TrustedContact = {
@@ -42,7 +44,7 @@ export function prettyPhone(raw?: string): string {
 /** Read the list, migrating the old names-only shape. Never throws. */
 export async function loadContacts(): Promise<TrustedContact[]> {
   try {
-    const raw = await AsyncStorage.getItem(CONTACTS_KEY);
+    const raw = await AsyncStorage.getItem(contactsKey());
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
@@ -66,7 +68,7 @@ export async function loadContacts(): Promise<TrustedContact[]> {
 /** Write the list back. Never throws — a failed save must not take the screen down. */
 export async function saveContacts(next: TrustedContact[]): Promise<void> {
   try {
-    await AsyncStorage.setItem(CONTACTS_KEY, JSON.stringify(next.slice(0, MAX_CONTACTS)));
+    await AsyncStorage.setItem(contactsKey(), JSON.stringify(next.slice(0, MAX_CONTACTS)));
   } catch {
     // Storage full or unavailable. The in-memory list still holds for this session.
   }

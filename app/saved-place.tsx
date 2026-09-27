@@ -121,7 +121,7 @@ export default function SavedPlace() {
       <View style={{ flex: 1 }} />
       {busy ? <ActivityIndicator style={{ marginBottom: 14 }} /> : null}
       {editingFavorite ? (
-        <PrimaryButton label={t('traveler.removeSavedPlace')} onPress={clear} />
+        <PrimaryButton label={t('traveler.removeSavedDestination')} onPress={clear} />
       ) : (
         <>
           <PrimaryButton label={key === 'favorite' ? t('traveler.saveDestination') : t('traveler.saveAddress')} onPress={save} disabled={busy || !text.trim()} />

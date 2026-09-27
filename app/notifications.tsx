@@ -21,8 +21,10 @@ import { useGoBack } from '../src/components/nav';
 import { Card, LetterheadBar, Screen, Sub, Title } from '../src/components/UI';
 import { useLanguage } from '../src/state/LanguageContext';
 import { colors } from '../src/theme';
+import { auth } from '../src/firebase';
 
-const KEY = 'ar:notif-prefs:v1';
+const KEY_PREFIX = 'ar:notif-prefs:v2:';
+const prefsKey = () => KEY_PREFIX + (auth.currentUser?.uid || 'preview');
 
 // KEYS, NOT SENTENCES — built at import, before the stored language is read.
 const ROWS: { id: string; title: string; sub: string; def: boolean }[] = [
@@ -63,7 +65,7 @@ export default function Notifications() {
   );
 
   useEffect(() => {
-    AsyncStorage.getItem(KEY)
+    AsyncStorage.getItem(prefsKey())
       .then((raw) => raw && setPrefs((p) => ({ ...p, ...JSON.parse(raw) })))
       .catch(() => {});
   }, []);
@@ -83,7 +85,7 @@ export default function Notifications() {
   const toggle = (id: string) => {
     const next = { ...prefs, [id]: !prefs[id] };
     setPrefs(next);
-    AsyncStorage.setItem(KEY, JSON.stringify(next)).catch(() => {});
+    AsyncStorage.setItem(prefsKey(), JSON.stringify(next)).catch(() => {});
     // AND ON THE ACCOUNT. The device copy survives a restart; the account copy is the one the
     // server reads before it sends, and without it the toggle governs nothing.
     savePushPrefs(next);

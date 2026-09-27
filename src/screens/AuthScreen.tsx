@@ -340,6 +340,7 @@ export function AuthScreen() {
             />
             <Text style={s.wordmark}>AMERICAN RIDER</Text>
             <Text style={s.lockupTag}>NATIONAL TRANSPORTATION</Text>
+            <Text style={s.tagline}>{t('auth.tagline')}</Text>
           </View>
           {/* A MEASURED GAP, NOT A SECOND SPRING. This was `flex: 1`, which is the one
               thing Chad's directive above rules out — an elastic gap in the middle of the

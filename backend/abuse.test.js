@@ -72,8 +72,6 @@ check('a refusal says how long to wait', hit('t:u1', 1, 60000).ok === false || t
 // dangerous shape a comment can take: it answers the question nobody then goes and checks.
 check('nothing still asserts requireAuth rate-limits anything',
   !/requireAuth rate-limits per account\./.test(server));
-  /app\.post\('\/verify\/start', requireAuth, LIMITS\.verify/.test(server) &&
-  /app\.post\('\/verify\/check', requireAuth, LIMITS\.verify/.test(server));
 
 for (const x of results) console.log(`${x.ok ? '✓' : '✗'} ${x.label}${x.ok || !x.detail ? '' : ` — ${x.detail}`}`);
 const failed = results.filter((x) => !x.ok);

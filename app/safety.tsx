@@ -52,11 +52,14 @@ export default function SafeTravels() {
     setAdding(true);
   };
 
+  const normalizedDraftPhone = normalizePhone(draftPhone);
+  const phoneDigits = normalizedDraftPhone.replace(/\D/g, '');
+  const contactReady = !!draftName.trim() && phoneDigits.length >= 7 && phoneDigits.length <= 15;
+
   const saveDraft = () => {
     const name = draftName.trim();
-    if (!name) return;
-    const phone = normalizePhone(draftPhone);
-    commit([...contacts, { name, ...(phone ? { phone } : {}) }]);
+    if (!contactReady) return;
+    commit([...contacts, { name, phone: normalizedDraftPhone }]);
     setAdding(false);
   };
 
@@ -239,12 +242,13 @@ export default function SafeTravels() {
               </Pressable>
               <Pressable
                 onPress={saveDraft}
-                style={[styles.saveBtn, !draftName.trim() && { backgroundColor: colors.disabled }]}
+                disabled={!contactReady}
+                style={[styles.saveBtn, !contactReady && { backgroundColor: colors.disabled }]}
               >
                 <Text
                   style={[
                     styles.saveBtnText,
-                    !draftName.trim() && { color: colors.disabledText },
+                    !contactReady && { color: colors.disabledText },
                   ]}
                 >
                   {t('traveler.saveContact')}

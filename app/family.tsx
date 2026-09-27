@@ -21,7 +21,7 @@ export default function FamilyScreen(){
  useEffect(()=>{void refresh();},[]);
  useEffect(()=>{const request=`${inviteId}:${inviteToken}:${acceptAttempt}`;if(!inviteId||!inviteToken||accepted||acceptRequest.current===request)return;acceptRequest.current=request;setAccepting(true);setAcceptFailed(false);acceptFamilyInvite(inviteId,inviteToken).then(async()=>{setAccepted(true);await refresh();}).catch(()=>setAcceptFailed(true)).finally(()=>setAccepting(false));},[inviteId,inviteToken,accepted,acceptAttempt]);
  const invite=async()=>{if(busy)return;setBusy(true);try{await createFamilyInvite({guardianName:'',teenName,teenEmail,teenDob});setTeenName('');setTeenEmail('');setTeenDob('');await refresh();}catch{showNote(t('traveler.familyInviteUnable'));}finally{setBusy(false);}};
- return <Screen note={note}><LetterheadBar onBack={back}/><Title>{t('traveler.familyTitle')}</Title>
+ return <Screen note={note}><LetterheadBar onBack={back}/><Title size={24}>{t('traveler.familyTitle')}</Title>
   {(inviteId&&inviteToken)?<Card style={styles.notice}><Text style={styles.name}>{accepting?t('traveler.familyAccepting'):accepted?t('traveler.familyAccepted'):t('traveler.familyInviteUnable')}</Text>{acceptFailed?<Pressable accessibilityRole="button" onPress={()=>setAcceptAttempt(v=>v+1)}><Text style={styles.action}>{t('traveler.tryAgain')}</Text></Pressable>:null}</Card>:null}
   {loadFailed?<Card style={styles.notice}><Text style={styles.meta}>{t('traveler.familyLoadUnable')}</Text><Pressable accessibilityRole="button" onPress={refresh}><Text style={styles.action}>{t('traveler.tryAgain')}</Text></Pressable></Card>:null}
   {loading?<Text style={styles.meta}>{t('traveler.familyWorking')}</Text>:null}
@@ -36,4 +36,4 @@ export default function FamilyScreen(){
   </Card>
  </Screen>;
 }
-const styles=StyleSheet.create({card:{marginTop:10,padding:18,gap:12},notice:{marginTop:16,padding:18},row:{flexDirection:'row',alignItems:'center',paddingVertical:8},name:{fontSize:15,color:colors.ink},meta:{fontSize:12,color:colors.muted,marginTop:3,lineHeight:18},action:{fontSize:13,color:colors.ink},input:{borderBottomWidth:1,borderBottomColor:colors.hairline,paddingVertical:12,color:colors.ink}});
+const styles=StyleSheet.create({card:{marginTop:10,padding:16,gap:12},notice:{marginTop:16,padding:16},row:{flexDirection:'row',alignItems:'center',paddingVertical:8},name:{fontSize:14.5,color:colors.ink},meta:{fontSize:12,color:colors.muted,marginTop:3,lineHeight:18},action:{fontSize:13,fontWeight:'600',color:colors.accent},input:{borderBottomWidth:1,borderBottomColor:colors.hairline,paddingVertical:12,color:colors.ink}});

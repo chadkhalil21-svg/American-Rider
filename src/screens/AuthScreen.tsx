@@ -242,7 +242,7 @@ export function AuthScreen() {
   const digits = mobile.replace(/\D/g, '');
   const canSubmit =
     emailOk(email) &&
-    password.length >= 6 &&
+    (step === 'signup' ? password.length >= 15 : password.length > 0) &&
     !busy &&
     (step !== 'signup' || (name.trim().length >= 2 && digits.length >= 10));
   const forgotPassword = async () => {
@@ -265,7 +265,6 @@ export function AuthScreen() {
         setOnboarding(false);
         return;
       }
-      // Mobile verification is not represented until a real verification provider is active.
       setStep('select');
     } else {
       signIn(email, password);

@@ -401,7 +401,7 @@ export default function Home() {
           other screens again. It owns the demo's 24px gap below itself. */}
       <LetterheadBar onMenu={() => setMenuOpen(true)} />
 
-      <Display>{t('traveler.beginTravel2')}</Display>
+      <Display style={styles.homeDisplay}>{t('traveler.beginTravel2')}</Display>
 
       {/* SPATIAL CONTEXT, NOT THE SUBJECT OF THE SCREEN (Chad, 13 Sept 2026, approved the
           same evening). It shows where the traveler is and nothing else: no operators we
@@ -826,6 +826,14 @@ export default function Home() {
 }
 
 const styles = StyleSheet.create({
+  // The home heading is important, not theatrical. The shared 34pt Display remains
+  // available for true hero moments; here 29pt gives the letterhead, departure context,
+  // destination field and actions a calmer single hierarchy.
+  homeDisplay: {
+    fontSize: 29,
+    lineHeight: 33,
+    letterSpacing: -0.52,
+  },
   ongoingCard: {
     marginTop: 18,
     backgroundColor: colors.ink,
@@ -865,20 +873,19 @@ const styles = StyleSheet.create({
   },
   // Demo: .card margin-top:22 padding:17px 18px gap:13, 16.5px --muted placeholder
   searchCard: {
-    marginTop: 22,
+    marginTop: 20,
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.hairline,
-    borderRadius: radii.card,
-    // 16/18 is the demo's own field padding; ours was 17. It also answers Chad's note
-    // that the search object read as a hero element — 2px shorter, same tap target.
-    paddingVertical: 16,
+    borderRadius: 14,
+    // Keep a generous target while reducing the visual mass of the field.
+    paddingVertical: 14,
     paddingHorizontal: 18,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 13,
   },
-  searchPlaceholder: { fontSize: 16.5, color: colors.muted },
+  searchPlaceholder: { fontSize: 15.5, color: colors.muted },
   // Demo: 'Suggested Travel' margin-top:26 · 'Recent Travel' margin-top:28 · card mt 12
   labelSuggested: { marginTop: 26, marginBottom: 12 },
 
@@ -901,14 +908,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.hairline,
-    borderRadius: radii.card,
+    borderRadius: 14,
     paddingVertical: 2,
-    paddingHorizontal: 20,
+    paddingHorizontal: 18,
   },
   listRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingVertical: 14,
     gap: 14,
   },
   listRowDivider: {
@@ -916,15 +923,15 @@ const styles = StyleSheet.create({
     borderTopColor: colors.hairline,
   },
   // The demo's recent rows are REGULAR weight at 15px — not bold at 16.
-  listName: { fontSize: 15, color: colors.ink },
-  listMeta: { fontSize: 12.5, color: colors.muted, marginTop: 3 },
+  listName: { fontSize: 14.5, color: colors.ink },
+  listMeta: { fontSize: 12, color: colors.muted, marginTop: 3 },
   rowRight: { alignItems: 'flex-end' },
   scheduleLink: {
     textAlign: 'center',
-    fontSize: 13.5,
+    fontSize: 13,
     fontWeight: '500',
-    color: colors.ink2,
-    paddingVertical: 14,
+    color: colors.accent,
+    paddingVertical: 13,
   },
   rowAction: { fontSize: 12, fontWeight: '600', color: colors.blue, marginTop: 4 },
   // .btn.cta-space{ margin-top:24; border-radius:13; padding:18; 16/600/.01em }
@@ -940,12 +947,13 @@ const styles = StyleSheet.create({
   reserveBtn: {
     marginTop: 12,
     backgroundColor: colors.solid,
-    borderRadius: radii.button,
-    padding: 18,
+    borderRadius: 12,
+    paddingVertical: 15,
+    paddingHorizontal: 18,
     alignItems: 'center',
   },
   reserveBtnText: {
-    fontSize: 16,
+    fontSize: 15.5,
     fontWeight: '600',
     letterSpacing: 0.16,
     color: colors.solidFg,

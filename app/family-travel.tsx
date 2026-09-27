@@ -15,7 +15,7 @@ export default function FamilyTravel(){
  const [messages,setMessages]=useState<TravelMessage[]>([]),[text,setText]=useState(''),[sending,setSending]=useState(false);
  useEffect(()=>watchTravelThread(tripNo,'guardian',setMessages,()=>showNote(t('traveler.errConversationLoad'))),[tripNo,showNote,t]);
  const send=async()=>{if(!text.trim()||sending)return;setSending(true);const value=text.trim();const ok=await sendTravelMessage({rideId,tripNo,text:value,from:'guardian'});if(ok)setText('');else showNote(t('traveler.familyMessageFailed'));setSending(false);};
- return <Screen note={note}><LetterheadBar onBack={back}/><Title>{t('traveler.familyTeenTravel')}</Title>
+ return <Screen note={note}><LetterheadBar onBack={back}/><Title size={24}>{t('traveler.familyTeenTravel')}</Title>
   <Card style={styles.card}><Text style={styles.name}>{String(p.travelerName||t('traveler.familyTeenTraveler'))}</Text><Text style={styles.meta}>{t('traveler.travelNumber')}</Text><Mono size={13}>{tripNo||'—'}</Mono><Text style={styles.meta}>{t('traveler.familyOperator',{name:String(p.operatorName||'—')})}</Text>
    {p.followUrl?<Pressable accessibilityRole="link" onPress={()=>Linking.openURL(String(p.followUrl))}><Text style={styles.link}>{t('traveler.familyFollowLive')}</Text></Pressable>:null}
   </Card>
@@ -26,4 +26,4 @@ export default function FamilyTravel(){
   </Card>
  </Screen>;
 }
-const styles=StyleSheet.create({card:{marginTop:10,padding:18,gap:12},name:{fontSize:16,color:colors.ink,fontWeight:'600'},meta:{fontSize:12.5,color:colors.muted,lineHeight:18},link:{fontSize:14,color:colors.blue,marginTop:4},message:{borderTopWidth:1,borderTopColor:colors.hairline,paddingTop:10},messageWho:{fontSize:11,color:colors.muted,textTransform:'uppercase'},messageText:{fontSize:14,color:colors.ink,marginTop:4,lineHeight:20},input:{borderBottomWidth:1,borderBottomColor:colors.hairline,paddingVertical:12,color:colors.ink,minHeight:52}});
+const styles=StyleSheet.create({card:{marginTop:10,padding:16,gap:12},name:{fontSize:15,color:colors.ink,fontWeight:'600'},meta:{fontSize:12.5,color:colors.muted,lineHeight:18},link:{fontSize:13.5,fontWeight:'600',color:colors.accent,marginTop:4},message:{borderTopWidth:1,borderTopColor:colors.hairline,paddingTop:10},messageWho:{fontSize:11,color:colors.muted,textTransform:'uppercase'},messageText:{fontSize:14,color:colors.ink,marginTop:4,lineHeight:20},input:{borderBottomWidth:1,borderBottomColor:colors.hairline,paddingVertical:12,color:colors.ink,minHeight:52}});

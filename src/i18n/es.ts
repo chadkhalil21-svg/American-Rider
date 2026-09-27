@@ -319,6 +319,8 @@ export default {
     insFixedInstruction: 'Solicite una póliza comercial independiente de transporte de pasajeros que cumpla los requisitos TNC de Florida y cubra todos los periodos; no un complemento de transporte compartido sobre una póliza personal.',
     insStatusTitle: "Estado Continuo del Seguro",
     insAuthorizeTitle: "Autorización única de estado",
+    insProviderProcessTitle: "Verificación específica del proveedor",
+    insProviderProcessBody: "Su aseguradora o corredor requiere su propio formulario de autorización, portal o proceso de verificación. American Rider Operator Relations gestionará la excepción con usted; el plazo de verificación vigente sigue aplicando.",
     insAuthorizeBody: "Autorice a American Rider a preguntar a su aseguradora, agente autorizado, corredor, MGA o proveedor de supervisión aprobado únicamente si la póliza sigue activa y sin cambios materiales para determinar su elegibilidad. American Rider no solicita su método de pago, historial de reclamaciones ni información ajena a la póliza.",
     insAuthorizeButton: "Autorizar Verificación de Estado",
     insAuthorized: "Verificación de estado autorizada",

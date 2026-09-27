@@ -12,9 +12,8 @@
 // sheet at payment), a portrait (nothing stores one), a corporate billing switch (not built).
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { Linking, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Text } from '../src/components/AppText';
-import { LEGAL_URL } from '../src/config';
 import { loadContacts, type TrustedContact } from '../src/contacts';
 import { useGoBack } from '../src/components/nav';
 import { Card, Chev, LetterheadBar, Screen, SectionLabel } from '../src/components/UI';
@@ -248,15 +247,6 @@ export default function Profile() {
         </Card>
       </Pressable>
 
-      {/* THE MODEL, STATED ONCE, as the founders' brief §10A asks: an institutional fact in a
-          permanent account surface, not a slogan through the journey. */}
-      <View style={styles.charter}>
-        <SectionLabel style={styles.charterLabel}>{t('traveler.company')}</SectionLabel>
-        <Text style={styles.charterText}>{t('traveler.operatorsReceive99')}</Text>
-        <Pressable accessibilityRole="link" onPress={() => Linking.openURL(`${LEGAL_URL}/about`)} hitSlop={8}>
-          <Text style={styles.action}>{t('traveler.aboutAmericanRider')} ›</Text>
-        </Pressable>
-      </View>
     </Screen>
   );
 }
@@ -288,7 +278,4 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  charter: { marginTop: 24, gap: 7, paddingBottom: 4 },
-  charterLabel: { marginBottom: 1 },
-  charterText: { fontSize: 12.5, color: colors.ink2, lineHeight: 18.5 },
 });

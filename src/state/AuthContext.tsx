@@ -21,7 +21,7 @@ type AuthState = {
   initializing: boolean;
   busy: boolean;
   error: string | null;
-  signUp: (email: string, password: string, name?: string, mobile?: string) => Promise<void>;
+  signUp: (email: string, password: string, name?: string, mobile?: string) => Promise<boolean>;
   // True while the post-signup onboarding steps (code, role, ready) are on screen —
   // keeps the front-door overlay up even though Firebase already has a user.
   onboarding: boolean;
@@ -121,8 +121,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initializing,
     busy,
     error,
-    signUp: (email, password, name, mobile) =>
-      run(async () => {
+    signUp: async (email, password, name, mobile) => {
+      setBusy(true);
+      setError(null);
+      try {
         const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
         if (name) await updateProfile(cred.user, { displayName: name.trim() });
         // THE VERIFICATION EMAIL WAS NEVER SENT, so `emailVerified` was false on every
@@ -152,7 +154,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } catch {
           // profile write is best-effort; the account itself is created
         }
-      }),
+        return true;
+      } catch (e: any) {
+        setError(friendly(e?.code ?? ''));
+        return false;
+      } finally {
+        setBusy(false);
+      }
+    },
     signIn: (email, password) =>
       run(() => signInWithEmailAndPassword(auth, email.trim(), password)),
     // The demo's sign-in screen offers "Forgot password?"; here it really sends the

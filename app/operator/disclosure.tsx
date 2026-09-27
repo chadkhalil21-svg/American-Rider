@@ -6,9 +6,9 @@
 // duty is refused until it is acknowledged, and the acknowledgement is stored on the account
 // with the exact text and the moment — see backend/disclosure.js.
 //
-// The Operator's own qualifying policy remains a mandatory eligibility layer. The TNC's own
-// coverage disclosure is served by backend/disclosure.js from the bound production policy,
- // so this screen never hardcodes or invents coverage that must match the actual binder.
+// The Operator's own qualifying policy is the insurance layer American Rider verifies.
+// American Rider does not provide automobile insurance. The server owns the disclosure text,
+// version and acknowledgement record so the app cannot silently diverge from the record.
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -34,18 +34,19 @@ export default function OperatorDisclosure() {
   const [acknowledgedAt, setAcknowledgedAt] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // ONE CERTIFICATE, READ IN PLACE. The three sections are the server's own text
+  // ONE CERTIFICATE, READ IN PLACE. The sections are the server's own text
   // (backend/disclosure.js), shown as rows of a single card rather than three separate
   // cards. Nothing is rewritten, summarised or resealed here: the statute periods stay
   // inside the bodies where the server put them (§627.748(7) in "What you must carry").
   //
   // EVERY PART MUST BE OPENED BEFORE THE OPERATOR CAN AGREE (Adrian, 18 Sept 2026).
-  // §627.748(8)(a) requires TWO things in writing: what the TNC provides, and that the
-  // operator's own policy might not cover them. When the card first shipped, one row opened
+  // §627.748(8)(a) requires the written platform-coverage statement, the own-policy warning,
+  // and the warning for compensated transportation outside a prearranged TNC Travel. The
+  // additional qualification row explains what American Rider requires. When the card first shipped, one row opened
   // and the others stayed shut, so an operator could acknowledge text that never appeared on
   // their screen — and the record would then hold words they never read, which is worse than
   // no record. `seen` is the set of rows they have opened. The control stays off until it
-  // holds all three, and says which condition is unmet, exactly as the qualification screen
+  // holds every row, and says which condition is unmet, exactly as the qualification screen
   // says "Verify all 5 to continue".
   const [open, setOpen] = useState<number | null>(0);
   const [seen, setSeen] = useState<number[]>([0]);
@@ -68,7 +69,7 @@ export default function OperatorDisclosure() {
     setAcknowledgedAt(Date.now());
   };
 
-  const sections = doc ? [doc.provided, doc.ownPolicy, doc.required] : [];
+  const sections = doc ? [doc.provided, doc.ownPolicy, doc.outsidePrearranged, doc.required] : [];
   const allSeen = sections.length > 0 && sections.every((_, i) => seen.includes(i));
 
   return (

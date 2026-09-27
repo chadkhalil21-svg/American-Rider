@@ -39,7 +39,7 @@ import { colors } from '../theme';
 
 const emailOk = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
 
-type Step = 'welcome' | 'signin' | 'signup' | 'confirm' | 'select' | 'ready';
+type Step = 'welcome' | 'signin' | 'signup' | 'select' | 'ready';
 
 function InkButton({
   label,
@@ -239,7 +239,6 @@ export function AuthScreen() {
   const [mobile, setMobile] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [code, setCode] = useState('');
 
   const firstName = name.trim().split(/\s+/)[0] || 'Traveler';
   const digits = mobile.replace(/\D/g, '');
@@ -265,7 +264,10 @@ export function AuthScreen() {
       setOnboarding(true); // keep the front door up through code → role → ready
       try {
         await signUp(email, password, name, mobile);
-        setStep('confirm');
+        // Mobile verification is not represented until a real verification provider
+        // is active. A production institution must never accept arbitrary digits and
+        // present that as verification.
+        setStep('select');
       } catch {
         setOnboarding(false);
       }
@@ -465,54 +467,12 @@ export function AuthScreen() {
     );
   }
 
-  if (step === 'confirm') {
-    return (
-      <Screen scroll={false}>
-        <View style={{ flex: 1 }}>
-          <Text style={s.title}>{t('auth.confirmYourNumber')}</Text>
-          <Text style={s.sub}>
-            {/* WAS: "A 6-digit code was sent to +1 305…". No code was sent — there is no
-                SMS provider wired to this app, and the line below already admitted it by
-                telling the traveler to type any six digits. An institution does not state a
-                thing on one line and contradict it on the next. */}
-            {t('auth.verifyOff')}
-          </Text>
-          <View style={s.fieldCard}>
-            <View style={[s.fieldWrap, s.fieldWrapLast]}>
-              <Text style={s.fieldLabel}>{t('auth.verificationCode')}</Text>
-              <TextInput
-                style={[s.field, s.codeField]}
-                placeholder="••••••"
-                placeholderTextColor={colors.faint}
-                keyboardType="number-pad"
-                maxLength={6}
-                value={code}
-                onChangeText={setCode}
-                autoFocus
-              />
-            </View>
-          </View>
-          <Text style={s.demoNote}>{t('auth.enterAnySix')}</Text>
-          {/* RESEND CODE REMOVED. It sent nothing and then said "New code sent" in green —
-              a control named after an action it did not perform, reporting an outcome that
-              did not happen. Restore it with the SMS provider it needs. */}
-          <View style={{ flex: 1 }} />
-          <InkButton
-            label={t('auth.confirm')}
-            onPress={() => setStep('select')}
-            disabled={code.replace(/\D/g, '').length !== 6}
-          />
-        </View>
-      </Screen>
-    );
-  }
-
   if (step === 'select') {
     return (
       <Screen scroll={false}>
         <View style={{ flex: 1 }}>
-          <Text style={s.title}>{t('auth.selectAccount')}</Text>
-          <Text style={s.sub}>{t('auth.chooseWhereToBegin')}</Text>
+          <Text style={[s.title, s.selectTitle]}>{t('auth.selectAccount')}</Text>
+          <Text style={[s.sub, s.selectSub]}>{t('auth.chooseWhereToBegin')}</Text>
 
           <Pressable onPress={() => setStep('ready')}>
             <View style={s.roleCard}>
@@ -544,9 +504,6 @@ export function AuthScreen() {
           </Pressable>
 
           <View style={{ flex: 1 }} />
-          <Pressable onPress={() => setStep('ready')} hitSlop={10}>
-            <Text style={s.notSure}>{t('auth.notSureYet')}</Text>
-          </Pressable>
         </View>
       </Screen>
     );
@@ -874,23 +831,27 @@ const s = StyleSheet.create({
   helper: { fontSize: 12.5, color: colors.faint, marginTop: 10 },
   // The demo's "Forgot password?" sits muted under the field card.
   forgot: { fontSize: 12.5, color: colors.muted, marginTop: 12 },
-  codeField: { fontSize: 28, fontWeight: '600', letterSpacing: 10 },
-  demoNote: { fontSize: 12.5, color: colors.faint, marginTop: 12 },
-  roleCard: {
+  selectTitle: {
+    fontSize: 22,
+    letterSpacing: -0.25,
     marginTop: 14,
+  },
+  selectSub: { fontSize: 13.5, lineHeight: 19, maxWidth: 320 },
+  roleCard: {
+    marginTop: 12,
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.hairline,
-    borderRadius: 16,
-    padding: 22,
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 17,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
-  roleTitle: { fontSize: 19, fontWeight: '600', letterSpacing: -0.2, color: colors.ink },
-  roleSub: { fontSize: 13.5, color: colors.muted, marginTop: 5, lineHeight: 19 },
-  roleChevron: { fontSize: 20, color: colors.faint },
-  notSure: { textAlign: 'center', fontSize: 14, fontWeight: '500', color: colors.muted, marginBottom: 8 },
+  roleTitle: { fontSize: 17, fontWeight: '600', letterSpacing: -0.15, color: colors.ink },
+  roleSub: { fontSize: 12.5, color: colors.muted, marginTop: 4, lineHeight: 18 },
+  roleChevron: { fontSize: 18, color: colors.faint },
   checkCircle: {
     width: 60,
     height: 60,

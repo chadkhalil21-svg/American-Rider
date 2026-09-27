@@ -50,7 +50,7 @@ export default {
     signInToAccount: 'Inicie sesión en su cuenta.',
     pleaseWait: 'Un momento…',
     alreadyHave: '¿Ya tiene una cuenta? ',
-    newHere: '¿Es nuevo aquí? ',
+    newHere: '¿Es nuevo en American Rider? ',
     signInLink: 'Iniciar sesión',
     createAccountLink: 'Crear una cuenta',
     fullNameLabel: 'NOMBRE COMPLETO',

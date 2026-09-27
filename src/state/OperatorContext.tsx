@@ -456,6 +456,13 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
         return out;
       }
       setDocReviews((r) => ({ ...r, [k]: out }));
+      // The policy expiry is read from the accepted insurance document. Do not make the
+      // Operator type the same date a second time — duplicate entry creates disagreement and
+      // turns a deterministic fact into a clerical task.
+      if (k === 'insurance' && out.verdict === 'accept' && out.expiry) {
+        setInsuranceExpiryState(out.expiry);
+        AsyncStorage.setItem(K_COVERAGE, out.expiry).catch(() => {});
+      }
       setDocs((prev) => {
         const next = { ...prev, [k]: (out.verdict === 'accept' ? 'ok' : 'todo') as DocState };
         persistDocs(next);

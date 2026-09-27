@@ -45,8 +45,8 @@ export default {
     mobileNumberLabel: 'NUMERO DI CELLULARE',
     emailLabel: 'INDIRIZZO E-MAIL',
     passwordLabel: 'PASSWORD',
-    pwNewPh: '6+ caratteri',
-    usedToReach: 'Utilizzato per contattarla riguardo al viaggio.',
+    pwNewPh: 'Almeno 6 caratteri',
+    usedToReach: 'Utilizzato per le comunicazioni relative all’account e al Viaggio.',
     forgotPassword: 'Password dimenticata?',
   },
   common: {

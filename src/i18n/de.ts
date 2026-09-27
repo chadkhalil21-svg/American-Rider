@@ -829,7 +829,7 @@ export default {
     deleteAccount: 'Kontoschließung Autorisieren',
     whatIsDeleted: 'Gelöschte Datenkategorien',
     delCredentials: 'Persönliche Zugangsdaten und Profildaten',
-    delTravelRecords: 'Fahrtaufzeichnungen',
+    delTravelRecords: 'Zugriff auf den Reiseverlauf',
     delNeedPassword: 'Geben Sie Ihr Passwort ein, um fortzufahren.',
     deleting: 'Löschen…',
     yesDelete: 'Ja, löschen',

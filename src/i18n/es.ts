@@ -254,6 +254,8 @@ export default {
     insPremiumOffsetAR: "Con la retención del 99 % de American Rider",
     insPremiumOffsetBenchmark: "Con el rango observado del 50,5 %–57 %",
     insBenchmarkSource: "Fuente: Consumer Reports, junio de 2026. Las plataformas clasifican los costos externos de manera diferente; impuestos, peajes, propinas y otros importes transferidos no son idénticos.",
+    insAdvantageOffset: "Volumen de tarifas en el que la retención adicional compensa esta prima de seguro",
+    insAdvantageOffsetRange: "Comparado con el rango observado por Consumer Reports",
     insNoHoursNeeded: "No se usa una tarifa por hora inventada, tarifa media ni volumen prometido de Viajes. Introduzca únicamente la cotización real de seguro que recibió.",
     insEconomicsBody: "Use su propia cotización y actividad prevista. American Rider no inventa una tarifa media ni un número garantizado de Viajes.",
     insMonthlyPremium: "Prima mensual del seguro",

@@ -39,6 +39,7 @@ export default {
     forgotPassword: 'Password dimenticata?',
   },
   common: {
+    cancel: 'Annulla',
     back: 'Indietro',
     done: 'Fatto',
     language: 'Lingua',

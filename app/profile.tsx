@@ -51,7 +51,7 @@ export default function Profile() {
   // THE NAME. The one the traveler gave at sign-up, editable here and saved to the account;
   // until there is one, the address the account is held under — never a handle minted from it.
   const givenName = user?.displayName?.trim() ?? '';
-  const headName = givenName || user?.email?.trim() || '';
+  const headName = givenName || user?.email?.trim() || t('traveler.accountDetails');
   const [editingName, setEditingName] = useState(false);
   const [draftName, setDraftName] = useState('');
   const [savingName, setSavingName] = useState(false);
@@ -102,7 +102,7 @@ export default function Profile() {
         {since && <Text style={styles.since}>{t('traveler.travelerSince', { year: since })}</Text>}
       </View>
 
-      <SectionLabel style={{ marginTop: 24 }}>{t('traveler.account')}</SectionLabel>
+      <SectionLabel style={{ marginTop: 22 }}>{t('traveler.account')}</SectionLabel>
       <Card style={styles.card}>
         {editingName ? (
           <View style={styles.row}>
@@ -143,7 +143,7 @@ export default function Profile() {
       {/* SAVED PLACES. A row a traveler has not filled says "Not set" and opens the editor. It
           never guesses, and it never shows a place they did not type. Favourites: any
           destination they want one tap away on Home, up to MAX_FAVORITES. */}
-      <SectionLabel style={{ marginTop: 24 }}>{t('traveler.savedPlaces')}</SectionLabel>
+      <SectionLabel style={{ marginTop: 22 }}>{t('traveler.savedPlaces')}</SectionLabel>
       <Card style={styles.card}>
         {(['home', 'work'] as const).map((k, i) => (
           <Pressable
@@ -189,7 +189,7 @@ export default function Profile() {
 
       {/* THE SAVED CABIN ENVIRONMENT, applied to every travel; the control opens the screen
           that changes it. */}
-      <SectionLabel style={{ marginTop: 24 }}>{t('traveler.travelPreferences')}</SectionLabel>
+      <SectionLabel style={{ marginTop: 22 }}>{t('traveler.travelPreferences')}</SectionLabel>
       <Card style={styles.card}>
         <View style={styles.row}>
           <Text style={styles.rowTitle}>{t('traveler.climate')}</Text>
@@ -219,7 +219,7 @@ export default function Profile() {
       </Card>
 
       {/* TRUSTED CONTACTS: how many are configured, and the screen that manages them. */}
-      <SectionLabel style={{ marginTop: 24 }}>{t('traveler.safeTravels')}</SectionLabel>
+      <SectionLabel style={{ marginTop: 22 }}>{t('traveler.safeTravels')}</SectionLabel>
       <Pressable accessibilityRole="button" onPress={() => router.navigate('/safety')}>
         <Card style={styles.card}>
           <View style={styles.row}>
@@ -231,7 +231,7 @@ export default function Profile() {
         </Card>
       </Pressable>
 
-      <SectionLabel style={{ marginTop: 24 }}>{t('traveler.travelStatistics')}</SectionLabel>
+      <SectionLabel style={{ marginTop: 22 }}>{t('traveler.travelStatistics')}</SectionLabel>
       <Card style={styles.card}>
         <View style={styles.row}>
           <Text style={styles.rowTitle}>{t('traveler.travelsCompletedThisYear')}</Text>
@@ -251,6 +251,7 @@ export default function Profile() {
       {/* THE MODEL, STATED ONCE, as the founders' brief §10A asks: an institutional fact in a
           permanent account surface, not a slogan through the journey. */}
       <View style={styles.charter}>
+        <SectionLabel style={styles.charterLabel}>{t('traveler.company')}</SectionLabel>
         <Text style={styles.charterText}>{t('traveler.operatorsReceive99')}</Text>
         <Pressable accessibilityRole="link" onPress={() => Linking.openURL(`${LEGAL_URL}/about`)} hitSlop={8}>
           <Text style={styles.action}>{t('traveler.aboutAmericanRider')} ›</Text>
@@ -261,32 +262,33 @@ export default function Profile() {
 }
 
 const styles = StyleSheet.create({
-  head: { marginTop: 10 },
-  name: { fontSize: 22, fontWeight: '600', letterSpacing: -0.44, color: colors.ink },
-  since: { fontSize: 13.5, color: colors.ink2, marginTop: 4 },
-  card: { marginTop: 12, paddingHorizontal: 20, paddingVertical: 2 },
+  head: { marginTop: 8 },
+  name: { fontSize: 20.5, fontWeight: '600', letterSpacing: -0.38, color: colors.ink },
+  since: { fontSize: 12.5, color: colors.muted, marginTop: 4 },
+  card: { marginTop: 10, paddingHorizontal: 18, paddingVertical: 1 },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: 12,
-    paddingVertical: 15,
+    paddingVertical: 13.5,
   },
   hair: { borderTopWidth: 1, borderTopColor: colors.hairline },
-  rowTitle: { fontSize: 15, color: colors.ink },
+  rowTitle: { fontSize: 14.5, color: colors.ink },
   rowValue: { flex: 1, textAlign: 'right' },
-  statValue: { fontSize: 15, fontWeight: '600', color: colors.ink },
-  notSet: { fontSize: 14.5, color: colors.muted },
-  nameInput: { flex: 1, fontSize: 15, fontWeight: '600', color: colors.ink, textAlign: 'right', padding: 0 },
-  action: { fontSize: 13.5, fontWeight: '600', color: colors.ink2 },
+  statValue: { fontSize: 14.5, fontWeight: '600', color: colors.ink },
+  notSet: { fontSize: 14, color: colors.muted },
+  nameInput: { flex: 1, fontSize: 14.5, fontWeight: '600', color: colors.ink, textAlign: 'right', padding: 0 },
+  action: { fontSize: 13, fontWeight: '600', color: colors.accent },
   payCard: {
-    marginTop: 24,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
+    marginTop: 22,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  charter: { marginTop: 28, gap: 6 },
-  charterText: { fontSize: 13, color: colors.ink2, lineHeight: 19 },
+  charter: { marginTop: 24, gap: 7, paddingBottom: 4 },
+  charterLabel: { marginBottom: 1 },
+  charterText: { fontSize: 12.5, color: colors.ink2, lineHeight: 18.5 },
 });

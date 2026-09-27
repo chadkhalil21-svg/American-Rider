@@ -14,7 +14,8 @@ export const colors = {
   ink2: '#3A3F49', // --ink2 — emphatic secondary text
   muted: '#8A8A82', // --muted
   faint: '#B4B3AB', // --faint
-  blue: '#2E5FE0', // --blue
+  blue: '#2E5FE0', // --blue — legacy/demo accent; do not expand its use
+  accent: '#36516F', // APP-ONLY — restrained slate-navy for deliberate navigation/choice
   blueTint: '#F0F3FC', // --blue-t — tinted panel fill
   blueBorder: '#E1E9FB', // --blue-b — tinted panel border
   green: '#1F8A5B', // --green

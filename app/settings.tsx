@@ -97,13 +97,13 @@ export default function Settings() {
             "Regulatory & Legal Repository"). Both are served by our own backend in five
             languages, so the row opens the reader's language rather than English. There is no
             separate "National Network Policy" document, so the row is not named after one. */}
-        <Pressable onPress={() => Linking.openURL(`${LEGAL_URL}/terms`)}>
+        <Pressable onPress={() => Linking.openURL(`${LEGAL_URL}/terms?lang=${encodeURIComponent(language)}`)}>
           <View style={[styles.row, styles.hair]}>
             <Text style={[styles.rowTitle, styles.rowTitleWrap]}>{t('traveler.termsOfService')}</Text>
             <Chev />
           </View>
         </Pressable>
-        <Pressable onPress={() => Linking.openURL(`${LEGAL_URL}/privacy`)}>
+        <Pressable onPress={() => Linking.openURL(`${LEGAL_URL}/privacy?lang=${encodeURIComponent(language)}`)}>
           <View style={[styles.row, styles.hair]}>
             <Text style={[styles.rowTitle, styles.rowTitleWrap]}>{t('traveler.privacy')}</Text>
             <Chev />

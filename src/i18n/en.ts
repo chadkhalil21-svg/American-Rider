@@ -44,6 +44,7 @@ export default {
     forgotPassword: 'Forgot password?',
   },
   common: {
+    cancel: 'Cancel',
     back: 'Back',
     done: 'Done',
     language: 'Language',

@@ -24,7 +24,7 @@ const {
   quote, createPaymentIntent, resumePaymentIntent, chargeRide, refundTravel,
   connectAccountFor, connectOnboardingLink, connectAccountStatus,
   transferToOperator, refundableFor, connectDashboardLink, pingStripe, probeNetwork,
-  transferFixed, createScreeningIntent, operatorPayoutAccount,
+  transferFixed, operatorPayoutAccount,
   listPaymentMethods, createSetupIntent, setDefaultPaymentMethod, detachPaymentMethod,
   defaultCardCountry, chargeOperatorAccountFee,
 } = require('./payments');
@@ -47,7 +47,7 @@ const LIMITS = {
   // somebody in trouble has failed at the one thing it must not fail at.
   emergency: countOnly({ name: 'emergency', limit: 6, windowMs: 60 * 60 * 1000 }),
   // COST CONTROLS (22 Sept 2026). Each of these calls something that costs money or reaches a
-  // third party: the document reader (a model call), Checkr, Stripe, push notifications,
+  // third party: the document reader (a model call), screening support workflow, Stripe, push notifications,
   // the routers. The client cannot be trusted to hold back, so the server does. Generous for a
   // real person — nobody photographs a licence 20 times an hour — and a hard stop for a loop.
   document: perAccount({ name: 'document', limit: 20, windowMs: 60 * 60 * 1000 }),

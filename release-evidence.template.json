@@ -10,10 +10,13 @@
       "reviewer": null,
       "evidence": [],
       "details": {
-        "carrier": null,
-        "binderOrPolicyReference": null,
-        "effectiveDate": null,
-        "expirationDate": null,
+        "jurisdiction": null,
+        "statuteReviewed": null,
+        "disclosureVersion": null,
+        "jurisdictionRuleReviewed": false,
+        "continuingStatusMonitoringValidated": false,
+        "adverseStatusLockoutValidated": false,
+        "directProviderConfirmationValidated": false,
         "englishDisclosureReviewed": false,
         "translationsReviewed": []
       }

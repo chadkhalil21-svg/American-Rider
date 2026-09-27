@@ -845,7 +845,7 @@ export default {
     deleteAccount: 'Autorizar el Cierre de la Cuenta',
     whatIsDeleted: 'Categorías de Datos Eliminados',
     delCredentials: 'Credenciales Personales y Datos del Perfil',
-    delTravelRecords: 'Registros de Viaje',
+    delTravelRecords: 'Acceso al Historial de Viajes',
     delNeedPassword: 'Introduzca su contraseña para continuar.',
     deleting: 'Eliminando…',
     yesDelete: 'Sí, eliminar',

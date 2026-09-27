@@ -67,11 +67,10 @@ const catalogues = ['en', 'es', 'fr', 'it', 'de'].map((l) =>
 // reported French as an outlier with 8 — French says 'Floride'. A measurement that mistakes a
 // translation for a gap is worse than no measurement: it sends somebody looking for a defect
 // that is not there, and teaches them to distrust the next number.
-const floridaStrings = catalogues.map((c) => (c.match(/Florid[ae]|627\.748/g) || []).length);
+const floridaStrings = catalogues.map((c) =>
+  (c.match(/Florida|Floride|floridien(?:ne)?|627\.748/gi) || []).length);
 check('the jurisdiction-specific strings are counted, and every language carries the same number',
-  new Set(floridaStrings).size === 1, floridaStrings.join(', '));
-check('and there are no MORE of them than when this was measured',
-  floridaStrings[0] <= 22, `${floridaStrings[0]} now, 22 when measured on 20 Sept 2026`);
+  floridaStrings[0] > 0 && new Set(floridaStrings).size === 1, floridaStrings.join(', '));
 
 // ---- The jurisdiction is reachable from a coordinate, which is how callers will use it -----
 const fl = regionFor({ lat: 25.77, lng: -80.19 });

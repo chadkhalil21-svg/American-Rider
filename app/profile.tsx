@@ -12,7 +12,7 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../src/components/AppText';
 import { loadContacts, type TrustedContact } from '../src/contacts';
 import { useGoBack } from '../src/components/nav';
@@ -28,7 +28,7 @@ export default function Profile() {
   const { t } = useLanguage();
   const router = useRouter();
   const goBack = useGoBack();
-  const { user, setDisplayName } = useAuth();
+  const { user } = useAuth();
   const cabin = useCabinPrefs();
 
   // Re-read on focus rather than once: a traveler returning from the editors must see what
@@ -36,9 +36,7 @@ export default function Profile() {
   const [places, setPlaces] = useState<SavedPlaces>({ favorites: [] });
   const [contacts, setContacts] = useState<TrustedContact[]>([]);
   const [mobile, setMobile] = useState('');
-  const [editingMobile, setEditingMobile] = useState(false);
-  const [draftMobile, setDraftMobile] = useState('');
-  const [savingMobile, setSavingMobile] = useState(false);
+  const [phoneVerified, setPhoneVerified] = useState(false);
   useFocusEffect(
     useCallback(() => {
       let live = true;
@@ -50,6 +48,7 @@ export default function Profile() {
             if (!live || !snap.exists()) return;
             const value = snap.data()?.mobile;
             setMobile(typeof value === 'string' ? value.trim() : '');
+            setPhoneVerified(snap.data()?.phoneVerified === true);
           })
           .catch(() => {});
       }
@@ -59,51 +58,20 @@ export default function Profile() {
     }, [user?.uid]),
   );
 
-  // THE NAME. The one the traveler gave at sign-up, editable here and saved to the account;
-  // until there is one, the address the account is held under — never a handle minted from it.
-  const givenName = user?.displayName?.trim() ?? '';
-  const headName = givenName || user?.email?.trim() || t('traveler.accountDetails');
-  const [editingName, setEditingName] = useState(false);
-  const [draftName, setDraftName] = useState('');
-  const [savingName, setSavingName] = useState(false);
-  const beginEdit = () => {
-    setDraftName(givenName);
-    setEditingName(true);
-  };
-  const saveName = async () => {
-    const clean = draftName.trim().slice(0, 40);
-    if (!clean || clean === givenName) {
-      setEditingName(false);
-      return;
-    }
-    setSavingName(true);
-    try {
-      await setDisplayName(clean);
-    } finally {
-      setSavingName(false);
-      setEditingName(false);
-    }
-  };
+  // The signed-in web review bypass has no Firebase account by design. Give that review surface
+  // a clearly fictional but complete account record so the Account Details composition can be
+  // judged as it appears for a real Traveler, rather than as an impossible half-created account.
+  const webPreview =
+    Platform.OS === 'web' &&
+    process.env.EXPO_PUBLIC_AUTH_PREVIEW_BYPASS === '1' &&
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('preview') === 'app';
 
-  const beginMobileEdit = () => {
-    setDraftMobile(mobile);
-    setEditingMobile(true);
-  };
-  const saveMobile = async () => {
-    const clean = draftMobile.trim().slice(0, 30);
-    if (!user?.uid || clean === mobile) {
-      setEditingMobile(false);
-      return;
-    }
-    setSavingMobile(true);
-    try {
-      await setDoc(doc(db, 'users', user.uid), { mobile: clean }, { merge: true });
-      setMobile(clean);
-    } finally {
-      setSavingMobile(false);
-      setEditingMobile(false);
-    }
-  };
+  const givenName = user?.displayName?.trim() || (webPreview ? 'Preview Traveler' : '');
+  const accountEmail = user?.email?.trim() || (webPreview ? 'traveler@americanrider.app' : '');
+  const accountMobile = mobile || (webPreview ? '+1 (305) 555-0148' : '');
+  const emailVerified = user?.emailVerified === true || webPreview;
+  const mobileVerified = phoneVerified || webPreview;
 
   // THE YEAR THIS ACCOUNT WAS ACTUALLY OPENED, from Firebase — not a demonstration traveler's.
   const since = user?.metadata?.creationTime
@@ -123,81 +91,57 @@ export default function Profile() {
       <LetterheadBar onBack={goBack} />
 
       <View style={styles.head}>
-        <Text style={styles.name} numberOfLines={2}>{headName}</Text>
+        <Text style={styles.name}>{t('traveler.accountDetails')}</Text>
         {since && <Text style={styles.since}>{t('traveler.travelerSince', { year: since })}</Text>}
       </View>
 
       <SectionLabel style={{ marginTop: 22 }}>{t('traveler.account')}</SectionLabel>
       <Card style={styles.card}>
-        {editingName ? (
+        <Pressable onPress={() => router.navigate('/account-name')} accessibilityRole="button">
           <View style={styles.row}>
             <Text style={styles.rowTitle}>{t('traveler.nameLabel')}</Text>
-            <TextInput
-              style={styles.nameInput}
-              value={draftName}
-              onChangeText={setDraftName}
-              autoFocus
-              autoCorrect={false}
-              maxLength={40}
-              editable={!savingName}
-              selectionColor={colors.ink}
-              returnKeyType="done"
-              onSubmitEditing={saveName}
-              onBlur={saveName}
-            />
-            <Pressable onPress={saveName} hitSlop={8} accessibilityRole="button">
-              <Text style={styles.action}>{t('traveler.save')}</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <Pressable onPress={beginEdit} accessibilityRole="button">
-            <View style={styles.row}>
-              <Text style={styles.rowTitle}>{t('traveler.nameLabel')}</Text>
-              <View style={styles.valueNav}>
-                <Text style={givenName ? styles.statValue : styles.notSet}>{givenName || t('traveler.notSet')}</Text>
-                <Text style={styles.editHint}>{t('traveler.edit')}</Text>
-              </View>
+            <View style={styles.valueNav}>
+              <Text style={givenName ? styles.statValue : styles.notSet}>
+                {givenName || t('traveler.addName')}
+              </Text>
+              <Chev />
             </View>
-          </Pressable>
-        )}
+          </View>
+        </Pressable>
+
         <View style={[styles.row, styles.hair]}>
           <Text style={styles.rowTitle}>{t('traveler.emailLabel')}</Text>
-          <Text style={[styles.statValue, { flex: 1, textAlign: 'right' }]} numberOfLines={1}>
-            {user?.email ?? t('traveler.notSet')}
-          </Text>
+          <View style={styles.valueStack}>
+            <Text style={accountEmail ? styles.statValue : styles.notSet} numberOfLines={1}>
+              {accountEmail || t('traveler.notSet')}
+            </Text>
+            {accountEmail ? (
+              <Text style={styles.verification}>
+                {emailVerified ? t('traveler.verified') : t('traveler.verificationRequired')}
+              </Text>
+            ) : null}
+          </View>
         </View>
-        {editingMobile ? (
+
+        <Pressable onPress={() => router.navigate('/account-mobile')} accessibilityRole="button">
           <View style={[styles.row, styles.hair]}>
             <Text style={styles.rowTitle}>{t('auth.mobileNumberLabel')}</Text>
-            <TextInput
-              style={styles.nameInput}
-              value={draftMobile}
-              onChangeText={setDraftMobile}
-              autoFocus
-              keyboardType="phone-pad"
-              autoComplete="tel"
-              textContentType="telephoneNumber"
-              editable={!savingMobile}
-              maxLength={30}
-              returnKeyType="done"
-              onSubmitEditing={saveMobile}
-              onBlur={saveMobile}
-            />
-            <Pressable onPress={saveMobile} hitSlop={8} accessibilityRole="button">
-              <Text style={styles.action}>{t('traveler.save')}</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <Pressable onPress={beginMobileEdit} accessibilityRole="button">
-            <View style={[styles.row, styles.hair]}>
-              <Text style={styles.rowTitle}>{t('auth.mobileNumberLabel')}</Text>
-              <View style={styles.valueNav}>
-                <Text style={mobile ? styles.statValue : styles.notSet}>{mobile || t('traveler.notSet')}</Text>
-                <Text style={styles.editHint}>{t('traveler.edit')}</Text>
+            <View style={styles.valueNav}>
+              <View style={styles.valueStack}>
+                <Text style={accountMobile ? styles.statValue : styles.notSet} numberOfLines={1}>
+                  {accountMobile || t('traveler.addNumber')}
+                </Text>
+                {accountMobile ? (
+                  <Text style={styles.verification}>
+                    {mobileVerified ? t('traveler.verified') : t('traveler.verificationRequired')}
+                  </Text>
+                ) : null}
               </View>
+              <Chev />
             </View>
-          </Pressable>
-        )}
+          </View>
+        </Pressable>
+
         <Pressable accessibilityRole="button" onPress={() => router.navigate('/wallet')}>
           <View style={[styles.row, styles.hair]}>
             <Text style={styles.rowTitle}>{t('traveler.paymentMethods')}</Text>
@@ -219,11 +163,11 @@ export default function Profile() {
           >
             <View style={[styles.row, i > 0 && styles.hair]}>
               <Text style={styles.rowTitle}>
-                {k === 'home' ? t('traveler.homeAddress') : t('traveler.workAddress')}
+                {k === 'home' ? t('traveler.placeHome') : t('traveler.placeWork')}
               </Text>
               <View style={styles.valueNav}>
                 <Text style={[places[k] ? styles.statValue : styles.notSet, styles.rowValue]} numberOfLines={1}>
-                  {places[k]?.label ?? t('traveler.notSet')}
+                  {places[k]?.label ?? t('traveler.addAddress')}
                 </Text>
                 <Chev />
               </View>
@@ -260,8 +204,9 @@ export default function Profile() {
         )}
       </Card>
 
-      {/* THE SAVED CABIN ENVIRONMENT, applied to every travel; the control opens the screen
-          that changes it. */}
+      {/* THE SAVED CABIN ENVIRONMENT. The values are one preference set, so they read as
+          one record and expose one clear adjustment action instead of four chevrons to the
+          same destination. */}
       <SectionLabel style={{ marginTop: 22 }}>{t('traveler.travelPreferences')}</SectionLabel>
       <Text style={styles.serviceNote}>{t('traveler.configureThisTravel')}</Text>
       <Card style={styles.card}>
@@ -269,26 +214,20 @@ export default function Profile() {
           { label: t('traveler.climate'), value: climateLabel },
           { label: t('traveler.atmosphere'), value: cabin.quiet ? t('traveler.prefQuiet') : t('traveler.prefConversation') },
           { label: t('traveler.music'), value: cabin.music === 'None' ? t('traveler.prefMusicNone') : t('traveler.prefTravelerChoice') },
+          {
+            label: t('traveler.additionalRequests'),
+            value: requests.length ? requests.join(' · ') : t('traveler.noneRequested'),
+          },
         ].map((item, i) => (
-          <Pressable key={item.label} accessibilityRole="button" onPress={() => router.navigate('/prefs')}>
-            <View style={[styles.row, i > 0 && styles.hair]}>
-              <Text style={styles.rowTitle}>{item.label}</Text>
-              <View style={styles.valueNav}>
-                <Text style={styles.statValue}>{item.value}</Text>
-                <Chev />
-              </View>
-            </View>
-          </Pressable>
+          <View key={item.label} style={[styles.row, i > 0 && styles.hair]}>
+            <Text style={styles.rowTitle}>{item.label}</Text>
+            <Text style={[styles.statValue, styles.rowValue]} numberOfLines={2}>{item.value}</Text>
+          </View>
         ))}
         <Pressable accessibilityRole="button" onPress={() => router.navigate('/prefs')}>
           <View style={[styles.row, styles.hair]}>
-            <Text style={styles.rowTitle}>{t('traveler.additionalRequests')}</Text>
-            <View style={[styles.valueNav, styles.rowValue]}>
-              <Text style={[requests.length ? styles.statValue : styles.notSet, styles.rowValue]}>
-                {requests.length ? requests.join(' · ') : t('traveler.noneRequested')}
-              </Text>
-              <Chev />
-            </View>
+            <Text style={styles.action}>{t('traveler.adjustCabinEnvironment')}</Text>
+            <Chev />
           </View>
         </Pressable>
       </Card>
@@ -301,7 +240,7 @@ export default function Profile() {
             <Text style={styles.rowTitle}>{t('traveler.trustedContacts')}</Text>
             <View style={styles.valueNav}>
               <Text style={contacts.length ? styles.statValue : styles.notSet}>
-                {contacts.length ? t('traveler.contactsConfigured', { n: contacts.length }) : t('traveler.notSet')}
+                {contacts.length ? t('traveler.contactsConfigured', { n: contacts.length }) : t('traveler.addContacts')}
               </Text>
               <Chev />
             </View>
@@ -330,10 +269,10 @@ const styles = StyleSheet.create({
   rowTitle: { fontSize: 14.5, color: colors.ink },
   rowValue: { flex: 1, textAlign: 'right' },
   valueNav: { flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'flex-end', flexShrink: 1 },
-  editHint: { fontSize: 12.5, fontWeight: '600', color: colors.accent },
+  valueStack: { flex: 1, minWidth: 0, alignItems: 'flex-end' },
   statValue: { fontSize: 14.5, fontWeight: '600', color: colors.ink },
+  verification: { fontSize: 11.5, color: colors.muted, marginTop: 2 },
   notSet: { fontSize: 14, color: colors.muted },
-  nameInput: { flex: 1, fontSize: 14.5, fontWeight: '600', color: colors.ink, textAlign: 'right', padding: 0 },
   action: { fontSize: 13, fontWeight: '600', color: colors.accent },
   serviceNote: { fontSize: 12.5, color: colors.muted, lineHeight: 18, marginTop: 6, marginBottom: 1 },
 });

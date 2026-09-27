@@ -44,6 +44,7 @@ export default {
     language: 'Lingua',
   },
   operator: {
+    verificationCode: 'Codice di verifica',
     inboxReadFailed: "Non è stato possibile registrare questa comunicazione come letta. Riprovi.",
     inboxBody: "Qualificazione, copertura, verifica, pagamenti e comunicazioni operative.",
     communications: "COMUNICAZIONI",

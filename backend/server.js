@@ -128,12 +128,7 @@ const family = require('./family');
 const { provisionTeenPin, verifyTeenPin } = require('./teenpickup');
 const { listPlatformMessages, markPlatformMessageRead } = require('./platforminbox');
 const { page } = require('./shell');
-const {
-  screeningReady, evaluateExistingReport, screeningCurrent,
-  SCREENING_FEE_CENTS, MVR_ONLY_FEE_CENTS, BASIC_ONLY_FEE_CENTS, sweepScreening,
-  grossUpCents, screeningQuote,
-} = require('./screening');
-const checkr = require('./checkr');
+const { screeningReady, screeningCurrent, sweepScreening } = require('./screening');
 
 const app = express();
 // One proxy in front (Render). Makes req.ip the caller rather than the proxy, which the
@@ -146,19 +141,7 @@ app.use(cors()); // let the app (a different origin) call this server
 // A signature is computed over the EXACT bytes Stripe sent. Once express.json() has parsed and
 // re-serialised the body, those bytes are gone and every event fails verification — which is
 // the classic way this endpoint ends up either broken or, worse, "fixed" by skipping the check.
-async function handleCheckrProviderEvent(event) {
-  const out = await checkr.handleEvent(event);
-  const db = adminDb();
-  if (out?.uid && db && ['decided', 'dispute cleared operator', 'dispute remains pre-adverse', 'adverse action finalized'].includes(out.action)) {
-    await assessAndRecord({ db, uid: out.uid, checks: qualificationChecks, liveMoney: operationalMode });
-  }
-  return out;
-}
-
-const PROVIDER_HANDLERS = {
-  stripe: handleEvent,
-  checkr: handleCheckrProviderEvent,
-};
+const PROVIDER_HANDLERS = { stripe: handleEvent };
 
 async function acceptDurableProviderEvent(provider, event, res) {
   const queued = await enqueueProviderEvent({ provider, event });
@@ -196,15 +179,6 @@ app.post('/stripe/connect-webhook', express.raw({ type: 'application/json' }), a
 });
 
 
-app.post('/checkr/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-  if (!checkr.webhookReady()) return res.status(503).json({ error: 'Checkr webhook signing key is not configured' });
-  if (!checkr.verifySignature(req.body, req.get('x-checkr-signature'))) return res.status(403).json({ error: 'Bad signature' });
-  let event;
-  try { event = JSON.parse(req.body.toString('utf8')); }
-  catch { return res.status(400).json({ error: 'Not JSON' }); }
-  return acceptDurableProviderEvent('checkr', event, res);
-});
-
 app.use(express.json()); // parse JSON request bodies — everything BELOW the webhook
 
 // WHICH WORLD IS THIS SERVER IN? Read from the key's own prefix, and cover all four forms
@@ -228,7 +202,7 @@ function productionReadiness() {
   if (!readKey('STRIPE_PUBLISHABLE_KEY')) missing.push('stripe_publishable_key');
   if (!readKey('STRIPE_WEBHOOK_SECRET')) missing.push('stripe_webhook_secret');
   if (!readKey('STRIPE_CONNECT_WEBHOOK_SECRET')) missing.push('stripe_connect_webhook_secret');
-  if (!checkr.webhookReady() || !screeningReady()) missing.push('screening_provider');
+  if (!screeningReady()) missing.push('screening_provider');
   if (!readKey('HERE_API_KEY')) missing.push('toll_provider');
   if (!readKey('SCHEDULER_TOKEN')) missing.push('scheduler_token');
   if (!adminStatus().ok) missing.push('firebase_admin');
@@ -2698,6 +2672,7 @@ app.get('/operator/screening', requireAuth, async (req, res) => {
     res.json({
       ok: true,
       provider: 'external',
+      providerUrl: readKey('SCREENING_PROVIDER_URL') || null,
       jurisdiction: market?.state ? { state: market.state } : null,
       screening: user.screening || null,
     });

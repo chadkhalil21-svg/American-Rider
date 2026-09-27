@@ -810,7 +810,7 @@ export default {
     processing: 'Procesando…',
     homeAddress: 'Dirección de Casa',
     workAddress: 'Dirección del Trabajo',
-    savedPlaceSub: 'Se guarda de forma privada en este dispositivo para agilizar la planificación de Viajes.',
+    savedPlaceSub: 'Guardado en su cuenta y disponible cuando inicie sesión en otro dispositivo.',
     addressOrPlace: 'Dirección o lugar',
     saveAddress: 'Guardar dirección',
     saveDestination: 'Guardar destino',

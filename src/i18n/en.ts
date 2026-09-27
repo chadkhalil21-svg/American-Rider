@@ -761,7 +761,7 @@ export default {
     anonymousRecords: 'Service Records',
     yourPasswordPh: 'Your password',
     keepMyAccount: 'Keep my account',
-    configureThisTravel: 'Saved to your account and applied to every travel.',
+    configureThisTravel: 'Saved to your account as your preferred cabin environment.'
     completedTravelAppears: 'Completed travel appears here.',
     mapNeedsApp: 'Choosing a pickup on the map needs the iPhone app',
     searchByNameInstead: 'You can still search for a pickup spot by name.',
@@ -813,7 +813,10 @@ export default {
     processing: 'Processing…',
     homeAddress: 'Home Address',
     workAddress: 'Work Address',
-    savedPlaceSub: 'Saved on this device only. American Rider does not store it.',
+    savedPlaceSub: 'Saved privately on this device for faster Travel planning.',
+    addressOrPlace: 'Address or place',
+    saveAddress: 'Save address',
+    saveDestination: 'Save destination',
     savedPlaceExample: 'Enter a street address',
     placeNotFound: 'That address could not be found. Try adding the city.',
     removeSavedPlace: 'Remove this address',
@@ -822,7 +825,7 @@ export default {
     changeTravel: 'Change Travel',
     dispatchUnavailable: 'Dispatch unavailable. Check your connection.',
     emergencyAssistance: 'Emergency Assistance',
-    shareTravelSub: 'Send a trusted contact a link that shows the vehicle’s position, your operator and the arrival estimate while this travel is underway. It stops working when the travel ends.',
+    shareTravelSub: 'Share a private live link with a trusted contact during an active Travel. The link expires when the Travel ends.'
     smartTravelTitle: 'Smart Travel',
     checkingTransit: "Checking current transit service…",
     transitChanged: "Transit service has changed since this journey was planned. The second car Travel is held until the current service is verified.",
@@ -887,8 +890,8 @@ export default {
     travelPreferences: 'Cabin Environment',
     modifyCabin: 'Adjust cabin preferences',
     mapAttribution: '© OpenStreetMap contributors',
-    paymentSettlement: 'Payment & Settlement',
-    paymentSettlementSub: 'Stored payment methods and travel history.',
+    paymentSettlement: 'Payment Methods',
+    paymentSettlementSub: 'Manage how you pay for Travel.'
     noPaymentMethodSaved: 'No payment method saved.',
     methodsUnreadable: 'Saved payment methods could not be read.',
     addPaymentMethod: 'Add payment method',
@@ -950,7 +953,7 @@ export default {
     travelsPerWeek: 'Travels per week',
     // ---- body prose. Longer strings live here for the same reason the short ones do: a
     // translator must be able to see the whole surface without reading React. ------------
-    safetySub: 'While a travel is underway the route is watched. An unexplained stop is put to your operator, then to you; unanswered, it opens a case with a person. A trusted contact can follow the travel, and a code confirms the vehicle before you board.',
+    safetySub: 'During an active Travel, American Rider monitors the route for unusual interruptions. Trusted contacts can follow the Travel, and vehicle verification helps confirm the correct vehicle before boarding.'
     shareUnavailable: 'Available once an operator is assigned.',
     verifyCodeIntro: 'Ask your operator for this code before you board.',
     verifyCodeIdle: 'Each travel is issued a code once an operator is assigned. Ask your operator for it before you board.',

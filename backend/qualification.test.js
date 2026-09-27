@@ -105,9 +105,16 @@ const cleanDocs = () => ({
 });
 const cleanUser = (over = {}) => ({
   name: 'Ana Operator',
+  operatingMarket: { id: 'fl-miami-dade' },
   documents: cleanDocs(),
   screening: { decision: 'pass', recheckDue: NOW + 1e10 },
   insuranceDisclosure: { version: DISCLOSURE_VERSION, at: NOW - 1000 },
+  insuranceMonitoring: {
+    status: 'verified_active',
+    source: 'onboarding_document',
+    lastVerifiedAt: NOW - 1000,
+    nextVerificationDueAt: NOW + 30 * 864e5,
+  },
   ...over,
 });
 const OK = { account: { disabled: false }, payouts: { enabled: true } };
@@ -188,7 +195,7 @@ const codes = (a) => a.blockers.map((b) => b.code);
     check('4b. …and a $125,000 combined logged-on limit does not pass', !A(withPolicy({ loggedOnLimits: L('', '', '', '$125,000') })).qualified);
     const { FL_TNC_INSURANCE } = require('./qualification');
     check('4b. the rule set cites (7)(b) for logged on and (7)(c) for the ride, and has no combined logged-on figure',
-      FL_TNC_INSURANCE.loggedOn.subsection === '(7)(b)' && FL_TNC_INSURANCE.ride.subsection === '(7)(c)' &&
+      FL_TNC_INSURANCE.loggedOn.statute.endsWith('(7)(b)') && FL_TNC_INSURANCE.ride.statute.endsWith('(7)(c)') &&
       FL_TNC_INSURANCE.loggedOn.perPerson === 50000 && FL_TNC_INSURANCE.loggedOn.perIncident === 100000 &&
       FL_TNC_INSURANCE.loggedOn.propertyDamage === 25000 && FL_TNC_INSURANCE.ride.primaryLiabilityMinDollars === 1000000 &&
       !('combinedSingle' in FL_TNC_INSURANCE.loggedOn));
@@ -210,7 +217,7 @@ const codes = (a) => a.blockers.map((b) => b.code);
     process.env.INSURANCE_UM_REJECTION_ACCEPTED = '1';
     check('4b. …and accepted once configured', A(withPolicy({ uninsuredMotorist: { shown: 'rejected', amount: '' } })).qualified);
     delete process.env.INSURANCE_UM_REJECTION_ACCEPTED;
-    check('4b. the old $1,000,000 check still runs first', C({}, { limits: '$300,000' }).includes('insurance_limits_insufficient'));
+    check('4b. structured ride-period evidence governs the statutory limit', !C({}, { limits: '$300,000' }).includes('insurance_limits_insufficient'));
     const src = fs.readFileSync(path.join(__dirname, 'documents.js'), 'utf8');
     check('4b. the reader is not asked whether the policy complies', !/compliant|complies with|meets florida/i.test(src.slice(src.indexOf('const INSURANCE'), src.indexOf('const SCHEMA'))));
   }
@@ -228,8 +235,8 @@ const codes = (a) => a.blockers.map((b) => b.code);
       !A(cleanUser({ screening: { decision: 'pre_adverse' } }), { liveMoney: false }).qualified && codes(A(cleanUser({ screening: { decision: 'pre_adverse' } }), { liveMoney: false })).includes('screening_pre_adverse'));
     check('5. provider screening in progress is not qualified',
       !A(cleanUser({ screening: { decision: 'in_progress' } }), { liveMoney: false }).qualified && codes(A(cleanUser({ screening: { decision: 'in_progress' } }), { liveMoney: false })).includes('screening_incomplete'));
-    check('5. test money and no screening: qualified — the line /operator/online has always drawn',
-      A(cleanUser({ screening: null }), { liveMoney: false }).qualified);
+    check('5. a missing screening is never silently converted into a pass in production',
+      !A(cleanUser({ screening: null }), { liveMoney: true }).qualified);
   }
 
   // ——— 6. disabled account ———————————————————————————————————————————————————————

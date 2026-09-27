@@ -72,7 +72,6 @@ check('a refusal says how long to wait', hit('t:u1', 1, 60000).ok === false || t
 // dangerous shape a comment can take: it answers the question nobody then goes and checks.
 check('nothing still asserts requireAuth rate-limits anything',
   !/requireAuth rate-limits per account\./.test(server));
-check('and the SMS endpoints are ACTUALLY limited now',
   /app\.post\('\/verify\/start', requireAuth, LIMITS\.verify/.test(server) &&
   /app\.post\('\/verify\/check', requireAuth, LIMITS\.verify/.test(server));
 

@@ -582,20 +582,18 @@ export function AuthScreen() {
           <Text style={s.back}>{t('auth.back')}</Text>
         </Pressable>
 
-        <Text style={[s.title, !isSignup && s.signInTitle]}>
+        <Text style={[s.title, isSignup ? s.signupTitle : s.signInTitle]}>
           {isSignup ? t('auth.createYourAccount') : t('auth.welcomeBack')}
         </Text>
-        <Text style={s.sub}>
-          {isSignup ? t('auth.sameFirstStep') : t('auth.signInToAccount')}
-        </Text>
+        {!isSignup && <Text style={s.sub}>{t('auth.signInToAccount')}</Text>}
 
         {/* The demo's labeled-field card: uppercase labels, underlined fields, one card. */}
-        <View style={[s.fieldCard, !isSignup && s.signInFieldCard]}>
+        <View style={[s.fieldCard, isSignup ? s.signupFieldCard : s.signInFieldCard]}>
           {isSignup && (
-            <View style={[s.fieldWrap, !isSignup && s.signInFieldWrap]}>
-              <Text style={s.fieldLabel}>{t('auth.fullNameLabel')}</Text>
+            <View style={[s.fieldWrap, s.signupFieldWrap]}>
+              <Text style={[s.fieldLabel, s.signupFieldLabel]}>{t('auth.fullNameLabel')}</Text>
               <TextInput
-                style={s.field}
+                style={[s.field, s.signupField]}
                 placeholder="J. Reyes"
                 placeholderTextColor={colors.faint}
                 autoCapitalize="words"
@@ -605,10 +603,10 @@ export function AuthScreen() {
             </View>
           )}
           {isSignup && (
-            <View style={s.fieldWrap}>
-              <Text style={s.fieldLabel}>{t('auth.mobileNumberLabel')}</Text>
+            <View style={[s.fieldWrap, s.signupFieldWrap]}>
+              <Text style={[s.fieldLabel, s.signupFieldLabel]}>{t('auth.mobileNumberLabel')}</Text>
               <TextInput
-                style={s.field}
+                style={[s.field, s.signupField]}
                 placeholder="(305) 555-4417"
                 placeholderTextColor={colors.faint}
                 keyboardType="phone-pad"
@@ -617,10 +615,10 @@ export function AuthScreen() {
               />
             </View>
           )}
-          <View style={[s.fieldWrap, !isSignup && s.signInFieldWrap]}>
-            <Text style={s.fieldLabel}>{t('auth.emailLabel')}</Text>
+          <View style={[s.fieldWrap, isSignup ? s.signupFieldWrap : s.signInFieldWrap]}>
+            <Text style={[s.fieldLabel, isSignup && s.signupFieldLabel]}>{t('auth.emailLabel')}</Text>
             <TextInput
-              style={[s.field, !isSignup && s.signInField]}
+              style={[s.field, isSignup ? s.signupField : s.signInField]}
               placeholder={t('traveler.emailPh')}
               placeholderTextColor={colors.faint}
               autoCapitalize="none"
@@ -630,10 +628,10 @@ export function AuthScreen() {
               onChangeText={setEmail}
             />
           </View>
-          <View style={[s.fieldWrap, s.fieldWrapLast, !isSignup && s.signInFieldWrap]}>
-            <Text style={s.fieldLabel}>{t('auth.passwordLabel')}</Text>
+          <View style={[s.fieldWrap, s.fieldWrapLast, isSignup ? s.signupFieldWrap : s.signInFieldWrap]}>
+            <Text style={[s.fieldLabel, isSignup && s.signupFieldLabel]}>{t('auth.passwordLabel')}</Text>
             <TextInput
-              style={[s.field, !isSignup && s.signInField]}
+              style={[s.field, isSignup ? s.signupField : s.signInField]}
               placeholder={isSignup ? t('auth.pwNewPh') : t('traveler.yourPasswordPh')}
               placeholderTextColor={colors.faint}
               secureTextEntry
@@ -646,7 +644,7 @@ export function AuthScreen() {
 
         {/* WAS: "A verification code will be sent by text." It will not — see the confirm
             step. Your number is stored on your profile and used for travel, which is true. */}
-        {isSignup && <Text style={s.helper}>{t('auth.usedToReach')}</Text>}
+        {isSignup && <Text style={[s.helper, s.signupHelper]}>{t('auth.usedToReach')}</Text>}
         {/* The demo's sign-in carries this link; here it really sends the reset email. */}
         {!isSignup && (
           <Pressable onPress={forgotPassword} hitSlop={8}>
@@ -658,7 +656,7 @@ export function AuthScreen() {
         <View style={{ flex: 1 }} />
 
         {isSignup && (
-          <Text style={[s.legal, { marginBottom: 14 }]}>
+          <Text style={[s.legal, s.signupLegal, { marginBottom: 12 }]}>
             {legalSentence(t('traveler.byContinuingAccept', { terms: '\u0000', privacy: '\u0001' }), {
               '\u0000': (
                 <Text
@@ -825,6 +823,11 @@ const s = StyleSheet.create({
     letterSpacing: -0.25,
     marginTop: 14,
   },
+  signupTitle: {
+    fontSize: 22,
+    letterSpacing: -0.25,
+    marginTop: 14,
+  },
   fieldCard: {
     marginTop: 24,
     backgroundColor: colors.card,
@@ -848,6 +851,17 @@ const s = StyleSheet.create({
   },
   signInFieldWrap: { paddingTop: 11 },
   signInField: { paddingVertical: 10, fontSize: 15.5 },
+  signupFieldCard: {
+    marginTop: 20,
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 0,
+  },
+  signupFieldWrap: { paddingTop: 10 },
+  signupFieldLabel: { fontSize: 10.5, letterSpacing: 1.0 },
+  signupField: { paddingVertical: 9.5, fontSize: 15.5 },
+  signupHelper: { fontSize: 11.5, marginTop: 9, color: colors.muted },
+  signupLegal: { fontSize: 11.5, lineHeight: 17 },
   fieldLabel: {
     fontSize: 11,
     fontWeight: '600',

@@ -23,7 +23,7 @@ export default {
     roleTraveler: 'Reisender',
     roleTravelerSub: 'Planen und verwalten Sie Ihre Fahrt.',
     roleOperator: 'Betreiber',
-    roleOperatorSub: 'Behalten Sie 99 % jedes Travel Fare. Eine Qualifizierung ist erforderlich, um mit American Rider zu operieren.',
+    roleOperatorSub: 'Behalten Sie 99 % jedes Travel Fare. Beginnen Sie die Qualifizierung, um mit American Rider zu operieren.',
     accountReady: 'Ihr Konto ist bereit, %{name}',
     paymentLater: 'Die Zahlung können Sie bei Ihrer ersten Reservierung hinzufügen.',
     back: '‹ Zurück',

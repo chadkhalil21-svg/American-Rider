@@ -127,7 +127,10 @@ export default function Profile() {
           <Pressable onPress={beginEdit} accessibilityRole="button">
             <View style={styles.row}>
               <Text style={styles.rowTitle}>{t('traveler.nameLabel')}</Text>
-              <Text style={givenName ? styles.statValue : styles.notSet}>{givenName || t('traveler.notSet')}</Text>
+              <View style={styles.valueNav}>
+                <Text style={givenName ? styles.statValue : styles.notSet}>{givenName || t('traveler.notSet')}</Text>
+                <Text style={styles.editHint}>{t('traveler.edit')}</Text>
+              </View>
             </View>
           </Pressable>
         )}
@@ -154,9 +157,12 @@ export default function Profile() {
               <Text style={styles.rowTitle}>
                 {k === 'home' ? t('traveler.homeAddress') : t('traveler.workAddress')}
               </Text>
-              <Text style={[places[k] ? styles.statValue : styles.notSet, styles.rowValue]} numberOfLines={1}>
-                {places[k]?.label ?? t('traveler.notSet')}
-              </Text>
+              <View style={styles.valueNav}>
+                <Text style={[places[k] ? styles.statValue : styles.notSet, styles.rowValue]} numberOfLines={1}>
+                  {places[k]?.label ?? t('traveler.notSet')}
+                </Text>
+                <Chev />
+              </View>
             </View>
           </Pressable>
         ))}
@@ -170,7 +176,10 @@ export default function Profile() {
           >
             <View style={[styles.row, styles.hair]}>
               <Text style={styles.rowTitle}>{t('traveler.favoriteDestination')}</Text>
-              <Text style={[styles.statValue, styles.rowValue]} numberOfLines={1}>{f.label}</Text>
+              <View style={styles.valueNav}>
+                <Text style={[styles.statValue, styles.rowValue]} numberOfLines={1}>{f.label}</Text>
+                <Chev />
+              </View>
             </View>
           </Pressable>
         ))}
@@ -224,9 +233,12 @@ export default function Profile() {
         <Card style={styles.card}>
           <View style={styles.row}>
             <Text style={styles.rowTitle}>{t('traveler.trustedContacts')}</Text>
-            <Text style={contacts.length ? styles.statValue : styles.notSet}>
-              {contacts.length ? t('traveler.contactsConfigured', { n: contacts.length }) : t('traveler.notSet')}
-            </Text>
+            <View style={styles.valueNav}>
+              <Text style={contacts.length ? styles.statValue : styles.notSet}>
+                {contacts.length ? t('traveler.contactsConfigured', { n: contacts.length }) : t('traveler.notSet')}
+              </Text>
+              <Chev />
+            </View>
           </View>
         </Card>
       </Pressable>
@@ -267,7 +279,8 @@ const styles = StyleSheet.create({
   hair: { borderTopWidth: 1, borderTopColor: colors.hairline },
   rowTitle: { fontSize: 14.5, color: colors.ink },
   rowValue: { flex: 1, textAlign: 'right' },
-  valueNav: { flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'flex-end' },
+  valueNav: { flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'flex-end', flexShrink: 1 },
+  editHint: { fontSize: 12.5, fontWeight: '600', color: colors.accent },
   statValue: { fontSize: 14.5, fontWeight: '600', color: colors.ink },
   notSet: { fontSize: 14, color: colors.muted },
   nameInput: { flex: 1, fontSize: 14.5, fontWeight: '600', color: colors.ink, textAlign: 'right', padding: 0 },

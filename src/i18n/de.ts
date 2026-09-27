@@ -568,7 +568,7 @@ export default {
     bgIfYouHaveNot: 'Falls Sie Das Nicht Getan Haben',
     bgWhatIsLeft: 'Was Noch Zu Beauftragen Ist',
     qualBasicsSub: 'Vollständiger Name, Geburtsdatum, Anschrift',
-    qualBgSub: 'Von American Rider veranlasst · zum Selbstkostenpreis',
+    qualBgSub: 'Über einen zugelassenen Prüfanbieter abgeschlossen',
     inboxNotSignedIn: 'Dieses Gerät ist nicht angemeldet und kann daher keine Fahrten empfangen.',
     inboxNotCommissioned: 'Dieses Konto ist noch nicht beauftragt, daher können ihm keine Fahrten zugewiesen werden.',
     noLongerInService: 'Sie sind nicht mehr im Dienst.',

@@ -4,7 +4,7 @@
 // "Conformément à votre demande de transport" fails exactly as hard as "no surge".
 export default {
   auth: {
-    tagline: 'Une infrastructure nationale de transport fondée sur la sécurité, la fiabilité et la précision.',
+    tagline: 'Safe. Reliable. American.',
     continueWithApple: 'Continuer avec Apple',
     continueWithGoogle: 'Continuer avec Google',
     orDivider: 'ou',

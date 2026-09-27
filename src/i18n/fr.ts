@@ -750,7 +750,7 @@ export default {
     anonymousRecords: 'Dossiers du Service',
     yourPasswordPh: 'Votre mot de passe',
     keepMyAccount: 'Conserver mon compte',
-    configureThisTravel: 'Enregistrées sur votre compte comme vos préférences de cabine.'
+    configureThisTravel: 'Enregistrées sur votre compte comme vos préférences de cabine.',
     completedTravelAppears: 'Les trajets terminés apparaissent ici.',
     mapNeedsApp: 'Choisir une prise en charge sur la carte nécessite l’application iPhone',
     searchByNameInstead: 'Vous pouvez rechercher un point de prise en charge par son nom.',

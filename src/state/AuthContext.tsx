@@ -4,9 +4,11 @@ import { updateProfile,
   createUserWithEmailAndPassword,
   deleteUser,
   onAuthStateChanged,
+  sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut as fbSignOut,
+  verifyBeforeUpdateEmail,
   User,
 } from 'firebase/auth';
 import { deleteDoc, doc } from 'firebase/firestore';
@@ -42,6 +44,8 @@ type AuthState = {
    * owner's email address wherever a name belonged, including to every traveler they drove.
    */
   setDisplayName: (name: string) => Promise<void>;
+  resendEmailVerification: () => Promise<boolean>;
+  requestEmailChange: (newEmail: string, reauthenticate: () => Promise<void>) => Promise<boolean>;
   deleteAccount: (reauthenticate: () => Promise<void>) => Promise<void>;
   signOut: () => Promise<void>;
 };
@@ -137,7 +141,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // not. Failing to send is not failing to sign up: the account exists, the traveler is
         // in, and the gates that need a verified address say so when they are reached.
         try {
-          const { sendEmailVerification } = await import('firebase/auth');
           await sendEmailVerification(cred.user);
         } catch {
           // Firebase rate-limits these; a refusal here must not cost somebody their account.
@@ -187,10 +190,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const clean = name.trim().slice(0, 40);
         if (!clean) throw new Error(t('traveler.errNameRequired'));
         await updateProfile(u, { displayName: clean });
+        await import('firebase/firestore').then(({ setDoc }) =>
+          setDoc(doc(db, 'users', u.uid), { name: clean }, { merge: true }),
+        );
         // React does not re-render on a Firebase profile change — the user object is the
         // same instance — so the new name is published deliberately.
         setUser({ ...u, displayName: clean } as User);
       }),
+    resendEmailVerification: async () => {
+      const u = auth.currentUser;
+      if (!u || !u.email || u.emailVerified) return !!u?.emailVerified;
+      try {
+        await sendEmailVerification(u);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    requestEmailChange: async (newEmail, reauthenticate) => {
+      const u = auth.currentUser;
+      const clean = newEmail.trim().toLowerCase();
+      if (!u || !clean) return false;
+      setBusy(true);
+      setError(null);
+      try {
+        await reauthenticate();
+        await verifyBeforeUpdateEmail(u, clean);
+        return true;
+      } catch (e: any) {
+        setError(friendly(e?.code ?? ''));
+        return false;
+      } finally {
+        setBusy(false);
+      }
+    },
     deleteAccount: (reauthenticate) =>
       runStrict(async () => {
         const u = auth.currentUser;

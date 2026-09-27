@@ -54,6 +54,7 @@ export default {
   // is deliberate and it translates as vocabulary, not as description — "Commence Operations"
   // becomes the equivalent formal undertaking in each language, never "start working".
   operator: {
+    verificationCode: 'Verification code',
     inboxReadFailed: "This communication could not be recorded as read. Try again.",
     inboxBody: "Qualification, coverage, screening, payouts and operational notices.",
     communications: "COMMUNICATIONS",

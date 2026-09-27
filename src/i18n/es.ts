@@ -584,7 +584,7 @@ export default {
     bgIfYouHaveNot: 'Si No Lo Ha Hecho',
     bgWhatIsLeft: 'Lo Que Queda Por Solicitar',
     qualBasicsSub: 'Nombre legal, fecha de nacimiento, dirección',
-    qualBgSub: 'Gestionada por American Rider · se paga a precio de coste',
+    qualBgSub: 'Se completa con un proveedor de verificación aprobado',
     inboxNotSignedIn: 'Este dispositivo no tiene la sesión iniciada, por lo que no puede recibir viajes.',
     inboxNotCommissioned: 'Esta cuenta aún no está comisionada, por lo que no se le pueden asignar viajes.',
     noLongerInService: 'Ya no está en servicio.',

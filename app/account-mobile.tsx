@@ -1,24 +1,29 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
-import { doc, getDoc } from 'firebase/firestore';
-import { Text } from '../src/components/AppText';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Card, LetterheadBar, PrimaryButton, Screen, SectionLabel, Sub, Title } from '../src/components/UI';
 import { useGoBack } from '../src/components/nav';
-import { startMobileVerification, checkMobileVerification } from '../src/backend/verify';
 import { useAuth } from '../src/state/AuthContext';
 import { useLanguage } from '../src/state/LanguageContext';
 import { db } from '../src/firebase';
 import { colors } from '../src/theme';
+
+function normalizeMobile(input: string): string {
+  const raw = input.trim();
+  const digits = raw.replace(/\D/g, '');
+  if (!digits) return '';
+  if (raw.startsWith('+')) return '+' + digits;
+  if (digits.length === 10) return '+1' + digits;
+  if (digits.length === 11 && digits.startsWith('1')) return '+' + digits;
+  return raw;
+}
 
 export default function AccountMobile() {
   const goBack = useGoBack();
   const { t } = useLanguage();
   const { user } = useAuth();
   const [current, setCurrent] = useState('');
-  const [verified, setVerified] = useState(false);
   const [phone, setPhone] = useState('');
-  const [code, setCode] = useState('');
-  const [stage, setStage] = useState<'number' | 'code'>('number');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -29,96 +34,63 @@ export default function AccountMobile() {
         const m = snap.data()?.mobile;
         const existing = typeof m === 'string' ? m.trim() : '';
         setCurrent(existing);
-        setVerified(snap.data()?.phoneVerified === true);
-        if (existing && snap.data()?.phoneVerified !== true) setPhone(existing);
+        setPhone(existing);
       })
       .catch(() => {});
   }, [user?.uid]);
 
-  const send = async () => {
-    const next = phone.trim();
-    if (!next || busy) return;
+  const save = async () => {
+    if (!user?.uid || busy) return;
+    const clean = normalizeMobile(phone);
+    const digits = clean.replace(/\D/g, '');
+    if (digits.length < 7 || digits.length > 15) {
+      setError(t('traveler.mobileInvalid'));
+      return;
+    }
     setBusy(true);
     setError('');
     try {
-      await startMobileVerification(next);
-      setStage('code');
-    } catch (e: any) {
-      setError(e?.code === 'not_configured' ? t('traveler.verificationUnavailable') : (e?.message || t('traveler.errReachAR')));
+      await setDoc(doc(db, 'users', user.uid), { mobile: clean }, { merge: true });
+      goBack();
+    } catch {
+      setError(t('traveler.couldNotSaveConn'));
     } finally {
       setBusy(false);
     }
   };
 
-  const verify = async () => {
-    if (!code.trim() || busy) return;
-    setBusy(true);
-    setError('');
-    try {
-      await checkMobileVerification(phone.trim(), code.trim());
-      goBack();
-    } catch (e: any) {
-      setError(e?.message || t('traveler.errReachAR'));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const changed = normalizeMobile(phone) !== normalizeMobile(current);
 
   return (
     <Screen>
       <LetterheadBar onBack={goBack} />
-      <Title size={24}>{verified ? t('traveler.changeMobileTitle') : t('traveler.verifyMobileTitle')}</Title>
-      <Sub>{verified ? t('traveler.changeMobileSub') : t('traveler.verifyMobileSub')}</Sub>
+      <Title size={24}>{t('traveler.changeMobileTitle')}</Title>
+      <Sub>{t('traveler.mobileContactSub')}</Sub>
 
-      {current ? (
-        <>
-          <SectionLabel style={{ marginTop: 22 }}>
-            {verified ? t('traveler.currentNumber') : t('traveler.numberToVerify')}
-          </SectionLabel>
-          <Card style={styles.currentCard}>
-            <Text style={styles.currentValue}>{current}</Text>
-          </Card>
-        </>
-      ) : null}
-
-      <SectionLabel style={{ marginTop: 22 }}>
-        {stage === 'number'
-          ? verified
-            ? t('traveler.newMobileNumber')
-            : t('traveler.mobileNumber')
-          : t('traveler.verificationCode')}
-      </SectionLabel>
+      <SectionLabel style={{ marginTop: 22 }}>{t('traveler.mobileNumber')}</SectionLabel>
       <Card style={styles.fieldCard}>
         <TextInput
           style={styles.field}
-          value={stage === 'number' ? phone : code}
-          onChangeText={stage === 'number' ? setPhone : setCode}
-          keyboardType={stage === 'number' ? 'phone-pad' : 'number-pad'}
-          autoComplete={stage === 'number' ? 'tel' : 'one-time-code'}
-          textContentType={stage === 'number' ? 'telephoneNumber' : 'oneTimeCode'}
-          placeholder={stage === 'number' ? '+1 (305) 555-0148' : t('traveler.enterVerificationCode')}
+          value={phone}
+          onChangeText={setPhone}
+          keyboardType="phone-pad"
+          autoComplete="tel"
+          textContentType="telephoneNumber"
+          placeholder="+1 (305) 555-0148"
           placeholderTextColor={colors.faint}
           autoFocus
           returnKeyType="done"
-          onSubmitEditing={stage === 'number' ? send : verify}
+          onSubmitEditing={save}
         />
       </Card>
-      {stage === 'code' ? (
-        <Text style={styles.note}>{t('traveler.codeSentTo', { phone: phone.trim() })}</Text>
-      ) : null}
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      <Sub style={styles.note}>{t('traveler.mobileContactNote')}</Sub>
+      {error ? <Sub style={styles.error}>{error}</Sub> : null}
 
       <View style={{ flex: 1, minHeight: 30 }} />
       <PrimaryButton
-        label={
-          busy
-            ? t('traveler.busyChecking')
-            : stage === 'number'
-              ? t('traveler.sendVerificationCode')
-              : t('traveler.verifyAndSave')
-        }
-        disabled={busy || (stage === 'number' ? !phone.trim() : !code.trim())}
-        onPress={stage === 'number' ? send : verify}
+        label={busy ? t('traveler.busySaving') : t('traveler.save')}
+        disabled={busy || !phone.trim() || !changed}
+        onPress={save}
         style={{ paddingVertical: 16 }}
       />
     </Screen>
@@ -126,10 +98,8 @@ export default function AccountMobile() {
 }
 
 const styles = StyleSheet.create({
-  currentCard: { marginTop: 10, paddingHorizontal: 18, paddingVertical: 15 },
-  currentValue: { fontSize: 15, fontWeight: '600', color: colors.ink },
   fieldCard: { marginTop: 10, paddingHorizontal: 18, paddingVertical: 1 },
   field: { paddingVertical: 15, fontSize: 16, color: colors.ink },
-  note: { fontSize: 12.5, color: colors.muted, lineHeight: 18, marginTop: 10 },
-  error: { fontSize: 13, color: colors.red, lineHeight: 19, marginTop: 12 },
+  note: { marginTop: 10 },
+  error: { color: colors.red, marginTop: 10 },
 });

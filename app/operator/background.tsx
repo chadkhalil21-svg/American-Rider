@@ -38,7 +38,7 @@ export default function OperatorBackground() {
   const [error, setError] = React.useState<string | null>(null);
 
   const refresh = React.useCallback(() => fetchScreening().then(setStatus), []);
-  React.useEffect(refresh, [refresh]);
+  React.useEffect(() => { void refresh(); }, [refresh]);
 
   const record = status?.screening || null;
   const decision = record?.decision;

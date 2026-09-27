@@ -331,7 +331,7 @@ export function AuthScreen() {
             logo → wordmark → eyebrow → tagline → buttons with no gap in the middle.
             The spare space sits ABOVE the logo, so the page reads as a composed whole. */}
         <View style={{ flex: 1 }}>
-          {isSignup ? <View style={{ flex: 1 }} /> : <View style={{ height: 30 }} />}
+          <View style={{ flex: 1 }} />
           <View style={{ alignItems: 'center' }}>
             <Image
               source={require('../../assets/splash-icon.png')}
@@ -477,7 +477,7 @@ export function AuthScreen() {
                 thing on one line and contradict it on the next. */}
             {t('auth.verifyOff')}
           </Text>
-          <View style={[s.fieldCard, !isSignup && s.signInFieldCard]}>
+          <View style={s.fieldCard}>
             <View style={[s.fieldWrap, s.fieldWrapLast]}>
               <Text style={s.fieldLabel}>{t('auth.verificationCode')}</Text>
               <TextInput
@@ -588,7 +588,7 @@ export function AuthScreen() {
         {isSignup && <Text style={s.sub}>{t('auth.sameFirstStep')}</Text>}
 
         {/* The demo's labeled-field card: uppercase labels, underlined fields, one card. */}
-        <View style={s.fieldCard}>
+        <View style={[s.fieldCard, !isSignup && s.signInFieldCard]}>
           {isSignup && (
             <View style={[s.fieldWrap, !isSignup && s.signInFieldWrap]}>
               <Text style={s.fieldLabel}>{t('auth.fullNameLabel')}</Text>
@@ -615,7 +615,7 @@ export function AuthScreen() {
               />
             </View>
           )}
-          <View style={s.fieldWrap}>
+          <View style={[s.fieldWrap, !isSignup && s.signInFieldWrap]}>
             <Text style={s.fieldLabel}>{t('auth.emailLabel')}</Text>
             <TextInput
               style={[s.field, !isSignup && s.signInField]}
@@ -653,7 +653,7 @@ export function AuthScreen() {
         )}
         {error ? <Text style={s.error}>{error}</Text> : null}
 
-        <View style={{ flex: 1 }} />
+        {isSignup ? <View style={{ flex: 1 }} /> : <View style={{ height: 30 }} />}
 
         {isSignup && (
           <Text style={[s.legal, { marginBottom: 14 }]}>

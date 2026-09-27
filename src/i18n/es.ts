@@ -931,7 +931,7 @@ export default {
     pickupTime: 'Hora de Recogida',
     enterATime: 'Introduzca una hora, por ejemplo 6:45.',
     scheduleTravel: 'Programar Viaje',
-    notifications: 'Avisos Operativos y de Despacho',
+    notifications: 'Notificaciones',
     notificationsSub: 'Elija qué actualizaciones de Viaje desea recibir.',
     inviteFriends: 'Invitar a un Viajero',
     inviteSub: 'Invite a alguien a viajar con American Rider. Puede revisar la invitación antes de enviarla.',

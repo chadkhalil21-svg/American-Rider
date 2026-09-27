@@ -11,6 +11,7 @@
 // sheet at payment), a portrait (nothing stores one), a corporate billing switch (not built).
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Text } from '../src/components/AppText';
 import { loadContacts, type TrustedContact } from '../src/contacts';
@@ -21,6 +22,7 @@ import { useAuth } from '../src/state/AuthContext';
 import { useCabinPrefs } from '../src/state/cabinPrefs';
 import { useLanguage } from '../src/state/LanguageContext';
 import { colors } from '../src/theme';
+import { db } from '../src/firebase';
 
 export default function Profile() {
   const { t } = useLanguage();
@@ -33,15 +35,28 @@ export default function Profile() {
   // they just set, not what was there when this screen mounted.
   const [places, setPlaces] = useState<SavedPlaces>({ favorites: [] });
   const [contacts, setContacts] = useState<TrustedContact[]>([]);
+  const [mobile, setMobile] = useState('');
+  const [editingMobile, setEditingMobile] = useState(false);
+  const [draftMobile, setDraftMobile] = useState('');
+  const [savingMobile, setSavingMobile] = useState(false);
   useFocusEffect(
     useCallback(() => {
       let live = true;
       loadSavedPlaces().then((p) => live && setPlaces(p));
       loadContacts().then((c) => live && setContacts(c));
+      if (user?.uid) {
+        getDoc(doc(db, 'users', user.uid))
+          .then((snap) => {
+            if (!live || !snap.exists()) return;
+            const value = snap.data()?.mobile;
+            setMobile(typeof value === 'string' ? value.trim() : '');
+          })
+          .catch(() => {});
+      }
       return () => {
         live = false;
       };
-    }, []),
+    }, [user?.uid]),
   );
 
   // THE NAME. The one the traveler gave at sign-up, editable here and saved to the account;
@@ -67,6 +82,26 @@ export default function Profile() {
     } finally {
       setSavingName(false);
       setEditingName(false);
+    }
+  };
+
+  const beginMobileEdit = () => {
+    setDraftMobile(mobile);
+    setEditingMobile(true);
+  };
+  const saveMobile = async () => {
+    const clean = draftMobile.trim().slice(0, 30);
+    if (!user?.uid || clean === mobile) {
+      setEditingMobile(false);
+      return;
+    }
+    setSavingMobile(true);
+    try {
+      await setDoc(doc(db, 'users', user.uid), { mobile: clean }, { merge: true });
+      setMobile(clean);
+    } finally {
+      setSavingMobile(false);
+      setEditingMobile(false);
     }
   };
 
@@ -131,6 +166,38 @@ export default function Profile() {
             {user?.email ?? t('traveler.notSet')}
           </Text>
         </View>
+        {editingMobile ? (
+          <View style={[styles.row, styles.hair]}>
+            <Text style={styles.rowTitle}>{t('auth.mobileNumberLabel')}</Text>
+            <TextInput
+              style={styles.nameInput}
+              value={draftMobile}
+              onChangeText={setDraftMobile}
+              autoFocus
+              keyboardType="phone-pad"
+              autoComplete="tel"
+              textContentType="telephoneNumber"
+              editable={!savingMobile}
+              maxLength={30}
+              returnKeyType="done"
+              onSubmitEditing={saveMobile}
+              onBlur={saveMobile}
+            />
+            <Pressable onPress={saveMobile} hitSlop={8} accessibilityRole="button">
+              <Text style={styles.action}>{t('traveler.save')}</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable onPress={beginMobileEdit} accessibilityRole="button">
+            <View style={[styles.row, styles.hair]}>
+              <Text style={styles.rowTitle}>{t('auth.mobileNumberLabel')}</Text>
+              <View style={styles.valueNav}>
+                <Text style={mobile ? styles.statValue : styles.notSet}>{mobile || t('traveler.notSet')}</Text>
+                <Text style={styles.editHint}>{t('traveler.edit')}</Text>
+              </View>
+            </View>
+          </Pressable>
+        )}
         <Pressable accessibilityRole="button" onPress={() => router.navigate('/wallet')}>
           <View style={[styles.row, styles.hair]}>
             <Text style={styles.rowTitle}>{t('traveler.paymentMethods')}</Text>

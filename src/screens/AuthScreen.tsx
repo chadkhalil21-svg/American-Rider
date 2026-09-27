@@ -39,7 +39,7 @@ import { colors } from '../theme';
 
 const emailOk = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
 
-type Step = 'welcome' | 'signin' | 'signup' | 'select' | 'ready';
+type Step = 'welcome' | 'signin' | 'signup' | 'select';
 
 function InkButton({
   label,
@@ -473,7 +473,13 @@ export function AuthScreen() {
           <Text style={[s.title, s.selectTitle]}>{t('auth.selectAccount')}</Text>
           <Text style={[s.sub, s.selectSub]}>{t('auth.chooseWhereToBegin')}</Text>
 
-          <Pressable onPress={() => setStep('ready')}>
+          <Pressable
+            onPress={() => {
+              // Traveler is the immediate service experience. Once chosen, the account is
+              // already ready; an additional ceremonial confirmation screen adds no value.
+              setOnboarding(false);
+            }}
+          >
             <View style={s.roleCard}>
               <View style={{ flex: 1 }}>
                 <Text style={s.roleTitle}>{t('auth.roleTraveler')}</Text>
@@ -503,28 +509,6 @@ export function AuthScreen() {
           </Pressable>
 
           <View style={{ flex: 1 }} />
-        </View>
-      </Screen>
-    );
-  }
-
-  if (step === 'ready') {
-    return (
-      <Screen scroll={false}>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <View style={s.checkCircle}>
-            <Text style={s.checkMark}>✓</Text>
-          </View>
-          <Text style={[s.title, { textAlign: 'center', marginTop: 22 }]}>
-            {t('auth.accountReady', { name: firstName })}
-          </Text>
-          <Text style={[s.sub, { textAlign: 'center' }]}>
-            {t('auth.paymentLater')}
-          </Text>
-          <View style={{ height: 40 }} />
-          <View style={{ alignSelf: 'stretch' }}>
-            <InkButton label={t('traveler.beginTravel')} onPress={() => setOnboarding(false)} />
-          </View>
         </View>
       </Screen>
     );

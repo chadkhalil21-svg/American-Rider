@@ -125,6 +125,7 @@ const { ready: r2Ready, uploadUrl: r2UploadUrl, readUrl: r2ReadUrl, owns: r2Owns
 const { assessOperator, assessAndRecord } = require('./qualification');
 const {
   initialMonitoringFromDocument, continuingStatus, applyOperatorAttestation, providerInstructions,
+  sweepInsuranceMonitoring,
 } = require('./insurance-monitoring');
 const { normalizeParty, operatorPartyView } = require('./travelparty');
 const family = require('./family');
@@ -1710,7 +1711,7 @@ let lastSweep = { at: 0, report: null };
  * Promise.all.
  */
 async function runAllSweeps() {
-  const [scheduled, monitor, assignments, screening, settlements, providerEvents, operatorFees, familyAgeOut] = await Promise.allSettled([
+  const [scheduled, monitor, assignments, screening, settlements, providerEvents, operatorFees, familyAgeOut, insuranceMonitoring] = await Promise.allSettled([
     sweepScheduled(),
     sweepMonitor(),
     sweepAssignments(),
@@ -1723,6 +1724,7 @@ async function runAllSweeps() {
       cardCountryFor: async (uid) => defaultCardCountry({ uid }),
     }),
     family.sweepFamilyAgeOut(),
+    sweepInsuranceMonitoring({ db: adminDb(), send, notify }),
   ]);
   const unwrap = (r) => (r.status === 'fulfilled' ? r.value : { ok: false, reason: String(r.reason) });
   return {
@@ -1734,6 +1736,7 @@ async function runAllSweeps() {
     providerEvents: unwrap(providerEvents),
     operatorFees: unwrap(operatorFees),
     familyAgeOut: unwrap(familyAgeOut),
+    insuranceMonitoring: unwrap(insuranceMonitoring),
   };
 }
 

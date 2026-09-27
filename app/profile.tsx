@@ -4,8 +4,7 @@
 // initials disc, a "default payment" that decided nothing, and two cards on an empty screen.
 // Now: the name the traveler gave (editable here, saved to the account) or the address the
 // account is held under; the year the account was opened; home, work and favourite
-// destinations; the saved cabin environment; trusted contacts; travels completed this year;
-// the payment methods screen; and, stated once, the operating model.
+// destinations; the saved cabin environment; trusted contacts; and payment methods.
 //
 // NOT HERE, because the app cannot say it truthfully: an honorific or a membership tier
 // (none exist), a bank name or card digits (Stripe holds the instrument and chooses it in its
@@ -20,7 +19,6 @@ import { Card, Chev, LetterheadBar, Screen, SectionLabel } from '../src/componen
 import { loadSavedPlaces, MAX_FAVORITES, type SavedPlaces } from '../src/savedPlaces';
 import { useAuth } from '../src/state/AuthContext';
 import { useCabinPrefs } from '../src/state/cabinPrefs';
-import { useRide } from '../src/state/RideContext';
 import { useLanguage } from '../src/state/LanguageContext';
 import { colors } from '../src/theme';
 
@@ -28,7 +26,6 @@ export default function Profile() {
   const { t } = useLanguage();
   const router = useRouter();
   const goBack = useGoBack();
-  const ride = useRide();
   const { user, setDisplayName } = useAuth();
   const cabin = useCabinPrefs();
 
@@ -77,12 +74,6 @@ export default function Profile() {
   const since = user?.metadata?.creationTime
     ? new Date(user.metadata.creationTime).getFullYear()
     : null;
-
-  // COMPLETED, THIS YEAR — as the label says. Cancelled and unfinished travels are not counted.
-  const thisYear = new Date().getFullYear();
-  const completed = ride.myRides.filter(
-    (r) => r.status === 'completed' && r.createdAt && new Date(r.createdAt).getFullYear() === thisYear,
-  ).length;
 
   const climateLabel = {
     Cool: t('traveler.prefCool'),
@@ -140,6 +131,12 @@ export default function Profile() {
             {user?.email ?? t('traveler.notSet')}
           </Text>
         </View>
+        <Pressable accessibilityRole="button" onPress={() => router.navigate('/wallet')}>
+          <View style={[styles.row, styles.hair]}>
+            <Text style={styles.rowTitle}>{t('traveler.paymentMethods')}</Text>
+            <Chev />
+          </View>
+        </Pressable>
       </Card>
 
       {/* SAVED PLACES. A row a traveler has not filled says "Not set" and opens the editor. It
@@ -198,6 +195,7 @@ export default function Profile() {
       {/* THE SAVED CABIN ENVIRONMENT, applied to every travel; the control opens the screen
           that changes it. */}
       <SectionLabel style={{ marginTop: 22 }}>{t('traveler.travelPreferences')}</SectionLabel>
+      <Text style={styles.serviceNote}>{t('traveler.configureThisTravel')}</Text>
       <Card style={styles.card}>
         {[
           { label: t('traveler.climate'), value: climateLabel },
@@ -214,17 +212,17 @@ export default function Profile() {
             </View>
           </Pressable>
         ))}
-        {requests.length > 0 && (
-          <Pressable accessibilityRole="button" onPress={() => router.navigate('/prefs')}>
-            <View style={[styles.row, styles.hair]}>
-              <Text style={styles.rowTitle}>{t('traveler.additionalRequests')}</Text>
-              <View style={[styles.valueNav, styles.rowValue]}>
-                <Text style={[styles.statValue, styles.rowValue]}>{requests.join(' · ')}</Text>
-                <Chev />
-              </View>
+        <Pressable accessibilityRole="button" onPress={() => router.navigate('/prefs')}>
+          <View style={[styles.row, styles.hair]}>
+            <Text style={styles.rowTitle}>{t('traveler.additionalRequests')}</Text>
+            <View style={[styles.valueNav, styles.rowValue]}>
+              <Text style={[requests.length ? styles.statValue : styles.notSet, styles.rowValue]}>
+                {requests.length ? requests.join(' · ') : t('traveler.noneRequested')}
+              </Text>
+              <Chev />
             </View>
-          </Pressable>
-        )}
+          </View>
+        </Pressable>
       </Card>
 
       {/* TRUSTED CONTACTS: how many are configured, and the screen that manages them. */}
@@ -243,22 +241,6 @@ export default function Profile() {
         </Card>
       </Pressable>
 
-      <SectionLabel style={{ marginTop: 22 }}>{t('traveler.travelStatistics')}</SectionLabel>
-      <Card style={styles.card}>
-        <View style={styles.row}>
-          <Text style={styles.rowTitle}>{t('traveler.travelsCompletedThisYear')}</Text>
-          <Text style={styles.statValue}>{completed}</Text>
-        </View>
-      </Card>
-
-      {/* THE INSTRUMENT IS CHOSEN IN STRIPE'S SHEET at the moment of payment, so this names the
-          screen it opens and claims no default that decides nothing. */}
-      <Pressable accessibilityRole="button" onPress={() => router.navigate('/wallet')}>
-        <Card style={styles.payCard}>
-          <Text style={styles.rowTitle}>{t('traveler.paymentMethods')}</Text>
-          <Chev />
-        </Card>
-      </Pressable>
 
     </Screen>
   );
@@ -285,12 +267,5 @@ const styles = StyleSheet.create({
   notSet: { fontSize: 14, color: colors.muted },
   nameInput: { flex: 1, fontSize: 14.5, fontWeight: '600', color: colors.ink, textAlign: 'right', padding: 0 },
   action: { fontSize: 13, fontWeight: '600', color: colors.accent },
-  payCard: {
-    marginTop: 22,
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
+  serviceNote: { fontSize: 12.5, color: colors.muted, lineHeight: 18, marginTop: 6, marginBottom: 1 },
 });

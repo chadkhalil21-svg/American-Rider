@@ -45,6 +45,7 @@ export default {
     language: 'Sprache',
   },
   operator: {
+    verificationCode: 'Verifizierungscode',
     inboxReadFailed: "Diese Mitteilung konnte nicht als gelesen erfasst werden. Versuchen Sie es erneut.",
     inboxBody: "Qualifikation, Versicherungsschutz, Überprüfung, Auszahlungen und betriebliche Mitteilungen.",
     communications: "MITTEILUNGEN",

@@ -354,44 +354,6 @@ export function AuthScreen() {
               changes. Sign in with Apple can return without this needing a thought. */}
           <View style={{ height: 40 }} />
 
-          {/* CHAD'S ENTRY ARCHITECTURE (13 Sept 2026): Apple, Google, then one field.
-              Each control is offered only when it can actually be served — Apple when the
-              device says so, Google when this build carries the client ids — because a
-              control named after something it cannot do is what got the previous row
-              removed on 13 Aug, and is what review guideline 2.1 rejects. */}
-          {(appleReady || SSO_PREVIEW) && (
-            <>
-              <SsoButton label={t('auth.continueWithApple')} onPress={onApple} glyph="apple" primary />
-              <View style={{ height: 10 }} />
-            </>
-          )}
-          {(googleSignInConfigured || SSO_PREVIEW) && (
-            <>
-              {googleSignInConfigured ? (
-                <GoogleEntry
-                  label={t('auth.continueWithGoogle')}
-                  onFailed={() => setSsoError(t('auth.googleUnavailable'))}
-                  onStart={() => setSsoError('')}
-                />
-              ) : (
-                <SsoButton
-                  label={t('auth.continueWithGoogle')}
-                  glyph="google"
-                  onPress={() => setSsoError(t('auth.ssoNotConfigured'))}
-                />
-              )}
-              <View style={{ height: 10 }} />
-            </>
-          )}
-
-          {(appleReady || googleSignInConfigured || SSO_PREVIEW) && (
-            <View style={s.orRow}>
-              <View style={s.orRule} />
-              <Text style={s.orText}>{t('auth.orDivider')}</Text>
-              <View style={s.orRule} />
-            </View>
-          )}
-
           {/* ONE FIELD, THEN ONE ACTION. The traveler types an address and continues; the
               next screen asks for the password and offers to create the account instead.
               It does NOT ask Firebase whether the address is already registered: email
@@ -425,6 +387,40 @@ export function AuthScreen() {
           <View style={{ height: 10 }} />
           <InkButton label={t('auth.continueLabel')} onPress={onContinue} disabled={!entry.trim()} />
 
+          {/* PRIMARY ENTRY FIRST. Email/mobile and Continue are the institutional default;
+              Apple and Google follow as equivalent alternate entry methods. This keeps the
+              first decision simple while preserving fast SSO for travelers who prefer it. */}
+          {(appleReady || googleSignInConfigured || SSO_PREVIEW) && (
+            <View style={s.orRow}>
+              <View style={s.orRule} />
+              <Text style={s.orText}>{t('auth.orDivider')}</Text>
+              <View style={s.orRule} />
+            </View>
+          )}
+
+          {(appleReady || SSO_PREVIEW) && (
+            <>
+              <SsoButton label={t('auth.continueWithApple')} onPress={onApple} glyph="apple" primary />
+              <View style={{ height: 10 }} />
+            </>
+          )}
+          {(googleSignInConfigured || SSO_PREVIEW) && (
+            <>
+              {googleSignInConfigured ? (
+                <GoogleEntry
+                  label={t('auth.continueWithGoogle')}
+                  onFailed={() => setSsoError(t('auth.googleUnavailable'))}
+                  onStart={() => setSsoError('')}
+                />
+              ) : (
+                <SsoButton
+                  label={t('auth.continueWithGoogle')}
+                  glyph="google"
+                  onPress={() => setSsoError(t('auth.ssoNotConfigured'))}
+                />
+              )}
+            </>
+          )}
           {ssoError ? <Text style={s.ssoError}>{ssoError}</Text> : null}
 
           {/* The sentence is ONE key, not an English lead-in glued to translated link

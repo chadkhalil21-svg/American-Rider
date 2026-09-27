@@ -75,6 +75,12 @@ export default function Settings() {
             <Chev />
           </View>
         </Pressable>
+        <Pressable onPress={() => router.navigate('/account-security')}>
+          <View style={[styles.row, styles.hair]}>
+            <Text style={[styles.rowTitle, styles.rowTitleWrap]}>{t('traveler.signInSecurity')}</Text>
+            <Chev />
+          </View>
+        </Pressable>
         {/* LANGUAGE and SECURITY & FACE ID removed 15 Aug 2026, App Store review.
             Both carried a chevron — the app's own promise that a tap opens something —
             and both only raised "This screen opens in the full build." Guideline 2.1

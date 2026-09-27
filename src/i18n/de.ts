@@ -545,7 +545,7 @@ export default {
     bgCompany: 'PRÜFUNTERNEHMEN',
     bgProviderName: 'Name des Anbieters',
     bgReportDate: 'BERICHTSDATUM',
-    bgReportDatePlaceholder: 'TT.MM.JJJJ',
+    bgReportDatePlaceholder: 'YYYY-MM-DD',
     bgReportDateInvalid: 'Geben Sie das auf dem Prüfbericht angegebene Datum ein.',
     bgCriminalSex: 'Strafregister- und Sexualstraftäterprüfungen',
     bgDrivingHistory: 'Fahrverlauf',

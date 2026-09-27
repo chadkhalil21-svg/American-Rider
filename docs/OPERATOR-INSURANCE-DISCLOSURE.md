@@ -67,7 +67,10 @@ Before first Travel, the production disclosure must state accurately:
 1. what automobile insurance, if any, American Rider itself maintains;
 2. that the Operator's personal automobile policy may provide no coverage while logged on or
    engaged in a prearranged Travel; and
-3. that the Operator is contractually required by American Rider to maintain the qualifying
+3. that compensated passenger transportation outside a prearranged American Rider TNC Travel
+   is subject to the separate financial-responsibility requirements and penalties identified by
+   the applicable jurisdiction; and
+4. that the Operator is contractually required by American Rider to maintain the qualifying
    commercial/livery/TNC coverage described above continuously.
 
 The production wording must be approved by Florida counsel and a licensed Florida commercial/TNC

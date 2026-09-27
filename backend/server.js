@@ -134,7 +134,18 @@ const app = express();
 // One proxy in front (Render). Makes req.ip the caller rather than the proxy, which the
 // per-address limits in ratelimit.js need.
 app.set('trust proxy', 1);
-app.use(cors()); // let the app (a different origin) call this server
+// Native apps do not depend on browser CORS. Browser clients do, so production permits only
+// American Rider's own web origins. Development remains open for Expo/local tooling.
+const CORS_ORIGINS = new Set(
+  String(readKey('CORS_ORIGINS') || 'https://americanrider.app,https://www.americanrider.app')
+    .split(',').map((s) => s.trim()).filter(Boolean),
+);
+app.use(cors({
+  origin(origin, callback) {
+    if (!productionMode || !origin || CORS_ORIGINS.has(origin)) return callback(null, true);
+    return callback(new Error('Origin not allowed'));
+  },
+}));
 
 // --- Stripe's webhook. MOUNTED BEFORE express.json(), and that order is load-bearing. -------
 //

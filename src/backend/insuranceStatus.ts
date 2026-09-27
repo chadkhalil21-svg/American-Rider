@@ -2,6 +2,21 @@
 import { PAYMENT_SERVER_URL } from '../config';
 import { auth } from '../firebase';
 
+export type InsuranceConfig = {
+  state: string;
+  stateName: string;
+  statute: string;
+  source: string;
+  script: string;
+  policyUse: string;
+  limits: {
+    loggedOn?: { perPerson?: number; perIncident?: number; propertyDamage?: number };
+    ridePrimaryLiability?: number;
+    pipRequired?: boolean;
+    umUim?: string;
+  };
+};
+
 export type InsuranceStatus = {
   ok: boolean;
   status: string;
@@ -54,5 +69,24 @@ export async function requestInsuranceConfirmation(contact: {
     return r.ok ? { ok: true } : { ok: false, error: d?.error || `Server error ${r.status}` };
   } catch {
     return { ok: false, error: 'American Rider could not reach the insurance-status service.' };
+  }
+}
+
+export async function insuranceConfig(): Promise<InsuranceConfig | null> {
+  try {
+    const r = await fetch(`${PAYMENT_SERVER_URL}/operator/insurance/config`, { headers: await headers() });
+    return r.ok ? await r.json() : null;
+  } catch { return null; }
+}
+
+export async function authorizeInsuranceStatusVerification(): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const r = await fetch(`${PAYMENT_SERVER_URL}/operator/insurance/authorize-status`, {
+      method: 'POST', headers: await headers(), body: '{}',
+    });
+    const d = await r.json().catch(() => ({}));
+    return r.ok ? { ok: true } : { ok: false, error: d?.error || `Server error ${r.status}` };
+  } catch {
+    return { ok: false, error: 'American Rider could not record the authorization.' };
   }
 }

@@ -4,11 +4,14 @@
 // quote links as the economics screen, and the verification theater. After
 // commissioning this doubles as the operator's Insurance page.
 import { Linking } from 'react-native';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Alert, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Text } from '../../src/components/AppText';
 import { pickDocument } from '../../src/backend/documentUpload';
+import {
+  insuranceStatus, attestInsuranceUnchanged, requestInsuranceConfirmation, type InsuranceStatus,
+} from '../../src/backend/insuranceStatus';
 import { useGoBack } from '../../src/components/nav';
 import { BadgeOk } from '../../src/components/operator';
 import { BackLink, Card, PrimaryButton, Screen, SectionLabel, Sub, Title } from '../../src/components/UI';
@@ -26,6 +29,40 @@ export default function OperatorInsurance() {
   const router = useRouter();
   const goBack = useGoBack();
   const op = useOperator();
+  const [liveStatus, setLiveStatus] = useState<InsuranceStatus | null>(null);
+  const [brokerEmail, setBrokerEmail] = useState('');
+  const [statusBusy, setStatusBusy] = useState(false);
+
+  useEffect(() => {
+    insuranceStatus().then((s) => {
+      if (!s) return;
+      setLiveStatus(s);
+      if (s.contact?.email) setBrokerEmail(s.contact.email);
+    });
+  }, [op.docs.insurance]);
+
+  const confirmUnchanged = async () => {
+    setStatusBusy(true);
+    const s = await attestInsuranceUnchanged();
+    setStatusBusy(false);
+    if (!s) return Alert.alert('Not recorded', t('traveler.errReachAR'));
+    setLiveStatus(s);
+    Alert.alert(t('traveler.insStatusTitle'), t('traveler.insAttestationSent'));
+  };
+
+  const requestStatus = async () => {
+    const email = brokerEmail.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return Alert.alert(t('traveler.insStatusTitle'), t('traveler.insBrokerEmail'));
+    }
+    setStatusBusy(true);
+    const out = await requestInsuranceConfirmation({ email, type: 'broker' });
+    setStatusBusy(false);
+    if (!out.ok) return Alert.alert('Not sent', out.error || t('traveler.errReachAR'));
+    const s = await insuranceStatus();
+    if (s) setLiveStatus(s);
+    Alert.alert(t('traveler.insStatusTitle'), t('traveler.insRequestSent'));
+  };
 
   // Submits the policy and reports the outcome. Nothing is claimed here — op.reviewDoc has
   // already recorded the verdict and the Documents screen reads it; this only surfaces the
@@ -74,8 +111,8 @@ export default function OperatorInsurance() {
         </View>
       )}
 
-      {/* COVERAGE ON FILE. American Rider provides no automobile insurance, so the policy an
-          operator carries is the only coverage a travel has. Nothing recorded when it ended,
+      {/* COVERAGE ON FILE. The Operator's qualifying commercial policy is a mandatory
+          eligibility condition. Nothing recorded when it ended,
           which meant nothing could stop travel being assigned to somebody whose coverage had
           run out weeks earlier. The date is on the certificate; it needs nobody's cooperation
           to check, and it is checked again at the moment a travel is matched. */}
@@ -109,6 +146,41 @@ export default function OperatorInsurance() {
           disabled={!/^\d{4}-\d{2}-\d{2}$/.test(expiry.trim())}
           style={{ marginTop: 16 }}
         />
+      </Card>
+
+      <SectionLabel style={styles.lbl}>{t('traveler.insStatusTitle')}</SectionLabel>
+      <Card style={styles.statusCard}>
+        <Text style={styles.statusTitle}>
+          {liveStatus?.ok ? t('traveler.insStatusActive') : t('traveler.insStatusNeedsVerification')}
+        </Text>
+        <Text style={styles.body}>{t('traveler.insStatusExplain')}</Text>
+        <Text style={[styles.body, { marginTop: 8 }]}>{t('traveler.insAnyCarrierAccepted')}</Text>
+        <Text style={[styles.body, { marginTop: 8 }]}>{t('traveler.insEvidenceEmail')}</Text>
+
+        {st === 'ok' && (
+          <>
+            <TextInput
+              value={brokerEmail}
+              onChangeText={setBrokerEmail}
+              placeholder={t('traveler.insBrokerEmailPh')}
+              placeholderTextColor={colors.faint}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="email-address"
+              style={[styles.coverInput, { marginTop: 16 }]}
+            />
+            <Text style={styles.coverLabel}>{t('traveler.insBrokerEmail')}</Text>
+            <PrimaryButton
+              label={t('traveler.insRequestConfirmation')}
+              onPress={requestStatus}
+              disabled={statusBusy || !brokerEmail.trim()}
+              style={{ marginTop: 14 }}
+            />
+            <Pressable onPress={confirmUnchanged} disabled={statusBusy} hitSlop={8}>
+              <Text style={styles.guidelinesLink}>{t('traveler.insAttest')}</Text>
+            </Pressable>
+          </>
+        )}
       </Card>
 
       {/* CONTINUING COVERAGE. The expiry date is deterministic and gates duty/acceptance.
@@ -272,6 +344,8 @@ export default function OperatorInsurance() {
 }
 
 const styles = StyleSheet.create({
+  statusCard: { marginTop: 12, paddingVertical: 18, paddingHorizontal: 20 },
+  statusTitle: { fontSize: 15, fontWeight: '600', color: colors.ink, marginBottom: 8 },
   coverCard: { marginTop: 12, paddingVertical: 18, paddingHorizontal: 20 },
   coverLabel: { fontSize: 13, color: colors.muted },
   coverInput: {

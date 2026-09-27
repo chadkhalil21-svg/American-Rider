@@ -180,7 +180,7 @@ function applyIndependentConfirmation(monitoring, {
 async function sweepInsuranceMonitoring({ db, requestConfirmation, notify, now = Date.now(), limit = 250 } = {}) {
   if (!db) return { ok: false, reason: 'no database', considered: 0, requested: 0, reminded: 0 };
   const report = { ok: true, considered: 0, requested: 0, reminded: 0, failed: [] };
-  const requestWindow = now + 5 * DAY_MS;
+  const requestWindow = now + 10 * DAY_MS;
   let snap;
   try {
     snap = await db.collection('users')
@@ -205,7 +205,8 @@ async function sweepInsuranceMonitoring({ db, requestConfirmation, notify, now =
 
     // Once a broker/agent/carrier address is known, American Rider initiates the refresh.
     // The Operator does not have to remember a monthly chore.
-    if (contact?.email && (!lastRequest || now - lastRequest >= 7 * DAY_MS)) {
+    const requestCount = Math.max(0, Number(m.verificationRequestCount) || 0);
+    if (contact?.email && requestCount < 3 && (!lastRequest || now - lastRequest >= 5 * DAY_MS)) {
       try {
         const result = await requestConfirmation?.({
           uid: doc.id,

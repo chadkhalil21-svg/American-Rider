@@ -253,7 +253,8 @@ export default function Profile() {
             onPress={() => router.navigate({ pathname: '/saved-place', params: { which: 'favorite' } })}
           >
             <View style={[styles.row, styles.hair]}>
-              <Text style={styles.action}>{t('traveler.addFavorite')} ›</Text>
+              <Text style={styles.action}>{t('traveler.addFavorite')}</Text>
+              <Chev />
             </View>
           </Pressable>
         )}

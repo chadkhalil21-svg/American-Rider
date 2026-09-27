@@ -914,7 +914,7 @@ export default {
     pickupTime: 'Orario di Ritiro',
     enterATime: 'Inserisca un orario, per esempio 6:45.',
     scheduleTravel: 'Programmare il Viaggio',
-    notifications: 'Avvisi Operativi e di Assegnazione',
+    notifications: 'Notifiche',
     notificationsSub: 'Scelga quali aggiornamenti sul Viaggio desidera ricevere.',
     inviteFriends: 'Invitare un Viaggiatore',
     inviteSub: 'Inviti qualcuno a viaggiare con American Rider. Può rivedere l’invito prima di inviarlo.',

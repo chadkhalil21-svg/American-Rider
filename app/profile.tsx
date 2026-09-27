@@ -190,31 +190,32 @@ export default function Profile() {
           that changes it. */}
       <SectionLabel style={{ marginTop: 22 }}>{t('traveler.travelPreferences')}</SectionLabel>
       <Card style={styles.card}>
-        <View style={styles.row}>
-          <Text style={styles.rowTitle}>{t('traveler.climate')}</Text>
-          <Text style={styles.statValue}>{climateLabel}</Text>
-        </View>
-        <View style={[styles.row, styles.hair]}>
-          <Text style={styles.rowTitle}>{t('traveler.atmosphere')}</Text>
-          <Text style={styles.statValue}>{cabin.quiet ? t('traveler.prefQuiet') : t('traveler.prefConversation')}</Text>
-        </View>
-        <View style={[styles.row, styles.hair]}>
-          <Text style={styles.rowTitle}>{t('traveler.music')}</Text>
-          <Text style={styles.statValue}>
-            {cabin.music === 'None' ? t('traveler.prefMusicNone') : t('traveler.prefTravelerChoice')}
-          </Text>
-        </View>
+        {[
+          { label: t('traveler.climate'), value: climateLabel },
+          { label: t('traveler.atmosphere'), value: cabin.quiet ? t('traveler.prefQuiet') : t('traveler.prefConversation') },
+          { label: t('traveler.music'), value: cabin.music === 'None' ? t('traveler.prefMusicNone') : t('traveler.prefTravelerChoice') },
+        ].map((item, i) => (
+          <Pressable key={item.label} accessibilityRole="button" onPress={() => router.navigate('/prefs')}>
+            <View style={[styles.row, i > 0 && styles.hair]}>
+              <Text style={styles.rowTitle}>{item.label}</Text>
+              <View style={styles.valueNav}>
+                <Text style={styles.statValue}>{item.value}</Text>
+                <Chev />
+              </View>
+            </View>
+          </Pressable>
+        ))}
         {requests.length > 0 && (
-          <View style={[styles.row, styles.hair]}>
-            <Text style={styles.rowTitle}>{t('traveler.additionalRequests')}</Text>
-            <Text style={[styles.statValue, styles.rowValue]}>{requests.join(' · ')}</Text>
-          </View>
+          <Pressable accessibilityRole="button" onPress={() => router.navigate('/prefs')}>
+            <View style={[styles.row, styles.hair]}>
+              <Text style={styles.rowTitle}>{t('traveler.additionalRequests')}</Text>
+              <View style={[styles.valueNav, styles.rowValue]}>
+                <Text style={[styles.statValue, styles.rowValue]}>{requests.join(' · ')}</Text>
+                <Chev />
+              </View>
+            </View>
+          </Pressable>
         )}
-        <Pressable accessibilityRole="button" onPress={() => router.navigate('/prefs')}>
-          <View style={[styles.row, styles.hair]}>
-            <Text style={styles.action}>{t('traveler.modifyCabin')} ›</Text>
-          </View>
-        </Pressable>
       </Card>
 
       {/* TRUSTED CONTACTS: how many are configured, and the screen that manages them. */}
@@ -266,6 +267,7 @@ const styles = StyleSheet.create({
   hair: { borderTopWidth: 1, borderTopColor: colors.hairline },
   rowTitle: { fontSize: 14.5, color: colors.ink },
   rowValue: { flex: 1, textAlign: 'right' },
+  valueNav: { flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'flex-end' },
   statValue: { fontSize: 14.5, fontWeight: '600', color: colors.ink },
   notSet: { fontSize: 14, color: colors.muted },
   nameInput: { flex: 1, fontSize: 14.5, fontWeight: '600', color: colors.ink, textAlign: 'right', padding: 0 },

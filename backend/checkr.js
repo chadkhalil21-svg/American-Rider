@@ -46,7 +46,7 @@ const packageFor = (tier) =>
 // Work location is per Operator, not a deployment-wide constant. Checkr requires a US state
 // in work_locations; the server passes the state from the Operator's declared active market.
 // CHECKR_WORK_STATE is retained only as an explicit compatibility override for old test fixtures.
-function workState(value) {
+function normalizeWorkState(value) {
   const s = String(value || readKey('CHECKR_WORK_STATE') || '').trim().toUpperCase();
   if (!/^[A-Z]{2}$/.test(s)) throw new Error('A valid two-letter Operator work state is required for screening.');
   return s;
@@ -106,17 +106,17 @@ function verifySignature(rawBody, signatureHeader) {
  * resolves operators through OUR record first — a payload shape Checkr controls is a poor
  * place to keep the only copy of who a report is about.
  */
-async function invite({ uid, email, tier = 'full', workState }) {
+async function invite({ uid, email, tier = 'full', workState: state }) {
   const db = adminDb();
   const candidate = await api('POST', '/candidates', {
     email,
     custom_id: String(uid),
-    work_locations: [{ country: 'US', state: workState(workState) }],
+    work_locations: [{ country: 'US', state: normalizeWorkState(state) }],
   });
   const invitation = await api('POST', '/invitations', {
     candidate_id: candidate.id,
     package: packageFor(tier),
-    work_locations: [{ country: 'US', state: workState(workState) }],
+    work_locations: [{ country: 'US', state: normalizeWorkState(state) }],
   });
   if (db) {
     await db.collection('screeningOrders').doc(String(candidate.id)).set({
@@ -137,11 +137,11 @@ async function invite({ uid, email, tier = 'full', workState }) {
 }
 
 /** Re-send an invitation for a candidate we already created (link expired, same payment). */
-async function reinvite({ candidateId, tier = 'full', workState }) {
+async function reinvite({ candidateId, tier = 'full', workState: state }) {
   const invitation = await api('POST', '/invitations', {
     candidate_id: candidateId,
     package: packageFor(tier),
-    work_locations: [{ country: 'US', state: workState(workState) }],
+    work_locations: [{ country: 'US', state: normalizeWorkState(state) }],
   });
   return {
     invitationId: invitation.id || null,

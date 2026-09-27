@@ -17,6 +17,8 @@ This file records founder-approved interface checkpoints. An approved checkpoint
 
 | Operator Qualification / Commissioning | `approved/operator-qualification-commissioning-2026-09-28` | `715fadca3e516617934d7752be039a3f6e3ad183` |
 
+| Production browser-origin security boundary | `approved/security-cors-boundary-2026-09-28` | `27db8dbe3929e81d9ee207f9a54bdc11e9d2f2cf` |
+
 ## Lock protocol
 
 When a surface is approved:

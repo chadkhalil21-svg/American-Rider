@@ -760,7 +760,7 @@ export default {
     anonymousRecords: 'Registros del Servicio',
     yourPasswordPh: 'Su contraseña',
     keepMyAccount: 'Conservar mi cuenta',
-    configureThisTravel: 'Guardadas en su cuenta como sus preferencias de cabina.'
+    configureThisTravel: 'Guardadas en su cuenta como sus preferencias de cabina.',
     completedTravelAppears: 'Los viajes completados aparecen aquí.',
     mapNeedsApp: 'Elegir la recogida en el mapa requiere la aplicación de iPhone',
     searchByNameInstead: 'Puede buscar un punto de recogida por su nombre.',

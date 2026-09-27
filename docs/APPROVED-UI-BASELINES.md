@@ -9,6 +9,7 @@ This file records founder-approved interface checkpoints. An approved checkpoint
 | Create account | `approved/create-account-2026-09-27` | `b469e51286abf73e4f31cb7e0af60ed6b56888bd` |
 | Authentication recovery | `approved/authentication-recovery-2026-09-27` | `8aa4576e15aa680db2600cbd95d2c8813660cb79` |
 | Home / Arrange Travel | `approved/home-2026-09-27` | `0fa2d12071a2204c05a84e5b81681bfbdf7de382` |
+| Hamburger drawer | `approved/drawer-2026-09-27` | `0997d43a86ac390848efd78edc3c1ef8320f254a` |
 
 ## Lock protocol
 

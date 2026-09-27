@@ -6,14 +6,14 @@
 // said nothing about the present (an insurance policy that lapsed the next day left it
 // standing). Now nothing stores the answer as authority. assessOperator() derives it from the
 // records every time it is asked — at every document reading, every status check, every
-// go-on-duty and 90-second renewal, and every travel acceptance.
+// enter-service and 90-second renewal, and every travel acceptance.
 //
 // TWO KINDS OF GATE, one function.
 //   qualification — what makes an operator fit to carry travelers at all: the three documents,
 //                   the insurance cover, the background screening (live money), the account,
 //                   and no suspension or unresolved hold. All pass → qualified, automatically.
 //   duty          — what must also hold at the moment travel is taken: the §627.748(8)(a)
-//                   disclosure in force, Stripe payouts, being on duty, the policy date the
+//                   disclosure in force, Stripe payouts, being in service, the policy date the
 //                   operator recorded. These are not qualification because the app reaches the
 //                   payout and duty screens only after qualifying.
 //
@@ -24,7 +24,7 @@
 // carrying passengers for hire at no less than the jurisdiction's limit.
 //
 // A PERSON DECIDES ONLY THE EXCEPTIONS. `review` from the reader, an insurance limit that cannot
-// be read, a screening Checkr marks for review — those wait on /ops. A person's decision is
+// be read, a screening result the approved provider marks for review — those wait on /ops. A person's decision is
 // recorded beside the reading (never over it), is authenticated and audit-logged (see
 // resolveDocument / setSuspension), and still passes the same date and coverage checks.
 const { disclosureCurrent } = require('./disclosure');

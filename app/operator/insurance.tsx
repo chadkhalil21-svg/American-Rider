@@ -166,6 +166,15 @@ export default function OperatorInsurance() {
         <Text style={[styles.body, { marginTop: 8 }]}>{t('traveler.insStatusAutomatic')}</Text>
         <Text style={[styles.body, { marginTop: 8 }]}>{t('traveler.insStatusFallback')}</Text>
         <Text style={[styles.body, { marginTop: 8 }]}>{t('traveler.insEvidenceEmail')}</Text>
+        {!!liveStatus?.verificationIssue && (
+          <Card style={styles.processCard}>
+            <Text style={styles.statusTitle}>{t('traveler.insProviderProcessTitle')}</Text>
+            <Text style={styles.body}>{t('traveler.insProviderProcessBody')}</Text>
+            {!!liveStatus.verificationIssue.note && (
+              <Text style={[styles.body, { marginTop: 8 }]}>{liveStatus.verificationIssue.note}</Text>
+            )}
+          </Card>
+        )}
 
         {st === 'ok' && (
           <>
@@ -412,6 +421,7 @@ export default function OperatorInsurance() {
 
 const styles = StyleSheet.create({
   statusCard: { marginTop: 12, paddingVertical: 18, paddingHorizontal: 20 },
+  processCard: { marginTop: 14, paddingVertical: 14, paddingHorizontal: 16 },
   statusTitle: { fontSize: 15, fontWeight: '600', color: colors.ink, marginBottom: 8 },
   econCard: { paddingVertical: 18, paddingHorizontal: 20 },
   compareBlock: { marginTop: 18 },

@@ -11,6 +11,7 @@ This file records founder-approved interface checkpoints. An approved checkpoint
 | Home / Arrange Travel | `approved/home-2026-09-27` | `0fa2d12071a2204c05a84e5b81681bfbdf7de382` |
 | Hamburger drawer | `approved/drawer-2026-09-27` | `f3a7c883e879c8d27af461c40c6691f4204c170b` |
 | Profile / Account Details / Saved Places / Cabin Environment / Traveler Safety | `approved/profile-account-safety-2026-09-27` | `362b5f7c21642bf6d17c9c6859aca8efe0bc9569` |
+| Sign-in & Security / account identity management | `approved/account-security-2026-09-27` | `6d3bc82c8369a9c01f4045b919b73693710eabd2` |
 
 ## Lock protocol
 

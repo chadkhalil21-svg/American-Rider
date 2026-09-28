@@ -2667,12 +2667,10 @@ app.post('/operator/disclosure/acknowledge', requireAuth, async (req, res) => {
 
 // --- Operator screening. -------------------------------------------------------------------
 //
-// WHO PAYS AND WHO ORDERS ARE DIFFERENT QUESTIONS, and getting them confused is the whole
-// trap here. The OPERATOR pays (Chad, 23 Aug — pre-revenue). AMERICAN RIDER ORDERS, because
-// the statute requires the TNC to conduct or arrange the check and the FCRA permissible
-// purpose belongs to whoever the report is for. An operator who buys a consumer report about
-// themselves has not satisfied either. So the fee is a pass-through: the operator pays us
-// exactly what the screening costs, we pay the screening company.
+// Screening procurement is provider-neutral. The Operator pays the approved consumer
+// reporting agency directly; American Rider does not sell or mark up screening. Qualification
+// depends on authoritative provider evidence received and adjudicated under the active
+// jurisdiction's rules. An Operator declaration or uploaded consumer copy is never authority.
 app.get('/operator/screening', requireAuth, async (req, res) => {
   const db = adminDb();
   if (!db) return res.json({ ok: false, provider: 'external', screening: null, reason: adminStatus().reason });

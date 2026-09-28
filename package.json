@@ -55,7 +55,8 @@
     "parity": "node scripts/check-simulator-parity.mjs",
     "release:evidence": "node scripts/verify-release-evidence.mjs",
     "backend:lint": "npm run lint --prefix backend",
-    "commission:deterministic": "node scripts/run-deterministic-commissioning.mjs"
+    "commission:deterministic": "node scripts/run-deterministic-commissioning.mjs",
+    "commission:whole-platform-twice": "node scripts/run-double-whole-platform-trace.mjs"
   },
   "private": true,
   "allowScripts": {

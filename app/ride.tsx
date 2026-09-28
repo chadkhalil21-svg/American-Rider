@@ -551,7 +551,7 @@ const styles = StyleSheet.create({
   // ---- searching (the demo's radar screen) ----
   radarWrap: { width: 92, height: 92 },
   searchTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '600',
     letterSpacing: -0.44,
     color: colors.ink,
@@ -580,7 +580,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
-  statusTitle: { fontSize: 23, fontWeight: '600', letterSpacing: -0.46, color: colors.ink },
+  statusTitle: { fontSize: 21, fontWeight: '600', letterSpacing: -0.46, color: colors.ink },
   statusSub: { fontSize: 14.5, color: colors.muted, marginTop: 9, lineHeight: 21.75 },
   etaWrap: { alignItems: 'flex-end', flexShrink: 0, marginLeft: 12 },
   etaLabel: { fontSize: 9.5, letterSpacing: 1.425 },

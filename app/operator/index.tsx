@@ -479,7 +479,7 @@ const styles = StyleSheet.create({
   coverWarnText: { fontSize: 13.5, color: colors.ink, lineHeight: 20 },
   display: {
     marginTop: 8,
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: '600',
     letterSpacing: -0.64,
     lineHeight: 36.5,

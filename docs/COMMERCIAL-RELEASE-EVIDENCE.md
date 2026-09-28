@@ -14,7 +14,7 @@ Record jurisdiction, statute/version reviewed, reviewer/counsel or broker, execu
 
 Capture the deployed revision and `/health` response with secrets absent/redacted. Production passes only when `deployment=production`, `operationalReady=true`, `operationalMissing=[]`, and the deployed SHA equals the candidate SHA.
 
-Then prove provider behavior, not merely key presence: Stripe API connectivity + signed webhook delivery; Checkr production connectivity + signed webhook; Firebase Admin read/write; scheduler authenticated execution; HERE known-toll and no-toll responses; OTP current itinerary and realtime behavior where configured; receipt/support email delivery; phone verification; private document storage/read; named operations authentication; push delivery; platform calling if the call control is exposed.
+Then prove provider behavior, not merely key presence: Stripe API connectivity + signed webhook delivery; approved screening-provider production connectivity and authoritative report/event delivery; Firebase Admin read/write; scheduler authenticated execution; HERE known-toll and no-toll responses; OTP current itinerary and realtime behavior where configured; receipt/support email delivery; phone verification; private document storage/read; named operations authentication; push delivery; platform calling if the call control is exposed.
 
 For each provider record: environment, test identifier, UTC timestamp, expected result, observed result, provider-side identifier/log reference and American Rider-side identifier/log reference. Never put credentials in the evidence file.
 
@@ -58,4 +58,4 @@ The evidence package must include a complete reachable-screen inventory plus cri
 
 Copy `release-evidence.template.json` to an evidence file outside the public repository or in an access-controlled release system. Every gate requires `result: "pass"`, the exact candidate SHA, UTC execution time, executor/reviewer and at least one durable evidence reference. `npm run release:evidence -- /secure/path/evidence.json <candidate-sha>` validates completeness without inspecting the underlying sensitive artifact.
 
-A missing artifact, a verbal assurance, a screenshot without an identifiable build/provider event, or a test performed against a different SHA is **not a pass**. PR #7 is mergeable only after CI is green and this manifest validates for the same candidate SHA.
+A missing artifact, a verbal assurance, a screenshot without an identifiable build/provider event, or a test performed against a different SHA is **not a pass**. A release candidate can advance only after CI is green and this manifest validates for the same candidate SHA.

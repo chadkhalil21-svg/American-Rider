@@ -14,7 +14,7 @@ import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../src/components/AppText';
 import { useNative } from '../src/components/anim';
 import { useGoBack } from '../src/components/nav';
-import { Chip, LetterheadBar, PrimaryButton, Screen, SectionLabel, Sub, Title } from '../src/components/UI';
+import { Card, LetterheadBar, PrimaryButton, Screen, SectionLabel, Sub, Title } from '../src/components/UI';
 import { CLIMATES, MUSIC, setCabinPrefs, useCabinPrefs, type Climate, type Music } from '../src/state/cabinPrefs';
 import { useRide } from '../src/state/RideContext';
 import { useLanguage } from '../src/state/LanguageContext';
@@ -80,17 +80,18 @@ export default function CabinEnvironment() {
   const { t } = useLanguage();
   const goBack = useGoBack();
   const ride = useRide();
-  const { climate, music } = useCabinPrefs();
+  const cabin = useCabinPrefs();
+  const { climate, music, quiet, charging, luggage } = cabin;
 
-  const atmosphere = ride.tripPrefs.quiet ? 'Quiet' : 'Conversation';
+  const atmosphere = quiet ? 'Quiet' : 'Conversation';
 
   return (
     <Screen>
       <LetterheadBar onBack={goBack} />
-      <Title>{t('traveler.travelPreferences')}</Title>
+      <Title size={24}>{t('traveler.travelPreferences')}</Title>
       <Sub>{t('traveler.configureThisTravel')}</Sub>
 
-      <SectionLabel style={{ marginTop: 26 }}>{t('traveler.climate')}</SectionLabel>
+      <SectionLabel style={{ marginTop: 22 }}>{t('traveler.climate')}</SectionLabel>
       <View style={styles.segWrap}>
         <Segmented
           options={[...CLIMATES]}
@@ -100,20 +101,21 @@ export default function CabinEnvironment() {
         />
       </View>
 
-      <SectionLabel style={{ marginTop: 24 }}>{t('traveler.atmosphere')}</SectionLabel>
+      <SectionLabel style={{ marginTop: 22 }}>{t('traveler.atmosphere')}</SectionLabel>
       <View style={styles.segWrap}>
         <Segmented
           options={['Quiet', 'Conversation']}
           labels={{ Quiet: t('traveler.prefQuiet'), Conversation: t('traveler.prefConversation') }}
           value={atmosphere}
           onChange={(v) => {
-            if ((v === 'Quiet') !== ride.tripPrefs.quiet) ride.togglePref('tripPrefs', 'quiet');
-            setCabinPrefs({ quiet: v === 'Quiet' }); // saved for every travel, not only this one
+            const next = v === 'Quiet';
+            setCabinPrefs({ quiet: next });
+            if (next !== ride.tripPrefs.quiet) ride.togglePref('tripPrefs', 'quiet');
           }}
         />
       </View>
 
-      <SectionLabel style={{ marginTop: 24 }}>{t('traveler.music')}</SectionLabel>
+      <SectionLabel style={{ marginTop: 22 }}>{t('traveler.music')}</SectionLabel>
       <View style={styles.segWrap}>
         <Segmented
           options={[...MUSIC]}
@@ -128,28 +130,45 @@ export default function CabinEnvironment() {
         </Text>
       )}
 
-      <SectionLabel style={{ marginTop: 24 }}>{t('traveler.additionalRequests')}</SectionLabel>
-      <View style={styles.chips}>
-        <Chip
-          label={t('traveler.charger')}
-          on={ride.tripPrefs.charging}
-          onPress={() => {
-            setCabinPrefs({ charging: !ride.tripPrefs.charging });
-            ride.togglePref('tripPrefs', 'charging');
-          }}
-        />
-        <Chip
-          label={t('traveler.luggage')}
-          on={ride.tripPrefs.luggage}
-          onPress={() => {
-            setCabinPrefs({ luggage: !ride.tripPrefs.luggage });
-            ride.togglePref('tripPrefs', 'luggage');
-          }}
-        />
-      </View>
+      <SectionLabel style={{ marginTop: 22 }}>{t('traveler.additionalRequests')}</SectionLabel>
+      <Card style={styles.requestCard}>
+        {[
+          {
+            label: t('traveler.charger'),
+            on: charging,
+            toggle: () => {
+              const next = !charging;
+              setCabinPrefs({ charging: next });
+              if (next !== ride.tripPrefs.charging) ride.togglePref('tripPrefs', 'charging');
+            },
+          },
+          {
+            label: t('traveler.luggage'),
+            on: luggage,
+            toggle: () => {
+              const next = !luggage;
+              setCabinPrefs({ luggage: next });
+              if (next !== ride.tripPrefs.luggage) ride.togglePref('tripPrefs', 'luggage');
+            },
+          },
+        ].map((item, i) => (
+          <Pressable
+            key={item.label}
+            onPress={item.toggle}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: item.on }}
+          >
+            <View style={[styles.requestRow, i > 0 && styles.requestHair]}>
+              <Text style={styles.requestLabel}>{item.label}</Text>
+              <Text style={[styles.requestCheck, !item.on && styles.requestCheckOff]}>✓</Text>
+            </View>
+          </Pressable>
+        ))}
+      </Card>
 
-      {/* DONE, NOT CONTINUE: this screen is reached from the sheet and returns to it. */}
-      <PrimaryButton label={t('common.done')} onPress={goBack} style={{ marginTop: 'auto' }} />
+      <View style={styles.doneSpacer} />
+      {/* DONE, NOT CONTINUE: preferences save as they are selected; Done simply closes the screen. */}
+      <PrimaryButton label={t('common.done')} onPress={goBack} style={styles.doneButton} />
     </Screen>
   );
 }
@@ -158,7 +177,7 @@ const styles = StyleSheet.create({
   segWrap: { marginTop: 11 },
   seg: {
     flexDirection: 'row',
-    backgroundColor: colors.blueTint,
+    backgroundColor: colors.fill,
     borderRadius: 12,
     padding: 3,
   },
@@ -168,11 +187,24 @@ const styles = StyleSheet.create({
     bottom: 3,
     left: 3,
     borderRadius: 9,
-    backgroundColor: colors.ink,
+    backgroundColor: colors.accent,
   },
-  segOpt: { flex: 1, paddingVertical: 11, paddingHorizontal: 4, alignItems: 'center' },
-  segText: { fontSize: 14, fontWeight: '500', color: colors.ink2 },
+  segOpt: { flex: 1, paddingVertical: 10, paddingHorizontal: 4, alignItems: 'center' },
+  segText: { fontSize: 13.5, fontWeight: '500', color: colors.ink2 },
   segTextOn: { fontWeight: '600', color: '#fff' },
   musicNote: { fontSize: 12.5, color: colors.muted, marginTop: 9, lineHeight: 18.75 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginTop: 11 },
+  requestCard: { marginTop: 11, paddingHorizontal: 18, paddingVertical: 1 },
+  requestRow: {
+    minHeight: 50,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 13.5,
+  },
+  requestHair: { borderTopWidth: 1, borderTopColor: colors.hairline },
+  requestLabel: { fontSize: 14.5, color: colors.ink },
+  requestCheck: { fontSize: 16, fontWeight: '600', color: colors.accent },
+  requestCheckOff: { opacity: 0 },
+  doneSpacer: { flex: 1, minHeight: 30 },
+  doneButton: { marginTop: 2, paddingVertical: 16 },
 });

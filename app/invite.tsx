@@ -36,7 +36,7 @@ export default function Invitations() {
   return (
     <Screen>
       <LetterheadBar onBack={goBack} />
-      <Title>{t('traveler.inviteFriends')}</Title>
+      <Title size={24}>{t('traveler.inviteFriends')}</Title>
       <Sub>{t('traveler.inviteSub')}</Sub>
 
       {/* What will be sent, as it will be sent (Chad, 17 Sept 2026: show the recipient's
@@ -52,7 +52,7 @@ export default function Invitations() {
 }
 
 const styles = StyleSheet.create({
-  lbl: { marginTop: 24, marginBottom: 12 },
-  card: { paddingVertical: 18, paddingHorizontal: 20 },
-  message: { fontSize: 15, color: colors.ink, lineHeight: 23 },
+  lbl: { marginTop: 22, marginBottom: 10 },
+  card: { paddingVertical: 16, paddingHorizontal: 18 },
+  message: { fontSize: 14.5, color: colors.ink, lineHeight: 22 },
 });

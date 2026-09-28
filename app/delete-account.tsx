@@ -116,7 +116,7 @@ export default function DeleteAccount() {
       {/* The screen carries the name of the row that opens it (Chad, 19 Sept 2026). The BUTTON
           below keeps "Delete Account": a row names where it goes, a button names what it does,
           and "Account Termination Protocol" on a button would name neither. */}
-      <Title>{t('traveler.acctTermination')}</Title>
+      <Title size={24}>{t('traveler.acctTermination')}</Title>
       <Sub>{t('traveler.permanentRead')}</Sub>
 
       <SectionLabel style={styles.lbl}>{t('traveler.whatIsDeleted')}</SectionLabel>
@@ -242,13 +242,13 @@ export default function DeleteAccount() {
 }
 
 const styles = StyleSheet.create({
-  lbl: { marginTop: 24, marginBottom: 12 },
-  card: { paddingHorizontal: 20, paddingVertical: 2 },
-  block: { paddingVertical: 15 },
+  lbl: { marginTop: 22, marginBottom: 10 },
+  card: { paddingHorizontal: 18, paddingVertical: 1 },
+  block: { paddingVertical: 13.5 },
   hair: { borderTopWidth: 1, borderTopColor: colors.hairline },
-  blockTitle: { fontSize: 15, fontWeight: '600', color: colors.ink },
+  blockTitle: { fontSize: 14.5, fontWeight: '600', color: colors.ink },
   blockSub: { fontSize: 12.5, color: colors.muted, marginTop: 3, lineHeight: 18 },
-  fieldCard: { paddingHorizontal: 20, paddingVertical: 2 },
+  fieldCard: { paddingHorizontal: 18, paddingVertical: 1 },
   fieldWrap: { paddingTop: 14, paddingBottom: 2 },
   fieldLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 1.1, color: colors.muted },
   field: { paddingVertical: 12, fontSize: 16, color: colors.ink },
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
   error: { fontSize: 13.5, color: colors.red, marginTop: 14 },
   // The app's only other red button is Call 911; deletion earns the same weight.
   redBtn: {
-    marginTop: 24,
+    marginTop: 22,
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.redBorder,

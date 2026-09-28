@@ -1,19 +1,4 @@
-// Travel Complete — the web demo's rating/tip screen, exactly: green 56px check, total
-// charged, Travel Number, the operator-retained box, TRAVEL REVIEW outline stars, TIP
-// OPERATOR chips ("The operator keeps 100% of every tip."), View Travel Receipt, and
-// Complete.
-//
-// TWO DEFECTS FIXED HERE, 16 Aug 2026, both of the same kind — a stated outcome with
-// nothing behind it:
-//
-//   1. "Total Charged" read `trip.total + tip`. Selecting a $10 tip changed a row labelled
-//      CHARGED to an amount that had not been charged and never would be. An amount and a
-//      doubt about that amount must never render together; an amount and a falsehood about
-//      it is worse. Total Charged now shows the charge. The tip is its own line, labelled
-//      for what it is.
-//   2. The stars and the tip were local state that the Complete button threw away. Neither
-//      reached the operator, the travel record, or anything else. Both are now written to
-//      the travel in Firestore, and the screen says whether the write landed.
+// Travel Complete — completion record and optional Travel review. American Rider does not offer tipping.
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -21,7 +6,6 @@ import { Text } from '../src/components/AppText';
 import Svg, { Circle, Path } from 'react-native-svg';
 import {
   Card,
-  Chip,
   LetterheadBar,
   Mono,
   Num,
@@ -86,7 +70,7 @@ export default function TravelComplete() {
     }
     setSaving(true);
     setSaveFailed(false);
-    const ok = await ride.submitReview(stars, 0);
+    const ok = await ride.submitReview(stars);
     setSaving(false);
     if (!ok) {
       setSaveFailed(true);
@@ -153,17 +137,8 @@ export default function TravelComplete() {
         ))}
       </View>
 
-      {/* TIPPING REMOVED — founders' decision, 22 Aug 2026.
 
-          It had never worked: Travel Complete collected a tip, recordTravelReview wrote
-          tipCents onto the travel, and nothing in the backend ever read that field. Neither
-          charged nor paid, under a line reading "The operator keeps 100% of every tip."
-
-          The payment path was built and proven before the decision to remove it, so the
-          server route POST /travel/tip still exists and is correct. Nothing calls it. If
-          tipping returns, wire this screen back to tipTravel() — do not rebuild the
-          arithmetic, and do not reinstate a tip that only writes a field. */}
-
+      {/* No gratuity control by product decision. */}
 
       {firstLegDone && nextLeg && (
         <>
@@ -255,9 +230,6 @@ const styles = StyleSheet.create({
   },
   factLabel: { fontSize: 14, color: colors.ink2 },
   starsRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
-  tipSub: { fontSize: 12.5, color: colors.muted, marginTop: 6 },
-  tipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginTop: 12 },
-  tipChip: { minWidth: 64, alignItems: 'center' },
   saveFailed: { fontSize: 13, color: colors.red, marginTop: 16, lineHeight: 19 },
   skipLink: {
     textAlign: 'center',

@@ -82,6 +82,50 @@ export default function OperatorTrip() {
         </View>
       </Card>
 
+      {active.cabinPreferences ? (
+        <Card style={styles.prefsCard}>
+          {[
+            {
+              label: t('traveler.climate'),
+              value:
+                active.cabinPreferences.climate === 'Cool'
+                  ? t('traveler.prefCool')
+                  : active.cabinPreferences.climate === 'Warm'
+                    ? t('traveler.prefWarm')
+                    : t('traveler.prefModerate'),
+            },
+            {
+              label: t('traveler.atmosphere'),
+              value: active.cabinPreferences.quiet
+                ? t('traveler.prefQuiet')
+                : t('traveler.prefConversation'),
+            },
+            {
+              label: t('traveler.music'),
+              value:
+                active.cabinPreferences.music === 'Traveler Choice'
+                  ? t('traveler.prefTravelerChoice')
+                  : t('traveler.prefMusicNone'),
+            },
+            {
+              label: t('traveler.additionalRequests'),
+              value:
+                [
+                  active.cabinPreferences.charging ? t('traveler.charger') : null,
+                  active.cabinPreferences.luggage ? t('traveler.luggage') : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ') || t('traveler.noneRequested'),
+            },
+          ].map((item, i) => (
+            <View key={item.label} style={[styles.prefRow, i > 0 && styles.prefHair]}>
+              <Text style={styles.prefLabel}>{item.label}</Text>
+              <Text style={styles.prefValue}>{item.value}</Text>
+            </View>
+          ))}
+        </Card>
+      ) : null}
+
       <Card style={styles.revenueCard}>
         <View>
           <SectionLabel>{t('operator.yourRevenue')}</SectionLabel>
@@ -126,6 +170,25 @@ const styles = StyleSheet.create({
   travelerName: { fontSize: 16, fontWeight: '600', color: colors.ink },
   travelerSub: { fontSize: 12.5, color: colors.muted, marginTop: 2 },
   contact: { fontSize: 14, fontWeight: '500', color: colors.blue },
+  prefsCard: { marginTop: 12, paddingHorizontal: 18, paddingVertical: 1 },
+  prefRow: {
+    minHeight: 44,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 12,
+  },
+  prefHair: { borderTopWidth: 1, borderTopColor: colors.hairline },
+  prefLabel: { fontSize: 13.5, color: colors.muted, flexShrink: 0 },
+  prefValue: {
+    flex: 1,
+    fontSize: 13.5,
+    fontWeight: '600',
+    color: colors.ink,
+    lineHeight: 19,
+    textAlign: 'right',
+  },
   revenueCard: {
     marginTop: 12,
     paddingVertical: 16,

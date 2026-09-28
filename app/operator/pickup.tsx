@@ -106,13 +106,49 @@ export default function OperatorPickup() {
         <Text style={styles.codeBody}>{t('operator.verificationCodeSub')}</Text>
       </Card>
 
-      <Card style={styles.notesCard}>
-        <SectionLabel style={{ color: colors.blue }}>{t('operator.travelNotes')}</SectionLabel>
-        {/* Demonstration notes, the same for every travel — the real cabin environment of the
-            travel is not read here yet (handoff: found, not fixed). Keyed so the sentence is
-            at least in the operator's language. */}
-        <Text style={styles.notesBody}>{t('operator.travelNotesDemo')}</Text>
-      </Card>
+      {active.cabinPreferences ? (
+        <Card style={styles.prefsCard}>
+          {[
+            {
+              label: t('traveler.climate'),
+              value:
+                active.cabinPreferences.climate === 'Cool'
+                  ? t('traveler.prefCool')
+                  : active.cabinPreferences.climate === 'Warm'
+                    ? t('traveler.prefWarm')
+                    : t('traveler.prefModerate'),
+            },
+            {
+              label: t('traveler.atmosphere'),
+              value: active.cabinPreferences.quiet
+                ? t('traveler.prefQuiet')
+                : t('traveler.prefConversation'),
+            },
+            {
+              label: t('traveler.music'),
+              value:
+                active.cabinPreferences.music === 'Traveler Choice'
+                  ? t('traveler.prefTravelerChoice')
+                  : t('traveler.prefMusicNone'),
+            },
+            {
+              label: t('traveler.additionalRequests'),
+              value:
+                [
+                  active.cabinPreferences.charging ? t('traveler.charger') : null,
+                  active.cabinPreferences.luggage ? t('traveler.luggage') : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ') || t('traveler.noneRequested'),
+            },
+          ].map((item, i) => (
+            <View key={item.label} style={[styles.prefRow, i > 0 && styles.prefHair]}>
+              <Text style={styles.prefLabel}>{item.label}</Text>
+              <Text style={styles.prefValue}>{item.value}</Text>
+            </View>
+          ))}
+        </Card>
+      ) : null}
 
       <View style={{ flex: 1 }} />
       {!arrived ? (
@@ -155,6 +191,23 @@ const styles = StyleSheet.create({
   contact: { fontSize: 14, fontWeight: '500', color: colors.blue },
   codeCard: { marginTop: 12, paddingVertical: 16, paddingHorizontal: 18 },
   codeBody: { fontSize: 12.5, color: colors.muted, marginTop: 8, lineHeight: 18 },
-  notesCard: { marginTop: 12, paddingVertical: 16, paddingHorizontal: 18 },
-  notesBody: { fontSize: 14, color: colors.ink, marginTop: 8, lineHeight: 21 },
+  prefsCard: { marginTop: 12, paddingHorizontal: 18, paddingVertical: 1 },
+  prefRow: {
+    minHeight: 44,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 12,
+  },
+  prefHair: { borderTopWidth: 1, borderTopColor: colors.hairline },
+  prefLabel: { fontSize: 13.5, color: colors.muted, flexShrink: 0 },
+  prefValue: {
+    flex: 1,
+    fontSize: 13.5,
+    fontWeight: '600',
+    color: colors.ink,
+    lineHeight: 19,
+    textAlign: 'right',
+  },
 });

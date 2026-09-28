@@ -30,8 +30,11 @@ export default function SafeTravels() {
   const [adding, setAdding] = useState(false);
   const [draftName, setDraftName] = useState('');
   const [draftPhone, setDraftPhone] = useState('');
-  // The travel underway, if any: the share link and the verification code belong to it.
+  // Sharing is available from Travel confirmation onward. Vehicle verification waits until
+  // an Operator is actually assigned, because the server-authoritative Travel Number and the
+  // Operator's matching code do not exist before dispatch succeeds.
   const activeNo = ride.rideActive ? ride.lastTrip.no : null;
+  const verifiedTravelNo = ride.rideActive && ride.matchedOp ? ride.lastTrip.no : null;
 
   useEffect(() => {
     loadContacts().then(setContacts);
@@ -52,11 +55,14 @@ export default function SafeTravels() {
     setAdding(true);
   };
 
+  const normalizedDraftPhone = normalizePhone(draftPhone);
+  const phoneDigits = normalizedDraftPhone.replace(/\D/g, '');
+  const contactReady = !!draftName.trim() && phoneDigits.length >= 7 && phoneDigits.length <= 15;
+
   const saveDraft = () => {
     const name = draftName.trim();
-    if (!name) return;
-    const phone = normalizePhone(draftPhone);
-    commit([...contacts, { name, ...(phone ? { phone } : {}) }]);
+    if (!contactReady) return;
+    commit([...contacts, { name, phone: normalizedDraftPhone }]);
     setAdding(false);
   };
 
@@ -83,7 +89,7 @@ export default function SafeTravels() {
       t('traveler.safetyShareIntro', { place: ride.lastTrip.arr }),
       op && t('traveler.safetyOperatorLine', { name: op.name, car: op.car, plate: op.plate }),
       op && t('traveler.safetyArrivingIn', { n: op.etaMin }),
-      t('traveler.safetyTravelNumber', { no: ride.lastTrip.no }),
+      op && t('traveler.safetyTravelNumber', { no: ride.lastTrip.no }),
       // Absent when the server could not mint one. The message still sends — a share that
       // failed silently because a link could not be made would be the same defect again.
       link && t('traveler.safetyFollowHere', { link }),
@@ -100,7 +106,7 @@ export default function SafeTravels() {
   return (
     <Screen>
       <LetterheadBar onBack={goBack} />
-      <Title>{t('traveler.safeTravels')}</Title>
+      <Title size={24}>{t('traveler.safeTravels')}</Title>
       {/* The subtitle states what is true and nothing more (Chad, 17 Sept 2026: state the
           outcome, not the mechanism). Route monitoring IS real now — backend/monitor.js
           reports a delay with a known cause, asks the operator about an unexplained stop,
@@ -165,11 +171,11 @@ export default function SafeTravels() {
       {/* One code per travel, the same on the operator's pickup screen (src/verification.ts).
           The word of the day it replaces was shown to nobody but the traveler. */}
       <Card style={styles.verifyCard}>
-        {activeNo ? (
+        {verifiedTravelNo ? (
           <>
             <Text style={styles.verifyBody}>{t('traveler.verifyCodeIntro')}</Text>
             <Mono size={26} weight="600" style={{ marginTop: 8, letterSpacing: 1.3 }}>
-              {verificationCode(activeNo)}
+              {verificationCode(verifiedTravelNo)}
             </Mono>
           </>
         ) : (
@@ -239,12 +245,13 @@ export default function SafeTravels() {
               </Pressable>
               <Pressable
                 onPress={saveDraft}
-                style={[styles.saveBtn, !draftName.trim() && { backgroundColor: colors.disabled }]}
+                disabled={!contactReady}
+                style={[styles.saveBtn, !contactReady && { backgroundColor: colors.disabled }]}
               >
                 <Text
                   style={[
                     styles.saveBtnText,
-                    !draftName.trim() && { color: colors.disabledText },
+                    !contactReady && { color: colors.disabledText },
                   ]}
                 >
                   {t('traveler.saveContact')}

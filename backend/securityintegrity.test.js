@@ -8,7 +8,8 @@ const copy = (x) => JSON.parse(JSON.stringify(x));
 function fakeDb(seed) {
   const data = copy(seed);
   const docsFor = (c) => Object.entries(data[c] || {}).map(([id, value]) => ({ id, data: () => copy(value) }));
-  return { data, collection: (c) => ({
+  const db = { data };
+  db.collection = (c) => ({
     doc: (id) => ({
       get: async () => ({ exists: !!data[c]?.[id], data: () => copy(data[c]?.[id]) }),
       update: async (fields) => { data[c][id] = { ...data[c][id], ...copy(fields) }; },
@@ -21,7 +22,12 @@ function fakeDb(seed) {
       };
       return q;
     },
-  }) };
+  });
+  db.runTransaction = async (fn) => fn({
+    get: async (ref) => ref.get(),
+    update: (ref, fields) => ref.update(fields),
+  });
+  return db;
 }
 
 (async () => {

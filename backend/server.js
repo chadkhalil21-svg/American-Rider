@@ -24,14 +24,15 @@ const {
   quote, createPaymentIntent, resumePaymentIntent, chargeRide, refundTravel,
   connectAccountFor, connectOnboardingLink, connectAccountStatus,
   transferToOperator, refundableFor, connectDashboardLink, pingStripe, probeNetwork,
-  chargeTip, transferFixed, createScreeningIntent, operatorPayoutAccount,
+  transferFixed, operatorPayoutAccount,
   listPaymentMethods, createSetupIntent, setDefaultPaymentMethod, detachPaymentMethod,
-  defaultCardCountry,
+  defaultCardCountry, chargeOperatorAccountFee,
 } = require('./payments');
 const { readKey } = require('./env');
 const { requireAuth, attachAuth, requireVerifiedEmail } = require('./auth');
 const { perAccount, countOnly, perIp } = require('./ratelimit');
 const { marketFor, servesPoint, listMarkets, markets: allMarkets } = require('./markets');
+const { forMarket: insuranceForMarket, publicConfig: publicInsuranceConfig } = require('./insurance-jurisdictions');
 
 // ——— WHAT A THROWAWAY ACCOUNT MAY DO, AND HOW OFTEN ————————————————————————————
 // Booking was never the exposure: a travel needs a payment method, and a card is far harder to
@@ -45,11 +46,8 @@ const LIMITS = {
   // COUNTED, NEVER REFUSED. See ratelimit.js — an alarm that answers "too many times" to
   // somebody in trouble has failed at the one thing it must not fail at.
   emergency: countOnly({ name: 'emergency', limit: 6, windowMs: 60 * 60 * 1000 }),
-  // Each of these bills us for an SMS and puts a message on somebody's handset. Tight on
-  // purpose: a real traveler verifies once, twice if the first is slow.
-  verify: perAccount({ name: 'verify', limit: 5, windowMs: 60 * 60 * 1000 }),
   // COST CONTROLS (22 Sept 2026). Each of these calls something that costs money or reaches a
-  // third party: the document reader (a model call), Checkr, Stripe, Twilio, push notifications,
+  // third party: the document reader (a model call), screening support workflow, Stripe, push notifications,
   // the routers. The client cannot be trusted to hold back, so the server does. Generous for a
   // real person — nobody photographs a licence 20 times an hour — and a hard stop for a loop.
   document: perAccount({ name: 'document', limit: 20, windowMs: 60 * 60 * 1000 }),
@@ -76,7 +74,7 @@ const { presenceStale, coverageLapsed, matchOperator, etaMinutes } = require('./
 // DISCLOSURE IS IMPORTED FOR .statute, and leaving it out is how the acknowledge route below
 // threw `DISCLOSURE is not defined` for a day — every operator who read the disclosure was
 // refused when they said so, and could not go on duty. The 25 disclosure tests all passed:
-// they exercise disclosure.js directly and never call this route. Same shape as the tip path
+// they exercise disclosure.js directly and never call this route. Same class of wiring defect as an orphaned backend path
 // and the screening gate — written at both ends, unwired at the point that consumes it.
 const {
   DISCLOSURE, DISCLOSURE_VERSION, disclosureFor, disclosureCurrent,
@@ -97,106 +95,87 @@ const { lostItemTicket, stampLostItemCase } = require('./lostitem');
 const { adminDb, adminStatus, accountDisabled } = require('./firebase-admin');
 const { closeOperationalAccount } = require('./accountclosure');
 const { acceptOffer } = require('./eligibility');
+const { progressTravel } = require('./travelprogress');
 const { payForTravel, cancelTravel: cancelTravelFor, settleTravel: settleTravelFor } = require('./travelmoney');
 const { authorizeVoiceTravel, lostItemTravel, authorizeAnnouncement, claimAnnouncement } = require('./trustboundaries');
 const { TERMS_HTML, PRIVACY_HTML, ABOUT_HTML, legalPage, LEGAL_LANGUAGES } = require('./legal');
 const {
   HOME_HTML, OPERATE_HTML, SUPPORT_HTML, TRAVEL_HTML, SAFETY_HTML, SMART_HTML,
 } = require('./site');
-const { smartQuote } = require('./smart');
+const { smartQuote, revalidateTransit } = require('./smart');
 const { transitHealth } = require('./transit');
 const { sweepScheduled, sweepSettlements } = require('./scheduler');
 const { sweepMonitor, sweepAssignments } = require('./monitor');
 const { notify } = require('./push');
 const { handleEvent, webhookReady } = require('./webhook');
+const { enqueueProviderEvent, processProviderEvent, sweepProviderEvents } = require('./providerqueue');
+const { acquireLease, renewLease, releaseLease, DEFAULT_LEASE_MS } = require('./schedulerlease');
+const { sweepOperatorAccountFees } = require('./operatorfees');
+const crypto = require('node:crypto');
+const WORKER_ID = crypto.randomUUID();
 const { send, receiptEmail, emailReady: mailReady } = require('./email');
-const {
-  ready: verifyReady, startVerification, checkVerification, toE164,
-} = require('./verify');
 const { mount: mountOps, opsAuthMode } = require('./ops');
 const { readDocument, documentsReady, READER_VERSION } = require('./documents');
 const { ready: r2Ready, uploadUrl: r2UploadUrl, readUrl: r2ReadUrl, owns: r2Owns } = require('./r2');
 const { assessOperator, assessAndRecord } = require('./qualification');
-const { page } = require('./shell');
 const {
-  screeningReady, evaluateExistingReport, screeningCurrent,
-  SCREENING_FEE_CENTS, MVR_ONLY_FEE_CENTS, BASIC_ONLY_FEE_CENTS, sweepScreening,
-  grossUpCents, screeningQuote,
-} = require('./screening');
-const checkr = require('./checkr');
+  STATUS_DUE_MS, STATUS_MAX_AGE_MS,
+  initialMonitoringFromDocument, continuingStatus, applyOperatorAttestation, applyIndependentConfirmation,
+  providerInstructions, sweepInsuranceMonitoring,
+} = require('./insurance-monitoring');
+const { normalizeParty, operatorPartyView } = require('./travelparty');
+const family = require('./family');
+const { provisionTeenPin, verifyTeenPin } = require('./teenpickup');
+const { listPlatformMessages, markPlatformMessageRead } = require('./platforminbox');
+const { page } = require('./shell');
+const { screeningReady, screeningCurrent, sweepScreening } = require('./screening');
 
 const app = express();
 // One proxy in front (Render). Makes req.ip the caller rather than the proxy, which the
 // per-address limits in ratelimit.js need.
 app.set('trust proxy', 1);
-app.use(cors()); // let the app (a different origin) call this server
-
 // --- Stripe's webhook. MOUNTED BEFORE express.json(), and that order is load-bearing. -------
 //
 // A signature is computed over the EXACT bytes Stripe sent. Once express.json() has parsed and
 // re-serialised the body, those bytes are gone and every event fails verification — which is
 // the classic way this endpoint ends up either broken or, worse, "fixed" by skipping the check.
+const PROVIDER_HANDLERS = { stripe: handleEvent };
+
+async function acceptDurableProviderEvent(provider, event, res) {
+  const queued = await enqueueProviderEvent({ provider, event });
+  // No durable write means no acknowledgement. The provider will retry instead of us losing
+  // an event in a process crash or Firestore outage.
+  if (!queued.ok) return res.status(503).json({ error: queued.reason || 'event queue unavailable' });
+  res.json({ received: true, type: event?.type || 'unknown', duplicate: !!queued.duplicate });
+  processProviderEvent({ id: queued.id, handlers: PROVIDER_HANDLERS, workerId: WORKER_ID })
+    .then((out) => console.log(`[${provider}] ${event?.type}: ${out.result?.action || out.reason || (out.skipped ? 'already claimed' : 'processed')}`))
+    .catch((e) => console.log(`[${provider}] ${event?.type} failed: ${e.message}`));
+}
+
 app.post('/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   const secret = readKey('STRIPE_WEBHOOK_SECRET');
   if (!secret) return res.status(503).json({ error: 'STRIPE_WEBHOOK_SECRET is not set' });
-
   let event;
   try {
-    event = stripeClient().webhooks.constructEvent(
-      req.body,
-      req.get('stripe-signature'),
-      secret,
-    );
+    event = stripeClient().webhooks.constructEvent(req.body, req.get('stripe-signature'), secret);
   } catch (e) {
-    // 400, deliberately: Stripe stops retrying a 400 and shows it in the dashboard, which is
-    // how a wrong secret gets noticed instead of quietly retrying forever.
     return res.status(400).json({ error: `Signature verification failed: ${e.message}` });
   }
-
-  // ACKNOWLEDGE FIRST, WORK AFTER. Stripe retries anything that does not answer in seconds,
-  // and the work here writes to Firestore and files cases — slow enough to be retried into
-  // duplicates. The result is logged rather than returned; nothing is waiting for it.
-  res.json({ received: true, type: event.type });
-  handleEvent(event)
-    .then((out) => console.log(`[stripe] ${event.type}: ${out.action || out.reason}`))
-    .catch((e) => console.log(`[stripe] ${event.type} failed: ${e.message}`));
+  return acceptDurableProviderEvent('stripe', event, res);
 });
 
-// --- Checkr's webhook. Same raw-body rule as Stripe's above, for the same reason: the -------
-// signature is an HMAC-SHA256 over the EXACT bytes Checkr sent, and express.json() destroys
-// them. (The previous handler compared the signature header to the secret itself — Checkr
-// never sends the secret, so every genuine result was a 403 and none ever landed.)
-app.post('/checkr/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-  if (!readKey('CHECKR_WEBHOOK_SECRET')) {
-    return res.status(503).json({ error: 'CHECKR_WEBHOOK_SECRET is not set' });
-  }
-  if (!checkr.verifySignature(req.body, req.get('x-checkr-signature'))) {
-    // 403 and no retry-forever loop: a wrong secret should surface in Checkr's dashboard.
-    return res.status(403).json({ error: 'Bad signature' });
-  }
+app.post('/stripe/connect-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  const secret = readKey('STRIPE_CONNECT_WEBHOOK_SECRET');
+  if (!secret) return res.status(503).json({ error: 'STRIPE_CONNECT_WEBHOOK_SECRET is not set' });
   let event;
   try {
-    event = JSON.parse(req.body.toString('utf8'));
-  } catch {
-    return res.status(400).json({ error: 'Not JSON' });
+    event = stripeClient().webhooks.constructEvent(req.body, req.get('stripe-signature'), secret);
+  } catch (e) {
+    return res.status(400).json({ error: `Signature verification failed: ${e.message}` });
   }
-  // ACKNOWLEDGE FIRST, WORK AFTER — same as Stripe. The work fetches the report's screenings
-  // from Checkr's API and writes decisions, which is slow enough to be retried into
-  // duplicates if the 200 waited for it.
-  res.json({ received: true, type: event?.type || 'unknown' });
-  checkr.handleEvent(event)
-    .then(async (out) => {
-      console.log(`[checkr] ${event?.type}: ${out.action}${out.decision ? ` (${out.decision})` : ''}`);
-      // A SCREENING RESULT MOVES QUALIFICATION AT ONCE — a pass can complete it, a hold puts
-      // the operator in the /ops queue, a refusal takes them out of dispatch — without waiting
-      // for the operator to open the app. keyMode is read at call time (declared below).
-      const db = adminDb();
-      if (out?.action === 'decided' && out.uid && db) {
-        await assessAndRecord({ db, uid: out.uid, checks: qualificationChecks, liveMoney: keyMode === 'live' });
-      }
-    })
-    .catch((e) => console.log(`[checkr] ${event?.type} failed: ${e.message}`));
+  return acceptDurableProviderEvent('stripe', event, res);
 });
+
 
 app.use(express.json()); // parse JSON request bodies — everything BELOW the webhook
 
@@ -207,6 +186,50 @@ app.use(express.json()); // parse JSON request bodies — everything BELOW the w
 // money while /health reported "test" and the app told travelers nothing was being charged.
 const KEY = readKey('STRIPE_SECRET_KEY');
 const keyMode = /^(sk|rk)_live_/.test(KEY) ? 'live' : /^(sk|rk)_test_/.test(KEY) ? 'test' : 'no-key';
+const DEPLOYMENT_MODE = String(readKey('DEPLOYMENT_MODE') || 'development').toLowerCase();
+const declaredProduction = DEPLOYMENT_MODE === 'production';
+// A live Stripe credential is itself a production posture. This prevents an omitted or mistyped
+// DEPLOYMENT_MODE from allowing real-money operation around the full readiness gate.
+const productionMode = declaredProduction || keyMode === 'live';
+const operationalMode = productionMode;
+
+// Native apps do not depend on browser CORS. Browser clients do, so production permits only
+// American Rider's own web origins. Development remains open for Expo/local tooling.
+const CORS_ORIGINS = new Set(
+  String(readKey('CORS_ORIGINS') || 'https://americanrider.app,https://www.americanrider.app')
+    .split(',').map((s) => s.trim()).filter(Boolean),
+);
+app.use(cors({
+  origin(origin, callback) {
+    if (!productionMode || !origin || CORS_ORIGINS.has(origin)) return callback(null, true);
+    return callback(new Error('Origin not allowed'));
+  },
+}));
+
+function productionReadiness() {
+  const missing = [];
+  if (!['development', 'production'].includes(DEPLOYMENT_MODE)) missing.push('deployment_mode');
+  if (keyMode !== 'live') missing.push('stripe_live_key');
+  if (!readKey('STRIPE_PUBLISHABLE_KEY')) missing.push('stripe_publishable_key');
+  if (!readKey('STRIPE_WEBHOOK_SECRET')) missing.push('stripe_webhook_secret');
+  if (!readKey('STRIPE_CONNECT_WEBHOOK_SECRET')) missing.push('stripe_connect_webhook_secret');
+  if (!screeningReady()) missing.push('screening_provider');
+  if (!readKey('HERE_API_KEY')) missing.push('toll_provider');
+  if (!readKey('SCHEDULER_TOKEN')) missing.push('scheduler_token');
+  if (!adminStatus().ok) missing.push('firebase_admin');
+  if (opsAuthMode() !== 'named') missing.push('ops_auth');
+  return { ready: !productionMode || missing.length === 0, missing };
+}
+
+function requireOperationalReadiness(req, res, next) {
+  const state = productionReadiness();
+  if (!state.ready) return res.status(503).json({
+    error: 'American Rider production services are not operationally ready.',
+    code: 'production_not_ready',
+    missing: state.missing,
+  });
+  return next();
+}
 
 // Stripe, for signature verification only. The payment logic has its own client in
 // payments.js; this avoids importing that whole module's state to check one header.
@@ -220,8 +243,8 @@ const positiveCents = (v) => Number.isInteger(v) && v > 0;
 
 // Prices a ride from whatever the app told us about WHERE it is going — never from a price the
 // app sends. Two ways in, both server-priced:
-//   1. { destination: 'Wynwood' }                     -> the fixed FARES table (the demo places)
-//   2. { pickup: {lat,lng}, dest: {lat,lng} }         -> distance-based (any real address)
+//   1. { destination: '<configured place>' }          -> the fixed FARES table (development fixtures)
+//   2. { pickup: {lat,lng}, dest: {lat,lng} }         -> distance-based (authoritative operational path)
 // Coordinates win when both are present, because they describe a real trip rather than a label.
 // Returns { travelCostCents, miles|null, pricedBy, governmentFees } or null if we cannot price it.
 // `governmentFees` (fees.js) are fenced from THE SAME COORDINATES the price comes from — a fee
@@ -255,6 +278,7 @@ app.get('/healthz', (req, res) => res.json({ ok: true, service: 'american-rider-
 
 app.get('/health', async (req, res) => {
   const tickets = adminStatus();
+  const readiness = productionReadiness();
 
   // WHO IS ACTUALLY ON DUTY. Counts only — no name, no position, nothing about a person.
   //
@@ -335,18 +359,20 @@ app.get('/health', async (req, res) => {
     // Stripe can reach us, and we can reach a traveler's inbox. Both were absent and both
     // were invisible; a field on a URL is how that stops happening.
     webhook: webhookReady() ? 'on' : 'off',
+    deployment: DEPLOYMENT_MODE,
+    operationalReady: readiness.ready,
+    operationalMissing: readiness.missing,
+    scheduler: readKey('SCHEDULER_TOKEN') ? 'authenticated' : 'off',
+    tolls: readKey('HERE_API_KEY') ? 'on' : 'off',
     receipts: mailReady() ? 'on' : 'off',
     // NO PROVIDER MEANS NOBODY CAN BE COMMISSIONED. Every operator sits at
     // `awaiting_provider`, which is deliberately not a pass and not dispatchable — so an
-    // empty fleet on launch day would otherwise look like nobody had applied.
+    // empty fleet would otherwise look like nobody had applied.
     screening: screeningReady() ? 'on' : 'off',
     // Reading an operator's licence, registration, inspection and insurance. `off` means every
     // document falls to 'review' — never to 'accept'.
     documents: documentsReady() ? 'on' : 'off',
     insuranceDisclosure: DISCLOSURE_VERSION,
-    // Phone verification. `off` means sign-up cannot check a number, and the app is told so
-    // rather than showing a step that answers 503.
-    phoneVerification: verifyReady() ? 'on' : 'off',
     // How /ops is signed in to: 'named' is the production answer.
     opsAuth: opsAuthMode(),
     // Where travel is sold and operators are onboarded (backend/markets.js).
@@ -389,11 +415,13 @@ app.get('/health', async (req, res) => {
 // `mode` is what the app's payment copy reads, so no screen can claim payments are simulated
 // while real money is moving, or the reverse.
 app.get('/config', (req, res) => {
+  const readiness = productionReadiness();
   res.json({
     stripePublishableKey: readKey('STRIPE_PUBLISHABLE_KEY') || null,
     mode: keyMode,
     // false means the app must not offer to charge anybody.
-    canTakePayment: keyMode !== 'no-key' && !!readKey('STRIPE_PUBLISHABLE_KEY'),
+    canTakePayment: readiness.ready && keyMode !== 'no-key' && !!readKey('STRIPE_PUBLISHABLE_KEY'),
+    operationalReady: readiness.ready,
   });
 });
 
@@ -424,7 +452,7 @@ app.post('/account/close', requireAuth, async (req, res) => {
 // Served here so they are real, live web pages with no separate hosting to manage.
 // --- The public website. -------------------------------------------------------------------
 //
-// THE DEFECT THIS CLOSES, and it is the same one as chargeTip. backend/site.js was written,
+// THE DEFECT THIS CLOSES, and it is the same class as an unwired money path. backend/site.js was written,
 // reviewed and committed with six finished pages on it — and nothing ever required the file.
 // Only /terms and /privacy were served, so americanrider.app answered a bare Express 404 while
 // a nine-page site sat in the repo. Written is not shipped.
@@ -458,6 +486,7 @@ app.post('/travel/follow-link', requireAuth, LIMITS.announce, async (req, res) =
     const token = await issueFollowToken({
       rideId: String(req.body?.rideId || ''),
       travelerUid: req.uid,
+      guardianUid: req.uid,
     });
     if (!token) return res.status(409).json({ error: 'That travel cannot be shared right now' });
     res.json({ ok: true, url: `${PUBLIC_ORIGIN}/follow/${token}` });
@@ -507,12 +536,33 @@ app.post('/support', requireAuth, requireVerifiedEmail, LIMITS.support, async (r
   // method" while no money moved. Issue it against the real PaymentIntent; if that cannot
   // be done, this is a person's job and the case falls through to the escalation below.
   if (decision.action === 'credit') {
+    // A refund is bound to an authoritative Travel, not merely to *some* Stripe payment owned
+    // by this Traveler. Otherwise a caller with Travels A and B could file about A while
+    // supplying B's PaymentIntent. The phone supplies only rideId; ownership and payment id
+    // come back out of Firestore.
+    const db = adminDb();
+    const rideId = String(req.body?.rideId || trip?.rideId || '');
+    let refundRide = null;
+    let refundRideRef = null;
+    if (db && rideId) {
+      refundRideRef = db.collection('rides').doc(rideId);
+      const snap = await refundRideRef.get();
+      const r = snap.exists ? snap.data() || {} : null;
+      if (r && String(r.travelerUid || '') === String(req.uid)) refundRide = r;
+    }
+    if (!refundRide?.paymentIntentId) {
+      decision = {
+        action: 'escalate',
+        message: decision.message,
+        reason: 'Automatic credit approved but no authoritative owned Travel payment could be verified.',
+        forced: true,
+      };
+    } else {
     const refund = await refundTravel({
-      paymentIntentId: trip?.paymentIntentId,
+      paymentIntentId: refundRide.paymentIntentId,
       amountCents: decision.credit_cents,
-      // The request body cannot be trusted to say whose payment this is. refundTravel
-      // checks the id against Stripe's own record of who paid before a cent moves.
       expectUid: req.uid,
+      idempotencyKey: `ar_support_refund_${rideId}`,
     });
     // THE EXPOSURE CAP, WHICH IS NOT THE SAME AS THE CREDIT CAP. The credit cap measures what
     // a traveler might reasonably be owed; this measures what the company actually pays for
@@ -529,6 +579,7 @@ app.post('/support', requireAuth, requireVerifiedEmail, LIMITS.support, async (r
       });
     }
     if (refund.ok) {
+      if (refundRideRef) await refundRideRef.set({ supportRefundId: refund.refundId, supportRefundedCents: refund.amountCents, supportRefundedAt: Date.now() }, { merge: true });
       return res.json({ ...decision, refunded: true, refundId: refund.refundId });
     }
     decision = {
@@ -537,6 +588,7 @@ app.post('/support', requireAuth, requireVerifiedEmail, LIMITS.support, async (r
       reason: `Credit of ${decision.credit_cents}c approved but not issued: ${refund.error}`,
       forced: true,
     };
+    }
   }
 
   if (decision.action === 'escalate') {
@@ -626,6 +678,42 @@ app.get('/support/cases', requireAuth, async (req, res) => {
   } catch (e) {
     return res.status(502).json({ error: 'Your cases could not be read', detail: String(e && e.message || e) });
   }
+});
+
+// Family / Teen Travel: guardian-created relationship, accepted by the teen account.
+app.get('/family', requireAuth, async (req,res)=>{const out=await family.listFamilyLinks({uid:req.uid});return res.status(out.ok?200:503).json(out);});
+app.get('/family/travels', requireAuth, async (req,res)=>{
+ const out=await family.listGuardianActiveTravels({guardianUid:req.uid});if(!out.ok)return res.status(503).json(out);
+ const travels=[];for(const r of out.travels){const token=await issueFollowToken({rideId:r.id,travelerUid:req.uid,guardianUid:req.uid});travels.push({...r,followUrl:token?`${PUBLIC_ORIGIN}/follow/${token}`:null});}
+ return res.json({ok:true,travels});
+});
+app.post('/family/invite', requireAuth, requireVerifiedEmail, async (req,res)=>{
+  const b=req.body||{};
+  const out=await family.createFamilyInvite({guardianUid:req.uid,guardianName:req.name||b.guardianName,teenName:b.teenName,teenEmail:b.teenEmail,teenDob:b.teenDob});
+  if(!out.ok)return res.status(400).json(out);
+  // The token travels only through the addressed mailbox and into the app deep link. The
+  // Family screen never asks a person to copy an opaque identifier or security token.
+  const link=`americanrider://family?invite=${encodeURIComponent(out.id)}&token=${encodeURIComponent(out.inviteToken)}`;
+  const delivery=await send({
+    to:String(b.teenEmail||'').trim().toLowerCase(),
+    subject:'American Rider · Family invitation',
+    text:`AMERICAN RIDER — NATIONAL TRANSPORTATION\n\n${req.name||'Your guardian'} has invited you to join their American Rider Family account for Teen Travel.\n\nOpen this invitation on the device where American Rider is installed:\n${link}\n\nThe invitation expires in seven days and can be accepted only while signed in to the verified account at this email address.\n`,
+    html:`<p><strong>American Rider · Family</strong></p><p>You have been invited to join a Family account for Teen Travel.</p><p><a href="${link}">Accept Family Invitation</a></p><p>This invitation expires in seven days and can be accepted only while signed in to the verified account at this email address.</p>`,
+  });
+  if(!delivery.ok)return res.status(502).json({ok:false,reason:'The Family invitation could not be delivered. No invitation code is shown in the app.',id:out.id});
+  return res.json({ok:true,id:out.id,delivered:true});
+});
+app.post('/family/invite/:id/accept', requireAuth, requireVerifiedEmail, async (req,res)=>{const out=await family.acceptFamilyInvite({id:req.params.id,inviteToken:req.body?.inviteToken,teenUid:req.uid,teenEmail:req.email,emailVerified:req.emailVerified});return res.status(out.ok?200:400).json(out);});
+app.post('/family/:id/revoke', requireAuth, async (req,res)=>{const out=await family.revokeFamilyLink({id:req.params.id,guardianUid:req.uid});return res.status(out.ok?200:403).json(out);});
+
+// --- Platform inbox: durable American Rider -> Operator/account communications. -----------
+app.get('/operator/inbox', requireAuth, async (req, res) => {
+  const out = await listPlatformMessages(req.uid, req.query?.limit);
+  res.status(out.ok ? 200 : 503).json(out);
+});
+app.post('/operator/inbox/:id/read', requireAuth, async (req, res) => {
+  const out = await markPlatformMessageRead(req.uid, req.params.id);
+  res.status(out.ok ? 200 : out.reason === 'not found' ? 404 : 503).json(out);
 });
 
 // --- OPERATOR PAYOUTS: Stripe Connect onboarding. -----------------------------------------
@@ -751,7 +839,7 @@ app.get('/connect/done', (req, res) =>
 //
 // This is docs/OPEN-DECISIONS.md §4 answered for the payout case: operator identity is the
 // account, not the handset.
-app.post('/operator/online', requireAuth, async (req, res) => {
+app.post('/operator/online', requireAuth, requireOperationalReadiness, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
 
@@ -791,8 +879,8 @@ app.post('/operator/online', requireAuth, async (req, res) => {
     }
     const b = req.body || {};
 
-    // COVERAGE, CHECKED HERE AS WELL AS ON THE PHONE. American Rider carries no automobile
-    // policy, so an operator's own commercial coverage is the only coverage a travel has. A
+    // COVERAGE, CHECKED HERE AS WELL AS ON THE PHONE. The Operator's qualifying commercial
+    // coverage is a mandatory eligibility condition. A
     // date that has passed is a travel with nothing behind it, and a gate that exists only in
     // the app is a gate that runs on a device we do not control.
     // ---- THE SCREENING GATE. ---------------------------------------------------------
@@ -800,18 +888,18 @@ app.post('/operator/online', requireAuth, async (req, res) => {
     // THE DEFECT THIS CLOSES, and it is the worst one left. This route checked Stripe payouts,
     // an insurance expiry date and a position — and never once asked whether the operator had
     // passed a background screening. The whole apparatus behind that question existed:
-    // Florida's standard encoded in screening.js, the Checkr pipeline, the adjudication, the
+    // Florida's standard encoded in screening.js, the screening-provider pipeline, the adjudication, the
     // three-year clock, twenty-eight tests. None of it was consulted at the only moment it
     // decides anything. An operator who had never been screened could carry a passenger
     // provided they had a Stripe account and had typed a date into a box.
     //
-    // Built at both ends and not wired at the gate — the same shape as the tip path, the
+    // Built at both ends and not wired at the gate — the same class as an unwired backend path, the
     // website, and the AI planner. It is why "the code exists" is no longer evidence here.
     //
     // WHY IT IS GATED ON LIVE MODE rather than always. dispatch.ts already draws this line:
     // demonstration stand-ins are acceptable while no real traveler is carried, and never once
     // money is real. Refusing every operator today would stop the founders testing their own
-    // product before Checkr is credentialed. In test mode the travel is a demonstration; in
+    // product before a screening provider is configured. In test mode the travel is a demonstration; in
     // live mode a stranger gets into a car.
     //
     // The unscreened case is STAMPED either way, so /ops shows who is on duty without a
@@ -843,7 +931,7 @@ app.post('/operator/online', requireAuth, async (req, res) => {
       user,
       fleet: fleetNow,
       context: 'online',
-      liveMoney: keyMode === 'live',
+      liveMoney: operationalMode,
       account: { disabled: false }, // checked above
       payouts: { enabled: true }, // checked above, with Stripe's list of what is still due
     });
@@ -1040,88 +1128,6 @@ app.post('/operator/settle-pending', requireAuth, async (req, res) => {
       }
     }
     res.json({ ok: true, settled, centsPaid, stillOwed });
-  } catch (e) {
-    res.status(502).json({ error: e.message });
-  }
-});
-
-// --- A TIP: charged, and passed to the operator whole. -----------------------------------
-//
-// body: { rideId, tipCents }
-//
-// Travel Complete has always collected a tip and written it to the ride document, where
-// nothing read it. The traveler was not charged and the operator was not paid, under a line
-// reading "The operator keeps 100% of every tip". This is the mechanism that sentence needs.
-//
-// The amount is taken from the REQUEST rather than from a record, because a tip is the one
-// figure the traveler alone decides — so it is bounded here instead of trusted. The ceiling is
-// the greater of $100 or the fare itself: generous for any real gratuity, and low enough that
-// a malformed or hostile request cannot empty a card.
-const TIP_CEILING_CENTS = 10000;
-
-app.post('/travel/tip', requireAuth, LIMITS.payments, async (req, res) => {
-  if (keyMode === 'no-key') return res.status(500).json({ error: 'No Stripe key configured' });
-  const db = adminDb();
-  if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
-
-  const rideId = String(req.body?.rideId || '');
-  const tipCents = Math.floor(Number(req.body?.tipCents || 0));
-  if (!rideId || !(tipCents > 0)) {
-    return res.status(400).json({ error: 'rideId and a positive tipCents are required' });
-  }
-
-  try {
-    const rideRef = db.collection('rides').doc(rideId);
-    const snap = await rideRef.get();
-    if (!snap.exists) return res.status(404).json({ error: 'No such travel' });
-    const ride = snap.data();
-    if (String(ride.travelerUid) !== String(req.uid)) {
-      return res.status(403).json({ error: 'That travel belongs to another traveler' });
-    }
-    if (ride.tipChargedCents) {
-      return res.json({ ok: true, alreadyTipped: true, chargedCents: ride.tipChargedCents });
-    }
-    // A tip belongs to a travel that happened.
-    if (String(ride.status) !== 'completed') {
-      return res.status(409).json({ error: 'That travel is not complete', code: 'not_complete' });
-    }
-    const ceiling = Math.max(TIP_CEILING_CENTS, Number(ride.costCents || 0));
-    if (tipCents > ceiling) {
-      return res.status(400).json({ error: 'That tip exceeds the permitted amount', code: 'tip_too_large' });
-    }
-
-    const { accountId } = await operatorPayoutAccount(db, ride.operatorId);
-    if (!accountId) {
-      // Not charged. Taking a tip we cannot pass on would be American Rider keeping a
-      // gratuity meant for somebody else.
-      return res.status(409).json({
-        ok: false,
-        code: 'operator_not_payable',
-        error: 'That operator cannot receive a tip yet, so nothing has been charged.',
-      });
-    }
-
-    const out = await chargeTip({
-      uid: req.uid,
-      email: req.email,
-      operatorStripeAccount: accountId,
-      amountCents: tipCents,
-      tripNo: ride.tripNo || null,
-    });
-    if (!out.ok) return res.status(402).json(out);
-
-    await rideRef.set(
-      {
-        tipChargedCents: out.chargedCents,
-        tipPaymentIntentId: out.paymentIntentId,
-        tipTransferId: out.transferId,
-        tipPending: !out.forwarded,
-        tipBlockedReason: out.forwardError,
-        tippedAt: Date.now(),
-      },
-      { merge: true },
-    );
-    res.json(out);
   } catch (e) {
     res.status(502).json({ error: e.message });
   }
@@ -1394,7 +1400,7 @@ app.post('/route', LIMITS.routeIp, async (req, res) => {
 //   503 { status: 'unavailable' }     the planner is not answering — the app says so
 // This used to 404 when rail "did not win", and the app read 404 as "do not show". That gate
 // is withdrawn: the server reports; the client decides emphasis.
-app.post('/smart-quote', LIMITS.routeIp, async (req, res) => {
+app.post('/smart-quote', LIMITS.routeIp, requireOperationalReadiness, async (req, res) => {
   // OLDER APPS GET THE OLDER ANSWER. TestFlight build 36 reads any 200 as a plan and would
   // render `{ status: 'none' }` as a card reading "Save $NaN", then crash on its legs. An app
   // that does not name the new contract (header X-AR-Smart: 2) is answered the way the old
@@ -1405,6 +1411,13 @@ app.post('/smart-quote', LIMITS.routeIp, async (req, res) => {
   if (out.status === 'unavailable') return res.status(503).json({ status: 'unavailable' });
   if (out.status !== 'ok') return res.json({ status: 'none' });
   res.json(out.plan);
+});
+
+app.post('/smart-revalidate', LIMITS.routeIp, requireOperationalReadiness, async (req, res) => {
+  const plan = req.body?.plan;
+  const out = await revalidateTransit(plan);
+  if (out.status === 'unavailable') return res.status(503).json(out);
+  return res.json(out);
 });
 
 // --- Where can I go from here? The app asks; the server answers for the REGION. -----------
@@ -1438,10 +1451,11 @@ app.get('/destinations', LIMITS.quoteIp, (req, res) => {
 // any government fee inside that price (name, payee, cents) so a screen can say what it is;
 // `travelerPays` already contains it — nothing is added on top of the number shown.
 // No login needed: this only reveals pricing, and a traveler must see the price before booking.
-app.post('/fare-quote', attachAuth, LIMITS.quoteIp, async (req, res) => {
+app.post('/fare-quote', attachAuth, LIMITS.quoteIp, requireOperationalReadiness, async (req, res) => {
   const priced = await authoritativeFare({
     body: req.body, uid: req.uid, email: req.email, db: adminDb(), cardCountryFor: defaultCardCountry,
   });
+  if (priced?.invalidJourney) return res.status(409).json({ error: priced.reason, code: 'invalid_smart_journey' });
   if (priced?.outsideMarket) {
     return res.status(409).json({ error: priced.reason, code: 'outside_market', where: priced.outsideMarket });
   }
@@ -1456,6 +1470,9 @@ app.post('/fare-quote', attachAuth, LIMITS.quoteIp, async (req, res) => {
   if (!priced) {
     return res.status(400).json({ error: 'Need either pickup+dest coordinates or a known destination' });
   }
+  if (priced.pricedBy === 'distance' && priced.tollStatus === 'unknown') {
+    return res.status(503).json({ error: 'Toll cost could not be verified for this route.', code: 'toll_unavailable' });
+  }
   // WHICH FEE SCHEDULE, DECIDED HERE AND NOWHERE ELSE. The fee depends on the issuing country
   // of the traveler's default card (Chad, 20 Sept 2026), and the ONE place that can be read
   // without the price moving later is before the quote is given. A traveler with nothing on
@@ -1463,7 +1480,7 @@ app.post('/fare-quote', attachAuth, LIMITS.quoteIp, async (req, res) => {
   res.json({
     travelerPays: priced.travelerPays, operatorGets: priced.operatorGets,
     platformTake: priced.platformTake, commission: priced.commission, appFee: priced.appFee,
-    governmentFeeCents: priced.governmentFeeCents, feeLines: priced.feeLines,
+    governmentFeeCents: priced.governmentFeeCents, tollCents: priced.tollCents || 0, tollStatus: priced.tollStatus, feeLines: priced.feeLines,
     travelCostCents: priced.travelCostCents, miles: priced.miles, minutes: priced.minutes,
     timedBy: priced.timedBy, pricedBy: priced.pricedBy,
   });
@@ -1522,7 +1539,7 @@ app.delete('/payment-methods/:id', requireAuth, LIMITS.payments, async (req, res
   }
 });
 
-app.post('/create-payment-intent', requireAuth, LIMITS.payments, async (req, res) => {
+app.post('/create-payment-intent', requireAuth, LIMITS.payments, requireOperationalReadiness, async (req, res) => {
   if (keyMode === 'no-key') {
     return res.status(500).json({ error: 'No Stripe secret key configured. Add STRIPE_SECRET_KEY to backend/.env' });
   }
@@ -1562,6 +1579,7 @@ app.post('/create-payment-intent', requireAuth, LIMITS.payments, async (req, res
           // remittance.js reads it back by the month.
           governmentFees: ride.feeLines,
           cardCountry: ride.cardCountry || null,
+          tollCents: Math.max(0, Number(ride.tollCents) || 0),
           // Stamped onto the PaymentIntent so a later refund can prove who paid, and for which
           // travel.
           uid: req.uid,
@@ -1584,6 +1602,7 @@ app.post('/create-payment-intent', requireAuth, LIMITS.payments, async (req, res
           journey: ride.journey || null,
           governmentFees: ride.feeLines,
           cardCountry: ride.cardCountry || null,
+          tollCents: Math.max(0, Number(ride.tollCents) || 0),
         }),
     });
     if (out.status !== 200) return res.status(out.status).json(out.body);
@@ -1608,37 +1627,39 @@ app.post('/create-payment-intent', requireAuth, LIMITS.payments, async (req, res
 // called and whose own comment says "NOT used by the real app". Found 27 Aug 2026 by auditing
 // which routes take money and where their inputs come from.
 //
-// Kept, because proving a charge end to end from a terminal is genuinely useful — but only
-// where a test key means no real money can move, and never with a destination the caller named.
-app.post('/charge-ride', requireAuth, LIMITS.payments, async (req, res) => {
+// Kept because proving a charge end to end from a terminal is useful. The current test helper
+// ignores destination splitting entirely; settlement is tested through the same explicit
+// separate-transfer architecture as production.
+app.post('/charge-ride', requireAuth, LIMITS.payments, requireOperationalReadiness, async (req, res) => {
   if (keyMode === 'no-key') {
     return res.status(500).json({ error: 'No Stripe secret key configured. Add STRIPE_SECRET_KEY to backend/.env' });
   }
-  if (keyMode !== 'test') {
+  if (keyMode !== 'test' || productionMode) {
     return res.status(403).json({
       error: 'This route exists only for test-mode verification and is disabled with live keys.',
     });
   }
   // Price the ride on the server — never from a client-sent amount.
   const priced = await authoritativeFare({ body: req.body, uid: req.uid, email: req.email, cardCountryFor: defaultCardCountry });
+  if (priced?.invalidJourney) return res.status(409).json({ error: priced.reason, code: 'invalid_smart_journey' });
   if (priced?.outsideMarket) {
     return res.status(409).json({ error: priced.reason, code: 'outside_market', where: priced.outsideMarket });
   }
   if (!priced) {
     return res.status(400).json({ error: 'Need either pickup+dest coordinates or a known destination' });
   }
+  if (priced.pricedBy === 'distance' && priced.tollStatus === 'unknown') {
+    return res.status(503).json({ error: 'Toll cost could not be verified for this route.', code: 'toll_unavailable' });
+  }
   try {
     const result = await chargeRide({
       travelCostCents: priced.travelCostCents,
-      // NOT FROM THE BODY. The destination is never the caller's to name — see above. Left
-      // null: this route proves a charge, and the operator's 99% moves at settlement, from a
-      // destination the server looks up itself (POST /travel/settle).
-      operatorStripeAccount: null,
       travelerPaymentMethod: req.body?.travelerPaymentMethod || null,
       uid: req.uid,
       tripNo: req.body?.tripNo || null,
       governmentFees: priced.feeLines,
       cardCountry: priced.cardCountry,
+      tollCents: Math.max(0, Number(priced.tollCents) || 0),
     });
     res.json(result);
   } catch (e) {
@@ -1653,10 +1674,9 @@ app.post('/charge-ride', requireAuth, LIMITS.payments, async (req, res) => {
 // Render instance is also what wakes the process up. GET as well as POST: most free cron
 // services send GET and cannot be told otherwise.
 //
-// UNAUTHENTICATED BY DESIGN, unless SCHEDULER_TOKEN is set. The endpoint takes no parameters
-// and can only do what the clock would do a minute later on its own — it cannot be aimed at a
-// traveler, an amount, or an operator. Set SCHEDULER_TOKEN in the environment to require one
-// anyway, and give the same value to the pinger as ?token=.
+// AUTHENTICATED OPERATIONAL CONTROL. The endpoint takes no workload parameters and can only
+// invoke the same leased sweep the process clock invokes. SCHEDULER_TOKEN is mandatory; callers
+// without the configured token fail closed before any operational work begins.
 let lastSweep = { at: 0, report: null };
 
 /**
@@ -1667,14 +1687,20 @@ let lastSweep = { at: 0, report: null };
  * Promise.all.
  */
 async function runAllSweeps() {
-  const [scheduled, monitor, assignments, screening, settlements] = await Promise.allSettled([
+  const [scheduled, monitor, assignments, screening, settlements, providerEvents, operatorFees, familyAgeOut, insuranceMonitoring] = await Promise.allSettled([
     sweepScheduled(),
     sweepMonitor(),
     sweepAssignments(),
     sweepScreening(),
-    // Money owed to operators for work already done. Last, and never allowed to fail the
-    // others — Promise.allSettled, like the rest.
     sweepSettlements(),
+    sweepProviderEvents({ handlers: PROVIDER_HANDLERS, workerId: WORKER_ID }),
+    sweepOperatorAccountFees({
+      charge: ({ uid, email, month, amountCents }) =>
+        chargeOperatorAccountFee({ uid, email, month, amountCents }),
+      cardCountryFor: async (uid) => defaultCardCountry({ uid }),
+    }),
+    family.sweepFamilyAgeOut(),
+    sweepInsuranceMonitoring({ db: adminDb(), requestConfirmation: issueInsuranceConfirmationRequest, notify }),
   ]);
   const unwrap = (r) => (r.status === 'fulfilled' ? r.value : { ok: false, reason: String(r.reason) });
   return {
@@ -1683,58 +1709,59 @@ async function runAllSweeps() {
     assignments: unwrap(assignments),
     screening: unwrap(screening),
     settlements: unwrap(settlements),
+    providerEvents: unwrap(providerEvents),
+    operatorFees: unwrap(operatorFees),
+    familyAgeOut: unwrap(familyAgeOut),
+    insuranceMonitoring: unwrap(insuranceMonitoring),
   };
 }
 
-async function runSweep(req, res) {
-  // THE TOKEN NOW DECIDES WHAT COMES BACK, NOT WHETHER THE SWEEP RUNS.
-  //
-  // Found in the pre-launch sweep, 19 Sept 2026: this endpoint is open on production, by
-  // design — free cron services send an unauthenticated GET and cannot be told otherwise, and
-  // the sweep takes no parameters, so it cannot be aimed at a traveler, an amount or an
-  // operator. That reasoning covers what the endpoint DOES. It did not cover what it SAYS.
-  //
-  // The report is operational state: how many travels are waiting, how many operators are
-  // moving, settlements and `centsPaid` — and, when they are not empty, `emergencies`,
-  // `cases`, `stranded` and `dispatched`, which carry identifiers. Anyone on the internet
-  // could read all of it, once every ten seconds, including whether an emergency had just
-  // happened. That is the disclosure, and it is worst on exactly the quietest day, when one
-  // non-empty array is the whole story.
-  //
-  // Failing CLOSED was the wrong fix: no token is set on Render today, so refusing the call
-  // would stop scheduled travel being dispatched and settlements being paid. The clock must
-  // keep running for anyone. Only the detail is held back.
-  const want = readKey('SCHEDULER_TOKEN');
-  const got = String(req.query?.token || req.get('x-scheduler-token') || '');
-  const trusted = !!want && got === want;
-  // One real sweep per ten seconds. Protects against a pinger set too fast and against a
-  // manual sweep landing on top of the interval — the claim transaction makes that safe, but
-  // there is no reason to make Stripe and Firestore absorb it.
-  const now = Date.now();
-  if (now - lastSweep.at < 10000 && lastSweep.report) {
-    return res.json(sweepBody({ ...lastSweep.report, cached: true, ageMs: now - lastSweep.at }, trusted));
+async function runLeasedSweeps() {
+  const name = 'operations_sweep';
+  const lease = await acquireLease(name, { owner: WORKER_ID, ttlMs: DEFAULT_LEASE_MS });
+  if (!lease.ok) return { ok: false, reason: lease.reason || 'scheduler lease unavailable' };
+  if (!lease.acquired) return { ok: true, skipped: 'another server owns this sweep', leaseUntil: lease.leaseUntil };
+
+  // Renew well before expiry while provider/network work is still running. If this process
+  // dies, renewal dies with it and another instance can take over after the lease expires.
+  const heartbeat = setInterval(() => {
+    renewLease(name, { owner: WORKER_ID, ttlMs: DEFAULT_LEASE_MS })
+      .then((x) => { if (!x.renewed) console.error('[scheduler] lease renewal lost', x); })
+      .catch((e) => console.error('[scheduler] lease renewal failed', e?.message || e));
+  }, Math.max(15_000, Math.floor(DEFAULT_LEASE_MS / 3)));
+  heartbeat.unref?.();
+  try {
+    return await runAllSweeps();
+  } finally {
+    clearInterval(heartbeat);
+    await releaseLease(name, { owner: WORKER_ID }).catch(() => {});
   }
-  const report = await runAllSweeps();
-  lastSweep = { at: Date.now(), report };
-  res.json(sweepBody(report, trusted));
 }
 
-/**
- * What a caller is allowed to read back from a sweep.
- *
- * With the token: everything, which is what makes `GET /scheduled/sweep` the fastest way to
- * see what the platform is doing (docs/SCHEDULED-TRAVEL.md). Without it: that the sweep ran
- * and whether each pass succeeded, which is all a cron service needs in order to alert on a
- * failing job — and no counts, no amounts and no identifiers.
- */
-function sweepBody(report, trusted) {
-  if (trusted) return report;
-  const ran = {};
-  for (const [pass, result] of Object.entries(report)) {
-    if (result && typeof result === 'object' && 'ok' in result) ran[pass] = { ok: !!result.ok };
+async function runSweep(req, res) {
+  // Operational sweeps can dispatch reserved travel, re-offer assignments, block expired
+  // screenings, open safety cases and move money owed to operators. They are therefore an
+  // authenticated operational control, not a public health endpoint. The process already
+  // runs the same sweep internally every sixty seconds; external schedulers are optional.
+  //
+  // Previous behavior deliberately let an unauthenticated caller execute the sweep and merely
+  // hid the detailed response. That still exposed a public resource-amplification endpoint:
+  // an attacker could force repeated Firestore/Stripe work every ten seconds. Fail closed.
+  const want = readKey('SCHEDULER_TOKEN');
+  const got = String(req.query?.token || req.get('x-scheduler-token') || '');
+  if (!want || got !== want) {
+    return res.status(401).json({ error: 'scheduler authorization required' });
   }
-  return { ok: true, swept: true, passes: ran, detail: 'set SCHEDULER_TOKEN and pass ?token= to read it' };
+
+  const now = Date.now();
+  if (now - lastSweep.at < 10000 && lastSweep.report) {
+    return res.json({ ...lastSweep.report, cached: true, ageMs: now - lastSweep.at });
+  }
+  const report = await runLeasedSweeps();
+  lastSweep = { at: Date.now(), report };
+  return res.json(report);
 }
+
 
 // --- Private file storage. -----------------------------------------------------------------
 // The mobile app may request a five-minute upload URL only for its own namespace. R2 remains
@@ -1845,6 +1872,22 @@ app.post('/operator/document', requireAuth, LIMITS.document, async (req, res) =>
       { merge: true },
     );
 
+    // INSURANCE IS VERIFIED TWICE, FOR TWO DIFFERENT QUESTIONS. The document reader and
+    // qualification rules answer "does this policy satisfy the standard today?" This record
+    // starts the continuing-status clock that answers "has it since been cancelled or changed?"
+    // It is refreshed only by fresh evidence, never merely by the passage of time.
+    if (kind === 'insurance' && out.verdict === 'accept') {
+      const monitoringDoc = {
+        verdict: out.verdict,
+        expiry: out.expiry,
+        evidence: out.evidence || null,
+      };
+      await db.collection('users').doc(String(req.uid)).set(
+        { insuranceMonitoring: initialMonitoringFromDocument(monitoringDoc) },
+        { merge: true },
+      );
+    }
+
     // A document that is not accepted must not leave the operator dispatchable on the strength
     // of an earlier one. Taken off duty rather than deleted; the record stands.
     if (out.verdict !== 'accept') {
@@ -1858,7 +1901,7 @@ app.post('/operator/document', requireAuth, LIMITS.document, async (req, res) =>
     // required: a failure here is re-assessed at the next status check and at every gate.
     let qualification = null;
     try {
-      const a = await assessAndRecord({ db, uid: req.uid, checks: qualificationChecks, liveMoney: keyMode === 'live' });
+      const a = await assessAndRecord({ db, uid: req.uid, checks: qualificationChecks, liveMoney: operationalMode });
       qualification = { status: a.status, qualified: a.qualified };
     } catch (e) {
       console.error('[qualification] after document', e.message);
@@ -1882,7 +1925,7 @@ app.post('/operator/document', requireAuth, LIMITS.document, async (req, res) =>
 //   travel     — authorized by the PICKUP (and destination) the traveler asks for, wherever
 //                the traveler happens to be standing. Priced routes check it (market.js); so
 //                does dispatch.
-//   operators  — the costly and regulated steps (document reading, Checkr, Stripe Connect,
+//   operators  — the costly and regulated steps (document reading, screening, Stripe Connect,
 //                going on duty) run only for an operator whose declared operating market is
 //                ACTIVE. The market's CURRENT status is read each time, so switching a county
 //                to WAITLIST stops new work there at once.
@@ -2000,6 +2043,461 @@ app.post('/waitlist', requireAuth, LIMITS.waitlist, async (req, res) => {
   }
 });
 
+async function issueInsuranceConfirmationRequest({ uid, user, contact, now = Date.now(), reason = 'manual' }) {
+  const db = adminDb();
+  if (!db) return { ok: false, reason: adminStatus().reason || 'no database' };
+  const m = user?.insuranceMonitoring || {};
+  if (!m?.statusAuthorization?.acceptedAt) {
+    return { ok: false, reason: 'Operator authorization is required before requesting policy status.' };
+  }
+  const email = String(contact?.email || '').trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, reason: 'Invalid insurer or broker email.' };
+
+  const sameContact = String(m.contact?.email || '').trim().toLowerCase() === email;
+  const priorAttempts = sameContact ? Math.max(0, Number(m.verificationRequestCount) || 0) : 0;
+  if (priorAttempts >= 3) {
+    const issue = {
+      kind: 'delivery_attempts_exhausted',
+      at: now,
+      source: String(contact?.type || 'broker').slice(0, 20),
+      contactEmail: email,
+      note: 'Three delivery attempts to this verification contact have failed or remained unresolved.',
+    };
+    await db.collection('users').doc(String(uid)).set({
+      insuranceMonitoring: { ...m, verificationIssue: issue },
+    }, { merge: true });
+    await db.collection('audit_log').add({
+      at: now,
+      subject: String(uid),
+      actor: { name: 'American Rider', method: 'insurance_monitor' },
+      action: 'insurance_verification_delivery_exhausted',
+      contactEmail: email,
+      attempts: priorAttempts,
+      resultingEligibility: continuingStatus({ ...(user || {}), insuranceMonitoring: { ...m, verificationIssue: issue } }, now),
+    }).catch(() => {});
+    await fileTicket({
+      uid: String(uid),
+      email: user?.email || null,
+      description: `Insurance status verification could not be delivered after ${priorAttempts} attempts to ${email}. Operator Relations must verify the contact or use the carrier/broker's required process.`,
+      trip: null,
+      reason: 'insurance verification delivery exhausted',
+      kind: 'support',
+      category: 'operator-insurance',
+    }).catch(() => {});
+    return { ok: false, operational: true, reason: 'Insurance verification delivery requires Operator Relations.' };
+  }
+
+  const attempt = priorAttempts + 1;
+  const token = crypto.randomBytes(32).toString('base64url');
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  const expiresAt = now + 14 * 24 * 60 * 60 * 1000;
+  const policy = String(m.policyNumber || user?.documents?.insurance?.evidence?.insurance?.policyNumber || '');
+  const last4 = policy ? policy.slice(-4) : 'not shown';
+  const operatorName = String(user?.legalName || user?.name || 'the Operator').slice(0, 100);
+  const url = `${PUBLIC_ORIGIN}/insurance/status-confirmation?token=${encodeURIComponent(token)}`;
+  const requestRef = db.collection('insurance_status_requests').doc(tokenHash);
+
+  await requestRef.set({
+    uid: String(uid),
+    email,
+    contactName: String(contact?.name || '').slice(0, 100),
+    contactType: String(contact?.type || 'broker').slice(0, 20),
+    createdAt: now,
+    expiresAt,
+    usedAt: null,
+    reason,
+    policyLast4: last4,
+    attempt,
+    deliveryStatus: 'pending',
+  });
+  await db.collection('audit_log').add({
+    at: now,
+    subject: String(uid),
+    actor: { name: 'American Rider', method: 'insurance_monitor' },
+    action: 'insurance_verification_request_created',
+    requestId: tokenHash,
+    contactEmail: email,
+    attempt,
+    reason,
+  }).catch(() => {});
+
+  const sent = await send({
+    from: 'American Rider Insurance Verification <insurance@americanrider.app>',
+    replyTo: 'insurance@americanrider.app',
+    to: email,
+    subject: 'American Rider · Insurance status confirmation',
+    text:
+      'AMERICAN RIDER — NATIONAL TRANSPORTATION\n\n' +
+      'Insurance Status Confirmation\n\n' +
+      `The insured has authorized American Rider to request limited policy-status information for eligibility purposes. Please confirm whether the commercial automobile policy for ${operatorName}, policy ending ${last4}, remains active and unchanged for transportation-network / for-hire passenger operations.\n\n` +
+      'Use the secure confirmation link below. It asks only for current status and does not request premium, claims, payment method, or unrelated policy information.\n\n' +
+      url + '\n\n' +
+      'If your organization requires its own authorization form, reply to insurance@americanrider.app and American Rider will use that process instead.\n',
+  });
+
+  const nextMonitoring = {
+    ...m,
+    contact: { name: String(contact?.name || '').slice(0, 100), email, type: String(contact?.type || 'broker') },
+    verificationRequestedAt: now,
+    verificationRequestedTo: email,
+    verificationRequestReason: reason,
+    verificationRequestCount: attempt,
+  };
+
+  if (!sent.ok) {
+    const issue = attempt >= 3 ? {
+      kind: 'delivery_attempts_exhausted',
+      at: now,
+      source: String(contact?.type || 'broker').slice(0, 20),
+      contactEmail: email,
+      note: String(sent.reason || 'Delivery failed').slice(0, 500),
+    } : m.verificationIssue || null;
+    await requestRef.set({
+      deliveryStatus: 'failed',
+      deliveryFailedAt: now,
+      deliveryFailure: String(sent.reason || 'Confirmation request could not be sent.').slice(0, 500),
+    }, { merge: true });
+    await db.collection('users').doc(String(uid)).set({
+      insuranceMonitoring: { ...nextMonitoring, verificationIssue: issue },
+    }, { merge: true });
+    await db.collection('audit_log').add({
+      at: now,
+      subject: String(uid),
+      actor: { name: 'American Rider', method: 'insurance_monitor' },
+      action: 'insurance_verification_delivery_failed',
+      requestId: tokenHash,
+      contactEmail: email,
+      attempt,
+      reason: String(sent.reason || '').slice(0, 500),
+      resultingEligibility: continuingStatus({ ...(user || {}), insuranceMonitoring: { ...nextMonitoring, verificationIssue: issue } }, now),
+    }).catch(() => {});
+    if (attempt >= 3) {
+      await fileTicket({
+        uid: String(uid),
+        email: user?.email || null,
+        description: `Insurance status verification failed three times for ${email}. Last delivery result: ${String(sent.reason || 'unknown failure').slice(0, 500)}`,
+        trip: null,
+        reason: 'insurance verification delivery exhausted',
+        kind: 'support',
+        category: 'operator-insurance',
+      }).catch(() => {});
+    }
+    return { ok: false, reason: sent.reason || 'Confirmation request could not be sent.' };
+  }
+
+  await requestRef.set({
+    deliveryStatus: 'accepted',
+    deliveryAcceptedAt: now,
+    providerMessageId: sent.id || null,
+  }, { merge: true });
+  await db.collection('users').doc(String(uid)).set({
+    insuranceMonitoring: nextMonitoring,
+  }, { merge: true });
+  await db.collection('audit_log').add({
+    at: now,
+    subject: String(uid),
+    actor: { name: 'American Rider', method: 'insurance_monitor' },
+    action: 'insurance_verification_delivery_accepted',
+    requestId: tokenHash,
+    contactEmail: email,
+    attempt,
+    providerMessageId: sent.id || null,
+    resultingEligibility: continuingStatus({ ...(user || {}), insuranceMonitoring: nextMonitoring }, now),
+  }).catch(() => {});
+  return { ok: true, expiresAt, providerMessageId: sent.id || null };
+}
+
+// --- Continuing Operator insurance status. ------------------------------------------------
+//
+// The Operator's uploaded declarations page remains the qualification evidence. This layer is
+// deliberately carrier-neutral: a local livery broker, surplus-lines placement, regional
+// commercial carrier, or national carrier may all be used. What matters is compliant coverage
+// plus sufficiently fresh status evidence.
+//
+// A monthly Operator attestation is useful but never refreshes the independent-verification
+// timestamp. Independent confirmation may come from a carrier/broker, a monitoring network, or
+// an authenticated operations review of carrier/broker evidence.
+app.get('/operator/insurance/config', requireAuth, LIMITS.qualification, async (req, res) => {
+  const db = adminDb();
+  if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
+  try {
+    const snap = await db.collection('users').doc(String(req.uid)).get();
+    const u = snap.exists ? snap.data() : {};
+    const market = operatingMarketOf(u);
+    const rule = insuranceForMarket(market);
+    if (!rule) {
+      return res.status(409).json({
+        error: market
+          ? `Insurance requirements for ${market.state} have not yet been activated.`
+          : 'Choose your operating market before viewing insurance requirements.',
+        code: 'insurance_jurisdiction_not_configured',
+      });
+    }
+    return res.json(publicInsuranceConfig(rule));
+  } catch (e) {
+    return res.status(502).json({ error: e.message });
+  }
+});
+
+app.post('/operator/insurance/authorize-status', requireAuth, LIMITS.qualification, async (req, res) => {
+  const db = adminDb();
+  if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
+  try {
+    const ref = db.collection('users').doc(String(req.uid));
+    const snap = await ref.get();
+    const u = snap.exists ? snap.data() : {};
+    if (!u?.documents?.insurance || u.documents.insurance.verdict !== 'accept') {
+      return res.status(409).json({ error: 'A qualifying insurance policy must be verified first.', code: 'insurance_document_required' });
+    }
+    const m = u.insuranceMonitoring || {};
+    const authorization = {
+      acceptedAt: Date.now(),
+      version: '2026-09-26-v1',
+      scope: 'American Rider may request from the insurer, licensed agent, broker, MGA, or authorized monitoring provider only the current status, cancellation/nonrenewal status, material coverage changes, covered vehicle status, policy effective dates, and coverage terms needed to confirm Operator eligibility.',
+    };
+    await ref.set({ insuranceMonitoring: { ...m, statusAuthorization: authorization } }, { merge: true });
+    return res.json({ ok: true, authorization });
+  } catch (e) {
+    return res.status(502).json({ error: e.message });
+  }
+});
+
+app.get('/operator/insurance/status', requireAuth, LIMITS.qualification, async (req, res) => {
+  const db = adminDb();
+  if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
+  try {
+    const snap = await db.collection('users').doc(String(req.uid)).get();
+    const u = snap.exists ? snap.data() : {};
+    return res.json({ ...continuingStatus(u), contact: u.insuranceMonitoring?.contact || null, authorized: !!u.insuranceMonitoring?.statusAuthorization?.acceptedAt, verificationIssue: u.insuranceMonitoring?.verificationIssue || null, instructions: providerInstructions() });
+  } catch (e) {
+    return res.status(502).json({ error: e.message });
+  }
+});
+
+app.post('/operator/insurance/attest', requireAuth, LIMITS.qualification, async (req, res) => {
+  const db = adminDb();
+  if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
+  try {
+    const ref = db.collection('users').doc(String(req.uid));
+    const auditRef = db.collection('audit_log').doc();
+    const now = Date.now();
+    const result = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      const u = snap.exists ? snap.data() : {};
+      if (!u?.documents?.insurance || u.documents.insurance.verdict !== 'accept') {
+        return { error: 'A qualifying insurance policy must be verified first.', code: 'insurance_document_required', status: 409 };
+      }
+      const m = u.insuranceMonitoring || {};
+      const verifiedAt = Number(m.lastVerifiedAt) || 0;
+      if (!verifiedAt) return { error: 'Current insurance status has not been independently verified.', code: 'insurance_status_unverified', status: 409 };
+      const dueAt = verifiedAt + STATUS_DUE_MS;
+      const graceUntil = verifiedAt + STATUS_MAX_AGE_MS;
+      if (now <= dueAt) return { error: 'No Operator confirmation is required yet.', code: 'insurance_attestation_not_due', status: 409 };
+      if (now > graceUntil) return { error: 'Independent insurance confirmation is overdue.', code: 'insurance_status_stale', status: 409 };
+      if (Number(m.operatorAttestedAt) >= dueAt) return { error: 'This verification cycle has already been confirmed.', code: 'insurance_attestation_already_recorded', status: 409 };
+
+      const updated = applyOperatorAttestation(m, now);
+      const resulting = continuingStatus({ ...u, insuranceMonitoring: updated }, now);
+      tx.set(ref, { insuranceMonitoring: updated }, { merge: true });
+      tx.set(auditRef, {
+        at: now,
+        subject: String(req.uid),
+        actor: { uid: String(req.uid), method: 'operator_session' },
+        action: 'insurance_operator_attestation',
+        verificationDueAt: dueAt,
+        graceUntil,
+        resultingEligibility: resulting,
+      });
+      return { updated, u, resulting };
+    });
+    if (result.error) return res.status(result.status || 409).json({ error: result.error, code: result.code });
+    return res.json({ ...result.resulting, contact: result.updated.contact || null });
+  } catch (e) {
+    return res.status(502).json({ error: e.message });
+  }
+});
+
+app.post('/operator/insurance/request-confirmation', requireAuth, LIMITS.document, async (req, res) => {
+  const db = adminDb();
+  if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  const name = String(req.body?.name || '').trim().slice(0, 100);
+  const type = ['agent', 'broker', 'carrier', 'mga'].includes(String(req.body?.type || '').toLowerCase())
+    ? String(req.body.type).toLowerCase() : 'broker';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: 'Enter the email address of the insurer, agent, or broker.', code: 'insurance_contact_email' });
+  }
+  try {
+    const snap = await db.collection('users').doc(String(req.uid)).get();
+    const u = snap.exists ? snap.data() : {};
+    const out = await issueInsuranceConfirmationRequest({
+      uid: req.uid,
+      user: u,
+      contact: { name, email, type },
+      reason: 'operator_requested',
+    });
+    if (!out.ok) return res.status(out.reason?.includes('authorization') ? 409 : 502).json({ error: out.reason });
+    return res.json({ ok: true, expiresAt: out.expiresAt });
+  } catch (e) {
+    return res.status(502).json({ error: e.message });
+  }
+});
+
+// Secure third-party confirmation. Possession of the random, single-use token sent to the
+// stored insurer/broker address is the authentication factor. It exposes only masked policy
+// identity and the minimum status choices needed for eligibility.
+app.get('/insurance/status-confirmation', async (req, res) => {
+  const db = adminDb();
+  if (!db) return res.status(503).type('html').send(page('Insurance status', '<h1>Unavailable</h1>'));
+  const token = String(req.query?.token || '');
+  const hash = token ? crypto.createHash('sha256').update(token).digest('hex') : '';
+  const snap = hash ? await db.collection('insurance_status_requests').doc(hash).get().catch(() => null) : null;
+  const row = snap?.exists ? snap.data() : null;
+  const invalid = !row || row.usedAt || Number(row.expiresAt) < Date.now();
+  if (invalid) {
+    return res.status(410).type('html').send(page('Insurance status', '<h1>This confirmation link is no longer active.</h1>'));
+  }
+  const body =
+    '<h1>Insurance Status Confirmation</h1>' +
+    '<p class="lede">American Rider is requesting only the current status needed to confirm Operator eligibility.</p>' +
+    '<section><p>Policy ending <strong>' + String(row.policyLast4 || '').replace(/[^A-Za-z0-9]/g, '') + '</strong></p>' +
+    '<form method="post" action="/insurance/status-confirmation">' +
+    '<input type="hidden" name="token" value="' + token.replace(/["<>&]/g, '') + '">' +
+    '<label>Status<br><select name="status" required style="margin-top:8px;padding:12px;border-radius:10px;">' +
+    '<option value="verified_active">Active and unchanged</option>' +
+    '<option value="pending_cancellation">Pending cancellation</option>' +
+    '<option value="cancelled">Cancelled</option>' +
+    '<option value="nonrenewed">Nonrenewed</option>' +
+    '<option value="coverage_reduced">Coverage materially changed or reduced</option>' +
+    '<option value="vehicle_removed">Covered vehicle removed</option>' +
+    '<option value="requires_release">Our organization requires its own signed authorization/release form</option>' +
+    '<option value="requires_portal">Our organization requires verification through its own portal or process</option>' +
+    '<option value="unable_to_verify">We cannot provide status through this request</option>' +
+    '</select></label><br><br>' +
+    '<label>Optional note<br><textarea name="note" maxlength="500" rows="4" style="width:100%;margin-top:8px;"></textarea></label>' +
+    '<button type="submit" class="cta" style="border:0;cursor:pointer;">Submit confirmation</button>' +
+    '</form></section>';
+  return res.type('html').send(page('Insurance status', body));
+});
+
+app.post('/insurance/status-confirmation', express.urlencoded({ extended: false }), async (req, res) => {
+  const db = adminDb();
+  if (!db) return res.status(503).type('html').send(page('Insurance status', '<h1>Unavailable</h1>'));
+  const token = String(req.body?.token || '');
+  const hash = token ? crypto.createHash('sha256').update(token).digest('hex') : '';
+  const requestRef = hash ? db.collection('insurance_status_requests').doc(hash) : null;
+  const allowed = new Set(['verified_active', 'pending_cancellation', 'cancelled', 'nonrenewed', 'coverage_reduced', 'vehicle_removed', 'requires_release', 'requires_portal', 'unable_to_verify']);
+  const status = String(req.body?.status || '');
+  if (!requestRef || !allowed.has(status)) {
+    return res.status(410).type('html').send(page('Insurance status', '<h1>This confirmation cannot be accepted.</h1>'));
+  }
+
+  const note = String(req.body?.note || '').trim().slice(0, 500) || null;
+  const processStatuses = new Set(['requires_release', 'requires_portal', 'unable_to_verify']);
+  const now = Date.now();
+
+  try {
+    const result = await db.runTransaction(async (tx) => {
+      const requestSnap = await tx.get(requestRef);
+      if (!requestSnap.exists) return { invalid: true };
+      const row = requestSnap.data() || {};
+      if (row.usedAt || Number(row.expiresAt) < now) return { invalid: true };
+
+      const userRef = db.collection('users').doc(String(row.uid));
+      const userSnap = await tx.get(userRef);
+      const u = userSnap.exists ? userSnap.data() : {};
+      const actor = { name: row.email, method: 'secure_email_link' };
+      const auditRef = db.collection('audit_log').doc();
+
+      if (processStatuses.has(status)) {
+        const issue = {
+          kind: status,
+          at: now,
+          source: row.contactType || 'broker',
+          contactEmail: row.email,
+          note,
+        };
+        const monitoring = {
+          ...(u.insuranceMonitoring || {}),
+          verificationIssue: issue,
+        };
+        const resultingEligibility = continuingStatus({ ...u, insuranceMonitoring: monitoring }, now);
+
+        tx.set(userRef, { insuranceMonitoring: monitoring }, { merge: true });
+        tx.set(requestRef, { usedAt: now, result: status }, { merge: true });
+        tx.set(auditRef, {
+          at: now,
+          subject: String(row.uid),
+          actor,
+          action: 'insurance_verification_process_exception',
+          status,
+          source: row.contactType || 'broker',
+          requestId: hash,
+          note,
+          resultingEligibility,
+        });
+        return { invalid: false, process: true, row, resultingEligibility };
+      }
+
+      const updated = applyIndependentConfirmation(u.insuranceMonitoring, {
+        status,
+        source: row.contactType || 'broker',
+        actor,
+        note,
+        now,
+      });
+      updated.verificationRequestCount = 0;
+      updated.verificationIssue = null;
+      const resultingEligibility = continuingStatus({ ...u, insuranceMonitoring: updated }, now);
+
+      tx.set(userRef, { insuranceMonitoring: updated }, { merge: true });
+      tx.set(requestRef, { usedAt: now, result: status }, { merge: true });
+      tx.set(auditRef, {
+        at: now,
+        subject: String(row.uid),
+        actor,
+        action: 'insurance_status_confirmation',
+        status,
+        source: row.contactType || 'broker',
+        requestId: hash,
+        note,
+        resultingEligibility,
+      });
+      if (status !== 'verified_active') {
+        tx.set(db.collection('operators').doc(String(row.uid)), {
+          available: false,
+          offDutyReason: `insurance_${status}`,
+          offDutyAt: now,
+        }, { merge: true });
+      }
+      return { invalid: false, process: false, row, resultingEligibility };
+    });
+
+    if (result.invalid) {
+      return res.status(410).type('html').send(page('Insurance status', '<h1>This confirmation cannot be accepted.</h1>'));
+    }
+
+    if (result.process) {
+      await notify?.({
+        uid: String(result.row.uid),
+        kind: 'insurance_verification_process',
+        title: 'Insurance verification needs one more step',
+        body: status === 'requires_release'
+          ? 'Your insurer requires its own authorization form. American Rider Operator Relations will guide the next step.'
+          : status === 'requires_portal'
+            ? 'Your insurer requires its own verification process. American Rider Operator Relations will guide the next step.'
+            : 'Your insurer could not confirm status through the standard request. American Rider Operator Relations will guide the next step.',
+        data: { screen: '/operator/insurance' },
+      }).catch(() => {});
+      return res.type('html').send(page('Insurance status', '<h1>Process noted.</h1><p class="lede">Thank you. American Rider will use the verification process you identified.</p>'));
+    }
+
+    return res.type('html').send(page('Insurance status', '<h1>Confirmation received.</h1><p class="lede">Thank you. No further action is required on this request.</p>'));
+  } catch (e) {
+    return res.status(502).type('html').send(page('Insurance status', '<h1>Could not record confirmation.</h1>'));
+  }
+});
+
 // --- Qualification: automatic, exception-driven. -------------------------------------------
 //
 // An operator is qualified when every qualification gate in backend/qualification.js passes —
@@ -2024,7 +2522,7 @@ app.get('/operator/qualification', requireAuth, LIMITS.qualification, async (req
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   try {
-    const a = await assessAndRecord({ db, uid: req.uid, checks: qualificationChecks, liveMoney: keyMode === 'live' });
+    const a = await assessAndRecord({ db, uid: req.uid, checks: qualificationChecks, liveMoney: operationalMode });
     res.json(qualificationBody(a));
   } catch (e) {
     res.status(502).json({ error: e.message });
@@ -2036,7 +2534,7 @@ app.get('/operator/commission', requireAuth, LIMITS.qualification, async (req, r
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   try {
-    const a = await assessAndRecord({ db, uid: req.uid, checks: qualificationChecks, liveMoney: keyMode === 'live' });
+    const a = await assessAndRecord({ db, uid: req.uid, checks: qualificationChecks, liveMoney: operationalMode });
     const legacy = { qualified: 'approved', exception: 'pending', refused: 'refused', suspended: 'refused', incomplete: 'none' };
     res.json({ status: legacy[a.status], reason: a.qualified ? null : a.blockers[0]?.reason || null });
   } catch (e) {
@@ -2050,7 +2548,7 @@ app.post('/operator/qualification/submit', requireAuth, LIMITS.qualification, as
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   try {
-    const a = await assessAndRecord({ db, uid: req.uid, checks: qualificationChecks, liveMoney: keyMode === 'live' });
+    const a = await assessAndRecord({ db, uid: req.uid, checks: qualificationChecks, liveMoney: operationalMode });
     if (a.status === 'incomplete') {
       const first = a.blockers.find((x) => x.gate === 'qualification');
       return res.status(409).json({ code: first?.code || 'incomplete', error: first?.reason || 'Qualification is not complete.', ...qualificationBody(a) });
@@ -2177,23 +2675,20 @@ app.post('/operator/disclosure/acknowledge', requireAuth, async (req, res) => {
 // exactly what the screening costs, we pay the screening company.
 app.get('/operator/screening', requireAuth, async (req, res) => {
   const db = adminDb();
-  // The quote is ITEMIZED (Chad, 27 Aug): cost + card processing = total. The operator sees
-  // all three numbers; the app never shows a total whose parts it cannot name.
-  const out = { feeCents: SCREENING_FEE_CENTS, quote: screeningQuote(SCREENING_FEE_CENTS), provider: screeningReady() ? 'checkr' : null };
-  if (!db) return res.json({ ...out, screening: null, reason: adminStatus().reason });
+  if (!db) return res.json({ ok: false, provider: 'external', screening: null, reason: adminStatus().reason });
   try {
     const snap = await db.collection('users').doc(String(req.uid)).get();
-    const screening = snap.exists ? snap.data().screening || null : null;
-    // A PARTIAL TIER IS QUOTED AT ITS OWN PRICE. Both directions: the MVR alone when the
-    // criminal half is already in hand, and Basic alone when the driving record is.
-    const cost = Number(screening?.feeCents);
-    if (cost === MVR_ONLY_FEE_CENTS || cost === BASIC_ONLY_FEE_CENTS) {
-      out.feeCents = cost;
-      out.quote = screeningQuote(cost);
-    }
-    res.json({ ...out, screening });
+    const user = snap.exists ? snap.data() : {};
+    const market = operatingMarketOf(user);
+    res.json({
+      ok: true,
+      provider: 'external',
+      providerUrl: screeningReady() ? readKey('SCREENING_PROVIDER_URL') : null,
+      jurisdiction: market?.state ? { state: market.state } : null,
+      screening: user.screening || null,
+    });
   } catch (e) {
-    res.json({ ...out, screening: null, reason: e.message });
+    res.json({ ok: false, provider: 'external', screening: null, reason: e.message });
   }
 });
 
@@ -2217,16 +2712,10 @@ app.post('/operator/screening/existing', requireAuth, LIMITS.screening, requireA
   const elements = Array.isArray(req.body?.elements) ? req.body.elements.slice(0, 6) : [];
   const consent = req.body?.consent === true;
   if (!agency || !consent) {
-    return res.status(400).json({ error: 'The company name and your written instruction are required' });
+    return res.status(400).json({ error: 'The screening company and your written instruction are required.' });
   }
 
-  // Priced as though it arrives from the agency, because that is what we are asking them to do.
-  const verdict = evaluateExistingReport({ source: 'agency', issuedAt, elements });
-
   try {
-    // A real place to send it and a reference to put on it — "ask them to send it to us"
-    // was an instruction with no address (Chad, 27 Aug). The agency emails the report to
-    // the screening inbox citing the case number; support matches it by that number.
     const transferTo = 'support@americanrider.app';
     await db.collection('users').doc(String(req.uid)).set(
       {
@@ -2236,41 +2725,27 @@ app.post('/operator/screening/existing', requireAuth, LIMITS.screening, requireA
           transferTo,
           declaredIssuedAt: issuedAt || null,
           declaredElements: elements,
-          // The instruction itself, stamped. This is the permissible purpose, so it is a
-          // record we keep rather than a checkbox we forget.
           consentAt: Date.now(),
           consentText:
-            'I instruct the named screening company to release my most recent background ' +
-            'screening report to American Rider.',
-          feeCents: verdict.feeCents,
-          // WHICH PACKAGE THIS BUYS, stored alongside the price rather than re-derived from
-          // it later. See the note at the order route.
-          tier: verdict.tier || 'full',
-          partial: !!verdict.partial,
-          summary: verdict.reason,
+            'I instruct the named screening company to release my most recent background screening report to American Rider.',
+          summary: 'Waiting for the screening provider to send the authoritative report for review.',
         },
       },
       { merge: true },
     );
+
     const filed = await fileTicket({
       uid: req.uid,
       email: req.email,
       kind: 'support',
-      reason: 'Operator screening — request an existing report',
+      reason: 'Operator screening — review existing provider report',
       description:
-        `Operator ${req.uid} has instructed ${agency} to release their screening report to ` +
-        `American Rider (FCRA §604(a)(2), written instruction on file, stamped ` +
-        `${new Date().toISOString()}).
-` +
-        `Declared issue date: ${issuedAt ? new Date(issuedAt).toISOString().slice(0, 10) : 'not given'}
-` +
-        `Declared contents: ${elements.join(', ') || 'not given'}
-` +
-        `If it arrives complete and under twelve months old, the operator pays nothing. If only ` +
-        `the driving history is missing, they pay ${(MVR_ONLY_FEE_CENTS / 100).toFixed(2)}.
-` +
-        `NOTHING IS ACCEPTED FROM THE OPERATOR — it must arrive from ${agency} directly.`,
+        'The Operator instructed ' + agency + ' to release the existing screening report directly to American Rider. ' +
+        'Declared issue date: ' + (issuedAt ? new Date(issuedAt).toISOString().slice(0, 10) : 'not provided') + '. ' +
+        'Declared components: ' + (elements.join(', ') || 'not provided') + '. ' +
+        'Do not qualify from the Operator declaration. Authenticate the provider report, compare each component with the active jurisdiction requirements, preserve every qualifying component, and request only any missing or expired component.',
     });
+
     const caseNo = filed?.caseNo || null;
     if (caseNo) {
       await db.collection('users').doc(String(req.uid)).set(
@@ -2278,177 +2753,21 @@ app.post('/operator/screening/existing', requireAuth, LIMITS.screening, requireA
         { merge: true },
       );
     }
-    res.json({ ok: true, feeCents: verdict.feeCents, note: verdict.reason, transferTo, transferCaseNo: caseNo });
-  } catch (e) {
-    res.status(502).json({ error: e.message });
-  }
-});
-
-app.post('/operator/screening/intent', requireAuth, LIMITS.screening, requireActiveOperatingMarket, async (req, res) => {
-  if (keyMode === 'no-key') return res.status(500).json({ error: 'No Stripe key configured' });
-  try {
-    // The operator may be paying the full screening or only the driving history, depending on
-    // what an existing report already covered. Read from OUR record, never from the request:
-    // a client that could name its own price would name a smaller one.
-    const db = adminDb();
-    let costCents = SCREENING_FEE_CENTS;
-    if (db) {
-      const snap = await db.collection('users').doc(String(req.uid)).get();
-      const declared = snap.exists ? Number(snap.data()?.screening?.feeCents) : NaN;
-      // Both partial tiers, read from OUR record — never from the request.
-      if (declared === MVR_ONLY_FEE_CENTS || declared === BASIC_ONLY_FEE_CENTS) {
-        costCents = declared;
-      }
-    }
-    // The CHARGE is the itemized total: cost + card processing (see screening.js for the
-    // gross-up math). The stored feeCents stays the COST — it decides which package is
-    // ordered; what Stripe collects is that cost plus exactly its own fee.
-    const out = await createScreeningIntent({
-      amountCents: grossUpCents(costCents),
-      uid: req.uid,
-      email: req.email,
+    res.json({
+      ok: true,
+      note: 'Request recorded. We will preserve every qualifying component and ask only for anything still required.',
+      transferTo,
+      transferCaseNo: caseNo,
     });
-    res.json(out);
   } catch (e) {
     res.status(502).json({ error: e.message });
   }
 });
 
-/**
- * Order the check, once it has been paid for.
- *
- * WITHOUT A PROVIDER KEY THIS RECORDS THE ORDER AND SAYS SO. It does not simulate a pass. An
- * operator marked clear by a screening that never happened is the single worst thing this
- * codebase could contain, so the absent case is 'awaiting_provider' — which is not a pass, is
- * not dispatchable, and is visible on /ops until a key exists.
- */
-app.post('/operator/screening/order', requireAuth, LIMITS.screening, requireActiveOperatingMarket, async (req, res) => {
-  const db = adminDb();
-  if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
-  const paymentIntentId = String(req.body?.paymentIntentId || '');
-  if (!paymentIntentId) return res.status(400).json({ error: 'paymentIntentId is required' });
 
-  try {
-    // The fee must actually have been paid, and by this person. Checked against Stripe rather
-    // than believed from the request.
-    const paid = await refundableFor({ paymentIntentId, expectUid: req.uid });
-    if (!paid.ok) return res.status(402).json({ error: 'That payment cannot be verified', detail: paid.error });
-
-    const userRef = db.collection('users').doc(String(req.uid));
-    const snap = await userRef.get();
-    const existing = snap.exists ? snap.data().screening || {} : {};
-
-    // ORDERING TWICE MUST NOT SCREEN TWICE. A double-tap, a retried request, or an app that
-    // lost the response and asked again all land here — and each Checkr invitation is a real
-    // report and a real charge. An order already in flight is returned, not repeated.
-    if (existing.invitationId && ['invited', 'in_progress', 'ordered'].includes(existing.decision)) {
-      return res.json({
-        ok: true,
-        ordered: true,
-        alreadyOrdered: true,
-        invitationUrl: existing.invitationUrl || null,
-      });
-    }
-
-    // WITHOUT A PROVIDER KEY THIS RECORDS THE ORDER AND SAYS SO. It does not simulate a pass.
-    // An operator marked clear by a screening that never happened is the single worst thing
-    // this codebase could contain, so the absent case is 'awaiting_provider' — not a pass,
-    // not dispatchable, visible on /ops until a key exists.
-    if (!screeningReady()) {
-      await userRef.set(
-        {
-          screening: {
-            decision: 'awaiting_provider',
-            orderedAt: Date.now(),
-            paymentIntentId,
-            provider: null,
-            summary: 'Paid. American Rider will order this as soon as screening is live.',
-          },
-        },
-        { merge: true },
-      );
-      return res.json({ ok: true, ordered: false });
-    }
-
-    // The actual order: candidate + invitation at Checkr. The operator gets Checkr's email
-    // and enters their own SSN/licence/consent in Checkr's hosted flow — their PII never
-    // touches this server. The MVR-only package covers the $17.50 top-up path, where an
-    // existing report already satisfied the criminal half (see evaluateExistingReport).
-    // THE TIER IS READ, NOT INFERRED. This compared the stored fee against
-    // MVR_ONLY_FEE_CENTS to decide which package to order — deriving a package from a number
-    // of cents. Adding the criminal-only tier made two prices map to two different packages
-    // and one comparison; evaluateExistingReport now states the tier and it is stored with
-    // the record. `full` for anything written before this existed.
-    const tier = existing.tier || 'full';
-    const order = await checkr.invite({ uid: req.uid, email: req.email, tier });
-
-    await userRef.set(
-      {
-        screening: {
-          decision: 'invited',
-          orderedAt: Date.now(),
-          paymentIntentId,
-          provider: 'checkr',
-          candidateId: order.candidateId,
-          invitationId: order.invitationId,
-          invitationUrl: order.invitationUrl,
-          invitationExpiresAt: order.expiresAt,
-          tier,
-          summary: 'Check your email for the screening link from Checkr. Results usually return within a day of finishing it.',
-        },
-      },
-      { merge: true },
-    );
-    res.json({ ok: true, ordered: true, invitationUrl: order.invitationUrl });
-  } catch (e) {
-    res.status(502).json({ error: e.message });
-  }
-});
-
-/**
- * A new link for a paid screening whose invitation expired unfinished.
- *
- * The money was taken when the first link was sent; letting it dead-end there would make an
- * expired email a kept fee, which it is not. No new payment, same candidate, fresh
- * invitation. Only reachable from the states where it is true — paid, and not completed.
- */
-app.post('/operator/screening/reinvite', requireAuth, LIMITS.screening, requireActiveOperatingMarket, async (req, res) => {
-  const db = adminDb();
-  if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
-  if (!screeningReady()) return res.status(503).json({ error: 'Screening is not live yet' });
-
-  try {
-    const userRef = db.collection('users').doc(String(req.uid));
-    const snap = await userRef.get();
-    const s = snap.exists ? snap.data().screening || {} : {};
-
-    if (!s.paymentIntentId) return res.status(402).json({ error: 'No paid screening on this account' });
-    const expired = s.decision === 'expired'
-      || (s.decision === 'invited' && Number(s.invitationExpiresAt || 0) > 0 && Number(s.invitationExpiresAt) < Date.now());
-    if (!expired) return res.status(409).json({ error: 'The current screening link is still usable', decision: s.decision || null });
-
-    const order = s.candidateId
-      ? { candidateId: s.candidateId, ...(await checkr.reinvite({ candidateId: s.candidateId, tier: s.tier || 'full' })) }
-      : await checkr.invite({ uid: req.uid, email: req.email, tier: s.tier || 'full' });
-
-    await userRef.set(
-      {
-        screening: {
-          decision: 'invited',
-          candidateId: order.candidateId,
-          invitationId: order.invitationId,
-          invitationUrl: order.invitationUrl,
-          invitationExpiresAt: order.expiresAt,
-          summary: 'A new screening link is in your email. Nothing more to pay.',
-        },
-      },
-      { merge: true },
-    );
-    res.json({ ok: true, invitationUrl: order.invitationUrl });
-  } catch (e) {
-    res.status(502).json({ error: e.message });
-  }
-});
+// Screening is procured outside American Rider. The Operator pays the approved screening
+// provider directly. American Rider receives and reviews authoritative provider evidence;
+// it does not create a Stripe charge or purchase a screening on the Operator's behalf.
 
 // The screening company's result arrives on /checkr/webhook — mounted ABOVE express.json()
 // with the Stripe webhook, because its signature is an HMAC over the raw bytes. The event
@@ -2456,7 +2775,7 @@ app.post('/operator/screening/reinvite', requireAuth, LIMITS.screening, requireA
 // record the decision, handle expired invitations) lives in checkr.js.
 
 // --- The operations view. -----------------------------------------------------------------
-mountOps(app, express, { checks: qualificationChecks, liveMoney: () => keyMode === 'live' });
+mountOps(app, express, { checks: qualificationChecks, liveMoney: () => operationalMode });
 
 app.get('/scheduled/sweep', runSweep);
 app.post('/scheduled/sweep', runSweep);
@@ -2488,11 +2807,21 @@ app.post('/scheduled/sweep', runSweep);
 // every signed-in account. And each dispatch attempt read every operator document, which is
 // billed per read and does not survive a real fleet.
 //
-// Found in the pre-launch sweep, 19 Sept 2026 (docs/SWEEP-2026-09-19.md, F-A).
+// Found in the 19 Sept 2026 product sweep (docs/SWEEP-2026-09-19.md, F-A).
 //
 // The match now happens here, once, against the fleet read with admin access, through the same
 // matchOperator every other caller uses — so a gate added to that function protects every path
 // at once, which is the whole reason it is a function.
+// Dispatch reads only Operators who currently claim availability. This is a Firestore-indexed
+// prefilter, not an eligibility decision: matchOperator() remains the final authority for
+// presence freshness, insurance, disclosure, screening, commissioning, documents, Travel
+// class and distance. Keeping those rules in one gate prevents query optimization from becoming
+// a second qualification system.
+async function availableOperatorCandidates(db) {
+  const snap = await db.collection('operators').where('available', '==', true).get();
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
 // Human-facing Travel Numbers identify the authoritative pickup market, never a client label.
 // The pickup market is resolved from Census county geometry in markets.js.
 function travelNumberFor(documentId, pickup) {
@@ -2501,7 +2830,7 @@ function travelNumberFor(documentId, pickup) {
   return 'AR-' + String(documentId).slice(0, 8).toUpperCase() + '-' + code;
 }
 
-app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, async (req, res) => {
+app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, requireOperationalReadiness, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
 
@@ -2520,6 +2849,7 @@ app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, async (req, res) => {
     body: { pickup, dest: b.destinationPoint, destination: b.dest, travelClass: b.cls, journeyNo: b.journeyNo },
     uid: req.uid, email: req.email, db, cardCountryFor: defaultCardCountry,
   });
+  if (priced?.invalidJourney) return res.status(409).json({ error: priced.reason, code: 'invalid_smart_journey' });
   if (priced?.outsideMarket) {
     return res.status(409).json({ error: priced.reason, code: 'outside_market', where: priced.outsideMarket });
   }
@@ -2532,11 +2862,30 @@ app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, async (req, res) => {
   if (priced.pricedBy !== 'distance') {
     return res.status(400).json({ error: 'A valid pickup and destination position are required to create Travel.', code: 'route_geometry_required' });
   }
+  if (priced.tollStatus === 'unknown') {
+    return res.status(503).json({ error: 'Toll cost could not be verified for this route.', code: 'toll_unavailable' });
+  }
+
+  const partyResult = priced.journey?.party
+    ? { ok: true, party: priced.journey.party }
+    : await normalizeParty(b, { uid: req.uid, name: req.name || b.bookerName || b.travelerName || '' });
+  if (!partyResult.ok) return res.status(400).json({ error: partyResult.error, code: partyResult.code });
+  // Smart Travel leg 2 inherits the server-recorded first-leg party. The request may repeat
+  // party fields for presentation, but cannot change the Traveler/Teen/guardian envelope.
+  const party = partyResult.party;
+
+  const rawCabin = b.cabinPreferences && typeof b.cabinPreferences === 'object' ? b.cabinPreferences : {};
+  const cabinPreferences = {
+    climate: ['Cool', 'Moderate', 'Warm'].includes(String(rawCabin.climate)) ? String(rawCabin.climate) : 'Moderate',
+    music: ['None', 'Traveler Choice'].includes(String(rawCabin.music)) ? String(rawCabin.music) : 'None',
+    quiet: rawCabin.quiet !== false,
+    charging: rawCabin.charging === true,
+    luggage: rawCabin.luggage === true,
+  };
 
   let fleet;
   try {
-    const snap = await db.collection('operators').get();
-    fleet = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    fleet = await availableOperatorCandidates(db);
   } catch (e) {
     // "We could not read the fleet" and "nobody is on duty" are different answers and must not
     // render the same — the client draws a retry for one and a wait for the other.
@@ -2553,7 +2902,11 @@ app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, async (req, res) => {
   // EMPTY COLLECTION ONLY, AND NEVER WITH LIVE KEYS. A stand-in is for a database with nobody
   // in it, which is a development environment and a founder demonstration. The moment real
   // money is in play there is no such thing as a stand-in operator.
-  if (!fleet.length && keyMode !== 'live') {
+  if (!fleet.length && !operationalMode) {
+    // An empty availability query is not the same as an empty fleet. Only synthesize the
+    // demonstration fleet when the collection itself has no Operator records at all.
+    const anyOperator = await db.collection('operators').limit(1).get();
+    if (!anyOperator.empty) return res.json({ matched: null });
     const at = Date.now();
     fleet = [
       { id: 'op1', name: 'Miguel D.', lat: 25.768, lng: -80.1955, car: 'Gray Toyota Camry', plate: 'KTR 4821', classes: ['Standard', 'Pet Friendly'] },
@@ -2589,7 +2942,8 @@ app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, async (req, res) => {
   const tripNo = travelNumberFor(ref.id, pickup);
   const ride = {
     travelerUid: String(req.uid),
-    travelerName: String(b.travelerName || '').slice(0, 60),
+    travelerName: party.travelerName.slice(0, 60),
+    party,
     tripNo,
     // WRITTEN FROM THE SERVER'S OWN MATCH, never from the request. This is the line the whole
     // endpoint exists for.
@@ -2613,10 +2967,12 @@ app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, async (req, res) => {
     costCents: priced.travelerPays,
     miles: priced.miles,
     governmentFeeCents: priced.governmentFeeCents,
+    tollCents: Math.max(0, Number(priced.tollCents) || 0),
     feeLines: priced.feeLines,
     pricedBy: priced.pricedBy,
     cardCountry: priced.cardCountry,
     journey: priced.journey || null,
+    cabinPreferences,
     destinationLat: Number.isFinite(Number(b.destinationPoint?.lat)) ? Number(b.destinationPoint.lat) : null,
     destinationLng: Number.isFinite(Number(b.destinationPoint?.lng)) ? Number(b.destinationPoint.lng) : null,
     status: 'assigned',
@@ -2626,6 +2982,9 @@ app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, async (req, res) => {
 
   try {
     await ref.create(ride);
+    const teenPickup = await provisionTeenPin({ rideRef: ref, rideId: ref.id, party });
+    if (teenPickup.required && party.teenUid) await notify({ uid: party.teenUid, kind: 'teen_pickup_code', title: 'Your pickup code', body: `Give ${teenPickup.pin} to your Operator after confirming the vehicle and Operator.`, data: { screen: '/ride', rideId: ref.id, tripNo } });
+    if (teenPickup.required && party.guardianUid && party.guardianUid !== party.teenUid) await notify({ uid: party.guardianUid, kind: 'guardian_travel', title: 'Teen Travel assigned', body: `${party.travelerName}'s Travel has been assigned. You can follow it in American Rider.`, data: { screen: '/family', rideId: ref.id, tripNo } });
     res.json({
       rideId: ref.id,
       tripNo,
@@ -2640,6 +2999,7 @@ app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, async (req, res) => {
         miles: best.miles,
         demo: !!op.demo,
       },
+      party: operatorPartyView(party),
     });
   } catch (e) {
     res.status(502).json({ error: e.message });
@@ -2648,7 +3008,7 @@ app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, async (req, res) => {
 
 // Create a scheduled reservation with the same server authority as immediate dispatch.
 // The time and labels are traveler inputs. Fare, distance, fees and Travel Number are not.
-app.post('/travel/schedule', requireAuth, LIMITS.dispatch, async (req, res) => {
+app.post('/travel/schedule', requireAuth, LIMITS.dispatch, requireOperationalReadiness, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   const b = req.body || {};
@@ -2665,17 +3025,25 @@ app.post('/travel/schedule', requireAuth, LIMITS.dispatch, async (req, res) => {
     body: { pickup, dest: destinationPoint, destination: b.dest, travelClass: b.travelClass },
     uid: req.uid, email: req.email, db, cardCountryFor: defaultCardCountry,
   });
+  if (priced?.invalidJourney) return res.status(409).json({ error: priced.reason, code: 'invalid_smart_journey' });
+  if (priced?.route?.tollStatus === 'unknown') return res.status(503).json({ error: 'Toll pricing is temporarily unavailable.', code: 'toll_unavailable' });
   if (!priced || priced.outsideMarket || priced.permitRequired) {
     return res.status(409).json({ error: priced?.reason || 'The scheduled travel cannot be priced' });
   }
   if (priced.pricedBy !== 'distance') {
     return res.status(400).json({ error: 'A valid pickup and destination position are required to create Travel.', code: 'route_geometry_required' });
   }
+  if (priced.tollStatus === 'unknown') {
+    return res.status(503).json({ error: 'Toll cost could not be verified for this route.', code: 'toll_unavailable' });
+  }
+  const partyResult = await normalizeParty(b, { uid: req.uid, name: req.name || b.bookerName || b.travelerName || '' });
+  if (!partyResult.ok) return res.status(400).json({ error: partyResult.error, code: partyResult.code });
+  const party = partyResult.party;
   try {
     const ref = db.collection('scheduled_rides').doc();
     const tripNo = travelNumberFor(ref.id, pickup);
     const record = {
-      travelerUid: String(req.uid), travelerName: String(b.travelerName || '').slice(0, 60),
+      travelerUid: String(req.uid), travelerName: party.travelerName.slice(0, 60), party,
       travelerEmail: req.email || '', when: String(b.when || '').slice(0, 40),
       time: String(b.time || '').slice(0, 12), period: b.period === 'AM' ? 'AM' : 'PM',
       arr: String(b.arr || '').slice(0, 80), dep: String(b.dep || '').slice(0, 60),
@@ -2685,6 +3053,7 @@ app.post('/travel/schedule', requireAuth, LIMITS.dispatch, async (req, res) => {
       travelClass: String(b.travelClass || 'Standard'), atMs,
       travelCostCents: priced.travelCostCents, costCents: priced.travelerPays,
       miles: priced.miles, governmentFeeCents: priced.governmentFeeCents,
+      tollCents: Math.max(0, Number(priced.tollCents) || 0),
       feeLines: priced.feeLines, cardCountry: priced.cardCountry, tripNo,
       status: 'reserved', createdAt: Date.now(),
     };
@@ -2763,6 +3132,17 @@ app.post('/voice/connect', async (req, res) => {
   }
 });
 
+app.post('/travel/teen-pickup/verify', requireAuth, async (req,res)=>{const out=await verifyTeenPin({rideId:req.body?.rideId,operatorUid:req.uid,pin:req.body?.pin});return res.status(out.status||500).json(out);});
+// One server-stamped three-party thread. The client supplies words and the Travel id; the
+// server derives every participant id from the Travel so nobody can forge a correspondent.
+app.post('/travel/message', requireAuth, async (req,res)=>{
+ const db=adminDb();if(!db)return res.status(503).json({error:adminStatus().reason});const rideId=String(req.body?.rideId||''),text=String(req.body?.text||'').trim().slice(0,2000);
+ if(!rideId||!text)return res.status(400).json({error:'Travel and message text are required'});const snap=await db.collection('rides').doc(rideId).get();if(!snap.exists)return res.status(404).json({error:'No such Travel'});const r=snap.data()||{},uid=String(req.uid);
+ const from=uid===String(r.travelerUid)?'traveler':uid===String(r.operatorId)?'operator':r.party?.teen===true&&uid===String(r.party?.guardianUid)?'guardian':null;
+ if(!from)return res.status(403).json({error:'This account is not a participant in that Travel'});if(!['assigned','accepted','arrived','onboard'].includes(String(r.status))&&!req.body?.lostItemId)return res.status(409).json({error:'This Travel thread is closed'});
+ await db.collection('messages').add({rideId,tripNo:r.tripNo||rideId,from,travelerUid:r.travelerUid||null,operatorId:r.operatorId||null,guardianUid:r.party?.teen?r.party.guardianUid||null:null,lostItemId:req.body?.lostItemId||null,text,createdAt:Date.now()});return res.json({ok:true});
+});
+
 // POST /travel/accept { rideId } — the operator accepts the travel offered to them.
 //
 // THE DEFECT THIS CLOSES. Acceptance was a Firestore write from the phone: `status: 'accepted'`,
@@ -2780,7 +3160,7 @@ app.post('/voice/connect', async (req, res) => {
 // A REFUSAL RELEASES THE TRAVEL. It stays `assigned`, marked `releasedAt`, and the operator is
 // taken out of service; sweepAssignments re-offers it to somebody else on its next pass
 // without waiting out the answer window. The traveler's payment and travel number stand.
-app.post('/travel/accept', requireAuth, async (req, res) => {
+app.post('/travel/accept', requireAuth, requireOperationalReadiness, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   const rideId = String(req.body?.rideId || '');
@@ -2800,14 +3180,32 @@ app.post('/travel/accept', requireAuth, async (req, res) => {
   }
 
   try {
-    const out = await acceptOffer({ db, uid, rideId, externals, liveMoney: keyMode === 'live' });
+    const out = await acceptOffer({ db, uid, rideId, externals, liveMoney: operationalMode });
     res.status(out.status).json(out.body);
   } catch (e) {
     res.status(502).json({ error: e.message });
   }
 });
 
-app.post('/travel/return-operator', requireAuth, LIMITS.dispatch, async (req, res) => {
+// Operator progression is server-authoritative. Firestore rules no longer permit a phone to
+// manufacture arrived/onboard/completed states or the payout queue marker.
+app.post('/travel/progress', requireAuth, requireOperationalReadiness, async (req, res) => {
+  const db = adminDb();
+  if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
+  try {
+    const out = await progressTravel({
+      db,
+      uid: req.uid,
+      rideId: req.body?.rideId,
+      status: req.body?.status,
+    });
+    return res.status(out.status).json(out.body);
+  } catch (e) {
+    return res.status(502).json({ error: e.message });
+  }
+});
+
+app.post('/travel/return-operator', requireAuth, LIMITS.dispatch, requireOperationalReadiness, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
 
@@ -2863,75 +3261,11 @@ app.post('/travel/return-operator', requireAuth, LIMITS.dispatch, async (req, re
     body: { pickup: { lat: Number(next.operator.lat), lng: Number(next.operator.lng) }, dest: destination, travelClass: 'Standard' },
     uid: req.uid, email: req.email, db, cardCountryFor: defaultCardCountry,
   });
+  if (priced?.invalidJourney) return res.status(409).json({ error: priced.reason, code: 'invalid_smart_journey' });
   if (!priced || priced.outsideMarket || priced.permitRequired) {
     return res.status(409).json({ error: 'The return travel cannot be priced' });
   }
   res.json(strip(next.operator, 'any-operator', priced.travelerPays));
-});
-
-// --- Verifying a mobile number. ------------------------------------------------------------
-//
-// POST /verify/start  { phone }          -> { ok } | { error, code }
-// POST /verify/check  { phone, code }    -> { ok, phone } | { error, code }
-//
-// AUTHENTICATED, DELIBERATELY. A traveler verifies their OWN number after signing in, which is
-// what makes this cheap to protect: an open endpoint that sends an SMS on request is somebody
-// else's phone bill and a way to harass a stranger's handset.
-//
-// THIS COMMENT USED TO END "Twilio rate-limits per number; requireAuth rate-limits per
-// account." THE SECOND HALF WAS FALSE. requireAuth authenticates and does nothing else, so
-// one signed-in account could ask for unlimited SMS — each one billed to us at about six
-// cents, and each one a message somebody did not ask for. A comment asserting a control that
-// does not exist is the most dangerous shape a comment can take: it answers the question
-// nobody then goes and checks.
-//
-// Twilio does rate-limit per number, which is real and is the half that was true. The per
-// account limit now exists as well, and it is deliberately tight — a real traveler verifies
-// once, twice if the first message is slow.
-//
-// THE RESULT IS WRITTEN BY THE SERVER, never by the phone. `users/{uid}.phoneVerified` is
-// exactly the shape of field that firestore.rules now refuses a client (see the users block
-// there, and docs/SWEEP-2026-09-19.md F-D): a value the gated party could write is not a gate.
-app.post('/verify/start', requireAuth, LIMITS.verify, async (req, res) => {
-  if (!verifyReady()) {
-    return res.status(503).json({ error: 'Phone verification is not configured.', code: 'not_configured' });
-  }
-  const out = await startVerification(req.body?.phone);
-  if (!out.ok) {
-    if (out.detail) console.error('[verify] start', out.code, out.detail);
-    return res.status(out.code === 'bad_number' ? 400 : 502).json({ error: out.reason, code: out.code });
-  }
-  res.json({ ok: true });
-});
-
-app.post('/verify/check', requireAuth, LIMITS.verify, async (req, res) => {
-  if (!verifyReady()) {
-    return res.status(503).json({ error: 'Phone verification is not configured.', code: 'not_configured' });
-  }
-  const out = await checkVerification(req.body?.phone, req.body?.code);
-  if (!out.ok) {
-    if (out.detail) console.error('[verify] check', out.code, out.detail);
-    return res.status(out.code === 'wrong_code' || out.code === 'expired' ? 400 : 502)
-      .json({ error: out.reason, code: out.code });
-  }
-
-  // RECORDED AGAINST THE ACCOUNT, in the normalised form. Storing what the person typed would
-  // mean two records of the same number in different shapes, and the one an operator rings
-  // would be whichever was written last.
-  const db = adminDb();
-  if (db) {
-    try {
-      await db.collection('users').doc(String(req.uid)).set(
-        { mobile: out.to, phoneVerified: true, phoneVerifiedAt: Date.now() },
-        { merge: true },
-      );
-    } catch (e) {
-      // The number IS verified — Twilio said so. Failing to write that down is our problem to
-      // log, not a reason to tell the traveler their correct code was wrong.
-      console.error('[verify] could not record verification', e.message);
-    }
-  }
-  res.json({ ok: true, phone: out.to });
 });
 
 app.post('/travel/announce', requireAuth, LIMITS.announce, async (req, res) => {
@@ -2972,6 +3306,7 @@ app.post('/travel/announce', requireAuth, LIMITS.announce, async (req, res) => {
       });
       await ref.set({ notifiedOperatorAt: Date.now() }, { merge: true });
     } else if (event === 'arrived') {
+      if (ride.party?.teen && ride.party?.guardianUid && String(ride.party.guardianUid) !== String(ride.travelerUid)) await notify({ uid: ride.party.guardianUid, kind:'guardian_travel', title:'Operator arrived', body:`${ride.operatorName || 'The Operator'} has arrived for ${ride.party.travelerName || 'the Teen Traveler'}.`, data:{screen:'/family',rideId,tripNo:trip} });
       sent = await notify({
         uid: ride.travelerUid,
         kind: 'operator_arrived',
@@ -2980,6 +3315,7 @@ app.post('/travel/announce', requireAuth, LIMITS.announce, async (req, res) => {
         data: { screen: '/ride', rideId, tripNo: trip },
       });
     } else {
+      if (ride.party?.teen && ride.party?.guardianUid && String(ride.party.guardianUid) !== String(ride.travelerUid)) await notify({ uid: ride.party.guardianUid, kind:'guardian_travel', title:'Teen Travel complete', body:`${ride.party.travelerName || 'The Teen Traveler'} has reached ${ride.dest || 'the destination'}.`, data:{screen:'/family',rideId,tripNo:trip} });
       sent = await notify({
         uid: ride.travelerUid,
         kind: 'travel_complete',
@@ -3086,7 +3422,7 @@ app.listen(PORT, () => {
   // noticed at most a minute after six, which is inside the margin of "a long light".
   // `unref()` so the interval never holds a test process open.
   const tick = setInterval(() => {
-    runAllSweeps()
+    runLeasedSweeps()
       .then((r) => {
         lastSweep = { at: Date.now(), report: r };
       })

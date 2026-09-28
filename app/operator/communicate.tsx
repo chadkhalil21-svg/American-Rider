@@ -77,7 +77,7 @@ export default function OperatorCommunicate() {
       <View style={styles.head}>
         <Avatar initials={initials} size={40} />
         <View>
-          <Text style={styles.name}>{traveler || 'Traveler'}</Text>
+          <Text style={styles.name}>{traveler || t('traveler.yourTraveler')}</Text>
           <Text style={styles.role}>{t('traveler.yourTraveler')}</Text>
         </View>
       </View>
@@ -95,7 +95,7 @@ export default function OperatorCommunicate() {
             key={m.id}
             style={[styles.bubble, m.from === 'operator' ? styles.bubbleMe : styles.bubbleThem]}
           >
-            <Text style={[styles.bubbleText, m.from === 'operator' && { color: '#fff' }]}>
+            <Text style={[styles.bubbleText, m.from === 'operator' && styles.bubbleTextMe]}>
               {m.text}
             </Text>
           </View>
@@ -105,7 +105,9 @@ export default function OperatorCommunicate() {
       <View style={styles.inputRow}>
         <TextInput
           style={styles.field}
-          placeholder={`Message ${traveler || t('traveler.yourTravelerLower')}`}
+          placeholder={t('traveler.msgPlaceholder', {
+            name: traveler || t('traveler.yourTravelerLower'),
+          })}
           placeholderTextColor={colors.faint}
           value={draft}
           onChangeText={setDraft}
@@ -143,6 +145,7 @@ const styles = StyleSheet.create({
     borderColor: colors.hairline,
   },
   bubbleText: { fontSize: 14.5, lineHeight: 21, color: colors.ink },
+  bubbleTextMe: { color: colors.solidFg },
   inputRow: { flexDirection: 'row', gap: 10, marginTop: 16 },
   field: {
     flex: 1,
@@ -163,5 +166,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sendText: { fontSize: 15, fontWeight: '600', color: '#fff' },
+  sendText: { fontSize: 15, fontWeight: '600', color: colors.solidFg },
 });

@@ -1,14 +1,21 @@
-// Commercial Insurance step — the founders' 10 Aug compliance spec, rendered
-// institutionally: "The Cost-Effective Policy" guidance (liability-only livery policy,
-// written UM rejection, clean record, $350–650/month in Florida), the same three real
-// quote links as the economics screen, and the verification theater. After
-// commissioning this doubles as the operator's Insurance page.
+// Commercial Insurance — one path to understand the requirement, compare specialist quotes,
+// submit the declarations page, monitor continuing status, and understand retention economics.
+// After commissioning this remains the Operator's Insurance page.
 import { Linking } from 'react-native';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Alert, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Text } from '../../src/components/AppText';
 import { pickDocument } from '../../src/backend/documentUpload';
+import {
+  insuranceStatus,
+  insuranceConfig,
+  authorizeInsuranceStatusVerification,
+  attestInsuranceUnchanged,
+  requestInsuranceConfirmation,
+  type InsuranceStatus,
+  type InsuranceConfig,
+} from '../../src/backend/insuranceStatus';
 import { useGoBack } from '../../src/components/nav';
 import { BadgeOk } from '../../src/components/operator';
 import { BackLink, Card, PrimaryButton, Screen, SectionLabel, Sub, Title } from '../../src/components/UI';
@@ -26,11 +33,66 @@ export default function OperatorInsurance() {
   const router = useRouter();
   const goBack = useGoBack();
   const op = useOperator();
+  const [liveStatus, setLiveStatus] = useState<InsuranceStatus | null>(null);
+  const [config, setConfig] = useState<InsuranceConfig | null>(null);
+  const [configResolved, setConfigResolved] = useState(false);
+  const [brokerEmail, setBrokerEmail] = useState('');
+  const [statusBusy, setStatusBusy] = useState(false);
+  const [monthlyPremium, setMonthlyPremium] = useState('600');
+
+  useEffect(() => {
+    insuranceConfig().then((x) => {
+      setConfig(x);
+      setConfigResolved(true);
+    });
+    insuranceStatus().then((s) => {
+      if (!s) return;
+      setLiveStatus(s);
+      if (s.contact?.email) setBrokerEmail(s.contact.email);
+    });
+  }, [op.docs.insurance]);
+
+  const authorizeStatus = async () => {
+    setStatusBusy(true);
+    const out = await authorizeInsuranceStatusVerification();
+    setStatusBusy(false);
+    if (!out.ok) return Alert.alert(t('traveler.insAuthorizeTitle'), out.error || t('traveler.errReachAR'));
+    const s = await insuranceStatus();
+    if (s) setLiveStatus(s);
+    Alert.alert(t('traveler.insAuthorizeTitle'), t('traveler.insAuthorized'));
+  };
+
+  const confirmUnchanged = async () => {
+    setStatusBusy(true);
+    const s = await attestInsuranceUnchanged();
+    setStatusBusy(false);
+    if (!s) return Alert.alert('Not recorded', t('traveler.errReachAR'));
+    setLiveStatus(s);
+    Alert.alert(t('traveler.insStatusTitle'), t('traveler.insAttestationSent'));
+  };
+
+  const requestStatus = async () => {
+    const email = brokerEmail.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return Alert.alert(t('traveler.insStatusTitle'), t('traveler.insBrokerEmail'));
+    }
+    setStatusBusy(true);
+    const out = await requestInsuranceConfirmation({ email, type: 'broker' });
+    setStatusBusy(false);
+    if (!out.ok) return Alert.alert('Not sent', out.error || t('traveler.errReachAR'));
+    const s = await insuranceStatus();
+    if (s) setLiveStatus(s);
+    Alert.alert(t('traveler.insStatusTitle'), t('traveler.insRequestSent'));
+  };
 
   // Submits the policy and reports the outcome. Nothing is claimed here — op.reviewDoc has
   // already recorded the verdict and the Documents screen reads it; this only surfaces the
   // failures a row cannot show, and the refusal reason, which an operator needs immediately.
   const submitPolicy = async (fromCamera: boolean) => {
+    if (!config) {
+      Alert.alert(t('operator.commercialInsurance'), t('traveler.insJurisdictionUnavailable'));
+      return;
+    }
     const uri = await pickDocument(fromCamera);
     if (!uri) return;
     const out = await op.reviewDoc('insurance', uri);
@@ -48,7 +110,29 @@ export default function OperatorInsurance() {
   };
   const st = op.docs.insurance;
 
-  const [expiry, setExpiry] = useState(op.insuranceExpiry ?? '');
+  const premiumN = Math.max(0, Number(monthlyPremium) || 0);
+  const AR_SHARE = 0.99;
+  // Consumer Reports, June 2026: observed Uber/Lyft platform retention of 43%–49.5%
+  // in its matched rider/driver sample. The companies dispute that accounting treatment
+  // because CR includes external costs such as insurance. This remains a benchmark, not
+  // a forecast or earnings promise.
+  const BENCH_DRIVER_HIGH = 0.57;
+  const BENCH_DRIVER_LOW = 0.505;
+  const arPer100 = 100 * AR_SHARE;
+  const benchmarkPer100Low = 100 * BENCH_DRIVER_LOW;
+  const benchmarkPer100High = 100 * BENCH_DRIVER_HIGH;
+  const additionalLow = arPer100 - benchmarkPer100High;
+  const additionalHigh = arPer100 - benchmarkPer100Low;
+  const fareNeededAR = premiumN / AR_SHARE;
+  const fareNeededBenchmarkLow = premiumN / BENCH_DRIVER_HIGH;
+  const fareNeededBenchmarkHigh = premiumN / BENCH_DRIVER_LOW;
+  const advantageOffsetLow = premiumN / (AR_SHARE - BENCH_DRIVER_LOW);
+  const advantageOffsetHigh = premiumN / (AR_SHARE - BENCH_DRIVER_HIGH);
+  const money = (n: number) => String.fromCharCode(36) + n.toFixed(0);
+  const rangeMoney = (a: number, b: number) => money(a) + '–' + money(b);
+  const marketState = config?.state || null;
+  const nationalInsurers = config ? INSURERS.filter((x) => !x.states) : [];
+  const stateInsurers = config ? INSURERS.filter((x) => x.states?.includes(config.state)) : [];
 
   return (
     <Screen>
@@ -68,30 +152,23 @@ export default function OperatorInsurance() {
       <Sub style={{ marginTop: 8 }}>
         {t('traveler.liveryVerifyNotSell')}
       </Sub>
+      {configResolved && !config && (
+        <Card style={[styles.statusCard, { marginTop: 16 }]}>
+          <Text style={styles.statusTitle}>{t('operator.commercialInsurance')}</Text>
+          <Text style={styles.body}>{t('traveler.insJurisdictionUnavailable')}</Text>
+        </Card>
+      )}
       {st === 'ok' && (
         <View style={styles.badgeRow}>
           <BadgeOk label={t('operator.verified')} />
         </View>
       )}
 
-      {/* COVERAGE ON FILE. American Rider provides no automobile insurance, so the policy an
-          operator carries is the only coverage a travel has. Nothing recorded when it ended,
-          which meant nothing could stop travel being assigned to somebody whose coverage had
-          run out weeks earlier. The date is on the certificate; it needs nobody's cooperation
-          to check, and it is checked again at the moment a travel is matched. */}
+      {/* COVERAGE ON FILE. The expiry is extracted from the accepted declarations page. */}
       <SectionLabel style={styles.lbl}>{t('operator.coverageOnFile')}</SectionLabel>
       <Card style={styles.coverCard}>
         <Text style={styles.coverLabel}>{t('traveler.policyExpiry')}</Text>
-        <TextInput
-          value={expiry}
-          onChangeText={setExpiry}
-          placeholder={t('traveler.dateFormatPh')}
-          placeholderTextColor={colors.faint}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="numbers-and-punctuation"
-          style={styles.coverInput}
-        />
+        <Text style={styles.expiryValue}>{op.insuranceExpiry || '—'}</Text>
         <Text style={styles.coverNote}>
           {op.coverageDaysLeft == null
             ? t('traveler.insNoDateOnFile')
@@ -101,26 +178,162 @@ export default function OperatorInsurance() {
                 ? t('traveler.insDaysLeft', { n: op.coverageDaysLeft })
                 : t('traveler.insOnFileUntil', { date: op.insuranceExpiry })}
         </Text>
-        <PrimaryButton
-          label={t('operator.save')}
-          // No confirmation toast: the line above states the coverage position and rewrites
-          // itself the moment this saves, which says more than "Saved" would.
-          onPress={() => op.setInsuranceExpiry(expiry)}
-          disabled={!/^\d{4}-\d{2}-\d{2}$/.test(expiry.trim())}
-          style={{ marginTop: 16 }}
-        />
       </Card>
 
-      {/* HOW AMERICAN RIDER LEARNS A POLICY HAS ENDED. An expiry date is on the certificate
-          and can be checked by arithmetic. A mid-term cancellation is on no document at all —
-          only the carrier knows, and only the carrier can say. Naming us as certificate
-          holder is the standard instrument for exactly that, and it is free.
+      <SectionLabel style={styles.lbl}>{t('traveler.insStatusTitle')}</SectionLabel>
+      <Card style={styles.statusCard}>
+        <Text style={styles.statusTitle}>
+          {liveStatus?.ok ? t('traveler.insStatusActive') : t('traveler.insStatusNeedsVerification')}
+        </Text>
+        <Text style={styles.body}>{t('traveler.insStatusExplain')}</Text>
+        <Text style={[styles.body, { marginTop: 8 }]}>{t('traveler.insAnyCarrierAccepted')}</Text>
+        <Text style={[styles.body, { marginTop: 8 }]}>{t('traveler.insStatusAutomatic')}</Text>
+        <Text style={[styles.body, { marginTop: 8 }]}>{t('traveler.insStatusFallback')}</Text>
+        <Text style={[styles.body, { marginTop: 8 }]}>{t('traveler.insEvidenceEmail')}</Text>
 
-          CERTIFICATE HOLDER, NOT ADDITIONAL INSURED. The two are routinely confused and the
-          difference is money. A certificate holder receives the certificate and notice of
-          cancellation — information, nothing more. An additional insured is granted coverage
-          under the policy, which raises the premium and would say American Rider is insured
-          under it. We are not, and we do not ask to be. */}
+        {!!liveStatus?.verificationIssue && (
+          <Card style={styles.processCard}>
+            <Text style={styles.statusTitle}>{t('traveler.insProviderProcessTitle')}</Text>
+            <Text style={styles.body}>{t('traveler.insProviderProcessBody')}</Text>
+            {!!liveStatus.verificationIssue.note && (
+              <Text style={[styles.body, { marginTop: 8 }]}>{liveStatus.verificationIssue.note}</Text>
+            )}
+          </Card>
+        )}
+
+        {st === 'ok' && (
+          <>
+            <Text style={[styles.statusTitle, { marginTop: 16 }]}>{t('traveler.insAuthorizeTitle')}</Text>
+            <Text style={styles.body}>{t('traveler.insAuthorizeBody')}</Text>
+            {liveStatus?.authorized ? (
+              <Text style={[styles.body, { marginTop: 8 }]}>{t('traveler.insAuthorized')}</Text>
+            ) : (
+              <PrimaryButton
+                label={t('traveler.insAuthorizeButton')}
+                onPress={authorizeStatus}
+                disabled={statusBusy}
+                style={{ marginTop: 14 }}
+              />
+            )}
+
+            <Text style={[styles.coverLabel, { marginTop: 16 }]}>{t('traveler.insBrokerEmail')}</Text>
+            <TextInput
+              value={brokerEmail}
+              onChangeText={setBrokerEmail}
+              placeholder={t('traveler.insBrokerEmailPh')}
+              placeholderTextColor={colors.faint}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="email-address"
+              style={styles.coverInput}
+            />
+            <PrimaryButton
+              label={t('traveler.insRequestConfirmation')}
+              onPress={requestStatus}
+              disabled={statusBusy || !brokerEmail.trim() || !liveStatus?.authorized}
+              style={{ marginTop: 14 }}
+            />
+            {liveStatus?.operatorActionRequired && (
+              <Pressable onPress={confirmUnchanged} disabled={statusBusy} hitSlop={8}>
+                <Text style={styles.guidelinesLink}>{t('traveler.insAttest')}</Text>
+              </Pressable>
+            )}
+          </>
+        )}
+      </Card>
+
+      <SectionLabel style={styles.lbl}>{t('traveler.insCompareTitle')}</SectionLabel>
+      <Card style={styles.econCard}>
+        <Text style={styles.body}>{t('traveler.insCompareBody')}</Text>
+
+        <View style={styles.compareBlock}>
+          <Text style={styles.coverLabel}>{t('traveler.insPer100')}</Text>
+          <View style={styles.econRow}>
+            <Text style={styles.body}>{t('traveler.insAmericanRider')}</Text>
+            <Text style={styles.econValue}>{money(arPer100)}</Text>
+          </View>
+          <View style={styles.econRow}>
+            <Text style={styles.body}>{t('traveler.insObservedBenchmark')}</Text>
+            <Text style={styles.econValue}>{rangeMoney(benchmarkPer100Low, benchmarkPer100High)}</Text>
+          </View>
+          <View style={styles.econRow}>
+            <Text style={styles.body}>{t('traveler.insDifference')}</Text>
+            <Text style={styles.econValue}>{rangeMoney(additionalLow, additionalHigh)}</Text>
+          </View>
+        </View>
+
+        <Text style={[styles.statusTitle, { marginTop: 18 }]}>{t('traveler.insScaleTitle')}</Text>
+        {[1000, 5000].map((gross) => {
+          const ar = gross * AR_SHARE;
+          const low = gross * BENCH_DRIVER_LOW;
+          const high = gross * BENCH_DRIVER_HIGH;
+          return (
+            <View key={gross} style={styles.scaleBlock}>
+              <Text style={styles.coverLabel}>
+                {gross === 1000 ? t('traveler.insScale1000') : t('traveler.insScale5000')}
+              </Text>
+              <View style={styles.econRow}>
+                <Text style={styles.body}>{t('traveler.insScaleArKeeps')}</Text>
+                <Text style={styles.econValue}>{money(ar)}</Text>
+              </View>
+              <View style={styles.econRow}>
+                <Text style={styles.body}>{t('traveler.insScaleBenchmarkKeeps')}</Text>
+                <Text style={styles.econValue}>{rangeMoney(low, high)}</Text>
+              </View>
+              <View style={styles.econRow}>
+                <Text style={styles.body}>{t('traveler.insScaleDifference')}</Text>
+                <Text style={styles.econValue}>{rangeMoney(ar - high, ar - low)}</Text>
+              </View>
+            </View>
+          );
+        })}
+        <View style={styles.scaleBlock}>
+          <Text style={styles.coverLabel}>{t('traveler.insScaleAnnual')}</Text>
+          <View style={styles.econRow}>
+            <Text style={styles.body}>{t('traveler.insScaleDifference')}</Text>
+            <Text style={styles.econValue}>
+              {rangeMoney((5000 * AR_SHARE - 5000 * BENCH_DRIVER_HIGH) * 12, (5000 * AR_SHARE - 5000 * BENCH_DRIVER_LOW) * 12)}
+            </Text>
+          </View>
+        </View>
+        <Text style={styles.disclaimer}>{t('traveler.insScaleAnnualNote')}</Text>
+
+        <Text style={[styles.body, { marginTop: 16 }]}>{t('traveler.insNoHoursNeeded')}</Text>
+        <View style={styles.econInputs}>
+          <View style={styles.econField}>
+            <Text style={styles.coverLabel}>{t('traveler.insMonthlyPremium')}</Text>
+            <TextInput value={monthlyPremium} onChangeText={setMonthlyPremium} keyboardType="decimal-pad" style={styles.econInput} />
+          </View>
+        </View>
+
+        <Text style={[styles.coverLabel, { marginTop: 18 }]}>{t('traveler.insPremiumOffset')}</Text>
+        <View style={styles.econRows}>
+          <View style={styles.econRow}>
+            <Text style={styles.body}>{t('traveler.insPremiumOffsetAR')}</Text>
+            <Text style={styles.econValue}>{money(fareNeededAR)}</Text>
+          </View>
+          <View style={styles.econRow}>
+            <Text style={styles.body}>{t('traveler.insPremiumOffsetBenchmark')}</Text>
+            <Text style={styles.econValue}>{rangeMoney(fareNeededBenchmarkLow, fareNeededBenchmarkHigh)}</Text>
+          </View>
+        </View>
+        <Text style={[styles.coverLabel, { marginTop: 18 }]}>{t('traveler.insAdvantageOffset')}</Text>
+        <View style={styles.econRows}>
+          <View style={styles.econRow}>
+            <Text style={styles.body}>{t('traveler.insAdvantageOffsetRange')}</Text>
+            <Text style={styles.econValue}>{rangeMoney(advantageOffsetLow, advantageOffsetHigh)}</Text>
+          </View>
+        </View>
+
+        <Text style={styles.disclaimer}>{t('traveler.insBenchmarkSource')}</Text>
+      </Card>
+
+      {/* CONTINUING COVERAGE. The expiry date is deterministic and gates duty/acceptance.
+          Mid-term cancellation is harder: a standard certificate-holder designation is only
+          evidence and does NOT by itself guarantee cancellation notice. Where the underlying
+          policy offers a notice-of-cancellation/non-renewal endorsement, the broker/carrier
+          should issue that evidence to American Rider. Otherwise renewal/periodic verification
+          remains necessary. Never tell an Operator that a plain COI creates notice rights. */}
       {/* THE REQUIREMENT STAYS, THE ADVICE MOVES (Chad, 18 Sept 2026). What an operator must
           do to this policy is one line and belongs here; what to buy, what it costs at each
           age and how to ask for it is a page for somebody buying their first livery policy,
@@ -139,7 +352,7 @@ export default function OperatorInsurance() {
       {/* THE ONE CALL, ahead of the national quote pages, because it is the one where
           somebody is expecting this operator. Absent entirely until a broker is engaged —
           a referral to nobody is worse than no referral. */}
-      {BROKER && (() => {
+      {config?.state === 'FL' && BROKER && (() => {
         // Bound once so the closures below cannot be narrowed away by the compiler.
         const broker = BROKER;
         return (
@@ -184,9 +397,15 @@ export default function OperatorInsurance() {
           whoever wants the words. Both say the same thing, which is the point — the short one
           has to be right on its own. */}
       <Text style={styles.fixedInstruction}>{t('traveler.insFixedInstruction')}</Text>
-      <Card style={styles.scriptCard}>
-        <Text style={styles.script}>{t('traveler.insCallScript')}</Text>
-      </Card>
+      {config ? (
+        <Card style={styles.scriptCard}>
+          <Text style={styles.script}>{config.script}</Text>
+        </Card>
+      ) : (
+        <Card style={styles.scriptCard}>
+          <Text style={styles.body}>{t('traveler.insJurisdictionUnavailable')}</Text>
+        </Card>
+      )}
       {/* THE SCRIPT STAYS IN ENGLISH IN ALL FIVE CATALOGUES, ON PURPOSE. It is read aloud to a
           Florida insurance agent, so a Spanish or German rendering would be a script that does
           not work at the counter — the one place it has a job to do. The instruction ABOUT it
@@ -194,33 +413,47 @@ export default function OperatorInsurance() {
       <Text style={styles.disclaimer}>{t('traveler.insCallScriptNote')}</Text>
 
       <SectionLabel style={styles.lbl}>{t('operator.compareProviders')}</SectionLabel>
-      <Card style={styles.listCard}>
-        {INSURERS.filter((x) => !x.secondary).map((x, i) => (
-          <Pressable key={x.name} onPress={() => (x.url ? Linking.openURL(x.url) : Linking.openURL(`tel:${(x.phone || '').replace(/[^0-9+]/g, '')}`))}>
-            <View style={[styles.insurerRow, i > 0 && styles.hair]}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.insurerName}>{x.name}</Text>
-                <Text style={styles.insurerNote}>{t(x.note)}</Text>
-              </View>
-              <Text style={styles.insurerLink}>{x.url ? t('traveler.quote') : t('traveler.call')} ›</Text>
-            </View>
-          </Pressable>
-        ))}
-        {showMore && INSURERS.filter((x) => x.secondary).map((x) => (
-          <Pressable key={x.name} onPress={() => (x.url ? Linking.openURL(x.url) : Linking.openURL(`tel:${(x.phone || '').replace(/[^0-9+]/g, '')}`))}>
-            <View style={[styles.insurerRow, styles.hair]}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.insurerName}>{x.name}</Text>
-                <Text style={styles.insurerNote}>{t(x.note)}</Text>
-                {/* Said on the row rather than in a footnote: it is the difference between a
-                    name we checked and a name we did not. */}
-                {!!x.unverified && <Text style={styles.insurerUnverified}>{t('traveler.insNotLicenceChecked')}</Text>}
-              </View>
-              <Text style={styles.insurerLink}>{x.url ? t('traveler.quote') : t('traveler.call')} ›</Text>
-            </View>
-          </Pressable>
-        ))}
-      </Card>
+      {config ? (
+        <>
+          <Text style={styles.coverLabel}>{t('traveler.insNationalSources')}</Text>
+          <Card style={styles.listCard}>
+            {nationalInsurers.filter((x) => !x.secondary || showMore).map((x, i) => (
+              <Pressable key={x.name} onPress={() => (x.url ? Linking.openURL(x.url) : Linking.openURL(`tel:${(x.phone || '').replace(/[^0-9+]/g, '')}`))}>
+                <View style={[styles.insurerRow, i > 0 && styles.hair]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.insurerName}>{x.name}</Text>
+                    <Text style={styles.insurerNote}>{t(x.note)}</Text>
+                  </View>
+                  <Text style={styles.insurerLink}>{x.url ? t('traveler.quote') : t('traveler.call')} ›</Text>
+                </View>
+              </Pressable>
+            ))}
+          </Card>
+          {stateInsurers.length > 0 && (
+            <>
+              <Text style={[styles.coverLabel, { marginTop: 16 }]}>{t('traveler.insStateSources', { state: config.stateName })}</Text>
+              <Card style={styles.listCard}>
+                {stateInsurers.map((x, i) => (
+                  <Pressable key={x.name} onPress={() => (x.url ? Linking.openURL(x.url) : Linking.openURL(`tel:${(x.phone || '').replace(/[^0-9+]/g, '')}`))}>
+                    <View style={[styles.insurerRow, i > 0 && styles.hair]}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.insurerName}>{x.name}</Text>
+                        <Text style={styles.insurerNote}>{t(x.note)}</Text>
+                        {!!x.unverified && <Text style={styles.insurerUnverified}>{t('traveler.insNotLicenceChecked')}</Text>}
+                      </View>
+                      <Text style={styles.insurerLink}>{x.url ? t('traveler.quote') : t('traveler.call')} ›</Text>
+                    </View>
+                  </Pressable>
+                ))}
+              </Card>
+            </>
+          )}
+        </>
+      ) : (
+        <Card style={styles.listCard}>
+          <Text style={[styles.body, { paddingVertical: 16 }]}>{t('traveler.insJurisdictionUnavailable')}</Text>
+        </Card>
+      )}
       {!showMore && (
         <Pressable onPress={() => setShowMore(true)} hitSlop={8}>
           <Text style={styles.guidelinesLink}>{t('operator.compareMoreOptions')} ›</Text>
@@ -243,14 +476,14 @@ export default function OperatorInsurance() {
           {/* WAS: "Verify My Policy", which called verifyDoc and ticked the step after 900
               milliseconds without a policy ever being seen. It now submits the declarations
               page and reports what was read — including a refusal, which this screen must be
-              able to deliver: a personal-use policy does not cover a paying passenger, and
-              American Rider carries nothing behind it. */}
+              able to deliver: a personal-use policy does not establish qualifying commercial
+              passenger-transport coverage. */}
           <Text style={styles.testNote}>
             {t('traveler.declarationsPage')}
           </Text>
           <PrimaryButton
             label={st === 'checking' ? t('traveler.busyReading') : t('traveler.submitMyPolicy')}
-            disabled={st === 'checking'}
+            disabled={st === 'checking' || !config}
             onPress={() =>
               Alert.alert('Commercial Insurance', t('traveler.insWhereDecPage'), [
                 { text: 'Take a photograph', onPress: () => submitPolicy(true) },
@@ -262,10 +495,7 @@ export default function OperatorInsurance() {
           />
         </>
       )}
-      {/* Where an operator is already thinking about insurance is where they should be told
-          American Rider provides none of it. §627.748(8)(a) requires the disclosure before
-          travel is accepted; this is the second way to reach it, and the refusal on the duty
-          screen is the first. */}
+      {/* Insurance disclosures remain reachable here as well as at the duty gate. */}
       <Pressable onPress={() => router.navigate('/operator/disclosure')} hitSlop={8}>
         <Text style={styles.disclosureLink}>
           {t('traveler.whatWeInsure')}
@@ -276,8 +506,27 @@ export default function OperatorInsurance() {
 }
 
 const styles = StyleSheet.create({
+  statusCard: { marginTop: 12, paddingVertical: 18, paddingHorizontal: 20 },
+  processCard: { marginTop: 14, paddingVertical: 14, paddingHorizontal: 16 },
+  statusTitle: { fontSize: 15, fontWeight: '600', color: colors.ink, marginBottom: 8 },
+  econCard: { paddingVertical: 18, paddingHorizontal: 20 },
+  compareBlock: { marginTop: 18 },
+  scaleBlock: { marginTop: 14 },
+  econInputs: { marginTop: 16, gap: 12 },
+  econField: { gap: 6 },
+  econInput: {
+    borderWidth: 1, borderColor: colors.border, borderRadius: 13, paddingHorizontal: 14,
+    paddingVertical: 11, fontSize: 16, color: colors.ink, fontVariant: ['tabular-nums'],
+  },
+  econRows: { marginTop: 16 },
+  econRow: {
+    flexDirection: 'row', justifyContent: 'space-between', gap: 12, paddingVertical: 10,
+    borderTopWidth: 1, borderTopColor: colors.hairline,
+  },
+  econValue: { fontSize: 15, fontWeight: '600', color: colors.ink, fontVariant: ['tabular-nums'] },
   coverCard: { marginTop: 12, paddingVertical: 18, paddingHorizontal: 20 },
   coverLabel: { fontSize: 13, color: colors.muted },
+  expiryValue: { fontSize: 22, fontWeight: '600', color: colors.ink, marginTop: 8, fontVariant: ['tabular-nums'] },
   coverInput: {
     marginTop: 8,
     borderWidth: 1,

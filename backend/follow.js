@@ -39,14 +39,16 @@ const newToken = () => crypto.randomBytes(16).toString('hex');
  * Mint (or reuse) a follow token for a travel the traveler owns.
  * Returns null when the travel is not theirs, or is not underway.
  */
-async function issueFollowToken({ rideId, travelerUid }) {
+async function issueFollowToken({ rideId, travelerUid, guardianUid = null }) {
   const db = adminDb();
   if (!db || !rideId) return null;
   const ref = db.collection('rides').doc(String(rideId));
   const snap = await ref.get();
   if (!snap.exists) return null;
   const r = snap.data() || {};
-  if (String(r.travelerUid) !== String(travelerUid)) return null;
+  const owner = String(r.travelerUid) === String(travelerUid);
+  const guardian = r.party?.teen === true && guardianUid && String(r.party?.guardianUid) === String(guardianUid);
+  if (!owner && !guardian) return null;
   if (!ACTIVE.includes(String(r.status))) return null;
 
   // REUSED WITHIN ONE TRAVEL, so sharing twice does not leave two live links, and a contact
@@ -68,7 +70,18 @@ async function travelForToken(token) {
     if (q.empty) return null;
     const d = q.docs[0];
     const r = { id: d.id, ...d.data() };
-    if (Number(r.followIssuedAt || 0) < Date.now() - MAX_LIFE_MS) return null;
+    const now = Date.now();
+    const issuedAt = Number(r.followIssuedAt || 0);
+    if (!issuedAt || issuedAt < now - MAX_LIFE_MS) return null;
+
+    // A contact may see that the Travel ended, but the bearer link does not remain a
+    // long-lived location/itinerary capability. Completed and cancelled Travel get only the
+    // short grace period promised by this module.
+    const status = String(r.status || '');
+    if (!ACTIVE.includes(status)) {
+      const endedAt = Number(r.completedAt || r.statusAt || issuedAt);
+      if (!endedAt || endedAt < now - GRACE_MS) return null;
+    }
     return r;
   } catch {
     return null;

@@ -21,8 +21,10 @@ import { useGoBack } from '../src/components/nav';
 import { Card, LetterheadBar, Screen, Sub, Title } from '../src/components/UI';
 import { useLanguage } from '../src/state/LanguageContext';
 import { colors } from '../src/theme';
+import { auth } from '../src/firebase';
 
-const KEY = 'ar:notif-prefs:v1';
+const KEY_PREFIX = 'ar:notif-prefs:v2:';
+const prefsKey = () => KEY_PREFIX + (auth.currentUser?.uid || 'preview');
 
 // KEYS, NOT SENTENCES — built at import, before the stored language is read.
 const ROWS: { id: string; title: string; sub: string; def: boolean }[] = [
@@ -63,7 +65,7 @@ export default function Notifications() {
   );
 
   useEffect(() => {
-    AsyncStorage.getItem(KEY)
+    AsyncStorage.getItem(prefsKey())
       .then((raw) => raw && setPrefs((p) => ({ ...p, ...JSON.parse(raw) })))
       .catch(() => {});
   }, []);
@@ -83,7 +85,7 @@ export default function Notifications() {
   const toggle = (id: string) => {
     const next = { ...prefs, [id]: !prefs[id] };
     setPrefs(next);
-    AsyncStorage.setItem(KEY, JSON.stringify(next)).catch(() => {});
+    AsyncStorage.setItem(prefsKey(), JSON.stringify(next)).catch(() => {});
     // AND ON THE ACCOUNT. The device copy survives a restart; the account copy is the one the
     // server reads before it sends, and without it the toggle governs nothing.
     savePushPrefs(next);
@@ -96,7 +98,7 @@ export default function Notifications() {
   return (
     <Screen>
       <LetterheadBar onBack={goBack} />
-      <Title>{t('traveler.notifications')}</Title>
+      <Title size={24}>{t('traveler.notifications')}</Title>
       <Sub>{t('traveler.notificationsSub')}</Sub>
 
       <Card style={styles.card}>
@@ -129,20 +131,20 @@ export default function Notifications() {
 }
 
 const styles = StyleSheet.create({
-  card: { marginTop: 20, paddingHorizontal: 20, paddingVertical: 4 },
+  card: { marginTop: 18, paddingHorizontal: 18, paddingVertical: 2 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 16,
+    paddingVertical: 13.5,
   },
   hair: { borderTopWidth: 1, borderTopColor: colors.hairline },
-  blocked: { fontSize: 13, color: colors.red, marginTop: 18, lineHeight: 19 },
+  blocked: { fontSize: 13, color: colors.ink2, marginTop: 18, lineHeight: 19 },
   // Title table: the text column flexes and wraps (minWidth 0 so a long German
   // sub wraps instead of squeezing the toggle on web); the 46px toggle never
   // shrinks, so the rows hold their shape at 390pt with the longest sub.
   rowText: { flex: 1, minWidth: 0, paddingRight: 12 },
-  rowTitle: { fontSize: 15, color: colors.ink },
+  rowTitle: { fontSize: 14.5, color: colors.ink },
   rowSub: { fontSize: 12.5, color: colors.muted, marginTop: 2, lineHeight: 17 },
   sw: {
     width: 46,

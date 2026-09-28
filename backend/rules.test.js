@@ -96,12 +96,14 @@ check('R2 uploads accept only supported image media types', /allowedType/.test(r
 
 // ——— messages are bounded ————————————————————————————————————————————————————————
 const msgs = (rules.match(/match \/messages\/\{messageId\} \{[\s\S]*?\n {4}\}/) || [''])[0];
-check('messages: only the fields the app writes', /keys\(\)\.hasOnly\(\['rideId', 'tripNo', 'from', 'travelerUid', 'operatorId', 'lostItemId', 'text', 'createdAt'\]\)/.test(msgs));
+check('messages: only server-authoritative thread fields are admitted', /keys\(\)\.hasOnly\(\['rideId', 'tripNo', 'from', 'travelerUid', 'operatorId', 'guardianUid', 'lostItemId', 'text', 'createdAt'\]\)/.test(msgs));
 check('messages: bound to the ride record the rule reads', /messageFitsRide\(get\(\/databases\/\$\(database\)\/documents\/rides\/\$\(request\.resource\.data\.rideId\)\)\.data\)/.test(msgs));
 check('messages: text is bounded to 2,000 characters', /text\.size\(\) <= 2000/.test(msgs));
 const writer = fs.readFileSync(path.join(ROOT, 'src', 'backend', 'messages.ts'), 'utf8');
-check('messages: the app writes no field the rule refuses',
-  ['rideId', 'tripNo', 'from', 'travelerUid', 'operatorId', 'lostItemId', 'text', 'createdAt'].every((k) => new RegExp(`\\b${k}:`).test(writer)));
+check('messages: client sends content to authenticated server endpoint instead of writing participant authority',
+  writer.includes("fetch(`${PAYMENT_SERVER_URL}/travel/message`")
+  && writer.includes('Authorization:`Bearer ${token}`')
+  && !writer.includes('addDoc('));
 
 let bad = 0;
 for (const r of R) { if (!r.ok) bad++; console.log(`${r.ok ? 'PASS' : 'FAIL'}  ${r.l}${r.ok ? '' : '  — ' + (r.d || '')}`); }

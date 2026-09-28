@@ -6,14 +6,14 @@
 // said nothing about the present (an insurance policy that lapsed the next day left it
 // standing). Now nothing stores the answer as authority. assessOperator() derives it from the
 // records every time it is asked — at every document reading, every status check, every
-// go-on-duty and 90-second renewal, and every travel acceptance.
+// enter-service and 90-second renewal, and every travel acceptance.
 //
 // TWO KINDS OF GATE, one function.
 //   qualification — what makes an operator fit to carry travelers at all: the three documents,
 //                   the insurance cover, the background screening (live money), the account,
 //                   and no suspension or unresolved hold. All pass → qualified, automatically.
 //   duty          — what must also hold at the moment travel is taken: the §627.748(8)(a)
-//                   disclosure in force, Stripe payouts, being on duty, the policy date the
+//                   disclosure in force, Stripe payouts, being in service, the policy date the
 //                   operator recorded. These are not qualification because the app reaches the
 //                   payout and duty screens only after qualifying.
 //
@@ -21,15 +21,18 @@
 // structured fields it read. An `accept` is necessary and not sufficient: this file re-checks in
 // code everything that can be checked in code — that the document is the one requested and
 // legible, that it carries an expiry and it has not passed, and for insurance that it covers
-// carrying passengers for hire at no less than Florida's limit.
+// carrying passengers for hire at no less than the jurisdiction's limit.
 //
 // A PERSON DECIDES ONLY THE EXCEPTIONS. `review` from the reader, an insurance limit that cannot
-// be read, a screening Checkr marks for review — those wait on /ops. A person's decision is
+// be read, a screening result the approved provider marks for review — those wait on /ops. A person's decision is
 // recorded beside the reading (never over it), is authenticated and audit-logged (see
 // resolveDocument / setSuspension), and still passes the same date and coverage checks.
 const { disclosureCurrent } = require('./disclosure');
 const { screeningCurrent } = require('./screening');
 const { coverageLapsed } = require('./matching');
+const { continuingStatus } = require('./insurance-monitoring');
+const { forState: insuranceForState } = require('./insurance-jurisdictions');
+const { markets } = require('./markets');
 
 /**
  * The documents that gate an operator: the three the app asks for (app/operator/documents.tsx).
@@ -46,32 +49,16 @@ const REQUIRED_DOCS = ['license', 'registration', 'insurance'];
 // subsection it comes from. No alternative formulation is encoded: an earlier version accepted
 // a $125,000 combined single limit for the logged-on period, which no subsection of §627.748
 // authorizes, and it was removed. CONFIRM WITH FLORIDA COUNSEL; change figures here only.
-const FL_TNC_INSURANCE = Object.freeze({
-  statute: 'Fla. Stat. §627.748(7)',
-  // §627.748(7)(b): logged on to the digital network, not engaged in a prearranged ride —
-  // bodily injury $50,000 per person and $100,000 per incident, property damage $25,000. Stated
-  // as split limits; a combined figure alone is an exception for a person, not a pass.
-  loggedOn: { subsection: '(7)(b)', perPerson: 50000, perIncident: 100000, propertyDamage: 25000 },
-  // §627.748(7)(c): engaged in a prearranged ride — primary automobile liability of at least
-  // $1,000,000 for death, bodily injury and property damage.
-  ride: { subsection: '(7)(c)', primaryLiabilityMinDollars: 1000000 },
-  // §627.748(7)(b) and (7)(c) both require personal injury protection meeting the no-fault
-  // minimums; the $10,000 figure is the PIP benefit minimum of §627.736(1).
-  pipMinDollars: 10000,
-  // §627.748(7)(b) and (7)(c) both require uninsured / underinsured motorist coverage "as
-  // required by s. 627.727", and §627.727 lets a named insured reject it in writing. Whether a
-  // rejection satisfies the TNC requirement is for counsel: until INSURANCE_UM_REJECTION_ACCEPTED
-  // is set, a rejection is an exception, not a pass.
-  umRejectionAccepted: () => process.env.INSURANCE_UM_REJECTION_ACCEPTED === '1',
-  // Carried forward from the platform's own rules, not from §627.748(7): the policy must state
-  // TNC or for-hire use (a personal policy may exclude it), cover the registered vehicle, name the
-  // operator, and be in force. Each is an exception when not shown.
-});
-// Kept for the existing checks: the §627.748(7)(c) figure.
-const FL_TNC_RIDE_MIN = FL_TNC_INSURANCE.ride.primaryLiabilityMinDollars;
+function insuranceRuleForUser(user) {
+  const marketId = user?.operatingMarket?.id || null;
+  const market = marketId ? markets().find((m) => m.id === marketId) || null : null;
+  return { market, rule: insuranceForState(market?.state) };
+}
 
-// Kept under its old name: the $1,000,000 check the platform has always made.
-const FL_CARRYING_LIMIT_DOLLARS = FL_TNC_RIDE_MIN;
+// Compatibility exports for existing Florida tests and migration code. Qualification itself
+// resolves the rule from the Operator's declared operating market.
+const FL_TNC_INSURANCE = insuranceForState('FL');
+const FL_CARRYING_LIMIT_DOLLARS = FL_TNC_INSURANCE.ride.primaryLiabilityMinDollars;
 
 /** Every dollar figure in a limits string. Bare small numbers ("50/100/25") are not guessed at. */
 function dollarFigures(text) {
@@ -137,14 +124,22 @@ function insuranceEvidence(d, human) {
   };
 }
 
-/** Every Florida TNC insurance rule, applied in code. Returns findings (possibly none). */
+/** Every configured jurisdiction's TNC insurance rule, applied in code. */
 function insuranceFindings(d, human, ctx, now) {
-  const R = FL_TNC_INSURANCE;
   const out = [];
   const F = (k, code, reason) => out.push(finding('qualification', k, code, 'insurance', reason));
+  const { market, rule: R } = insuranceRuleForUser(ctx.user);
+  if (!market) {
+    F('incomplete', 'insurance_market_required', 'Choose the market where you will operate before American Rider verifies insurance.');
+    return out;
+  }
+  if (!R) {
+    F('incomplete', 'insurance_jurisdiction_not_configured', `Insurance requirements for ${market.state} have not yet been activated.`);
+    return out;
+  }
   const e = insuranceEvidence(d, human);
   if (!e.structured) {
-    F('exception', 'insurance_structured_evidence_missing', 'The policy has not been read in the structured form the Florida rules need.');
+    F('exception', 'insurance_structured_evidence_missing', 'The policy has not been read in the structured form the configured jurisdiction rules need.');
     return out;
   }
   // Who is insured: the account holder must be a named insured or listed driver.
@@ -242,10 +237,13 @@ function documentFindings(kind, d, now, ctx = {}) {
     if (use !== 'yes') return Q('exception', 'insurance_use_unverified', 'Whether the policy covers carrying passengers for hire is not confirmed.');
     const limit = human ? Number(human.limitDollars) : Math.max(0, ...dollarFigures(ev.fields?.limits));
     if (!(limit > 0)) return Q('exception', 'insurance_limits_unreadable', 'The coverage limits could not be read.');
-    if (limit < FL_CARRYING_LIMIT_DOLLARS) {
-      return Q('refused', 'insurance_limits_insufficient', `Highest limit shown is $${limit.toLocaleString('en-US')}; §627.748(7)(c) requires $1,000,000 during a prearranged ride.`);
+    const { market, rule } = insuranceRuleForUser(ctx.user);
+    if (!market) return Q('incomplete', 'insurance_market_required', 'Choose the market where you will operate before American Rider verifies insurance.');
+    if (!rule) return Q('incomplete', 'insurance_jurisdiction_not_configured', `Insurance requirements for ${market.state} have not yet been activated.`);
+    if (limit < rule.ride.primaryLiabilityMinDollars) {
+      return Q('refused', 'insurance_limits_insufficient', `Highest liability limit shown is ${limit.toLocaleString('en-US')}; ${rule.statute} requires at least ${rule.ride.primaryLiabilityMinDollars.toLocaleString('en-US')} during a prearranged Travel.`);
     }
-    // And the full Florida TNC rule set on the structured reading.
+    // And the full jurisdiction rule set on the structured reading.
     return insuranceFindings(d, human, ctx, now);
   }
   return [];
@@ -287,11 +285,31 @@ function assessOperator({ user, fleet = null, context = 'qualify', liveMoney = f
   }
   if (u) for (const k of REQUIRED_DOCS) documentFindings(k, u.documents?.[k], now, { user: u }).forEach(add);
 
+  // CONTINUING INSURANCE STATUS. A compliant declarations page is a point-in-time fact.
+  // Monthly independent confirmation and the Operator's own attestation are separate facts.
+  // Any adverse carrier/broker status, or status older than 35 days, blocks qualification.
+  if (u?.documents?.insurance?.verdict === 'accept') {
+    const live = continuingStatus(u, now);
+    if (!live.ok) {
+      add(finding(
+        'qualification',
+        live.status === 'cancelled' || live.status === 'nonrenewed' ? 'refused' : 'incomplete',
+        live.code,
+        'insurance',
+        live.reason,
+      ));
+    }
+  }
+
   const s = u?.screening || null;
   if (s?.decision === 'refuse') {
     add(finding('qualification', 'refused', 'screening_refused', 'screening', s.summary || 'Background screening refused.'));
   } else if (s?.decision === 'review') {
     add(finding('qualification', 'exception', 'screening_review', 'screening', s.summary || 'Background screening needs a decision.'));
+  } else if (s?.decision === 'pre_adverse') {
+    add(finding('qualification', 'incomplete', 'screening_pre_adverse', 'screening', s.summary || 'Background screening is in the required pre-adverse notice and dispute period.'));
+  } else if (['in_progress','invited','ordered','awaiting_provider','awaiting_agency','expired'].includes(s?.decision)) {
+    add(finding('qualification', 'incomplete', 'screening_incomplete', 'screening', s.summary || 'Background screening is not complete.'));
   } else if (fleet?.screeningBlocked) {
     // Set by a refusal or a hold (both handled above from the account record) and by the
     // three-year sweep, which leaves decision 'pass' in place: that one is a re-check owed.
@@ -399,7 +417,7 @@ function auditEntry({ actor, action, uid, item, before, after, note, now }) {
  *
  * An accept still passes every deterministic check in documentFinding: the person supplies the
  * expiry when the reading had none, and for insurance confirms commercial use and states the
- * limit they read, which is then held to Florida's figure like any other.
+ * limit they read, which is then held to the jurisdiction's figure like any other.
  */
 async function resolveDocument({ db, uid, kind, action, actor, note, expiry, commercialUse, limitDollars, verified, now = Date.now() }) {
   if (!REQUIRED_DOCS.includes(kind)) return { ok: false, status: 400, error: 'Unknown document' };

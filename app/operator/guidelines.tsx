@@ -17,12 +17,12 @@ import { colors } from '../../src/theme';
 
 // KEYS, NOT SENTENCES — evaluated at import, before the stored language is read.
 const GUIDANCE_KEYS: [string, string][] = [
-  ['traveler.insLiabilityTitle', 'traveler.insLiabilityBody'],
-  ['traveler.insUmTitle', 'traveler.insUmBody'],
-  ['traveler.insRecordTitle', 'traveler.insRecordBody'],
-  ['traveler.insCost25Title', 'traveler.insCost25Body'],
-  ['traveler.insCostU25Title', 'traveler.insCostU25Body'],
-  ['traveler.insAgeTitle', 'traveler.insAgeBody'],
+  ['traveler.insShopTitle', 'traveler.insShopBody'],
+  ['traveler.insPrepareTitle', 'traveler.insPrepareBody'],
+  ['traveler.insAskTitle', 'traveler.insAskBody'],
+  ['traveler.insCheckTitle', 'traveler.insCheckBody'],
+  ['traveler.insMarketCostTitle', 'traveler.insMarketCostBody'],
+  ['traveler.insRequoteTitle', 'traveler.insRequoteBody'],
 ];
 
 export default function CoverageGuidelines() {

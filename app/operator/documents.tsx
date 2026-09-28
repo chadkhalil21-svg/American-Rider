@@ -50,8 +50,8 @@ const DOCUMENTS: { key: DocKind; title: string; asks: string }[] = [
   },
 ];
 
-const dateLabel = (iso: string) =>
-  new Date(`${iso}T12:00:00`).toLocaleDateString('en-US', {
+const dateLabel = (iso: string, language: string) =>
+  new Date(`${iso}T12:00:00`).toLocaleDateString(language, {
     month: 'long',
     day: 'numeric',
     year: 'numeric',
@@ -69,9 +69,9 @@ export default function OperatorDocuments() {
     // offered because insurance and inspection documents usually arrive as a PDF or a
     // screenshot, and refusing it would refuse the ordinary case.
     Alert.alert(title, t('traveler.whereIsDocument'), [
-      { text: 'Take a photograph', onPress: () => run(kind, true) },
-      { text: 'Choose a file', onPress: () => run(kind, false) },
-      { text: 'Cancel', style: 'cancel' },
+      { text: t('traveler.takePhotograph'), onPress: () => run(kind, true) },
+      { text: t('traveler.chooseFile'), onPress: () => run(kind, false) },
+      { text: t('common.cancel'), style: 'cancel' },
     ]);
   };
 
@@ -84,8 +84,8 @@ export default function OperatorDocuments() {
     // NOTHING IS CLAIMED HERE. The context has already recorded the verdict; the rows below
     // read it. This only reports the failures the rows cannot show — an upload that never
     // arrived, and a server that could not be reached.
-    if (!out) Alert.alert('Not submitted', t('traveler.docUploadFailed'));
-    else if ('error' in out) Alert.alert('Not checked', out.error);
+    if (!out) Alert.alert(t('traveler.notSubmitted'), t('traveler.docUploadFailed'));
+    else if ('error' in out) Alert.alert(t('traveler.notChecked'), out.error);
   };
 
   const bgLabel = op.bgCheckedAt
@@ -119,10 +119,10 @@ export default function OperatorDocuments() {
 
                 {accepted ? (
                   <Text style={styles.rowSub}>
-                    {review?.expiry ? `Valid through ${dateLabel(review.expiry)}` : review?.summary || t('traveler.docAccepted')}
+                    {review?.expiry ? t('traveler.validThrough', { date: dateLabel(review.expiry, language) }) : review?.summary || t('traveler.docAccepted')}
                   </Text>
                 ) : review?.verdict === 'refuse' ? (
-                  <Text style={styles.rowRefused}>{review.reasons[0] || 'Not accepted.'}</Text>
+                  <Text style={styles.rowRefused}>{review.reasons[0] || t('traveler.notAccepted')}</Text>
                 ) : review?.verdict === 'review' ? (
                   <Text style={styles.rowSub}>
                     {t('traveler.beingCheckedByPerson', { reason: review.reasons[0] || '' })}
@@ -134,7 +134,7 @@ export default function OperatorDocuments() {
                 {!accepted && !checking && (
                   <Pressable onPress={() => submit(d.key, d.title)} hitSlop={6}>
                     <Text style={styles.action}>
-                      {review ? t('traveler.submitDifferentDoc') : 'Submit ›'}
+                      {review ? t('traveler.submitDifferentDoc') : `${t('traveler.submit')} ›`}
                     </Text>
                   </Pressable>
                 )}

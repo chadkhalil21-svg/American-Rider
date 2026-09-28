@@ -25,10 +25,10 @@
 //             say so rather than remember an old one.
 //   osrmUrl   an OSRM server for street routing, same lookup. Without one, streets.js asks OTP.
 //   transit.feeds     the GTFS feeds loaded into that OTP, by the feedId OTP prefixes onto
-//             every identifier it returns ('MDT:31009'). fareCents is what a traveler pays the
-//             agency for one boarding; null means the fare is not known here (zone- or
+//             every identifier it returns ('MDT:31009'). fareCents is the configured base boarding fare; null means the fare is not known here (zone- or
 //             date-priced) and smart.js reports that rather than inventing a number. freeModes
-//             lists our leg modes that ride free on that feed.
+//             lists our leg modes that ride free on that feed. transferIncluded must be explicitly
+//             true before Smart Travel assumes later boardings on that feed add no fare.
 //   transit.frequentRoutesFile  the bus allow-list infra/otp/frequent-routes.mjs writes for
 //             this region, relative to backend/. Without the file no bus is offered.
 //
@@ -116,7 +116,7 @@ const REGIONS = Object.freeze([
     timezone: 'America/New_York',
     transit: {
       feeds: [
-        { feedId: 'MDT', agency: 'Miami-Dade Transit', fareCents: 225, freeModes: ['tram'] },
+        { feedId: 'MDT', agency: 'Miami-Dade Transit', fareCents: 225, freeModes: ['tram'], transferIncluded: true },
         { feedId: 'BCT', agency: 'Broward County Transit', fareCents: null },
         { feedId: 'PALMTRAN', agency: 'Palm Tran', fareCents: 200 },
         { feedId: 'SFRTA', agency: 'Tri-Rail', fareCents: null },
@@ -186,7 +186,7 @@ function listRegions() {
     otp: { configured: !!r.otpUrl },
     streets: r.osrmUrl ? 'osrm' : r.otpUrl ? 'otp' : 'none',
     transit: {
-      feeds: r.transit.feeds.map((f) => ({ feedId: f.feedId, agency: f.agency, fareCents: f.fareCents, freeModes: [...(f.freeModes || [])] })),
+      feeds: r.transit.feeds.map((f) => ({ feedId: f.feedId, agency: f.agency, fareCents: f.fareCents, freeModes: [...(f.freeModes || [])], transferIncluded: f.transferIncluded === true })),
       frequentRoutesFile: r.transit.frequentRoutesFile,
     },
   }));

@@ -25,13 +25,14 @@
 // So a message now carries BOTH uids, and the security rule lets either party read the thread
 // and write only as themselves. `from` is still checked against the writer, so nobody can
 // forge a message from the other side.
-import { addDoc, collection, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { auth, db } from '../firebase';
+import { PAYMENT_SERVER_URL } from '../config';
 import { t } from '../i18n';
 
 export type TravelMessage = {
   id: string;
-  from: 'traveler' | 'operator';
+  from: 'traveler' | 'operator' | 'guardian';
   text: string;
   createdAt: number;
   lostItemId?: string | null;
@@ -48,35 +49,21 @@ export type TravelMessage = {
  * unless this returned true.
  */
 export async function sendTravelMessage(args: {
-  /** The ride record's id. The security rule reads it; the parties come from it. */
   rideId: string | null | undefined;
   tripNo: string;
   text: string;
-  from: 'traveler' | 'operator';
-  /** The other party's uid, so the rule can let both of them read the thread. */
+  from: 'traveler' | 'operator' | 'guardian';
   travelerUid?: string | null;
   operatorId?: string | null;
-  /** Set when the message belongs to a lost item report, so it lands with that case. */
+  guardianUid?: string | null;
   lostItemId?: string | null;
 }): Promise<boolean> {
-  const uid = auth.currentUser?.uid;
   const text = args.text.trim();
-  // THE RIDE IS REQUIRED. firestore.rules reads it to decide who may write here; a message
-  // with no ride is refused there, so it is not sent at all.
-  if (!uid || !text || !args.tripNo || !args.rideId) return false;
+  if (!auth.currentUser?.uid || !text || !args.rideId) return false;
   try {
-    await addDoc(collection(db, 'messages'), {
-      rideId: args.rideId,
-      tripNo: args.tripNo,
-      from: args.from,
-      // The writer is always themselves; the counterparty comes from the travel record.
-      travelerUid: args.from === 'traveler' ? uid : args.travelerUid ?? null,
-      operatorId: args.from === 'operator' ? uid : args.operatorId ?? null,
-      lostItemId: args.lostItemId ?? null,
-      text: text.slice(0, 2000),
-      createdAt: Date.now(),
-    });
-    return true;
+    const token=await auth.currentUser.getIdToken();
+    const res=await fetch(`${PAYMENT_SERVER_URL}/travel/message`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({rideId:args.rideId,text:text.slice(0,2000),lostItemId:args.lostItemId??null})});
+    return res.ok;
   } catch {
     return false;
   }
@@ -104,7 +91,7 @@ export async function sendTravelMessage(args: {
  */
 export function watchTravelThread(
   tripNo: string,
-  side: 'traveler' | 'operator',
+  side: 'traveler' | 'operator' | 'guardian',
   onChange: (msgs: TravelMessage[]) => void,
   onError?: (reason: string) => void,
 ): () => void {
@@ -117,7 +104,7 @@ export function watchTravelThread(
     const q = query(
       collection(db, 'messages'),
       where('tripNo', '==', tripNo),
-      where(side === 'operator' ? 'operatorId' : 'travelerUid', '==', uid),
+      where(side === 'operator' ? 'operatorId' : side === 'guardian' ? 'guardianUid' : 'travelerUid', '==', uid),
     );
     return onSnapshot(
       q,
@@ -128,7 +115,7 @@ export function watchTravelThread(
               const x = d.data() as Record<string, unknown>;
               return {
                 id: d.id,
-                from: x.from === 'operator' ? 'operator' : 'traveler',
+                from: x.from === 'operator' ? 'operator' : x.from === 'guardian' ? 'guardian' : 'traveler',
                 text: String(x.text ?? ''),
                 createdAt: Number(x.createdAt ?? 0),
                 lostItemId: (x.lostItemId as string | null) ?? null,

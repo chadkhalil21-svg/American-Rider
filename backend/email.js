@@ -27,19 +27,20 @@ const emailReady = () => !!(readKey('RESEND_API_KEY') && readKey('MAIL_FROM'));
  * Send one message. Returns { ok, reason }. NEVER throws — a receipt that cannot be sent must
  * not undo a journey that happened or a payment that succeeded.
  */
-async function send({ to, subject, html, text }) {
+async function send({ to, subject, html, text, from: fromOverride, replyTo }) {
   const key = readKey('RESEND_API_KEY');
-  const from = readKey('MAIL_FROM') || 'American Rider <receipts@americanrider.app>';
+  const from = fromOverride || readKey('MAIL_FROM') || 'American Rider <receipts@americanrider.app>'; 
   if (!key) return { ok: false, reason: 'RESEND_API_KEY is not set' };
   if (!to) return { ok: false, reason: 'no address for this account' };
   try {
     const r = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to: [to], subject, html, text }),
+      body: JSON.stringify({ from, to: [to], subject, html, text, ...(replyTo ? { reply_to: replyTo } : {}) }),
     });
     if (!r.ok) return { ok: false, reason: `Resend ${r.status}: ${(await r.text()).slice(0, 200)}` };
-    return { ok: true };
+    const out = await r.json().catch(() => ({}));
+    return { ok: true, id: out?.id || null };
   } catch (e) {
     return { ok: false, reason: e.message };
   }

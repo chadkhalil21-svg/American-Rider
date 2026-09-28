@@ -55,8 +55,8 @@ const KINDS = {
   insurance: {
     title: 'Commercial insurance',
     // The declarations page, not the wallet card: the card shows a policy exists, the
-    // declarations page shows what it covers. American Rider carries NO coverage behind the
-    // operator, so the limits on this page are the only ones a traveler has.
+    // declarations page shows what it covers. The Operator's policy is a mandatory eligibility
+    // layer; any separate TNC coverage required by applicable law is handled independently.
     wants: [
       'named insured',
       'policy number',

@@ -33,9 +33,9 @@ These need a founder's word before anything moves:
    the sheet; "Request Operator" / "Authorize & Dispatch Operator" for the button; "Travel
    Ledger", "Conclude Session", "Security Protocols", "Platform Governance & Philosophy". The
    existing true, translated names stayed; each is a one-string change if a founder picks one.
-5. **The 99% statement** — the brief (§10A) puts it in About and on the receipt, once; Chad
-   asked for it in the menu and on the profile. It is on the profile (once, "travel fare"), not
-   in the menu. Confirm or reverse.
+5. **The 99% statement — ANSWERED, 27 Sept 2026.** It stays in commercial and transaction
+   contexts such as About and the receipt. It does not appear in the menu or ordinary Profile,
+   because those surfaces contain account information rather than commercial promotion.
 6. **The last blue control — ANSWERED, 18 Sept 2026.** Chad listed "‹ Back" among the blue
    controls to take the colour off, in his review of the operator qualification flow. The
    shared `BackLink` is ink on all nine screens that use it (`a332664`). AGENTS.md's "until a

@@ -6,15 +6,9 @@
 // duty is refused until it is acknowledged, and the acknowledgement is stored on the account
 // with the exact text and the moment — see backend/disclosure.js.
 //
-// WHY THE ANSWER IS "NONE", AND WHY THAT IS FINE. §627.748(7) permits the required coverage to
-// be maintained by the driver rather than the company, so American Rider provides none. The
-// statute does not require a company to carry insurance; it requires a company to SAY what it
-// carries. Saying "none" plainly, once, in a place the operator cannot miss, is what
-// compliance looks like here — and it is also the only honest way to ask somebody to drive.
-//
-// THE VOICE. This is the screen where an operator learns they are uninsured by us. It does not
-// soften that, does not apologise for it, and does not bury it under what they should do
-// instead. The rubric's own words: state the fact and stop.
+// The Operator's own qualifying policy is the insurance layer American Rider verifies.
+// American Rider does not provide automobile insurance. The server owns the disclosure text,
+// version and acknowledgement record so the app cannot silently diverge from the record.
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -29,29 +23,30 @@ import { BackLink, Card, Chev, PrimaryButton, Screen, Sub, Title } from '../../s
 import { useLanguage } from '../../src/state/LanguageContext';
 import { colors } from '../../src/theme';
 
-const dateLabel = (ms: number) =>
-  new Date(ms).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+const dateLabel = (ms: number, language: string) =>
+  new Date(ms).toLocaleDateString(language, { month: 'long', day: 'numeric', year: 'numeric' });
 
 export default function OperatorDisclosure() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const goBack = useGoBack();
   const router = useRouter();
   const [doc, setDoc] = useState<Disclosure | null>(null);
   const [acknowledgedAt, setAcknowledgedAt] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // ONE CERTIFICATE, READ IN PLACE. The three sections are the server's own text
+  // ONE CERTIFICATE, READ IN PLACE. The sections are the server's own text
   // (backend/disclosure.js), shown as rows of a single card rather than three separate
   // cards. Nothing is rewritten, summarised or resealed here: the statute periods stay
   // inside the bodies where the server put them (§627.748(7) in "What you must carry").
   //
   // EVERY PART MUST BE OPENED BEFORE THE OPERATOR CAN AGREE (Adrian, 18 Sept 2026).
-  // §627.748(8)(a) requires TWO things in writing: what the TNC provides, and that the
-  // operator's own policy might not cover them. When the card first shipped, one row opened
+  // §627.748(8)(a) requires the written platform-coverage statement, the own-policy warning,
+  // and the warning for compensated transportation outside a prearranged TNC Travel. The
+  // additional qualification row explains what American Rider requires. When the card first shipped, one row opened
   // and the others stayed shut, so an operator could acknowledge text that never appeared on
   // their screen — and the record would then hold words they never read, which is worse than
   // no record. `seen` is the set of rows they have opened. The control stays off until it
-  // holds all three, and says which condition is unmet, exactly as the qualification screen
+  // holds every row, and says which condition is unmet, exactly as the qualification screen
   // says "Verify all 5 to continue".
   const [open, setOpen] = useState<number | null>(0);
   const [seen, setSeen] = useState<number[]>([0]);
@@ -74,7 +69,7 @@ export default function OperatorDisclosure() {
     setAcknowledgedAt(Date.now());
   };
 
-  const sections = doc ? [doc.provided, doc.ownPolicy, doc.required] : [];
+  const sections = doc ? [doc.provided, doc.ownPolicy, doc.outsidePrearranged, doc.required] : [];
   const allSeen = sections.length > 0 && sections.every((_, i) => seen.includes(i));
 
   return (
@@ -124,7 +119,7 @@ export default function OperatorDisclosure() {
       {acknowledgedAt ? (
         <Card style={styles.doneCard}>
           <Text style={styles.heading}>
-            {t('traveler.acknowledgedOn', { date: dateLabel(acknowledgedAt) })}
+            {t('traveler.acknowledgedOn', { date: dateLabel(acknowledgedAt, language) })}
           </Text>
           <Text style={[styles.body, { paddingBottom: 0 }]}>
             {t('traveler.disclosureRecorded')}

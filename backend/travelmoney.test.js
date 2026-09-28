@@ -11,7 +11,7 @@ const check = (l, c, d) => R.push({ l, ok: !!c, d });
 function fakeDb(seed) {
   const data = JSON.parse(JSON.stringify(seed));
   const snap = (c, id) => ({ exists: !!data[c]?.[id], data: () => (data[c]?.[id] ? JSON.parse(JSON.stringify(data[c][id])) : undefined) });
-  return {
+  const db = {
     data,
     collection: (c) => ({
       doc: (id) => ({
@@ -24,6 +24,15 @@ function fakeDb(seed) {
       }),
     }),
   };
+  db.runTransaction = async (fn) => {
+    const tx = {
+      get: async (ref) => ref.get(),
+      update: (ref, fields) => ref.update(fields),
+      set: (ref, fields, opts) => ref.set(fields, opts),
+    };
+    return fn(tx);
+  };
+  return db;
 }
 
 // A Stripe stand-in: two paid intents belonging to the SAME traveler, one per travel.
@@ -41,9 +50,9 @@ function stripe() {
       if (!pi || pi.uid !== expectUid) return { cents: 0, reason: 'not yours' };
       return { cents: pi.cents - pi.refunded, reason: null };
     },
-    refundTravel: async ({ paymentIntentId, amountCents }) => {
+    refundTravel: async ({ paymentIntentId, amountCents, idempotencyKey }) => {
       intents[paymentIntentId].refunded += amountCents;
-      log.refunds.push({ paymentIntentId, amountCents });
+      log.refunds.push({ paymentIntentId, amountCents, idempotencyKey });
       return { ok: true, refundId: `re_${paymentIntentId}`, amountCents, status: 'succeeded' };
     },
     transferFixed: async (x) => { log.transfers.push({ kind: 'fee', ...x }); return { ok: true, transferId: 'tr_fee' }; },
@@ -70,6 +79,7 @@ const rides = (over = {}) => ({
     const out = await cancelTravel({ db, uid: 'alice', rideId: 'A', deps: s, paymentIntentId: 'pi_B', body: { paymentIntentId: 'pi_B' } });
     check('cancel A while naming B\'s payment: A is refunded', out.status === 200 && out.body.refunded === true && s.log.refunds.length === 1 && s.log.refunds[0].paymentIntentId === 'pi_A', JSON.stringify(s.log.refunds));
     check('…and B is NEVER refunded', s.intents.pi_B.refunded === 0 && !s.log.refunds.some((r) => r.paymentIntentId === 'pi_B'));
+    check('cancellation carries one stable Stripe idempotency key for this Travel', s.log.refunds[0].idempotencyKey === 'ar_cancel_refund_A');
     check('…and B stays live', db.data.rides.B.status === 'accepted' && !db.data.rides.B.refundId);
     check('the cancel function takes no payment id from its caller at all', !/paymentIntentId\s*[,}]/.test(cancelTravel.toString().split('\n')[0]));
   }
@@ -133,6 +143,24 @@ const rides = (over = {}) => ({
     check('the owner pays for their own live ride', out.status === 200 && db.data.rides.N.paymentIntentId === 'pi_new' && db.data.rides.N.paidAt === 7);
     check('Stripe gets the RIDE\'s Travel Number and id, not the request\'s', s.log.creates[0].tripNo === 'AR-9-MIA' && s.log.creates[0].rideId === 'N');
   }
+  {
+    const db = fakeDb({ rides: { N: { ...fare, travelerUid: 'alice', tripNo: 'AR-9-MIA', status: 'assigned', paymentClaim: 'pay_other', paymentClaimedAt: 1000 } } });
+    const s = stripe();
+    const out = await payForTravel({ db, uid: 'alice', rideId: 'N', create: s.create, now: 2000 });
+    check('a concurrent live payment claim blocks a second Stripe creation', out.status === 409 && out.body.code === 'payment_in_progress' && s.log.creates.length === 0);
+  }
+  {
+    const db = fakeDb({ rides: { N: { ...fare, travelerUid: 'alice', tripNo: 'AR-9-MIA', status: 'assigned', paymentClaim: 'pay_dead', paymentClaimedAt: 1000 } } });
+    const s = stripe();
+    const out = await payForTravel({ db, uid: 'alice', rideId: 'N', create: s.create, now: 122001 });
+    check('an expired payment claim is recoverable instead of stranding the Travel', out.status === 200 && db.data.rides.N.paymentIntentId === 'pi_new' && s.log.creates.length === 1);
+  }
+  {
+    const src = fs.readFileSync(path.join(__dirname, 'travelmoney.js'), 'utf8');
+    const body = src.slice(src.indexOf('async function payForTravel'), src.indexOf('async function cancelTravel'));
+    check('payment claims use a unique nonce, not uid/ride as a pretend lock', /randomUUID\(\)/.test(body));
+    check('payment claims have an expiry so a dead process cannot strand payment forever', /PAYMENT_CLAIM_TTL_MS/.test(body) && /claimAge/.test(body));
+  }
   // ——— an already-paid travel: NO Stripe creation call at all (audit of f6ef88d) ——————————————
   {
     const db = fakeDb({ rides: { N: { ...fare, travelerUid: 'alice', tripNo: 'AR-9-MIA', status: 'assigned', paymentIntentId: 'pi_first' } } });
@@ -162,7 +190,7 @@ const rides = (over = {}) => ({
   {
     const src = fs.readFileSync(path.join(__dirname, 'travelmoney.js'), 'utf8');
     const body = src.slice(src.indexOf('async function payForTravel'), src.indexOf('async function cancelTravel'));
-    check('payForTravel checks the recorded payment BEFORE calling create()', body.indexOf('if (ride.paymentIntentId)') > 0 && body.indexOf('if (ride.paymentIntentId)') < body.indexOf('await create('));
+    check('payForTravel transactionally claims the payment transition BEFORE calling create()', /runTransaction/.test(body) && /paymentClaim/.test(body) && body.indexOf('runTransaction') < body.indexOf('await create('));
     const pay = fs.readFileSync(path.join(__dirname, 'payments.js'), 'utf8');
     const resume = pay.slice(pay.indexOf('async function resumePaymentIntent'), pay.indexOf('async function chargeRide'));
     check('resumePaymentIntent retrieves and never creates a PaymentIntent', /paymentIntents\.retrieve\(/.test(resume) && !/paymentIntents\.create\(/.test(resume));

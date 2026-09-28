@@ -9,9 +9,7 @@
 // what the traveler saves against driving the whole way.
 //
 // MONEY, THE RULES (founders, 9 Sept 2026):
-//   - We charge for the car legs we operate, plus ONE platform fee for the journey — the same
-//     platformFeeCents() the rest of the company charges, applied once, to the car total.
-//     Never per leg. The formula lives in payments.js and is imported, not copied.
+//   - We charge for the car legs we operate, with coordinated platform pricing across the journey. Each real car Travel is charged\n//     separately, and the combined fee funds the actual transaction count. The formula lives in\n//     payments.js and is imported, not copied.
 //   - Transit fares are paid by the traveler to the agency. They are never charged by us and
 //     never inside smartCents; they are REPORTED (transitFareCents) so the traveler sees what
 //     the journey actually costs, and the saving is journey against journey.
@@ -22,7 +20,7 @@
 // THE ANSWER is one of { status: 'ok', plan }, { status: 'none' } (no transit route exists),
 // { status: 'unavailable' } (the planner is not answering). Never a throw.
 const { fareCentsForCoords, straightLineMiles } = require('./fares');
-const { platformFeeCents } = require('./payments');
+const { quote } = require('./payments');
 const { governmentFeesFor } = require('./fees');
 const { REGIONS, regionForTrip } = require('./regions');
 const transit = require('./transit');
@@ -48,7 +46,7 @@ const sameAgency = (a, b) => {
 /** A region's fare table: one row per feed, { feedId, name, cents, freeModes }. */
 function fareGroupsFor(region) {
   const feeds = region && region.transit && Array.isArray(region.transit.feeds) ? region.transit.feeds : [];
-  return feeds.map((f) => ({ feedId: f.feedId, name: f.agency, cents: f.fareCents == null ? null : f.fareCents, freeModes: f.freeModes || [] }));
+  return feeds.map((f) => ({ feedId: f.feedId, name: f.agency, cents: f.fareCents == null ? null : f.fareCents, freeModes: f.freeModes || [], transferIncluded: f.transferIncluded === true }));
 }
 
 /** The fare table row a leg falls under, or null when its feed is not known here. */
@@ -306,33 +304,51 @@ function buildPlan(pickup, dest, itinerary, direct) {
   }
   ours.push(egress);
 
-  // ONE FARE PER SYSTEM, NOT PER BOARDING. Miami-Dade Transit's $2.25 buys a journey: the
-  // change at Earlington Heights is inside the fare gates, and Metrorail ↔ Metrobus transfers
-  // are free on the EASY Card and on contactless payment (cash on a bus is per boarding, and
-  // the app does not assume cash). Counted per boarding, Brickell → the airport cost $4.50.
-  // The first PAID boarding on each system carries the fare; later ones on that system carry
-  // none. A free leg (a mover) neither pays for the system nor is paid for by it.
+  // Transfer policy is agency/feed data, never a universal transit assumption. Only a feed
+  // explicitly configured with transferIncluded=true may collapse later paid boardings into
+  // the first fare. Unknown policy therefore errs toward not understating the Traveler's cost.
   const paid = new Set();
   for (const l of ours) {
     if (l.kind !== 'transit' || !l.fareGroup || !(l.cents > 0)) continue;
-    if (paid.has(l.fareGroup)) {
+    const group = transitFareGroup(l, region);
+    if (group?.transferIncluded && paid.has(l.fareGroup)) {
       l.cents = 0;
       l.transfer = true;
-    } else {
+    } else if (group?.transferIncluded) {
       paid.add(l.fareGroup);
     }
   }
 
-  // Money. carCents is what we operate; ONE fee on that total; transit fares reported apart.
-  // A journey with no car leg at all is nothing American Rider sells, so it carries no fee.
-  const carCents = sum(ours, (l) => (l.kind === 'car' ? l.cents : 0));
-  const feeCents = carCents > 0 ? platformFeeCents(carCents) : 0;
-  const governmentFeeCents = sum(ours, (l) => l.governmentFeeCents || 0);
-  const smartCents = carCents + feeCents + governmentFeeCents;
+  // Money. Each car leg is a real, separately charged Travel. Quote the first leg normally,
+  // then quote the second as the continuation of that paid journey. This keeps the screen's
+  // preview on the SAME two-transaction economics that payment uses, instead of the historical
+  // one-fee-on-combined-fare shortcut.
+  const carLegs = ours.filter((l) => l.kind === 'car');
+  const carCents = sum(carLegs, (l) => l.cents);
+  const governmentFeeCents = sum(carLegs, (l) => l.governmentFeeCents || 0);
+  let feeCents = 0;
+  let smartCents = 0;
+  if (carLegs.length === 1) {
+    const q = quote(carLegs[0].cents, null, carLegs[0].feeLines || [], null, 0);
+    feeCents = q.appFee;
+    smartCents = q.travelerPays;
+  } else if (carLegs.length >= 2) {
+    const first = carLegs[0];
+    const second = carLegs[carLegs.length - 1];
+    const q1 = quote(first.cents, null, first.feeLines || [], null, 0);
+    const q2 = quote(second.cents, {
+      journeyNo: 'smart-preview',
+      leg1FareCents: first.cents,
+      leg1GovernmentFeeCents: first.governmentFeeCents || 0,
+      leg1TollCents: 0,
+    }, second.feeLines || [], null, 0);
+    feeCents = q1.appFee + q2.appFee;
+    smartCents = q1.travelerPays + q2.travelerPays;
+  }
   const transitFareCents = sum(ours, (l) => (l.kind === 'transit' ? l.cents : 0));
   const transitFareUnknown = ours.some((l) => l.fareUnknown);
   const journeyCents = smartCents + transitFareCents;
-  const directCents = direct.travelCostCents + platformFeeCents(direct.travelCostCents);
+  const directCents = quote(direct.travelCostCents, null, governmentFeesFor(pickup, dest), null, 0).travelerPays;
   const saveCents = directCents - journeyCents;
 
   // Time. The transit part is OTP's timetable; our ends are added on either side of it.
@@ -347,7 +363,7 @@ function buildPlan(pickup, dest, itinerary, direct) {
     from: { id: board.stopId || '', name: bareName(board), lat: board.lat, lng: board.lng },
     to: { id: alight.stopId || '', name: bareName(alight), lat: alight.lat, lng: alight.lng },
     legs: ours,
-    smartCents, // what American Rider charges: the car legs, one fee, any government fee
+    smartCents, // what American Rider charges across the real car Travels and any government fee
     feeCents,
     governmentFeeCents, // an airport or port pickup fee on a car leg, passed through
     carCents,
@@ -398,4 +414,34 @@ async function smartQuote(pickup, dest, opts = {}) {
   return { status: 'ok', plan: built };
 }
 
-module.exports = { smartQuote, transitFareFor, transitFareGroup, fareGroupsFor, pickItinerary, tidyName, WALK_MILES };
+/**
+ * Re-checks the transit middle of an already selected Smart Travel against the region's current
+ * OTP state. This is intentionally geography-agnostic: OTP decides which configured GTFS /
+ * realtime feeds apply. It never silently blesses an old itinerary when the planner is down.
+ */
+async function revalidateTransit(currentPlan, opts = {}) {
+  if (!currentPlan || !isCoord(currentPlan.from) || !isCoord(currentPlan.to)) return { status: 'none', reason: 'bad_plan' };
+  const plan = typeof opts.planTransit === 'function' ? opts.planTransit : transit.planTransit;
+  const when = opts.when instanceof Date ? opts.when : new Date();
+  let res;
+  try { res = await plan({ from: currentPlan.from, to: currentPlan.to, when, access: 'WALK', egress: 'WALK', first: 4 }); }
+  catch (e) { return { status: 'unavailable', reason: (e && e.message) || String(e) }; }
+  if (!res || res.status === 'unavailable') return { status: 'unavailable', reason: (res && res.reason) || 'no answer' };
+  if (res.status !== 'ok') return { status: 'none', reason: res.reason || 'no_current_transit' };
+  const itinerary = pickItinerary(res.itineraries);
+  if (!itinerary) return { status: 'none', reason: 'no_current_transit' };
+  const oldTransit = (currentPlan.legs || []).filter((l) => l.kind === 'transit');
+  const newTransit = (itinerary.legs || []).filter((l) => l.kind === 'transit');
+  const sig = (legs) => legs.map((l) => [l.route?.gtfsId || '', l.from?.stopId || '', l.to?.stopId || ''].join('|')).join('>');
+  const changed = sig(oldTransit) !== sig(newTransit);
+  return {
+    status: 'ok',
+    changed,
+    checkedAt: when.toISOString(),
+    departAt: newTransit[0]?.startTime || itinerary.startTime || null,
+    arriveAt: newTransit[newTransit.length - 1]?.endTime || itinerary.endTime || null,
+    routeSignature: sig(newTransit),
+  };
+}
+
+module.exports = { smartQuote, revalidateTransit, transitFareFor, transitFareGroup, fareGroupsFor, pickItinerary, tidyName, WALK_MILES };

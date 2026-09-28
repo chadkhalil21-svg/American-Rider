@@ -11,6 +11,8 @@ import { i18n, t } from '../i18n';
 
 /** The travel a case concerns. Sent so the server reasons from recorded facts, not guesses. */
 export type SupportTrip = {
+  /** Firestore Travel id. Monetary remedies are impossible without this authoritative key. */
+  rideId?: string;
   no: string;
   dep: string;
   arr: string;
@@ -64,6 +66,7 @@ export async function submitIssue(args: {
       headers: await authHeaders(),
       body: JSON.stringify({
         description: args.description,
+        rideId: args.trip?.rideId,
         trip: args.trip ?? undefined,
         category: args.category,
         // So every word the traveler reads back — the model's answer and our fixed lines — is

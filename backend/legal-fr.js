@@ -38,10 +38,10 @@ l’Assistance Voyageurs) si vous pensez qu’une autre personne l’utilise.</l
 
 <section><h2>3 · Tarification — l’engagement</h2>
 <ul>
-<li>Un <strong>prix unique tout compris vous est indiqué avant la réservation</strong> : le
-tarif du trajet plus des frais de plateforme. Les frais de plateforme s’élèvent à 1,50 USD
-ou à 5 % du tarif du trajet, selon le montant le plus élevé. Le traitement du paiement est
-prélevé sur ces frais.</li>
+<li>Un <strong>prix unique tout compris vous est indiqué avant la réservation</strong>. Il
+constitue le coût total du trajet : le tarif du trajet et des frais de plateforme, qui ne sont
+jamais présentés comme des frais séparés ni ajoutés au montant indiqué. Le traitement du
+paiement est prélevé sur ces frais.</li>
 <li>Le prix indiqué à la réservation est le prix débité.</li>
 <li>Votre opérateur conserve 99 % du tarif du trajet. Notre commission s’élève à 1 % du tarif
 du trajet.</li>

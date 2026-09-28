@@ -12,8 +12,8 @@ flow, design, the penny-accurate 99% money math, the logo, dark mode, and the di
 (Smart Travel, Find-My arrow, predictive routing). It's the blueprint the real app copies.
 
 ✅ **Stripe account created** (test mode) and the **core payment code written & verified** —
-the 99% / 1% split and the platform fee (the greater of $1.50 and 5% of the travel fare,
-since 9 Sept 2026) work to the penny (`backend/payments.js`).
+the 99% / 1% split and the cost-funded platform fee in `backend/economics.js` work to the
+penny (`backend/payments.js`).
 
 The demo's job is done. Everything below is turning that proven demo into a real, launchable app.
 

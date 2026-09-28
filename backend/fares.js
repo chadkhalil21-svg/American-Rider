@@ -69,8 +69,9 @@ function fareCentsFor(destination) {
 //
 // THE RATES. These are the whole fare model — change them here and nowhere else.
 // Chosen to sit near Miami UberX pricing so we're competitive without underpaying operators.
-// Remember: the operator keeps 99% of this amount; the traveler pays this + the platform fee
-// (payments.js platformFeeCents: the greater of $1.50 and 5% of it).
+// Remember: the operator keeps 99% of this amount; the traveler pays this plus the
+// server-calculated platform fee. That fee is the minimum whole-cent amount satisfying the
+// complete unit-economic invariant in economics.js; it is not a fixed percentage.
 // THE RATES. These are the whole fare model — change them here and nowhere else.
 //
 // RESTORED TO THE OFFICIAL FORMULA, 20 SEPT 2026 (Chad, explicitly, after re-checking Miami
@@ -117,19 +118,12 @@ const PER_MINUTE_CENTS = 15; // $0.15 per minute
 // twelve minutes and five miles in forty. In Miami traffic that is a straight transfer from the
 // operator to our headline price, and it is the failure mode the $1.80 flat rate reintroduced.
 
-// THE FLOOR IS ON WHAT THE TRAVELER PAYS, NOT ON THE FARE. Chad, 20 Sept 2026: "lowest total
-// travel cost is $5". The traveler pays fare + platform fee, and the fee is $1.50 at every fare
-// this floor can reach, so the fare floor is $3.50 and the total floor is exactly $5.00.
-//
-// A CONFLICT, RESOLVED IN THE OPEN. The same day's instruction to restore the official formula
-// quotes it with a "$6.00 minimum", which is a floor on the FARE and would put the lowest total
-// at $7.50. The two cannot both hold. $5.00 is implemented because Chad's own argument in that
-// message is that our minimum must not sit above the competition — he names Uber's Miami
-// minimum at $6.09 and Lyft's at $3.62, and calls our old $9.00 "meaningfully above both". A
-// $7.50 total would still be above Uber. A $5.00 total is below it. Flagged to the founders
-// rather than settled quietly; one constant reverses it.
-const MIN_TOTAL_CENTS = 500; // $5.00, the lowest total travel cost
-const MINIMUM_CENTS = MIN_TOTAL_CENTS - 200; // $3.00 fare + the $2.00 platform-fee floor
+// THE FLOOR IS ON THE TRAVELER'S FARE+PLATFORM-FEE TOTAL. The absolute platform-fee
+// floor is $2.00 and economics.js confirms that the $2 floor controls at the $3 minimum fare,
+// so a no-pass-through Standard Travel starts at $5.00. Government fees and tolls, when
+// applicable, are true pass-throughs and may raise the final Total.
+const MIN_TOTAL_CENTS = 500;
+const MINIMUM_CENTS = MIN_TOTAL_CENTS - 200; // $3 fare + $2 absolute platform-fee floor
 
 // Straight-line distance under-states how far a car actually drives (roads bend, one-ways,
 // causeways). This multiplier approximates real driving distance, and is used ONLY when no

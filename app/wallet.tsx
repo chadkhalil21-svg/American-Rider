@@ -15,7 +15,7 @@
 // NOT HERE, because the app cannot say it truthfully: corporate billing profiles, retainers,
 // monthly statements and expense-system integrations (none exist), and card artwork drawn
 // for instruments the record does not hold.
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../src/components/AppText';
@@ -36,7 +36,6 @@ import { colors } from '../src/theme';
 
 export default function PaymentAndSettlement() {
   const { t } = useLanguage();
-  const router = useRouter();
   const goBack = useGoBack();
   const payConfig = usePaymentConfig();
   const modeNote = paymentModeNote(payConfig);
@@ -106,7 +105,7 @@ export default function PaymentAndSettlement() {
   return (
     <Screen>
       <LetterheadBar onBack={goBack} />
-      <Title>{t('traveler.paymentSettlement')}</Title>
+      <Title size={24}>{t('traveler.paymentSettlement')}</Title>
       <Sub>{t('traveler.paymentSettlementSub')}</Sub>
 
       <SectionLabel style={{ marginTop: 24 }}>{t('traveler.paymentMethods')}</SectionLabel>
@@ -146,7 +145,7 @@ export default function PaymentAndSettlement() {
                       <Text style={styles.action}>{t('traveler.setAsDefault')}</Text>
                     </Pressable>
                     <Pressable accessibilityRole="button" disabled={busy} onPress={() => remove(m.id)} hitSlop={8}>
-                      <Text style={styles.action}>{t('traveler.remove')}</Text>
+                      <Text style={styles.removeAction}>{t('traveler.remove')}</Text>
                     </Pressable>
                   </View>
                 )}
@@ -176,41 +175,29 @@ export default function PaymentAndSettlement() {
       {error && <Text style={styles.errorNote}>{error}</Text>}
       {modeNote && <Text style={styles.modeNote}>{modeNote}</Text>}
 
-      <SectionLabel style={{ marginTop: 24 }}>{t('traveler.travel')}</SectionLabel>
-      <Pressable accessibilityRole="button" onPress={() => router.navigate({ pathname: '/history', params: { from: 'wallet' } })}>
-        <Card style={styles.receiptsCard}>
-          <Text style={styles.rowTitle}>{t('traveler.travelLogReceipts')}</Text>
-          <Chev />
-        </Card>
-      </Pressable>
+
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { marginTop: 12, paddingHorizontal: 20, paddingVertical: 2 },
+  card: { marginTop: 10, paddingHorizontal: 18, paddingVertical: 1 },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 15,
+    paddingVertical: 13.5,
     gap: 12,
   },
   hair: { borderTopWidth: 1, borderTopColor: colors.hairline },
-  rowTitle: { fontSize: 15, color: colors.ink },
+  rowTitle: { fontSize: 14.5, color: colors.ink },
   rowSub: { fontSize: 12.5, color: colors.muted, marginTop: 3 },
-  muted: { fontSize: 14.5, color: colors.ink2 },
+  muted: { fontSize: 14, color: colors.ink2 },
   defaultTag: { fontSize: 13, fontWeight: '600', color: colors.ink2 },
   actions: { alignItems: 'flex-end', gap: 8 },
-  action: { fontSize: 13, fontWeight: '600', color: colors.ink2 },
+  action: { fontSize: 13, fontWeight: '600', color: colors.accent },
+  removeAction: { fontSize: 13, fontWeight: '600', color: colors.ink2 },
   errorNote: { fontSize: 13, color: colors.ink, marginTop: 10 },
   modeNote: { fontSize: 12, color: colors.muted, marginTop: 10, lineHeight: 17.5 },
-  receiptsCard: {
-    marginTop: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
+
 });

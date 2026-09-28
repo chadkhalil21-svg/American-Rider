@@ -15,6 +15,7 @@ export type Disclosure = {
   title: string;
   provided: DisclosureSection;
   ownPolicy: DisclosureSection;
+  outsidePrearranged: DisclosureSection;
   required: DisclosureSection;
   acknowledgement: string;
 };

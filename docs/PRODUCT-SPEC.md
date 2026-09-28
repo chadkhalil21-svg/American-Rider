@@ -34,8 +34,8 @@ itself into every transaction.
 
 - Operator retains: **99% of the travel fare**
 - American Rider receives: **1% of the travel fare (no cap)** plus the traveler's
-  **platform fee: the greater of $1.50 and 5% of the travel fare, rounded up to the cent**
-  ($1.50 exactly below a $30 fare — Chad, 9 Sept 2026; confirmed in writing 13 Sept 2026)
+  **platform fee: the minimum whole-cent amount required by the current cost model in
+  `backend/economics.js`**
 - Objective: the lowest-extraction transportation marketplace in the industry.
 
 ## Platform Principles

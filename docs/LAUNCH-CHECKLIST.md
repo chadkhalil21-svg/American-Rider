@@ -17,7 +17,7 @@ The short version: *we've built the cockpit; now we need the plane.*
 | Item | Status | Plain English | Tool |
 |---|---|---|---|
 | **Design & flow** | ✅ DONE | The whole look, feel, screens, navigation, dark mode, language | — |
-| **Fare math** | ✅ DONE | 1% of the travel fare + the platform fee (the greater of $1.50 and 5% of the fare, since 9 Sept 2026), operator keeps 99%, penny-accurate | — |
+| **Fare math** | ✅ DONE | Server-authoritative cost-funded platform fee; Operator keeps 99% of Travel Fare; penny-accurate | Controlled live-money evidence |
 | **Accounts / login** | 🔴 NEEDS BUILDING | Sign up once, it remembers you. Right now nothing is saved. | Firebase Auth |
 | **Payments** | 🔴 NEEDS BUILDING | Actually charge the traveler, actually pay the operator 99%. **This IS the business.** | Stripe Connect |
 | **Maps + GPS** | 🟡 DEMO-ONLY (hand-drawn map) | Real location, real routing, real ETA, fare from *actual* miles/minutes | Google Maps |

@@ -35,9 +35,9 @@ Viaggiatori) se ritiene che un’altra persona lo stia utilizzando.</li>
 <section><h2>3 · Prezzi — l’impegno</h2>
 <ul>
 <li>Le viene mostrato <strong>un unico prezzo comprensivo di tutto prima della
-prenotazione</strong>: la tariffa del viaggio più una commissione di piattaforma. La
-commissione di piattaforma è di 1,50 USD o del 5 % della tariffa del viaggio, a seconda di
-quale sia maggiore. L’elaborazione del pagamento è pagata con tale commissione.</li>
+prenotazione</strong>. È il costo totale del viaggio: la tariffa del viaggio insieme a una
+commissione di piattaforma, che non viene mai mostrata come addebito separato né aggiunta
+all’importo indicato. L’elaborazione del pagamento è pagata con tale commissione.</li>
 <li>Il prezzo indicato alla prenotazione è il prezzo addebitato.</li>
 <li>Il suo operatore trattiene il 99 % della tariffa del viaggio. La nostra commissione è
 l’1 % della tariffa del viaggio.</li>

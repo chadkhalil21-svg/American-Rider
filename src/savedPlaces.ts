@@ -10,13 +10,15 @@
 // Favourites were added 14 September 2026 at Adrian's request: any number of destinations
 // (up to eight) a traveler wants one tap away on Home.
 //
-// STORED ON THE DEVICE. A home address is the most sensitive thing a rideshare app holds; it
-// is the one piece of data that says where somebody sleeps. It is not needed on the server —
-// nothing dispatches from it, and a booking sends coordinates like any other pickup — so it
-// does not go there. Deleting the app deletes it.
+// ACCOUNT-BACKED, with an account-scoped device cache. Saved Places follow the Traveler to a
+// replacement phone while the local copy keeps the interface immediate and usable offline.
+// One account must never inherit another account's places on a shared device.
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { auth, db } from './firebase';
 
-const KEY = 'ar:saved-places:v1';
+const KEY_PREFIX = 'ar:saved-places:v2:';
+const storageKey = () => KEY_PREFIX + (auth.currentUser?.uid || 'preview');
 export const MAX_FAVORITES = 8;
 
 export type SavedPlace = { label: string; lat: number; lng: number };
@@ -30,25 +32,61 @@ const ok = (p?: SavedPlace | null): SavedPlace | undefined =>
     : undefined;
 
 export async function loadSavedPlaces(): Promise<SavedPlaces> {
+  let local: SavedPlaces = { favorites: [] };
   try {
-    const raw = await AsyncStorage.getItem(KEY);
-    if (!raw) return { favorites: [] };
-    const v = JSON.parse(raw) as Partial<SavedPlaces>;
-    const favorites = (Array.isArray(v.favorites) ? v.favorites : [])
-      .map((p) => ok(p))
-      .filter((p): p is SavedPlace => !!p)
-      .slice(0, MAX_FAVORITES);
-    return { home: ok(v.home), work: ok(v.work), favorites };
+    const raw = await AsyncStorage.getItem(storageKey());
+    if (raw) {
+      const v = JSON.parse(raw) as Partial<SavedPlaces>;
+      const favorites = (Array.isArray(v.favorites) ? v.favorites : [])
+        .map((p) => ok(p))
+        .filter((p): p is SavedPlace => !!p)
+        .slice(0, MAX_FAVORITES);
+      local = { home: ok(v.home), work: ok(v.work), favorites };
+    }
   } catch {
-    return { favorites: [] };
+    local = { favorites: [] };
   }
+
+  const uid = auth.currentUser?.uid;
+  if (!uid) return local;
+
+  try {
+    const snap = await getDoc(doc(db, 'users', uid));
+    const rawRemote = snap.exists() ? snap.data()?.savedPlaces : null;
+    if (rawRemote && typeof rawRemote === 'object') {
+      const v = rawRemote as Partial<SavedPlaces>;
+      const favorites = (Array.isArray(v.favorites) ? v.favorites : [])
+        .map((p) => ok(p))
+        .filter((p): p is SavedPlace => !!p)
+        .slice(0, MAX_FAVORITES);
+      const remote = { home: ok(v.home), work: ok(v.work), favorites };
+      await AsyncStorage.setItem(storageKey(), JSON.stringify(remote)).catch(() => {});
+      return remote;
+    }
+
+    // One-time migration for people who already had device-only places before account sync.
+    if (local.home || local.work || local.favorites.length) {
+      await setDoc(doc(db, 'users', uid), { savedPlaces: local }, { merge: true });
+    }
+  } catch {
+    // Offline or rules unavailable: the account-scoped local cache remains usable.
+  }
+  return local;
 }
 
 async function persist(next: SavedPlaces): Promise<SavedPlaces> {
   try {
-    await AsyncStorage.setItem(KEY, JSON.stringify(next));
+    await AsyncStorage.setItem(storageKey(), JSON.stringify(next));
   } catch {
     /* a device that cannot store it still returns the value for this session */
+  }
+  const uid = auth.currentUser?.uid;
+  if (uid) {
+    try {
+      await setDoc(doc(db, 'users', uid), { savedPlaces: next }, { merge: true });
+    } catch {
+      // The local account cache remains usable offline; the next load can retry migration.
+    }
   }
   return next;
 }

@@ -1,5 +1,8 @@
 // Trusted contacts — the up-to-three people who can be told where a traveler is.
 //
+// The list is account-backed with an account-scoped device cache so a safety configuration
+// follows the Traveler to a replacement phone without crossing between accounts on one device.
+//
 // WHY THIS FILE EXISTS: the list used to be `string[]` — names only. Safe Travels then
 // offered "Add a contact" and stored, say, "Ana". A name is not a way of reaching anyone,
 // so the emergency screen could not have messaged a single one of them. Storing a number
@@ -8,8 +11,11 @@
 // The old shape is migrated in place rather than discarded: someone who added three names
 // keeps all three, they simply have no number until one is added.
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { auth, db } from './firebase';
 
-export const CONTACTS_KEY = 'ar:trusted-contacts:v1';
+const CONTACTS_KEY_PREFIX = 'ar:trusted-contacts:v2:';
+const contactsKey = () => CONTACTS_KEY_PREFIX + (auth.currentUser?.uid || 'preview');
 export const MAX_CONTACTS = 3;
 
 export type TrustedContact = {
@@ -39,35 +45,68 @@ export function prettyPhone(raw?: string): string {
   return raw || '';
 }
 
+function normalizeContacts(parsed: unknown): TrustedContact[] {
+  if (!Array.isArray(parsed)) return [];
+  return parsed
+    .map((c: unknown): TrustedContact | null => {
+      if (typeof c === 'string') return c.trim() ? { name: c.trim() } : null;
+      if (c && typeof c === 'object') {
+        const name = String((c as TrustedContact).name ?? '').trim();
+        const phone = normalizePhone(String((c as TrustedContact).phone ?? ''));
+        return name ? { name, ...(phone ? { phone } : {}) } : null;
+      }
+      return null;
+    })
+    .filter((c): c is TrustedContact => c !== null)
+    .slice(0, MAX_CONTACTS);
+}
+
 /** Read the list, migrating the old names-only shape. Never throws. */
 export async function loadContacts(): Promise<TrustedContact[]> {
+  let local: TrustedContact[] = [];
   try {
-    const raw = await AsyncStorage.getItem(CONTACTS_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .map((c: unknown): TrustedContact | null => {
-        if (typeof c === 'string') return c.trim() ? { name: c.trim() } : null;
-        if (c && typeof c === 'object') {
-          const name = String((c as TrustedContact).name ?? '').trim();
-          const phone = normalizePhone(String((c as TrustedContact).phone ?? ''));
-          return name ? { name, ...(phone ? { phone } : {}) } : null;
-        }
-        return null;
-      })
-      .filter((c): c is TrustedContact => c !== null)
-      .slice(0, MAX_CONTACTS);
+    const raw = await AsyncStorage.getItem(contactsKey());
+    local = raw ? normalizeContacts(JSON.parse(raw)) : [];
   } catch {
-    return [];
+    local = [];
   }
+
+  const uid = auth.currentUser?.uid;
+  if (!uid) return local;
+
+  try {
+    const snap = await getDoc(doc(db, 'users', uid));
+    const remote = snap.exists() ? normalizeContacts(snap.data()?.trustedContacts) : [];
+    if (snap.exists() && Array.isArray(snap.data()?.trustedContacts)) {
+      await AsyncStorage.setItem(contactsKey(), JSON.stringify(remote)).catch(() => {});
+      return remote;
+    }
+
+    // One-time migration from the earlier device-only model.
+    if (local.length) {
+      await setDoc(doc(db, 'users', uid), { trustedContacts: local }, { merge: true });
+    }
+  } catch {
+    // Offline or rules unavailable: the account-scoped local cache remains usable.
+  }
+
+  return local;
 }
 
 /** Write the list back. Never throws — a failed save must not take the screen down. */
 export async function saveContacts(next: TrustedContact[]): Promise<void> {
+  const clean = normalizeContacts(next);
   try {
-    await AsyncStorage.setItem(CONTACTS_KEY, JSON.stringify(next.slice(0, MAX_CONTACTS)));
+    await AsyncStorage.setItem(contactsKey(), JSON.stringify(clean));
   } catch {
     // Storage full or unavailable. The in-memory list still holds for this session.
+  }
+  const uid = auth.currentUser?.uid;
+  if (uid) {
+    try {
+      await setDoc(doc(db, 'users', uid), { trustedContacts: clean }, { merge: true });
+    } catch {
+      // The local account cache remains usable offline; a later load can retry migration.
+    }
   }
 }

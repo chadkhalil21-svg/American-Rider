@@ -185,6 +185,14 @@ export async function dispatchRide(opts: {
   journeyNo?: string | null;
   /** Operators who have already declined this travel. Never offered it twice. */
   excludeIds?: string[];
+  party?: { mode: 'self' | 'other_adult' | 'teen'; travelerName?: string; familyLinkId?: string };
+  cabinPreferences?: {
+    climate: 'Cool' | 'Moderate' | 'Warm';
+    music: 'None' | 'Traveler Choice';
+    quiet: boolean;
+    charging: boolean;
+    luggage: boolean;
+  };
 }): Promise<MatchedOp | null> {
   // Never dispatch without a signed-in traveler: the server writes the travel against the
   // authenticated uid, and an "anon" travel could not be read back by anyone.
@@ -206,7 +214,11 @@ export async function dispatchRide(opts: {
       cls: opts.cls,
       journeyNo: opts.journeyNo ?? null,
       excludeIds: opts.excludeIds ?? [],
-      travelerName: auth.currentUser?.displayName || '',
+      travelerName: opts.party?.travelerName || auth.currentUser?.displayName || '',
+      bookerName: auth.currentUser?.displayName || '',
+      partyMode: opts.party?.mode || 'self',
+      familyLinkId: opts.party?.familyLinkId,
+      cabinPreferences: opts.cabinPreferences ?? null,
     }),
   });
 
@@ -354,25 +366,16 @@ export async function fetchMyRides(): Promise<RideRecord[]> {
 /**
  * Record the traveler's review of a completed travel.
  *
- * THE DEFECT THIS CLOSES: the Travel Complete screen collected a star rating and a tip and
- * did nothing with either. Worse, it added the tip to a row labelled "Total Charged" — an
- * amount stated as charged that had never been charged. A rating nobody stores cannot affect
- * an operator's standing, and a tip nobody records cannot reach them.
- *
- * `tipCents` is RECORDED, not collected: no second charge is made here. The screen must say
- * so rather than implying the money has moved.
- *
- * Returns whether the write landed. Never throws.
+ * Ratings are feedback only; no gratuity amount is stored or collected.
  */
 export async function recordTravelReview(
   rideId: string,
-  review: { stars: number; tipCents: number },
+  review: { stars: number },
 ): Promise<boolean> {
   if (!rideId) return false;
   try {
     await updateDoc(doc(db, 'rides', rideId), {
       rating: review.stars || null,
-      tipCents: review.tipCents || 0,
       reviewedAt: Date.now(),
     });
     return true;

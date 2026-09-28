@@ -7,7 +7,9 @@
 // the TNC's digital network. 2. That the TNC driver's own automobile insurance policy might
 // not provide any coverage while the TNC driver is logged on to the digital network or is
 // engaged in a prearranged ride, depending on the terms of the TNC driver's own automobile
-// insurance policy."
+// insurance policy. 3. That compensated passenger transportation outside a prearranged TNC
+// ride is subject to the financial-responsibility requirements in §324.032(1), with penalties
+// under §324.221."
 //
 // TWO THINGS FOLLOW FROM THAT WORDING, and both shape this file.
 //
@@ -21,11 +23,10 @@
 // one is out of date and is asked again, rather than being silently treated as having agreed
 // to words they never saw.
 //
-// WHAT AMERICAN RIDER PROVIDES IS NOTHING, and the statute is satisfied by saying so plainly.
-// §627.748(7) permits the required coverage to be maintained by the driver rather than the
-// TNC (verified against the statute 23 Aug 2026, after I had first overstated it). A
-// disclosure whose honest content is "none" is still a disclosure; what it must not do is
-// leave an operator guessing.
+// American Rider's product rule is explicit: each Operator must carry qualifying commercial
+// coverage and remain continuously verified. American Rider does not sell or provide automobile
+// insurance. The disclosure states that fact directly; qualification and continuing-status gates
+// decide whether an Operator may operate.
 
 // Bump this whenever the TEXT below changes in substance. Formatting fixes do not count;
 // anything that changes what an operator is agreeing to does.
@@ -38,7 +39,7 @@
 // This bump is not free and is made deliberately now: every operator who acknowledged
 // 2026-08-29.1 is asked to read and acknowledge again before going on duty. Today that is a
 // handful of test accounts; after the operator program opens on 28 Sept it would be everyone.
-const DISCLOSURE_VERSION = '2026-09-18.1';
+const DISCLOSURE_VERSION = '2026-09-27.1';
 
 /**
  * The disclosure itself. Served from here rather than written into the app so that the words
@@ -52,11 +53,8 @@ const DISCLOSURE = {
   provided: {
     heading: 'What American Rider provides',
     body:
-      'American Rider does not provide automobile liability insurance, uninsured or ' +
-      'underinsured motorist coverage, or personal injury protection for any period. Not while ' +
-      'you are logged on to the network, not while you are travelling to a pickup, and not ' +
-      'while a traveler is in your vehicle. There are no coverage types and no limits to state ' +
-      'because there is no coverage.',
+      'American Rider does not provide automobile liability insurance, uninsured or underinsured motorist coverage, or personal injury protection for an Operator or vehicle. ' +
+      'Each Operator must maintain qualifying commercial, for-hire, livery, or TNC coverage that satisfies the requirements of the jurisdiction in which the Operator serves.',
   },
   // (8)(a)2 — that the driver's own policy might not cover them.
   // (8)(a)2 — that the driver's own policy might not cover them.
@@ -82,6 +80,15 @@ const DISCLOSURE = {
       'policies exclude carrying passengers for payment. Read your policy, or ask your insurer ' +
       'directly whether it covers you while you operate for a transportation network company.',
   },
+  // (8)(a)3 — compensated passenger transportation outside a prearranged TNC Travel.
+  outsidePrearranged: {
+    heading: 'Travel must be prearranged through American Rider',
+    body:
+      'Florida law distinguishes prearranged TNC Travel from other compensated passenger transportation. ' +
+      'If you provide transportation for compensation that was not prearranged through the American Rider digital network, ' +
+      'the financial-responsibility requirements in Fla. Stat. §324.032(1) apply. Failure to satisfy those requirements ' +
+      'is subject to the penalties in §324.221.',
+  },
   /** Shown instead of `ownPolicy` once a commercial policy has been verified. */
   ownPolicyVerified: {
     heading: 'The policy you have provided',
@@ -98,13 +105,13 @@ const DISCLOSURE = {
     heading: 'What you must carry',
     body:
       'Florida requires the coverage in §627.748(7) to be in force whenever you are logged on. ' +
-      'Because American Rider provides none of it, all of it must come from a policy you hold ' +
-      'yourself — commercial, for-hire or livery. American Rider verifies that policy and its ' +
+      'American Rider requires you to maintain qualifying commercial, for-hire or livery coverage in your own name. American Rider verifies that policy and its ' +
       'expiry date, and will not assign travel to an operator whose coverage has lapsed.',
   },
   acknowledgement:
-    'I have read this disclosure. I understand American Rider provides no insurance, and that ' +
-    'my own policy might not cover me while I am logged on or carrying a traveler.',
+    'I have read this disclosure, including that American Rider does not provide automobile insurance, ' +
+    'the warning that my own policy might not cover me while I am logged on or carrying a traveler, and ' +
+    'the requirements that apply to compensated passenger transportation outside a prearranged American Rider Travel.',
 };
 
 /**

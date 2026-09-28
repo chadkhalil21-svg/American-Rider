@@ -20,6 +20,7 @@
 // that sentence into something more polite. They must not. An operator deciding whether to
 // spend $200 a month on commercial cover is entitled to the same flat statement in their own
 // language that an English speaker gets.
+
 const TRANSLATIONS = {
   es: {
     title: 'Declaración de Seguro',
@@ -41,6 +42,13 @@ const TRANSLATIONS = {
         'pago. Lea su póliza, o pregunte directamente a su aseguradora si le cubre mientras ' +
         'opera para una empresa de red de transporte.',
     },
+    outsidePrearranged: {
+      heading: 'El Viaje debe concertarse previamente mediante American Rider',
+      body:
+        'La ley de Florida distingue un Viaje TNC concertado previamente de otros servicios remunerados de transporte de pasajeros. ' +
+        'Si presta transporte a cambio de compensación que no fue concertado previamente mediante la red digital de American Rider, ' +
+        'se aplican los requisitos de responsabilidad financiera del Estatuto de Florida §324.032(1). El incumplimiento está sujeto a las sanciones de §324.221.',
+    },
     ownPolicyVerified: {
       heading: 'La póliza que usted ha aportado',
       body:
@@ -61,8 +69,7 @@ const TRANSLATIONS = {
         'asignará viajes a un operador cuya cobertura haya vencido.',
     },
     acknowledgement:
-      'He leído esta declaración. Entiendo que American Rider no proporciona ningún seguro y ' +
-      'que mi propia póliza podría no cubrirme mientras esté conectado o lleve a un viajero.',
+      'He leído esta declaración. Entiendo que American Rider no proporciona seguro de automóvil, que mi propia póliza podría no cubrirme mientras esté conectado o lleve a un viajero y los requisitos aplicables al transporte remunerado fuera de un Viaje American Rider preacordado.',
     governing:
       'Esta traducción se ofrece para que pueda leer este documento en su idioma. La versión ' +
       'en inglés es la jurídicamente vinculante.',
@@ -89,6 +96,13 @@ const TRANSLATIONS = {
         'contre rémunération. Lisez votre police, ou demandez directement à votre assureur si ' +
         'elle vous couvre lorsque vous opérez pour une entreprise de réseau de transport.',
     },
+    outsidePrearranged: {
+      heading: 'Le Voyage doit être préarrangé par American Rider',
+      body:
+        'La loi de Floride distingue un Voyage TNC préarrangé des autres transports rémunérés de passagers. ' +
+        'Si vous fournissez un transport contre rémunération qui n’a pas été préarrangé par le réseau numérique d’American Rider, ' +
+        'les exigences de responsabilité financière prévues au §324.032(1) des Florida Statutes s’appliquent. Le non-respect est soumis aux sanctions prévues au §324.221.',
+    },
     ownPolicyVerified: {
       heading: 'La police que vous avez fournie',
       body:
@@ -110,9 +124,7 @@ const TRANSLATIONS = {
         'n’attribuera aucun trajet à un opérateur dont la garantie a expiré.',
     },
     acknowledgement:
-      'J’ai lu cette déclaration. Je comprends qu’American Rider ne fournit aucune assurance ' +
-      'et que ma propre police pourrait ne pas me couvrir lorsque je suis connecté ou ' +
-      'transporte un voyageur.',
+      'J’ai lu cette déclaration. Je comprends qu’American Rider ne fournit pas d’assurance automobile, que ma propre police pourrait ne pas me couvrir lorsque je suis connecté ou transporte un voyageur, et les exigences applicables au transport rémunéré en dehors d’un Voyage American Rider préarrangé.',
     governing:
       'Cette traduction est fournie afin que vous puissiez lire ce document dans votre langue. ' +
       'La version anglaise est juridiquement contraignante.',
@@ -138,6 +150,13 @@ const TRANSLATIONS = {
         'passeggeri a pagamento. Legga la sua polizza, o chieda direttamente al suo ' +
         'assicuratore se la copre mentre opera per una società di rete di trasporto.',
     },
+    outsidePrearranged: {
+      heading: 'Il Viaggio deve essere preorganizzato tramite American Rider',
+      body:
+        'La legge della Florida distingue un Viaggio TNC preorganizzato dagli altri trasporti di passeggeri a pagamento. ' +
+        'Se fornisce trasporto a pagamento che non è stato preorganizzato tramite la rete digitale di American Rider, ' +
+        'si applicano i requisiti di responsabilità finanziaria del Florida Statute §324.032(1). Il mancato rispetto è soggetto alle sanzioni previste dal §324.221.',
+    },
     ownPolicyVerified: {
       heading: 'La polizza che lei ha fornito',
       body:
@@ -158,9 +177,7 @@ const TRANSLATIONS = {
         'assegnerà viaggi a un operatore la cui copertura sia scaduta.',
     },
     acknowledgement:
-      'Ho letto questa informativa. Comprendo che American Rider non fornisce alcuna ' +
-      'assicurazione e che la mia polizza potrebbe non coprirmi mentre sono connesso o ' +
-      'trasporto un viaggiatore.',
+      'Ho letto questa informativa. Comprendo che American Rider non fornisce assicurazione automobilistica, che la mia polizza potrebbe non coprirmi mentre sono connesso o trasporto un viaggiatore e i requisiti applicabili al trasporto a pagamento fuori da un Viaggio American Rider preorganizzato.',
     governing:
       'Questa traduzione è fornita affinché possa leggere il documento nella sua lingua. La ' +
       'versione inglese è quella giuridicamente vincolante.',
@@ -187,6 +204,13 @@ const TRANSLATIONS = {
         'Ihre Police, oder fragen Sie Ihren Versicherer direkt, ob sie Sie beim Betrieb für ein ' +
         'Transportnetzwerkunternehmen abdeckt.',
     },
+    outsidePrearranged: {
+      heading: 'Die Fahrt muss über American Rider vorab vereinbart sein',
+      body:
+        'Das Recht Floridas unterscheidet eine vorab vereinbarte TNC-Fahrt von anderer entgeltlicher Personenbeförderung. ' +
+        'Wenn Sie Personen gegen Entgelt befördern und diese Beförderung nicht über das digitale Netzwerk von American Rider vorab vereinbart wurde, ' +
+        'gelten die finanziellen Verantwortungsanforderungen nach Florida Statute §324.032(1). Bei Nichterfüllung gelten die Sanktionen nach §324.221.',
+    },
     ownPolicyVerified: {
       heading: 'Die von Ihnen vorgelegte Police',
       body:
@@ -207,9 +231,7 @@ const TRANSLATIONS = {
         'einem Operator, dessen Schutz abgelaufen ist, keine Fahrten zu.',
     },
     acknowledgement:
-      'Ich habe diesen Hinweis gelesen. Mir ist bekannt, dass American Rider keinerlei ' +
-      'Versicherung bereitstellt und dass meine eigene Police mich möglicherweise nicht ' +
-      'abdeckt, während ich angemeldet bin oder einen Reisenden befördere.',
+      'Ich habe diesen Hinweis gelesen. Mir ist bekannt, dass American Rider keine Kfz-Versicherung bereitstellt, dass meine eigene Police mich möglicherweise nicht abdeckt, während ich angemeldet bin oder einen Reisenden befördere, und welche Anforderungen für entgeltliche Personenbeförderung außerhalb einer vorab vereinbarten American-Rider-Fahrt gelten.',
     governing:
       'Diese Übersetzung wird bereitgestellt, damit Sie dieses Dokument in Ihrer Sprache lesen ' +
       'können. Rechtlich verbindlich ist die englische Fassung.',
@@ -225,7 +247,8 @@ const DISCLOSURE_LANGUAGES = ['en', ...Object.keys(TRANSLATIONS)];
  * part another: an operator cannot tell which half they agreed to.
  */
 function translationFor(lang) {
-  return TRANSLATIONS[String(lang || '').slice(0, 2).toLowerCase()] || null;
+  const code = String(lang || '').slice(0, 2).toLowerCase();
+  return TRANSLATIONS[code] || null;
 }
 
 module.exports = { TRANSLATIONS, DISCLOSURE_LANGUAGES, translationFor };

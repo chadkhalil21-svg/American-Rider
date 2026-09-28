@@ -98,10 +98,6 @@ export default function OperatorRevenue() {
         </>
       )}
 
-      <Text style={styles.testNote}>
-        {t('traveler.revenueSimulated')}
-      </Text>
-
       <OperatorDrawer open={menuOpen} onClose={() => setMenuOpen(false)} onNote={showNote} />
     </OperatorScreen>
   );
@@ -132,5 +128,4 @@ const styles = StyleSheet.create({
   hair: { borderTopWidth: 1, borderTopColor: colors.hairline },
   opArr: { fontSize: 15, color: colors.ink },
   opTime: { fontSize: 12.5, color: colors.muted, marginTop: 2 },
-  testNote: { fontSize: 11.5, color: colors.faint, marginTop: 16, lineHeight: 16.7 },
 });

@@ -14,7 +14,7 @@ to start a payment; the server does the sensitive part.
 ## What's in here
 
 - `server.js` — the server. Answers requests from the app.
-- `payments.js` — the money math + the actual Stripe charge (99% to operator, 1% + the platform fee to us — the greater of $1.50 and 5% of the fare).
+- `payments.js` — the Stripe charge and settlement path. The Operator receives 99% of the Travel Fare. `economics.js` supplies the current cost-funded platform fee.
 - `matching.js` — the operator-matching logic (already proven).
 - `regions.js` — where the company operates: one record per service region (its box, its clock, its transit planner, its agency fares). The market gate, routing, Smart Travel and the fee ledger all read it; nothing else names a place.
 - `fees.js` — government per-travel fees (an airport's or a port's per-pickup charge), fenced to a box and passed through whole to the public body; `remittance.js` sums what is owed to each for a month.

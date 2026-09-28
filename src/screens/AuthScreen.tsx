@@ -9,7 +9,7 @@
 // Review opens those links and the free-tier server sleeps. See src/config.ts.
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, Image, Linking, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Image, Linking, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Text } from '../components/AppText';
 import { Screen } from '../components/UI';
 import { LEGAL_URL, PAYMENT_SERVER_URL } from '../config';
@@ -27,19 +27,13 @@ import { googleSignInConfigured, useGoogleSignIn } from '../state/googleSignIn';
 // work. Set EXPO_PUBLIC_SSO_PREVIEW=1 on a local simulator build to see the full layout.
 const SSO_PREVIEW = process.env.EXPO_PUBLIC_SSO_PREVIEW === '1';
 
-// The only country whose numbers we dispatch. South Florida today; the prefix becomes a
-// selector the day a second country's numbers are routed, and not before.
-const DEFAULT_DIAL_CODE = '+1';
-
-/** A telephone number as typed: digits and the punctuation people put between them. */
-const looksLikePhone = (v: string) => /^[+\d][\d\s().-]*$/.test(v.trim()) && /\d/.test(v);
 import { useAuth } from '../state/AuthContext';
 import { useLanguage } from '../state/LanguageContext';
 import { colors } from '../theme';
 
 const emailOk = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
 
-type Step = 'welcome' | 'signin' | 'signup' | 'confirm' | 'select' | 'ready';
+type Step = 'welcome' | 'signin' | 'signup' | 'select';
 
 function InkButton({
   label,
@@ -202,10 +196,14 @@ export function AuthScreen() {
   };
 
 
-  // One field, then the password step. The address is carried across so nobody types it twice.
+  // One email field, then the password step. Phone numbers are contact information only;
+  // offering them here would imply an authentication path that does not exist.
   const onContinue = () => {
     const clean = entry.trim();
-    if (!clean) return;
+    if (!emailOk(clean)) {
+      setSsoError(t('traveler.errInvalidEmail'));
+      return;
+    }
     setSsoError('');
     setEmail(clean);
     setStep('signin');
@@ -213,7 +211,6 @@ export function AuthScreen() {
 
   // null while the answer is unknown, then true or false — never assumed either way.
   const [netUp, setNetUp] = useState<boolean | null>(null);
-  const entryIsPhone = looksLikePhone(entry);
   useEffect(() => {
     let live = true;
     const ctrl = new AbortController();
@@ -239,36 +236,36 @@ export function AuthScreen() {
   const [mobile, setMobile] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [code, setCode] = useState('');
+  const [resetNotice, setResetNotice] = useState('');
 
   const firstName = name.trim().split(/\s+/)[0] || 'Traveler';
   const digits = mobile.replace(/\D/g, '');
   const canSubmit =
     emailOk(email) &&
-    password.length >= 6 &&
+    (step === 'signup' ? password.length >= 15 : password.length > 0) &&
     !busy &&
     (step !== 'signup' || (name.trim().length >= 2 && digits.length >= 10));
   const forgotPassword = async () => {
+    setResetNotice('');
     if (!emailOk(email)) {
-      Alert.alert(t('traveler.enterEmailFirst'), t('traveler.typeAddressThenTap'));
+      setResetNotice(t('traveler.typeAddressThenTap'));
       return;
     }
-    await resetPassword(email);
-    // Firebase answers the same way whether or not the address has an account, so this
-    // confirmation deliberately doesn't reveal which it was.
-    Alert.alert(t('traveler.checkYourEmail'), t('traveler.resetLinkSent', { email: email.trim() }));
+    const accepted = await resetPassword(email);
+    if (!accepted) return;
+    setResetNotice(t('traveler.resetLinkSent', { email: email.trim() }));
   };
 
   const submit = async () => {
     if (!canSubmit) return;
     if (step === 'signup') {
       setOnboarding(true); // keep the front door up through code → role → ready
-      try {
-        await signUp(email, password, name, mobile);
-        setStep('confirm');
-      } catch {
+      const created = await signUp(email, password, name, mobile);
+      if (!created) {
         setOnboarding(false);
+        return;
       }
+      setStep('select');
     } else {
       signIn(email, password);
     }
@@ -352,13 +349,46 @@ export function AuthScreen() {
               every remaining pixel above the logo where the directive says it belongs, and
               — unlike a spring — does not silently re-tune itself when the button count
               changes. Sign in with Apple can return without this needing a thought. */}
-          <View style={{ height: 56 }} />
+          <View style={{ height: 28 }} />
 
-          {/* CHAD'S ENTRY ARCHITECTURE (13 Sept 2026): Apple, Google, then one field.
-              Each control is offered only when it can actually be served — Apple when the
-              device says so, Google when this build carries the client ids — because a
-              control named after something it cannot do is what got the previous row
-              removed on 13 Aug, and is what review guideline 2.1 rejects. */}
+          {/* ONE FIELD, THEN ONE ACTION. The traveler types an address and continues; the
+              next screen asks for the password and offers to create the account instead.
+              It does NOT ask Firebase whether the address is already registered: email
+              enumeration protection has been on by default since 15 Sept 2023 and returns
+              nothing to fetchSignInMethodsForEmail, deliberately, so that a stranger cannot
+              discover who holds an account. A screen that branched on the answer would
+              either leak that or lie about it. */}
+          {/* Email is the direct credential path. Mobile is account contact information,
+              not an authentication factor, so the front door must not imply phone sign-in. */}
+          <View style={s.entryRow}>
+            <TextInput
+              value={entry}
+              onChangeText={setEntry}
+              placeholder={t('auth.emailOrMobileField')}
+              placeholderTextColor={colors.faint}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="email"
+              textContentType="username"
+              returnKeyType="next"
+              onSubmitEditing={onContinue}
+              style={s.entryInput}
+            />
+          </View>
+          <View style={{ height: 10 }} />
+          <InkButton label={t('auth.continueLabel')} onPress={onContinue} disabled={!entry.trim()} />
+
+          {/* PRIMARY ENTRY FIRST. Email and Continue are the institutional default;
+              Apple and Google follow as equivalent alternate entry methods. */}
+          {(appleReady || googleSignInConfigured || SSO_PREVIEW) && (
+            <View style={s.orRow}>
+              <View style={s.orRule} />
+              <Text style={s.orText}>{t('auth.orDivider')}</Text>
+              <View style={s.orRule} />
+            </View>
+          )}
+
           {(appleReady || SSO_PREVIEW) && (
             <>
               <SsoButton label={t('auth.continueWithApple')} onPress={onApple} glyph="apple" primary />
@@ -380,51 +410,8 @@ export function AuthScreen() {
                   onPress={() => setSsoError(t('auth.ssoNotConfigured'))}
                 />
               )}
-              <View style={{ height: 10 }} />
             </>
           )}
-
-          {(appleReady || googleSignInConfigured || SSO_PREVIEW) && (
-            <View style={s.orRow}>
-              <View style={s.orRule} />
-              <Text style={s.orText}>{t('auth.orDivider')}</Text>
-              <View style={s.orRule} />
-            </View>
-          )}
-
-          {/* ONE FIELD, THEN ONE ACTION. The traveler types an address and continues; the
-              next screen asks for the password and offers to create the account instead.
-              It does NOT ask Firebase whether the address is already registered: email
-              enumeration protection has been on by default since 15 Sept 2023 and returns
-              nothing to fetchSignInMethodsForEmail, deliberately, so that a stranger cannot
-              discover who holds an account. A screen that branched on the answer would
-              either leak that or lie about it. */}
-          {/* THE FIELD FOLLOWS WHAT IS BEING TYPED (Chad, 13 Sept 2026). Digits, spaces and
-              the usual punctuation of a telephone number bring the +1 prefix and the number
-              pad; anything with a letter or an @ returns it to the e-mail keyboard. The
-              prefix is a label, not a menu: we route numbers in one country today, and a
-              chevron on something with a single option names a control after what it does
-              not do. It becomes a selector when a second country's numbers are dispatched. */}
-          <View style={[s.entryRow, entryIsPhone && s.entryRowPhone]}>
-            {entryIsPhone && <Text style={s.dialCode}>{DEFAULT_DIAL_CODE}</Text>}
-            <TextInput
-              value={entry}
-              onChangeText={setEntry}
-              placeholder={t('auth.emailOrMobileField')}
-              placeholderTextColor={colors.faint}
-              keyboardType={entryIsPhone ? 'phone-pad' : 'email-address'}
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoComplete={entryIsPhone ? 'tel' : 'email'}
-              textContentType="username"
-              returnKeyType="next"
-              onSubmitEditing={onContinue}
-              style={s.entryInput}
-            />
-          </View>
-          <View style={{ height: 10 }} />
-          <InkButton label={t('auth.continueLabel')} onPress={onContinue} disabled={!entry.trim()} />
-
           {ssoError ? <Text style={s.ssoError}>{ssoError}</Text> : null}
 
           {/* The sentence is ONE key, not an English lead-in glued to translated link
@@ -459,55 +446,11 @@ export function AuthScreen() {
               same defect as a LIVE badge over a simulated car: a claim the system has not
               established. This asks the server and prints what it answered, including when
               the answer is that it cannot be reached. */}
-          <Text style={[s.network, netUp === false && s.networkDown]}>
-            {netUp === null
-              ? t('auth.networkChecking')
-              : netUp
-                ? t('auth.networkActive')
-                : t('auth.networkUnreachable')}
-          </Text>
-        </View>
-      </Screen>
-    );
-  }
-
-  if (step === 'confirm') {
-    return (
-      <Screen scroll={false}>
-        <View style={{ flex: 1 }}>
-          <Text style={s.title}>{t('auth.confirmYourNumber')}</Text>
-          <Text style={s.sub}>
-            {/* WAS: "A 6-digit code was sent to +1 305…". No code was sent — there is no
-                SMS provider wired to this app, and the line below already admitted it by
-                telling the traveler to type any six digits. An institution does not state a
-                thing on one line and contradict it on the next. */}
-            {t('auth.verifyOff')}
-          </Text>
-          <View style={s.fieldCard}>
-            <View style={[s.fieldWrap, s.fieldWrapLast]}>
-              <Text style={s.fieldLabel}>{t('auth.verificationCode')}</Text>
-              <TextInput
-                style={[s.field, s.codeField]}
-                placeholder="••••••"
-                placeholderTextColor={colors.faint}
-                keyboardType="number-pad"
-                maxLength={6}
-                value={code}
-                onChangeText={setCode}
-                autoFocus
-              />
-            </View>
-          </View>
-          <Text style={s.demoNote}>{t('auth.enterAnySix')}</Text>
-          {/* RESEND CODE REMOVED. It sent nothing and then said "New code sent" in green —
-              a control named after an action it did not perform, reporting an outcome that
-              did not happen. Restore it with the SMS provider it needs. */}
-          <View style={{ flex: 1 }} />
-          <InkButton
-            label={t('auth.confirm')}
-            onPress={() => setStep('select')}
-            disabled={code.replace(/\D/g, '').length !== 6}
-          />
+          {netUp === false && (
+            <Text style={[s.network, s.networkDown]}>
+              {t('auth.networkUnreachable')}
+            </Text>
+          )}
         </View>
       </Screen>
     );
@@ -517,10 +460,16 @@ export function AuthScreen() {
     return (
       <Screen scroll={false}>
         <View style={{ flex: 1 }}>
-          <Text style={s.title}>{t('auth.selectAccount')}</Text>
-          <Text style={s.sub}>{t('auth.chooseWhereToBegin')}</Text>
+          <Text style={[s.title, s.selectTitle]}>{t('auth.selectAccount')}</Text>
+          <Text style={[s.sub, s.selectSub]}>{t('auth.chooseWhereToBegin')}</Text>
 
-          <Pressable onPress={() => setStep('ready')}>
+          <Pressable
+            onPress={() => {
+              // Traveler is the immediate service experience. Once chosen, the account is
+              // already ready; an additional ceremonial confirmation screen adds no value.
+              setOnboarding(false);
+            }}
+          >
             <View style={s.roleCard}>
               <View style={{ flex: 1 }}>
                 <Text style={s.roleTitle}>{t('auth.roleTraveler')}</Text>
@@ -550,31 +499,6 @@ export function AuthScreen() {
           </Pressable>
 
           <View style={{ flex: 1 }} />
-          <Pressable onPress={() => setStep('ready')} hitSlop={10}>
-            <Text style={s.notSure}>{t('auth.notSureYet')}</Text>
-          </Pressable>
-        </View>
-      </Screen>
-    );
-  }
-
-  if (step === 'ready') {
-    return (
-      <Screen scroll={false}>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <View style={s.checkCircle}>
-            <Text style={s.checkMark}>✓</Text>
-          </View>
-          <Text style={[s.title, { textAlign: 'center', marginTop: 22 }]}>
-            {t('auth.accountReady', { name: firstName })}
-          </Text>
-          <Text style={[s.sub, { textAlign: 'center' }]}>
-            {t('auth.paymentLater')}
-          </Text>
-          <View style={{ height: 40 }} />
-          <View style={{ alignSelf: 'stretch' }}>
-            <InkButton label={t('traveler.beginTravel')} onPress={() => setOnboarding(false)} />
-          </View>
         </View>
       </Screen>
     );
@@ -588,20 +512,18 @@ export function AuthScreen() {
           <Text style={s.back}>{t('auth.back')}</Text>
         </Pressable>
 
-        <Text style={s.title}>{isSignup ? t('auth.createYourAccount') : t('auth.welcomeBack')}</Text>
-        <Text style={s.sub}>
-          {isSignup
-            ? t('auth.sameFirstStep')
-            : t('auth.signInToAccount')}
+        <Text style={[s.title, isSignup ? s.signupTitle : s.signInTitle]}>
+          {isSignup ? t('auth.createYourAccount') : t('auth.welcomeBack')}
         </Text>
+        {!isSignup && <Text style={s.sub}>{t('auth.signInToAccount')}</Text>}
 
         {/* The demo's labeled-field card: uppercase labels, underlined fields, one card. */}
-        <View style={s.fieldCard}>
+        <View style={[s.fieldCard, isSignup ? s.signupFieldCard : s.signInFieldCard]}>
           {isSignup && (
-            <View style={s.fieldWrap}>
-              <Text style={s.fieldLabel}>{t('auth.fullNameLabel')}</Text>
+            <View style={[s.fieldWrap, s.signupFieldWrap]}>
+              <Text style={[s.fieldLabel, s.signupFieldLabel]}>{t('auth.fullNameLabel')}</Text>
               <TextInput
-                style={s.field}
+                style={[s.field, s.signupField]}
                 placeholder="J. Reyes"
                 placeholderTextColor={colors.faint}
                 autoCapitalize="words"
@@ -611,10 +533,10 @@ export function AuthScreen() {
             </View>
           )}
           {isSignup && (
-            <View style={s.fieldWrap}>
-              <Text style={s.fieldLabel}>{t('auth.mobileNumberLabel')}</Text>
+            <View style={[s.fieldWrap, s.signupFieldWrap]}>
+              <Text style={[s.fieldLabel, s.signupFieldLabel]}>{t('auth.mobileNumberLabel')}</Text>
               <TextInput
-                style={s.field}
+                style={[s.field, s.signupField]}
                 placeholder="(305) 555-4417"
                 placeholderTextColor={colors.faint}
                 keyboardType="phone-pad"
@@ -623,26 +545,33 @@ export function AuthScreen() {
               />
             </View>
           )}
-          <View style={s.fieldWrap}>
-            <Text style={s.fieldLabel}>{t('auth.emailLabel')}</Text>
+          <View style={[s.fieldWrap, isSignup ? s.signupFieldWrap : s.signInFieldWrap]}>
+            <Text style={[s.fieldLabel, isSignup && s.signupFieldLabel]}>{t('auth.emailLabel')}</Text>
             <TextInput
-              style={s.field}
+              style={[s.field, isSignup ? s.signupField : s.signInField]}
               placeholder={t('traveler.emailPh')}
               placeholderTextColor={colors.faint}
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="email-address"
+              autoComplete="email"
+              textContentType="username"
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(value) => {
+                setEmail(value);
+                if (resetNotice) setResetNotice('');
+              }}
             />
           </View>
-          <View style={[s.fieldWrap, s.fieldWrapLast]}>
-            <Text style={s.fieldLabel}>{t('auth.passwordLabel')}</Text>
+          <View style={[s.fieldWrap, s.fieldWrapLast, isSignup ? s.signupFieldWrap : s.signInFieldWrap]}>
+            <Text style={[s.fieldLabel, isSignup && s.signupFieldLabel]}>{t('auth.passwordLabel')}</Text>
             <TextInput
-              style={s.field}
+              style={[s.field, isSignup ? s.signupField : s.signInField]}
               placeholder={isSignup ? t('auth.pwNewPh') : t('traveler.yourPasswordPh')}
               placeholderTextColor={colors.faint}
               secureTextEntry
+              autoComplete={isSignup ? 'new-password' : 'current-password'}
+              textContentType={isSignup ? 'newPassword' : 'password'}
               value={password}
               onChangeText={setPassword}
               onSubmitEditing={submit}
@@ -652,19 +581,28 @@ export function AuthScreen() {
 
         {/* WAS: "A verification code will be sent by text." It will not — see the confirm
             step. Your number is stored on your profile and used for travel, which is true. */}
-        {isSignup && <Text style={s.helper}>{t('auth.usedToReach')}</Text>}
+        {isSignup && <Text style={[s.helper, s.signupHelper]}>{t('auth.usedToReach')}</Text>}
         {/* The demo's sign-in carries this link; here it really sends the reset email. */}
         {!isSignup && (
-          <Pressable onPress={forgotPassword} hitSlop={8}>
-            <Text style={s.forgot}>{t('auth.forgotPassword')}</Text>
-          </Pressable>
+          <>
+            <Pressable
+              onPress={forgotPassword}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={t('auth.forgotPassword')}
+              style={s.forgotAction}
+            >
+              <Text style={s.forgot}>{t('auth.forgotPassword')}</Text>
+            </Pressable>
+            {resetNotice ? <Text style={s.resetNotice}>{resetNotice}</Text> : null}
+          </>
         )}
         {error ? <Text style={s.error}>{error}</Text> : null}
 
         <View style={{ flex: 1 }} />
 
         {isSignup && (
-          <Text style={[s.legal, { marginBottom: 14 }]}>
+          <Text style={[s.legal, s.signupLegal, { marginBottom: 12 }]}>
             {legalSentence(t('traveler.byContinuingAccept', { terms: '\u0000', privacy: '\u0001' }), {
               '\u0000': (
                 <Text
@@ -696,7 +634,7 @@ export function AuthScreen() {
 
         <Pressable
           onPress={() => setStep(isSignup ? 'signin' : 'signup')}
-          style={{ marginTop: 18, marginBottom: 6 }}
+          style={{ marginTop: isSignup ? 18 : 15, marginBottom: 6 }}
           hitSlop={8}
         >
           <Text style={s.switch}>
@@ -723,59 +661,58 @@ const s = StyleSheet.create({
   },
   langName: { fontSize: 12.5, color: colors.muted },
   langNameOn: { color: colors.ink, fontWeight: '600' },
-  mark: { width: 86, height: 57, tintColor: colors.ink },
+  mark: { width: 72, height: 48, tintColor: colors.ink },
   wordmark: {
-    marginTop: 18,
+    marginTop: 14,
     textAlign: 'center',
-    letterSpacing: 3.92, // .28em at 14px — the demo's enlarged welcome lockup
-    fontSize: 14,
+    letterSpacing: 3.4,
+    fontSize: 12.5,
     color: colors.ink,
     fontWeight: '600',
   },
   lockupTag: {
-    marginTop: 7,
+    marginTop: 6,
     textAlign: 'center',
-    letterSpacing: 3.52, // .32em at 11px
-    fontSize: 11,
+    letterSpacing: 3.0,
+    fontSize: 9.5,
     color: colors.faint,
     fontWeight: '600',
   },
-  // Charcoal, lightly tracked (Chad, 13 Sept 2026): the mission statement was passive grey.
-  tagline: { textAlign: 'center', fontSize: 16.5, color: colors.ink2, letterSpacing: 0.15, marginTop: 28, lineHeight: 24 },
-  btn: { borderRadius: 13, paddingVertical: 17, alignItems: 'center' },
+  tagline: { textAlign: 'center', fontSize: 14.5, color: colors.ink2, letterSpacing: 0.1, marginTop: 20, lineHeight: 20 },
+  btn: { borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   btnRow: { flexDirection: 'row', justifyContent: 'center', gap: 10 },
   btnInk: { backgroundColor: colors.ink },
   btnGhost: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
   // A DISABLED CONTROL SHOULD READ AS WAITING, NOT BROKEN (Chad, 13 Sept 2026). The filled
   // grey slab looked like a failure; an outline on paper reads as an action not yet available.
   btnDisabled: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.border },
-  btnText: { fontSize: 16, fontWeight: '600' },
+  btnText: { fontSize: 15, fontWeight: '600' },
   btnTextInk: { color: '#fff' },
   btnTextGhost: { color: colors.ink, fontWeight: '500' },
   btnTextDisabled: { color: colors.faint },
   legal: {
-    marginTop: 18,
+    marginTop: 16,
     textAlign: 'center',
-    fontSize: 11,
-    lineHeight: 16.5,
-    color: colors.faint,
+    fontSize: 11.5,
+    lineHeight: 17,
+    color: colors.ink2,
   },
   // NO UNDERLINE AND NO WEIGHT SHIFT (Chad, 13 Sept 2026) — the bolding read as an awkward
   // inline jump. Tone alone carries the link, which is allowed: charcoal on the muted body
   // measures 3.04:1, over the 3:1 that WCAG requires when nothing but colour separates a
   // link from its sentence, and the press state below is the second cue it also asks for.
-  legalLink: { color: colors.ink2 },
+  legalLink: { color: colors.ink, fontWeight: '500' },
   legalLinkPressed: { color: colors.ink, textDecorationLine: 'underline' },
   // A single-sign-on control: the same geometry as the ghost button, mark beside the label.
   btnSso: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
   btnTextSso: { color: colors.ink },
   ssoInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
-  orRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 14 },
+  orRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 11 },
   orRule: { flex: 1, height: 1, backgroundColor: colors.hairline },
   orText: { fontSize: 12.5, color: colors.muted },
   entryRow: {
-    height: 52,
-    borderRadius: 13,
+    height: 48,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.card,
@@ -793,11 +730,11 @@ const s = StyleSheet.create({
     borderRightColor: colors.hairline,
     paddingVertical: 2,
   },
-  entryInput: { flex: 1, fontSize: 16, color: colors.ink, height: '100%' },
+  entryInput: { flex: 1, fontSize: 15.5, color: colors.ink, height: '100%' },
   ssoError: { marginTop: 12, fontSize: 13, color: colors.ink2, textAlign: 'center', lineHeight: 19 },
   langBar: { alignItems: 'flex-end' },
   langTrigger: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 6 },
-  langTriggerText: { fontSize: 13, color: colors.muted },
+  langTriggerText: { fontSize: 12.5, color: colors.ink2 },
   langPanel: {
     alignSelf: 'flex-end',
     marginTop: 2,
@@ -813,12 +750,12 @@ const s = StyleSheet.create({
   network: {
     marginTop: 14,
     textAlign: 'center',
-    fontSize: 10.5,
-    letterSpacing: 0.9,
-    color: colors.faint,
+    fontSize: 11.5,
+    letterSpacing: 0.6,
+    color: colors.ink2,
   },
-  networkDown: { color: colors.muted },
-  back: { fontSize: 15, fontWeight: '500', color: colors.blue, paddingVertical: 4 },
+  networkDown: { color: colors.ink2 },
+  back: { fontSize: 13.5, fontWeight: '500', color: colors.blue, paddingVertical: 4 },
   title: {
     fontSize: 26,
     fontWeight: '600',
@@ -826,7 +763,17 @@ const s = StyleSheet.create({
     color: colors.ink,
     marginTop: 18,
   },
-  sub: { fontSize: 14.5, color: colors.muted, marginTop: 8 },
+  sub: { fontSize: 13.5, color: colors.muted, marginTop: 7 },
+  signInTitle: {
+    fontSize: 22,
+    letterSpacing: -0.25,
+    marginTop: 14,
+  },
+  signupTitle: {
+    fontSize: 22,
+    letterSpacing: -0.25,
+    marginTop: 14,
+  },
   fieldCard: {
     marginTop: 24,
     backgroundColor: colors.card,
@@ -842,6 +789,25 @@ const s = StyleSheet.create({
     borderBottomColor: colors.hairline,
   },
   fieldWrapLast: { borderBottomWidth: 0 },
+  signInFieldCard: {
+    marginTop: 20,
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 0,
+  },
+  signInFieldWrap: { paddingTop: 11 },
+  signInField: { paddingVertical: 10, fontSize: 15.5 },
+  signupFieldCard: {
+    marginTop: 20,
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 0,
+  },
+  signupFieldWrap: { paddingTop: 10 },
+  signupFieldLabel: { fontSize: 10.5, letterSpacing: 1.0 },
+  signupField: { paddingVertical: 9.5, fontSize: 15.5 },
+  signupHelper: { fontSize: 11.5, marginTop: 9, color: colors.muted },
+  signupLegal: { fontSize: 11.5, lineHeight: 17 },
   fieldLabel: {
     fontSize: 11,
     fontWeight: '600',
@@ -850,27 +816,33 @@ const s = StyleSheet.create({
   },
   field: { paddingVertical: 12, fontSize: 16, color: colors.ink },
   error: { color: colors.red, fontSize: 13.5, marginTop: 14, textAlign: 'center' },
-  switch: { textAlign: 'center', fontSize: 14, color: colors.muted },
+  switch: { textAlign: 'center', fontSize: 13, color: colors.muted },
   helper: { fontSize: 12.5, color: colors.faint, marginTop: 10 },
-  // The demo's "Forgot password?" sits muted under the field card.
-  forgot: { fontSize: 13.5, color: colors.muted, marginTop: 14 },
-  codeField: { fontSize: 28, fontWeight: '600', letterSpacing: 10 },
-  demoNote: { fontSize: 12.5, color: colors.faint, marginTop: 12 },
-  roleCard: {
+  // Password recovery is intentionally quiet, but never visually inert.
+  forgotAction: { alignSelf: 'flex-start', marginTop: 8, paddingVertical: 4 },
+  forgot: { fontSize: 12.5, color: colors.muted },
+  resetNotice: { fontSize: 12, color: colors.ink2, marginTop: 6, lineHeight: 17 },
+  selectTitle: {
+    fontSize: 22,
+    letterSpacing: -0.25,
     marginTop: 14,
+  },
+  selectSub: { fontSize: 13.5, lineHeight: 19, maxWidth: 320 },
+  roleCard: {
+    marginTop: 12,
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.hairline,
-    borderRadius: 16,
-    padding: 22,
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 17,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
-  roleTitle: { fontSize: 19, fontWeight: '600', letterSpacing: -0.2, color: colors.ink },
-  roleSub: { fontSize: 13.5, color: colors.muted, marginTop: 5, lineHeight: 19 },
-  roleChevron: { fontSize: 20, color: colors.faint },
-  notSure: { textAlign: 'center', fontSize: 14, fontWeight: '500', color: colors.muted, marginBottom: 8 },
+  roleTitle: { fontSize: 17, fontWeight: '600', letterSpacing: -0.15, color: colors.ink },
+  roleSub: { fontSize: 12.5, color: colors.muted, marginTop: 4, lineHeight: 18 },
+  roleChevron: { fontSize: 18, color: colors.faint },
   checkCircle: {
     width: 60,
     height: 60,

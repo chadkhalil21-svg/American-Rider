@@ -49,10 +49,12 @@
     "test:backend": "for f in backend/*.test.js; do echo \"--- $f\"; node \"$f\" || exit 1; done",
     "typecheck": "tsc --noEmit",
     "i18n": "node scripts/check-i18n.mjs && node scripts/check-untranslated.mjs && node scripts/check-unused-i18n.mjs",
-    "check": "npm run typecheck && npm run i18n && npm run test:backend",
+    "check": "npm run typecheck && npm run i18n && npm run backend:lint && npm run test:backend",
     "eas-build-pre-install": "bash scripts/eas-build-pre-install.sh",
     "build:sim": "bash scripts/build-simulator.sh",
-    "parity": "node scripts/check-simulator-parity.mjs"
+    "parity": "node scripts/check-simulator-parity.mjs",
+    "release:evidence": "node scripts/verify-release-evidence.mjs",
+    "backend:lint": "npm run lint --prefix backend"
   },
   "private": true,
   "allowScripts": {

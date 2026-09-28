@@ -347,6 +347,14 @@ export default function Home() {
       : operator.verification === 'pending'
         ? { label: t('traveler.finishOperatorQualification'), onPress: () => go('/operator/review') }
         : null;
+
+  // A Traveler can add the Operator role later. The front-door role choice promises this,
+  // so the signed-in account must provide a durable path back to qualification.
+  // "Operate with American Rider" states the relationship without gig-app recruiting language.
+  const operateWithUsRow: Row | null =
+    operator.verification === 'commissioned' || operator.verification === 'pending'
+      ? null
+      : { label: t('traveler.operateWithUs'), onPress: () => go('/operator/qualify') };
   const MENU_GROUPS: { label: string; rows: Row[] }[] = [
     {
       label: t('traveler.account'),
@@ -380,6 +388,12 @@ export default function Home() {
           },
         },
         { label: t('traveler.safeTravels'), onPress: () => go('/safety') },
+      ],
+    },
+    {
+      label: t('traveler.company'),
+      rows: [
+        ...(operateWithUsRow ? [operateWithUsRow] : []),
         {
           // Opens the real company page. It is also where the 99% belongs: the founders'
           // brief §10A puts the operator-retention statement in a permanent
@@ -401,7 +415,7 @@ export default function Home() {
           other screens again. It owns the demo's 24px gap below itself. */}
       <LetterheadBar onMenu={() => setMenuOpen(true)} />
 
-      <Display>{t('traveler.beginTravel2')}</Display>
+      <Display style={styles.homeDisplay}>{t('traveler.beginTravel2')}</Display>
 
       {/* SPATIAL CONTEXT, NOT THE SUBJECT OF THE SCREEN (Chad, 13 Sept 2026, approved the
           same evening). It shows where the traveler is and nothing else: no operators we
@@ -801,16 +815,9 @@ export default function Home() {
             ))}
           </View>
         ))}
-        {/* NO SPRING HERE — deliberate, documented deviation from the demo's markup.
-            The demo puts <div class="spring" style="flex:1"> above Sign Out, which pins it
-            to the bottom of the panel. Chad only ever saw the demo in mobile Safari, where
-            the URL bar and toolbar shorten the viewport enough that the spring collapses to
-            ~0 and Sign Out sits directly under "About American Rider". That tight version is
-            the one he approved (12 Aug 2026, screenshot): "he wanted exactly like this where
-            there's almost no spaces". Full-screen the spring would open to 161px at 390x844.
-            Design authority beats the demo's literal CSS — see docs/EXACTNESS-SWEEP.md. */}
-        {/* INK, NOT RED. Red is reserved for Call 911 (contract: buttons.red); ending a
-            session is not an emergency, and a warning colour on it read as one. */}
+        {/* Sign Out is an ordinary final row in the drawer, matching the other
+            navigation rows. Its own top hairline provides enough separation without turning
+            a reversible session action into a special or destructive control. */}
         <DrawerRow
           label={t('traveler.signOut')}
           color={colors.ink2}
@@ -826,6 +833,14 @@ export default function Home() {
 }
 
 const styles = StyleSheet.create({
+  // The home heading is important, not theatrical. The shared 34pt Display remains
+  // available for true hero moments; here 29pt gives the letterhead, departure context,
+  // destination field and actions a calmer single hierarchy.
+  homeDisplay: {
+    fontSize: 29,
+    lineHeight: 33,
+    letterSpacing: -0.52,
+  },
   ongoingCard: {
     marginTop: 18,
     backgroundColor: colors.ink,
@@ -865,20 +880,19 @@ const styles = StyleSheet.create({
   },
   // Demo: .card margin-top:22 padding:17px 18px gap:13, 16.5px --muted placeholder
   searchCard: {
-    marginTop: 22,
+    marginTop: 20,
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.hairline,
-    borderRadius: radii.card,
-    // 16/18 is the demo's own field padding; ours was 17. It also answers Chad's note
-    // that the search object read as a hero element — 2px shorter, same tap target.
-    paddingVertical: 16,
+    borderRadius: 14,
+    // Keep a generous target while reducing the visual mass of the field.
+    paddingVertical: 14,
     paddingHorizontal: 18,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 13,
   },
-  searchPlaceholder: { fontSize: 16.5, color: colors.muted },
+  searchPlaceholder: { fontSize: 15.5, color: colors.muted },
   // Demo: 'Suggested Travel' margin-top:26 · 'Recent Travel' margin-top:28 · card mt 12
   labelSuggested: { marginTop: 26, marginBottom: 12 },
 
@@ -901,14 +915,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.hairline,
-    borderRadius: radii.card,
+    borderRadius: 14,
     paddingVertical: 2,
-    paddingHorizontal: 20,
+    paddingHorizontal: 18,
   },
   listRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingVertical: 14,
     gap: 14,
   },
   listRowDivider: {
@@ -916,15 +930,15 @@ const styles = StyleSheet.create({
     borderTopColor: colors.hairline,
   },
   // The demo's recent rows are REGULAR weight at 15px — not bold at 16.
-  listName: { fontSize: 15, color: colors.ink },
-  listMeta: { fontSize: 12.5, color: colors.muted, marginTop: 3 },
+  listName: { fontSize: 14.5, color: colors.ink },
+  listMeta: { fontSize: 12, color: colors.muted, marginTop: 3 },
   rowRight: { alignItems: 'flex-end' },
   scheduleLink: {
     textAlign: 'center',
-    fontSize: 13.5,
+    fontSize: 13,
     fontWeight: '500',
-    color: colors.ink2,
-    paddingVertical: 14,
+    color: colors.accent,
+    paddingVertical: 13,
   },
   rowAction: { fontSize: 12, fontWeight: '600', color: colors.blue, marginTop: 4 },
   // .btn.cta-space{ margin-top:24; border-radius:13; padding:18; 16/600/.01em }
@@ -940,21 +954,22 @@ const styles = StyleSheet.create({
   reserveBtn: {
     marginTop: 12,
     backgroundColor: colors.solid,
-    borderRadius: radii.button,
-    padding: 18,
+    borderRadius: 12,
+    paddingVertical: 15,
+    paddingHorizontal: 18,
     alignItems: 'center',
   },
   reserveBtnText: {
-    fontSize: 16,
+    fontSize: 15.5,
     fontWeight: '600',
     letterSpacing: 0.16,
     color: colors.solidFg,
   },
   // The demo's drawer head: avatar · name/link, gap 13, air below — no rule (the
   // first row's top hairline draws the line).
-  drawerHead: { paddingBottom: 18 },
-  drawerName: { fontSize: 17, fontWeight: '600', color: colors.ink },
-  // Monochrome, weight-carried, like every other modify control since 13 Sept 2026.
-  drawerProfileLink: { fontSize: 13, fontWeight: '600', color: colors.ink2, marginTop: 4 },
-  drawerLabel: { marginTop: 18, marginBottom: 4 },
+  drawerHead: { paddingBottom: 16 },
+  drawerName: { fontSize: 16.5, fontWeight: '600', color: colors.ink },
+  // Monochrome, weight-carried; the profile entry remains secondary to the account name.
+  drawerProfileLink: { fontSize: 12.5, fontWeight: '600', color: colors.accent, marginTop: 4 },
+  drawerLabel: { marginTop: 16, marginBottom: 3, fontSize: 10.5, letterSpacing: 1.5 },
 });

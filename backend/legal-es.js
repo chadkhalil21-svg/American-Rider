@@ -46,10 +46,10 @@ Atención al Viajero) si cree que otra persona la está usando.</li>
 
 <section><h2>3 · Precios — el compromiso</h2>
 <ul>
-<li>Se le muestra <strong>un único precio final antes de reservar</strong>: la tarifa del
-viaje más una tarifa de plataforma. La tarifa de plataforma es de 1,50 USD o el 5 % de la
-tarifa del viaje, lo que sea mayor. El procesamiento del pago se paga con cargo a esa
-tarifa.</li>
+<li>Se le muestra <strong>un único precio final antes de reservar</strong>. Es el costo total
+del viaje: la tarifa del viaje junto con una tarifa de plataforma, que nunca se muestra como
+un cargo separado ni se añade al importe cotizado. El procesamiento del pago se paga con
+cargo a esa tarifa.</li>
 <li>El precio indicado al reservar es el precio que se cobra.</li>
 <li>Su operador retiene el 99 % de la tarifa del viaje. Nuestra comisión es del 1 % de la
 tarifa del viaje.</li>

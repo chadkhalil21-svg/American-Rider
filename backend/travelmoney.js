@@ -1,3 +1,5 @@
+const { randomUUID } = require('crypto');
+
 // Money on a travel: paying for it, cancelling it, settling it — each decided from the travel
 // RECORD, never from what a client names.
 //
@@ -55,28 +57,71 @@ async function authorizePaymentRide({ db, uid, rideId }) {
 async function payForTravel({ db, uid, rideId, create, resume = null, now = Date.now() }) {
   const auth = await authorizePaymentRide({ db, uid, rideId });
   if (!auth.ok) return auth;
-  const { ride, rideRef } = auth;
-  // A TRAVEL THAT ALREADY HAS A PAYMENT GETS NO SECOND ONE — decided from the record, BEFORE
-  // Stripe is asked for anything (audit of f6ef88d). This used to create the intent first and
-  // compare afterwards, so every repeat request made a Stripe call only to learn the travel was
-  // paid. A retry of the same payment (the sheet closed, a card declined) is answered from
-  // `resume`: the existing intent's details, looked up rather than created. With no `resume`
-  // the travel is simply reported as paid.
-  if (ride.paymentIntentId) {
+  const { rideRef } = auth;
+
+  // Claim the payment transition transactionally before Stripe is called. This closes the
+  // double-request window where two callers could both observe paymentIntentId as empty.
+  const claimId = `pay_${randomUUID()}`;
+  const PAYMENT_CLAIM_TTL_MS = 2 * 60 * 1000;
+  const claimed = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(rideRef);
+    if (!snap.exists) return { error: fail(404, 'No such travel', 'no_travel') };
+    const current = snap.data();
+    if (String(current.travelerUid) !== String(uid)) return { error: fail(403, 'That travel belongs to another traveler', 'not_yours') };
+    if (!PAYABLE.includes(String(current.status))) return { error: fail(409, 'That travel can no longer be paid for', 'not_payable') };
+    if (current.paymentIntentId) return { existing: current };
+    const claimAge = now - Number(current.paymentClaimedAt || 0);
+    if (current.paymentClaim && claimAge >= 0 && claimAge < PAYMENT_CLAIM_TTL_MS) return { busy: true };
+    // A dead process must not strand the Travel forever. After the short lease expires a retry
+    // may take the claim; Stripe's Travel+amount idempotency key recovers the already-created
+    // intent if the old process died after Stripe accepted it.
+    tx.update(rideRef, { paymentClaim: claimId, paymentClaimedAt: now });
+    return { ride: current };
+  });
+  if (claimed.error) return claimed.error;
+  if (claimed.existing) {
     if (resume) {
-      const again = await resume(ride.paymentIntentId, ride);
+      const again = await resume(claimed.existing.paymentIntentId, claimed.existing);
       if (again) return { status: 200, body: again };
     }
     return fail(409, 'This travel already has a payment', 'already_paid');
   }
-  const result = await create({ tripNo: ride.tripNo || null, rideId: String(rideId), ride });
-  await rideRef.update({
-    paymentIntentId: result.paymentIntentId,
-    paidAt: now,
-    governmentFeeCents: result.breakdown?.governmentFeeCents ?? 0,
-    feeLines: result.breakdown?.feeLines ?? [],
-  });
-  return { status: 200, body: result };
+  if (claimed.busy) return fail(409, 'Payment is already being prepared for this travel', 'payment_in_progress');
+
+  const ride = claimed.ride;
+  try {
+    const result = await create({ tripNo: ride.tripNo || null, rideId: String(rideId), ride });
+    // Commit only if our claim still owns the transition. Stripe is also Travel-idempotent,
+    // so a process retry cannot create a second intent for the same Travel/amount.
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(rideRef);
+      if (!snap.exists) throw new Error('Travel disappeared while payment was being prepared');
+      const current = snap.data();
+      if (current.paymentIntentId && current.paymentIntentId !== result.paymentIntentId) throw new Error('Travel already carries a different payment');
+      if (current.paymentClaim !== claimId && !current.paymentIntentId) throw new Error('Payment claim was lost');
+      tx.update(rideRef, {
+        paymentIntentId: result.paymentIntentId,
+        paidAt: now,
+        governmentFeeCents: result.breakdown?.governmentFeeCents ?? 0,
+        feeLines: result.breakdown?.feeLines ?? [],
+        paymentClaim: null,
+        paymentClaimedAt: null,
+      });
+    });
+    return { status: 200, body: result };
+  } catch (e) {
+    // Release our claim. Stripe idempotency makes a subsequent retry recover the same intent
+    // when Stripe created it before this process failed.
+    try {
+      await db.runTransaction(async (tx) => {
+        const snap = await tx.get(rideRef);
+        if (snap.exists && snap.data().paymentClaim === claimId && !snap.data().paymentIntentId) {
+          tx.update(rideRef, { paymentClaim: null, paymentClaimedAt: null, paymentError: String(e.message || e) });
+        }
+      });
+    } catch { /* the next request remains safely blocked rather than risking a second charge */ }
+    throw e;
+  }
 }
 
 /**
@@ -120,7 +165,12 @@ async function cancelTravel({ db, uid, rideId, deps, stripeConfigured = true, no
 
   // The arrival fee is withheld from the refund, never charged separately.
   const withheld = Math.min(arrivalFee, refundable);
-  const out = await deps.refundTravel({ paymentIntentId, amountCents: refundable - withheld, expectUid: String(uid) });
+  const out = await deps.refundTravel({
+    paymentIntentId,
+    amountCents: refundable - withheld,
+    expectUid: String(uid),
+    idempotencyKey: `ar_cancel_refund_${id}`,
+  });
   if (!out.ok) {
     await rideRef.set({ refundPending: true, refundBlockedReason: out.error }, { merge: true });
     return { status: 502, body: { ok: false, error: out.error } };

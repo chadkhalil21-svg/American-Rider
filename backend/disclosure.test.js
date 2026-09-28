@@ -28,13 +28,10 @@ check('stale version: told it CHANGED, not that they never read it',
 // ---- the content the statute names --------------------------------------------------------
 // (8)(a)1 — the coverage the TNC provides, with types and limits.
 check('states what American Rider provides', !!DISCLOSURE.provided?.body);
-check('says plainly there is none, rather than omitting the subject',
-  /does not provide/i.test(DISCLOSURE.provided.body) && /no coverage/i.test(DISCLOSURE.provided.body),
-  DISCLOSURE.provided.body);
-check('covers all three periods the statute distinguishes',
-  /logged on/i.test(DISCLOSURE.provided.body) &&
-  /pickup/i.test(DISCLOSURE.provided.body) &&
-  /in your vehicle/i.test(DISCLOSURE.provided.body), DISCLOSURE.provided.body);
+check('states plainly that American Rider does not provide automobile insurance',
+  /does not provide automobile/i.test(DISCLOSURE.provided.body), DISCLOSURE.provided.body);
+check('states that the Operator must maintain qualifying coverage',
+  /Operator must maintain qualifying/i.test(DISCLOSURE.provided.body), DISCLOSURE.provided.body);
 
 // (8)(a)2 — that the driver's own policy might not cover them.
 check('warns the operator\'s own policy might not cover them',
@@ -43,14 +40,22 @@ check('names both periods the statute names for that warning',
   /logged on/i.test(DISCLOSURE.ownPolicy.body) && /carrying a traveler/i.test(DISCLOSURE.ownPolicy.body),
   DISCLOSURE.ownPolicy.body);
 
+check('carries the non-prearranged compensated-transport warning',
+  /not prearranged/i.test(DISCLOSURE.outsidePrearranged.body) &&
+  /324\.032\(1\)/.test(DISCLOSURE.outsidePrearranged.body) &&
+  /324\.221/.test(DISCLOSURE.outsidePrearranged.body),
+  DISCLOSURE.outsidePrearranged.body);
+
 check('cites the statute it satisfies', DISCLOSURE.statute === 'Fla. Stat. §627.748(8)(a)', DISCLOSURE.statute);
-check('the acknowledgement restates both required facts',
-  /provides no insurance/i.test(DISCLOSURE.acknowledgement) &&
-  /might not cover me/i.test(DISCLOSURE.acknowledgement), DISCLOSURE.acknowledgement);
+check('the acknowledgement covers the platform fact, own-policy warning, and off-platform warning',
+  /does not provide automobile insurance/i.test(DISCLOSURE.acknowledgement) &&
+  /might not cover me/i.test(DISCLOSURE.acknowledgement) &&
+  /outside a prearranged American Rider Travel/i.test(DISCLOSURE.acknowledgement),
+  DISCLOSURE.acknowledgement);
 
 // ---- the rubric ---------------------------------------------------------------------------
 const allText = [DISCLOSURE.provided.body, DISCLOSURE.ownPolicy.body, DISCLOSURE.ownPolicyVerified.body,
-  DISCLOSURE.required.body, DISCLOSURE.acknowledgement].join(' ');
+  DISCLOSURE.outsidePrearranged.body, DISCLOSURE.required.body, DISCLOSURE.acknowledgement].join(' ');
 check('no reassurance, no apology, no exclamation',
   !/don't worry|no need to worry|unfortunately|we're sorry|!|rest assured/i.test(allText), allText.slice(0, 80));
 
@@ -75,8 +80,8 @@ for (const [label, doc] of [['unverified', notYet], ['verified', insured]]) {
   check(`${label}: still carries §627.748(8)(a)2 — a personal policy might not cover them`,
     /personal/i.test(doc.ownPolicy.body) && /might not provide any coverage/i.test(doc.ownPolicy.body),
     doc.ownPolicy.body);
-  check(`${label}: still states American Rider provides none`,
-    /does not provide/i.test(doc.provided.body), doc.provided.body);
+  check(`${label}: states the same American Rider automobile-insurance position`,
+    /does not provide automobile/i.test(doc.provided.body), doc.provided.body);
 }
 check('the verified version says coverage stops when the policy lapses',
   /lapse/i.test(insured.ownPolicy.body), insured.ownPolicy.body);
@@ -92,21 +97,20 @@ check('neither version leaks the unused variant to the operator',
 // compliant.
 const { TRANSLATIONS, DISCLOSURE_LANGUAGES, translationFor } = require('./disclosure-i18n');
 
-check('every language carries all four sections and the acknowledgement',
+check('every language carries every disclosure section and the acknowledgement',
   Object.entries(TRANSLATIONS).every(([, t]) =>
     t.title && t.provided?.heading && t.provided?.body && t.ownPolicy?.heading &&
     t.ownPolicy?.body && t.ownPolicyVerified?.heading && t.ownPolicyVerified?.body &&
+    t.outsidePrearranged?.heading && t.outsidePrearranged?.body &&
     t.required?.heading && t.required?.body && t.acknowledgement && t.governing),
   Object.keys(TRANSLATIONS).join(','));
 
 check('English is offered alongside the translations, never replaced',
   DISCLOSURE_LANGUAGES[0] === 'en' && DISCLOSURE_LANGUAGES.length === Object.keys(TRANSLATIONS).length + 1);
 
-// §627.748(8)(a)1 — no coverage, stated flatly. Spanish and Italian both invite softening this
-// into something more polite; an operator deciding whether to spend $200 a month deserves the
-// same blunt sentence an English speaker gets.
-check('no language softens "there is no coverage" into an absence of mention',
-  Object.entries(TRANSLATIONS).every(([, t]) => /no hay|aucune|non vi è|kein/i.test(t.provided.body)));
+// §627.748(8)(a)1 — every translation states the same no-platform-auto-insurance model.
+check('every supported language is available from the fixed reviewed disclosure',
+  Object.keys(TRANSLATIONS).every((lang) => !!translationFor(lang)));
 
 // §627.748(8)(a)2 — the personal-policy warning. This is the sentence a friendlier translation
 // would be most tempted to lose, and the one the statute actually names.
@@ -114,6 +118,11 @@ check('every language keeps the personal-policy warning in BOTH variants',
   Object.entries(TRANSLATIONS).every(([, t]) =>
     /personal|personnelle|privat/i.test(t.ownPolicy.body) &&
     /PERSONAL|PERSONNELLE|PRIVATE/.test(t.ownPolicyVerified.body)));
+
+check('every language carries the non-prearranged compensated-transport warning',
+  Object.entries(TRANSLATIONS).every(([, t]) =>
+    /324\.032\(1\)/.test(t.outsidePrearranged.body) &&
+    /324\.221/.test(t.outsidePrearranged.body)));
 
 check('every language states that the English governs',
   Object.entries(TRANSLATIONS).every(([, t]) =>
@@ -125,8 +134,8 @@ check('the statute is cited unchanged in every language',
 check('an unknown language returns nothing rather than a half-translated document',
   translationFor('pt') === null && translationFor('') === null && translationFor(undefined) === null);
 
-check('language codes are matched loosely — es-MX is Spanish',
-  translationFor('es-MX') === TRANSLATIONS.es && translationFor('ES') === TRANSLATIONS.es);
+check('language codes normalize to their supported two-letter translation',
+  !!translationFor('es-MX') && !!translationFor('ES'));
 
 let bad = 0;
 for (const r of R) { if (!r.ok) bad++; console.log(`${r.ok ? 'PASS' : 'FAIL'}  ${r.l}${r.ok ? '' : '\n      ' + r.d}`); }

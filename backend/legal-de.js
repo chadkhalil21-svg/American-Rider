@@ -35,10 +35,10 @@ Reisendenbetreuung mit, wenn Sie vermuten, dass eine andere Person es nutzt.</li
 
 <section><h2>3 · Preise — die Zusage</h2>
 <ul>
-<li>Ihnen wird <strong>vor der Reservierung ein einziger Gesamtpreis</strong> angezeigt: der
-Fahrpreis zuzüglich einer Plattformgebühr. Die Plattformgebühr beträgt 1,50 USD oder 5 % des
-Fahrpreises, je nachdem, welcher Betrag höher ist. Die Zahlungsabwicklung wird aus dieser
-Gebühr bezahlt.</li>
+<li>Ihnen wird <strong>vor der Reservierung ein einziger Gesamtpreis</strong> angezeigt. Er
+ist der vollständige Reisepreis: der Fahrpreis zusammen mit einer Plattformgebühr, die nie
+als separate Gebühr angezeigt oder zum genannten Betrag hinzugefügt wird. Die
+Zahlungsabwicklung wird aus dieser Gebühr bezahlt.</li>
 <li>Der bei der Reservierung genannte Preis ist der Preis, der abgebucht wird.</li>
 <li>Ihr Operator behält 99 % des Fahrpreises. Unsere Provision beträgt 1 % des Fahrpreises.</li>
 </ul></section>

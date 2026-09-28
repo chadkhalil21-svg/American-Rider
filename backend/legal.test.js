@@ -2,6 +2,8 @@
 // did not read. English is the source and is controlling; a translation exists to be
 // understood, and says so at the top rather than the bottom.
 const assert = require('node:assert');
+const fs = require('node:fs');
+const path = require('node:path');
 const results = [];
 const check = (label, ok, detail) => results.push({ label, ok: !!ok, detail });
 
@@ -51,9 +53,12 @@ for (const l of Object.keys(LANGS)) {
 for (const l of Object.keys(LANGS)) {
   const [terms, privacy] = docsOf(l);
   check(`${l}: the 99/1 split survives`, /99 ?%/.test(terms) && /\b1 ?%/.test(terms));
-  // The fee is the greater of $1.50 and 5% of the travel fare (Chad, 9 Sept 2026). Both halves
-  // must survive, and the wording it replaced — a fee that "rises on larger fares" — must not.
-  check(`${l}: the $1.50-or-5% platform fee survives`, /1[.,]50 USD/.test(terms) && /\b5 ?%/.test(terms));
+  // The cost-funded fee schedule replaced the old $1.50-or-5% formula. A translation must
+  // preserve the one-Total promise and must not publish either internal pricing schedule.
+  check(`${l}: the superseded $1.50-or-5% formula is absent`,
+    !/1[.,]50 USD/.test(terms) && !/\b5 ?%/.test(terms));
+  check(`${l}: one Total includes the platform fee`,
+    /precio final|prix unique tout compris|prezzo comprensivo di tutto|Gesamtpreis/i.test(terms));
   check(`${l}: the superseded rising-fee wording is gone`,
     !/aumenta en trayectos|augmentent sur les courses|aumenta sulle corse|steigt bei höheren/.test(terms));
   check(`${l}: the $3.00 arrival fee survives`, /3[.,]00 USD/.test(terms));
@@ -70,6 +75,10 @@ for (const l of Object.keys(LANGS)) {
 }
 
 check('About page still served', typeof ABOUT_HTML === 'string' && ABOUT_HTML.length > 0);
+check('the static Terms export matches the server document',
+  fs.readFileSync(path.join(__dirname, '..', 'legal', 'terms', 'index.html'), 'utf8') === TERMS_HTML);
+check('the static About export matches the server document',
+  fs.readFileSync(path.join(__dirname, '..', 'legal', 'about', 'index.html'), 'utf8') === ABOUT_HTML);
 
 // THE RULE IS NO LONGER QUOTED TO THE TRAVELER, AND THAT IS THE POINT (Chad, 20 Sept 2026):
 // "we do not want to say $1.50 'OR' 5% of the fare — the language must always be that the

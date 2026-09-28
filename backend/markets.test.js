@@ -105,9 +105,10 @@ const online = route("post\\('\\/operator\\/online'");
 check('go on duty: declared market active and position in an active market', /operatingMarketGate\(user\)/.test(online) && /servesPoint\(\{ lat, lng \}\)/.test(online));
 const doc = route("post\\('\\/operator\\/document'");
 check('document reading (a model call) only in an active market', /operatingMarketGate\(u\)/.test(doc));
-for (const r of ['existing', 'intent', 'order', 'reinvite']) {
-  check(`Checkr ${r}: only in an active market`, new RegExp(`app\\.post\\('/operator/screening/${r}', requireAuth, LIMITS\\.screening, requireActiveOperatingMarket`).test(server));
-}
+check(
+  'external screening evidence review is only available in an active market',
+  /app\.post\('\/operator\/screening\/existing', requireAuth, LIMITS\.screening, requireActiveOperatingMarket/.test(server),
+);
 check('Stripe Connect onboarding: only in an active market', /app\.post\('\/connect\/onboard', requireAuth, LIMITS\.connect, requireActiveOperatingMarket/.test(server));
 check('waitlist is lightweight: one record, rate-limited, nothing started', /app\.post\('\/waitlist', requireAuth, LIMITS\.waitlist/.test(server) && !/checkr|readDocument|connectAccountFor/.test(route("post\\('\\/waitlist'")));
 check('restricted places stay separate from county activation', /permitRequired/.test(server));

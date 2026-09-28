@@ -47,14 +47,13 @@ const HOME_HTML = page(
   <p>One price, quoted before the travel and covering the journey in full.</p>
   <div class="rows" style="margin-top:16px">
     <div><span class="k">Travel fare</span><span class="amount">$24.50</span></div>
-    <div><span class="k">Platform fee</span><span class="amount">$1.50</span></div>
-    <div><span class="k">Charged to the traveler</span><span class="amount">$26.00</span></div>
     <div class="split"><span class="k">To the operator</span><span class="amount">$24.26</span></div>
-    <div><span class="k">To American Rider</span><span class="amount">$1.74</span></div>
+    <div><span class="k">American Rider commission</span><span class="amount">$0.24</span></div>
   </div>
-  <p style="margin-top:16px">A 1% coordination commission on the fare, and a platform fee of
-  $1.50 or 5% of the travel fare, whichever is greater. Payment processing is paid from that
-  fee. The operator's 99% is unaffected at every fare.</p>
+  <p style="margin-top:16px">The traveler is quoted one Total before reservation. A platform
+  fee funds payment and platform infrastructure without reducing the operator's 99% share of
+  the travel fare. Government fees and tolls, when applicable, are passed through to their
+  beneficiaries rather than retained by American Rider.</p>
 </section>
 
 <section>
@@ -74,7 +73,7 @@ const HOME_HTML = page(
 <section>
   <h2>Operators</h2>
   <p>Operators are independent contractors. They own their vehicles, carry their own commercial
-  coverage, and are paid directly on completion of each travel.</p>
+  coverage. On completion of each Travel, American Rider initiates the Operator’s earnings transfer to the Operator’s Stripe connected account; bank payout timing follows the Operator’s Stripe payout schedule.</p>
   <a class="cta" href="/operate">Operate with American Rider</a>
 </section>
 
@@ -102,8 +101,7 @@ const OPERATE_HTML = page(
 <section>
   <h2>The whole travel</h2>
   <div class="rows">
-    <div><span class="k">Charged to the traveler</span><span class="amount">$26.00</span></div>
-    <div class="split"><span class="k">Travel fare</span><span class="amount">$24.50</span></div>
+    <div><span class="k">Travel fare</span><span class="amount">$24.50</span></div>
     <div><span class="k">Coordination commission (1%)</span><span class="amount">$0.24</span></div>
     <div><span class="k">Operator receives</span><span class="amount">$24.26</span></div>
   </div>
@@ -124,10 +122,7 @@ const OPERATE_HTML = page(
 
 <section>
   <h2>Payment</h2>
-  <p>Payouts are made by Stripe directly to the operator's bank account, and bank details are
-  held by Stripe.</p>
-  <p>The 99% transfers on completion of each travel. Standard bank transfer is made without
-  charge.</p>
+  <p>On completion of each Travel, American Rider transfers the Operator’s 99% fare share to the Operator’s Stripe connected account. Stripe then pays the connected balance to the Operator’s bank account according to the Operator’s Stripe payout schedule. Bank details remain with Stripe.</p>
 </section>
 
 <section>
@@ -148,8 +143,11 @@ const OPERATE_HTML = page(
     own underwriting, including on age, and coverage that cannot be obtained is work that
     cannot be commissioned. American Rider sets no age limit of its own beyond eighteen.
   </div>
-  <p style="margin-top:14px">American Rider does not provide automobile insurance. The
-  commercial coverage an operator carries is the only coverage that applies to their travels.</p>
+  <p style="margin-top:14px">Each operator must procure and maintain automobile coverage that
+  satisfies the requirements applicable to that operator and vehicle. American Rider verifies
+  the operator-procured coverage; it does not sell or substitute for that policy. Any coverage
+  American Rider may separately be required by law to maintain does not relieve the operator
+  of this requirement.</p>
   <p>Minimum limits are set state by state. In Florida they are $1,000,000 in liability while
   carrying a traveler, and $50,000 per person, $100,000 per incident and $25,000 property
   damage while available and unmatched.</p>
@@ -168,8 +166,15 @@ const OPERATE_HTML = page(
 
 <section>
   <h2>Qualification</h2>
-  <p>Qualification is completed in the app: license, vehicle, insurance and background check.
-  American Rider verifies commercial coverage and does not sell it.</p>
+  <p>Qualification is completed in the app: driver license, vehicle registration, qualifying
+  insurance and the background screening required in the operator's market. American Rider
+  verifies commercial coverage and does not sell it.</p>
+  <p>In Florida, the screening standard follows Fla. Stat. §627.748. A current check must include
+  the required nationwide criminal-record search with primary-source validation of records, the
+  National Sex Offender Public Website, and a driving-history report. The statutory
+  disqualifications are applied by the same rules to every applicant. A result that does not
+  contain enough reliable information to apply those rules is not guessed at and does not pass;
+  source clarification or dispute resolution is required before qualification can continue.</p>
 </section>
 `,
   '/operate',
@@ -260,8 +265,7 @@ const TRAVEL_HTML = page(
 
 <section>
   <h2>Afterwards</h2>
-  <p>A receipt is written to the Travel Log stating the fare, the platform fee and the total
-  charged. The operator's 99% transfers on completion.</p>
+  <p>A receipt is written to the Travel Log stating the fare, the platform fee and the total charged. On completion, the Operator’s 99% fare share is transferred to the Operator’s Stripe connected account; bank payout timing is separate.</p>
 </section>
 
 <section>

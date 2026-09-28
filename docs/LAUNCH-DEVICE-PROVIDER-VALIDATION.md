@@ -24,11 +24,11 @@ Use the production Connect account configuration in production validation with c
 
 Verify actual Connect invoice lines against the economic constants. If Stripe's contracted account/payout/routing pricing differs from public pricing, update `economics.js` before production use.
 
-## Checkr production validation
+## Screening-provider production validation
 
-**Owner:** compliance / operations. **Environment:** provider production validation using controlled test identities/events permitted by the provider. **Evidence:** candidate/report/adverse-action identifiers, event timestamps, persisted American Rider screening state and notice outcome.
+**Owner:** compliance / operations. **Environment:** approved consumer-reporting-agency production validation using controlled test identities/events permitted by the provider. **Evidence:** report/case/adverse-action identifiers where applicable, event timestamps, persisted American Rider screening state and notice outcome.
 
-Checkr staging does not support post-adverse action. Before production use, validate with Checkr the exact package slugs, report fields and adverse-action events used here. Confirm pre-adverse delivery, dispute pause, dispute completion/correction, cancellation on cleared evidence, post-adverse completion, undeliverable notice, duplicate webhook and delayed webhook. American Rider remains blocked on ambiguous evidence and never turns provider `consider` into its own refusal automatically.
+Before production use, validate the approved provider's exact report fields, authoritative delivery mechanism and any adverse-action events used by American Rider. Confirm ambiguous or incomplete evidence remains blocked, duplicate/delayed provider events are idempotent, and statutory qualification decisions are made from authoritative evidence rather than an Operator-uploaded copy. Where adverse-action procedures apply, validate notice, dispute and correction handling against the provider's actual production workflow.
 
 ## Infrastructure fault injection
 
@@ -41,7 +41,7 @@ Release requires a recorded pass/fail artifact for every row. A green unit-test 
 
 ## Production configuration attestation
 
-**Owner:** deployment administrator / operations. Record the deployed revision and independently verify: production Firebase project; restricted Stripe secret key; Stripe webhook signing secret; Checkr production credentials/webhook secret; non-empty `SCHEDULER_TOKEN`; operations authentication; support-email delivery; private document/object storage; production routing/toll providers; Firebase authorized domains; Apple and Google sign-in provider configuration; push credentials; and absence of test/demo bypasses. Capture `/health` with secrets redacted and confirm `scheduler: authenticated` plus each required provider readiness signal.
+**Owner:** deployment administrator / operations. Record the deployed revision and independently verify: production Firebase project; restricted Stripe secret key; Stripe webhook signing secret; approved screening-provider production configuration and authoritative report/event delivery; non-empty `SCHEDULER_TOKEN`; operations authentication; support-email delivery; private document/object storage; production routing/toll providers; Firebase authorized domains; Apple and Google sign-in provider configuration; push credentials; and absence of test/demo bypasses. Capture `/health` with secrets redacted and confirm `scheduler: authenticated` plus each required provider readiness signal.
 
 ## Toll-route campaign
 
@@ -53,7 +53,7 @@ Release requires a recorded pass/fail artifact for every row. A green unit-test 
 | --- | --- | --- | --- | --- | --- | --- |
 | Background presence |  |  |  |  | Pending |  |
 | Stripe money movement |  |  |  |  | Pending |  |
-| Checkr adverse action |  |  |  |  | Pending |  |
+| Screening provider |  |  |  |  | Pending |  |
 | Infrastructure faults |  |  |  |  | Pending |  |
 | Production configuration |  |  |  |  | Pending |  |
 | Toll routes |  |  |  |  | Pending |  |

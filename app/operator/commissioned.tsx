@@ -62,7 +62,7 @@ export default function OperatorCommissioned() {
 const styles = StyleSheet.create({
   title: {
     marginTop: 14,
-    fontSize: 26,
+    fontSize: 23,
     fontWeight: '600',
     letterSpacing: -0.52,
     color: colors.ink,

@@ -1,0 +1,72 @@
+name: Submit certified iOS build to TestFlight
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  submit-certified-ios:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      CERTIFIED_SHA: c6c04aff0ab685eda348319df360743962856fd5
+
+    steps:
+      - name: Check out certified release
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CERTIFIED_SHA }}
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Require Expo authorization
+        shell: bash
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::GitHub secret EXPO_TOKEN is not configured."
+            exit 1
+          fi
+
+      - name: Resolve latest successful iOS production build
+        id: resolve
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes eas-cli@latest build:list \
+            --platform ios \
+            --status finished \
+            --build-profile production \
+            --limit 1 \
+            --json \
+            --non-interactive > /tmp/eas-build.json
+
+          node <<'NODE'
+          const fs = require('fs');
+          const data = JSON.parse(fs.readFileSync('/tmp/eas-build.json', 'utf8'));
+          const build = Array.isArray(data) ? data[0] : null;
+          if (!build) throw new Error('No finished iOS production build found.');
+          const expected = process.env.CERTIFIED_SHA;
+          const actual = build.gitCommitHash || build.gitCommit?.hash || '';
+          if (actual !== expected) {
+            throw new Error(`Refusing submission: latest finished iOS production build is ${actual || 'missing git SHA'}, expected ${expected}.`);
+          }
+          if (!build.id) throw new Error('Resolved build has no EAS build ID.');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `build_id=${build.id}\n`);
+          console.log(`Certified EAS build resolved: ${build.id} @ ${actual}`);
+          NODE
+
+      - name: Submit exact certified build to App Store Connect
+        shell: bash
+        run: |
+          npx --yes eas-cli@latest submit \
+            --platform ios \
+            --id "${{ steps.resolve.outputs.build_id }}" \
+            --profile production \
+            --non-interactive \
+            --wait

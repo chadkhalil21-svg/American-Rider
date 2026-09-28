@@ -83,7 +83,7 @@ export default function OperatorPayouts() {
 }
 
 const styles = StyleSheet.create({
-  title: { fontSize: 27, fontWeight: '600', color: colors.ink, marginTop: 22, letterSpacing: -0.54 },
+  title: { fontSize: 23, fontWeight: '600', color: colors.ink, marginTop: 22, letterSpacing: -0.54 },
   sub: { fontSize: 15, color: colors.muted, marginTop: 8, lineHeight: 22 },
   lbl: { marginTop: 26, marginBottom: 12 },
   card: { paddingVertical: 4, paddingHorizontal: 20 },

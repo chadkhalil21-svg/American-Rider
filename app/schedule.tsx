@@ -465,7 +465,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   splashTitle: {
-    fontSize: 26,
+    fontSize: 23,
     fontWeight: '600',
     letterSpacing: -0.52,
     color: colors.ink,

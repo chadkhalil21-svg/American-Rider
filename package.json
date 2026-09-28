@@ -54,7 +54,9 @@
     "build:sim": "bash scripts/build-simulator.sh",
     "parity": "node scripts/check-simulator-parity.mjs",
     "release:evidence": "node scripts/verify-release-evidence.mjs",
-    "backend:lint": "npm run lint --prefix backend"
+    "backend:lint": "npm run lint --prefix backend",
+    "commission:trace": "node scripts/commissioning-trace.mjs",
+    "release:preflight": "npm run check && npm run commission:trace"
   },
   "private": true,
   "allowScripts": {

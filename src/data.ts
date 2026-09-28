@@ -236,9 +236,10 @@ export const RIDER = {
 };
 
 // Fare model (ONE all-in price for the traveler): the operator keeps 99% of the fare
-// (1% coordination commission, no cap). American Rider adds a per-travel platform fee —
-// the greater of $1.50 and 5% of the fare, see platformFee() — and that fee ALSO absorbs
-// our payment-processing cost, so the traveler is never shown a separate "processing"
+// (1% coordination commission, no cap). American Rider adds the smallest whole-cent
+// per-Travel Platform Fee that satisfies the current cost model, with a $2.00 minimum.
+// platformFee() mirrors backend/economics.js; the server remains authoritative. The fee
+// absorbs payment-processing cost, so the traveler is never shown a separate "processing"
 // line. Total charged = fare + platformFee(fare).
 // PROC_* below is our INTERNAL processing cost (not added on top, not shown to travelers).
 // Travel classes (the web demo's Travel Options). ⚠️ MIRROR of backend/fares.js

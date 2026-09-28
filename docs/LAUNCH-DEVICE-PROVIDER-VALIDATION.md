@@ -2,7 +2,14 @@
 
 The executable release contract is `docs/COMMERCIAL-RELEASE-EVIDENCE.md`; record final results in a copy of `release-evidence.template.json` and validate it with `npm run release:evidence -- <evidence.json> <full-candidate-sha>`. This matrix supplies the detailed procedures. A result against another SHA does not release the candidate.
 
-Automated tests cannot establish OS scheduling, push delivery, bank payout timing or provider production behavior. These are release gates. Record each execution with date, build SHA, environment, executor, evidence link, result and any incident/corrective-action reference. A row without evidence is not a pass.
+Automated tests cannot establish OS scheduling, push delivery, bank payout timing or provider production behavior. These remain release gates. They can, however, rigorously establish deterministic journey/state behavior, restart reconstruction, idempotency, accounting reconciliation and injected provider-failure handling. Run `npm run commission:deterministic` against the exact candidate SHA and retain `artifacts/commissioning/deterministic-commissioning.json`.
+
+Evidence classes must not be conflated:
+- **Automated deterministic:** journey simulations, adversarial transitions, kill/restart reconstruction, accounting reconciliation, concurrency and injected provider failures.
+- **Live/public integration:** current public/authorized transit feeds and other reachable provider endpoints, recorded with timestamp and candidate SHA. A deterministic fixture is not a live-feed pass.
+- **Device-only:** OS background execution, native permission behavior, push receipt, physical rendering/layout, battery/thermal behavior and other handset-specific behavior.
+
+Record each execution with date, build SHA, environment, executor, evidence link, result and any incident/corrective-action reference. A row without the evidence required for its class is not a pass.
 
 ## Operator background-presence campaign
 
@@ -34,7 +41,7 @@ Before production use, validate the approved provider's exact report fields, aut
 
 **Owner:** backend engineering / operations. **Environment:** staging or isolated production-validation environment; never inject destructive faults into ordinary Traveler or Operator activity. **Evidence:** fault start/end, affected request/event IDs, server/provider logs, recovery state and confirmation that money/Travel state remained idempotent.
 
-Staging: temporarily deny Firestore writes to provider_events (webhook must return non-2xx); kill server after durable receipt (event must replay); run two server instances (one sweep leader); inject Stripe timeout; inject Checkr timeout; disable push; disable support email; routing timeout; Firestore quota/resource-exhausted response; restart during settlement; 100 simultaneous scheduled reservations; concurrent accept attempts; duplicate dispatch requests; out-of-order provider events.
+Staging: temporarily deny Firestore writes to provider_events (webhook must return non-2xx); kill server after durable receipt (event must replay); run two server instances (one sweep leader); inject Stripe timeout; inject approved screening-provider timeout; disable push; disable support email; routing timeout; Firestore quota/resource-exhausted response; restart during settlement; 100 simultaneous scheduled reservations; concurrent accept attempts; duplicate dispatch requests; out-of-order provider events.
 
 Release requires a recorded pass/fail artifact for every row. A green unit-test workflow is necessary, not sufficient.
 

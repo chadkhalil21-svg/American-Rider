@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
   back: { alignSelf: 'flex-start', paddingVertical: 6 },
   backText: { fontSize: 15, fontWeight: '500', color: colors.ink },
   headRow: { flexDirection: 'row', alignItems: 'flex-start', marginTop: 6, gap: 12 },
-  title: { fontSize: 22, fontWeight: '600', letterSpacing: -0.44, color: colors.ink },
+  title: { fontSize: 20, fontWeight: '600', letterSpacing: -0.44, color: colors.ink },
   sub: { fontSize: 14, color: colors.muted, marginTop: 8, lineHeight: 21 },
   etaPill: {
     backgroundColor: colors.ink,

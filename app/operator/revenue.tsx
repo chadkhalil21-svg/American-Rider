@@ -106,7 +106,7 @@ export default function OperatorRevenue() {
 const styles = StyleSheet.create({
   title: {
     marginTop: 4,
-    fontSize: 26,
+    fontSize: 23,
     fontWeight: '600',
     letterSpacing: -0.52,
     color: colors.ink,

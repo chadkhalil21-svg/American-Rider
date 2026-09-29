@@ -5,6 +5,7 @@
 const { pricingProblems } = require('./market-pricing');
 const insurance = require('./insurance-jurisdictions');
 const US = require('./jurisdictions/us.json');
+const tollAuthorities = require('./toll-authorities');
 
 function regionAdmissionProblems(region) {
   if (!region) return ['region missing'];
@@ -18,6 +19,7 @@ function regionAdmissionProblems(region) {
   if (region.tollPolicy?.status !== 'verified' || region.tollPolicy?.failClosed !== true) p.push(`${region.id}: toll authority/fail-closed policy not verified`);
   if (!Array.isArray(region.marketFips) || !region.marketFips.length) p.push(`${region.id}: no market geography identifiers`);
   if (!Array.isArray(region.activeMarketFips)) p.push(`${region.id}: activation set missing`);
+  if (tollAuthorities.forMarket(region.id)?.verifiedDiscovery !== true) p.push(`${region.id}: toll authorities not directly inventoried`);
   // Airports/ports are deliberately separate permit records. Their absence never means
   // permission; fees.js remains default-deny for known authority-controlled places.
   return p;

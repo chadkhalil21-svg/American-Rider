@@ -547,17 +547,6 @@ async function sweepAssignments({ now = Date.now() } = {}) {
     return { ok: false, reason: e.message, pending: 0 };
   }
 
-  // Read at most once per sweep, and only if some travel actually needs re-offering. A quiet
-  // minute must not cost a fleet read.
-  let fleetCache = null;
-  const fleetOnce = async () => {
-    if (!fleetCache) {
-      const ops = await db.collection('operators').get();
-      fleetCache = ops.docs.map((d) => ({ id: d.id, ...d.data() }));
-    }
-    return fleetCache;
-  };
-
   for (const ride of rows) {
     const age = now - (Number(ride.createdAt) || now);
 
@@ -603,7 +592,7 @@ async function sweepAssignments({ now = Date.now() } = {}) {
       // reads a day against a 50,000 ceiling on a database with 166 writes in it.
       //
       // The exclusions are per-travel, so they stay in the loop. Only the READ is shared.
-      fleet = (await fleetOnce()).filter((o) => !exclude.has(o.id)).filter((o) => !coverageLapsed(o));
+      fleet = (await nearbyOperatorCandidates(db, from, { excludeIds: exclude })).filter((o) => !coverageLapsed(o));
     } catch {
       continue;
     }

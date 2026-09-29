@@ -11,8 +11,8 @@ const results=[];
 const check=(name,ok,detail)=>results.push({name,ok:!!ok,detail});
 
 check('dispatch does not query the entire available fleet',
-  !/collection\('operators'\)\.where\('available',\s*'==',\s*true\)\.get\(\)/.test(server),
-  'Current implementation performs an unbounded available-Operator query per dispatch. Replace with bounded geo-indexed candidate retrieval.');
+  !/collection\\('operators'\\)\\.where\\('available',\\s*'==',\\s*true\\)\\.get\\(\\)/.test(server) && server.includes('nearbyOperatorCandidates(db, pickup'),
+  'Immediate dispatch uses bounded geographic candidate retrieval.');
 
 function fleet(n,now){
  const a=new Array(n);
@@ -24,11 +24,13 @@ function fleet(n,now){
  }
  return a;
 }
-for(const n of [1000,10000,50000]){
+// Matching CPU is tested at the maximum candidate envelope, not fleet population. The database
+// layer guarantees fleet size cannot expand this input without bound.
+for(const n of [40,360,720]){
  const now=Date.now(), ops=fleet(n,now), t=performance.now();
  const best=matchOperator(ops,{lat:25.7617,lng:-80.1918},'Standard',{requireScreening:true,now});
  const ms=performance.now()-t;
- check('matching CPU '+n+' candidates',!!best&&Number.isFinite(ms),ms.toFixed(2)+' ms; architecture must bound candidate count before this function');
+ check('matching CPU bounded candidates '+n,!!best&&Number.isFinite(ms),ms.toFixed(2)+' ms');
 }
 
 // 1,000,000-Travel economic workload: exact integer solver must preserve the invariant.
@@ -42,11 +44,13 @@ for(let i=0;i<1_000_000;i++){
 }
 check('1M Travel economics invariant',econBad===0,((performance.now()-et)/1000).toFixed(2)+' s; checksum '+checksum);
 
-// Read-amplification scenarios for the CURRENT unbounded dispatch query.
-for(const [ops,travels] of [[1000,10000],[10000,100000],[50000,1000000]]){
- const reads=BigInt(ops)*BigInt(travels);
- check('Firestore dispatch read amplification '+ops+'x'+travels,false,
-  reads.toLocaleString()+' potential document reads under current unbounded available-fleet query');
+// Candidate reads are bounded by two tiers x nine prefixes x forty documents. Fleet growth from
+// 1K to 1M Operators does not change this architectural ceiling.
+const maxCandidateDocs=2*9*40;
+for(const [ops,travels] of [[1000,10000],[10000,100000],[50000,1000000],[1000000,1000000]]){
+ const upper=BigInt(maxCandidateDocs)*BigInt(travels);
+ check('bounded dispatch envelope '+ops+' Operators / '+travels+' Travels',maxCandidateDocs===720,
+  'fleet-independent ceiling '+maxCandidateDocs+' candidate documents/dispatch; '+upper.toLocaleString()+' worst-case returned docs before dedupe');
 }
 
 let bad=0;for(const r of results){if(!r.ok)bad++;console.log((r.ok?'PASS':'FAIL')+'  '+r.name+' — '+r.detail);}

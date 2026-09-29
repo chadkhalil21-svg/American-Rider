@@ -82,8 +82,12 @@ async function resolveTollsCostAware(from, to, opts = {}) {
   if (!route) {
     try { route = await require('./streets').routeCar(from, to); } catch { route = null; }
   }
-  if (route?.provider === 'osrm' && route.tollRelevant === false) {
-    return { status: 'clear', tollCents: 0, provider: 'osrm-osm', reason: 'route_has_no_toll_class' };
+  // An OSM/OSRM negative is only authoritative after the market's toll-facility coverage has
+  // been certified against the responsible public authorities. OSM can be incomplete; absence
+  // of toll=yes must never become a nationwide $0 assumption.
+  const region = require('./regions').regionForTrip(from, to);
+  if (route?.provider === 'osrm' && route.tollRelevant === false && region?.tollCoverage?.certified === true) {
+    return { status: 'clear', tollCents: 0, provider: 'osrm-osm-certified', reason: 'certified_market_route_has_no_toll_class' };
   }
   return resolveTolls(from, to, opts);
 }

@@ -1,0 +1,152 @@
+{
+  "asOf": "2026-09-29",
+  "market": "South Florida / Miami launch calibration",
+  "doctrine": "Observed Traveler Total is the calibration variable. Airport-origin observations are retained as validation but excluded from the ordinary Standard fit because permit/surcharge economics differ.",
+  "targetFraction": 0.95,
+  "observations": [
+    [
+      "Coral Gables → Miami",
+      5,
+      18,
+      18,
+      "https://www.uber.com/global/en/r/routes/coral-gables-fl-to-miami-fl/",
+      false
+    ],
+    [
+      "Homestead → Miami",
+      19,
+      36,
+      32,
+      "https://www.uber.com/global/en/r/routes/homestead-fl-to-miami-fl/",
+      false
+    ],
+    [
+      "Miami → Aventura",
+      13,
+      30,
+      30,
+      "https://www.uber.com/global/en/r/routes/miami-fl-to-aventura-fl/",
+      false
+    ],
+    [
+      "Doral → Miami",
+      8,
+      21,
+      20,
+      "https://www.uber.com/global/en/r/routes/doral-fl-to-miami-fl/",
+      false
+    ],
+    [
+      "Miami → Miami Beach",
+      8,
+      22,
+      23,
+      "https://www.uber.com/global/en/r/routes/miami-fl-to-miami-beach-fl/",
+      false
+    ],
+    [
+      "Doral → Miami Shores",
+      15,
+      28,
+      28,
+      "https://www.uber.com/global/en/r/routes/doral-fl-to-miami-shores-fl/",
+      false
+    ],
+    [
+      "North Miami → Aventura",
+      5,
+      19,
+      18,
+      "https://www.uber.com/global/en/r/routes/north-miami-fl-to-aventura-fl/",
+      false
+    ],
+    [
+      "Coral Gables → Miami Gardens",
+      21,
+      35,
+      35,
+      "https://www.uber.com/global/en/r/routes/coral-gables-fl-to-miami-gardens-fl/",
+      false
+    ],
+    [
+      "Homestead → Miami Beach",
+      40,
+      66,
+      56,
+      "https://www.uber.com/global/en/r/routes/homestead-fl-to-miami-beach-fl/",
+      false
+    ],
+    [
+      "West Miami → Doral",
+      6,
+      18,
+      15,
+      "https://www.uber.com/global/en/r/routes/west-miami-fl-to-doral-fl/",
+      false
+    ],
+    [
+      "Hialeah → Doral",
+      7,
+      17,
+      17,
+      "https://www.uber.com/global/en/r/routes/hialeah-fl-to-doral-fl/",
+      false
+    ],
+    [
+      "South Miami → Doral",
+      12,
+      24,
+      24,
+      "https://www.uber.com/global/en/r/routes/south-miami-fl-to-doral-fl/",
+      false
+    ],
+    [
+      "Miami Lakes → North Miami",
+      11,
+      30,
+      21,
+      "https://www.uber.com/global/en/r/routes/miami-lakes-fl-to-north-miami-fl/",
+      false
+    ],
+    [
+      "Doral → Hollywood",
+      30,
+      51,
+      48,
+      "https://www.uber.com/global/en/r/routes/doral-fl-to-hollywood-fl/",
+      false
+    ],
+    [
+      "MIA → Downtown Coral Gables",
+      5,
+      17,
+      22,
+      "https://www.uber.com/global/en/r/routes/mia-to-downtown-coral-gables-miami-fl-us/",
+      true
+    ],
+    [
+      "MIA → Aventura",
+      20,
+      40,
+      52,
+      "https://www.uber.com/global/en/r/routes/mia-to-aventura-aventura-fl-us/",
+      true
+    ],
+    [
+      "MIA → Fort Lauderdale",
+      29,
+      47,
+      66,
+      "https://www.uber.com/global/en/r/routes/mia-to-fort-lauderdale-fl/",
+      true
+    ]
+  ],
+  "fields": [
+    "route",
+    "miles",
+    "minutes",
+    "observedAverageTravelerTotalUsd",
+    "source",
+    "airportOrigin"
+  ]
+}

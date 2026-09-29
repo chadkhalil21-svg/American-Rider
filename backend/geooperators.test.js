@@ -1,0 +1,12 @@
+const assert=require('node:assert/strict');const fs=require('node:fs');
+const G=require('./geooperators');
+assert.equal(G.encodeGeohash(25.7617,-80.1918,7).length,7);
+for(const t of G.TIERS)assert.ok(G.prefixes({lat:25.7617,lng:-80.1918},t).length<=9);
+assert.equal(G.PER_PREFIX_LIMIT,40);
+const server=fs.readFileSync(__dirname+'/server.js','utf8'),sched=fs.readFileSync(__dirname+'/scheduler.js','utf8'),mon=fs.readFileSync(__dirname+'/monitor.js','utf8');
+assert.ok(server.includes('geohash: encodeGeohash(lat, lng)'));
+assert.ok(server.includes('nearbyOperatorCandidates(db, pickup'));
+assert.ok(!server.includes("collection('operators').where('available', '==', true).get()"));
+assert.ok(!sched.includes("collection('operators').get()"));
+assert.ok(!mon.includes("collection('operators').get()"));
+console.log('all bounded-geographic dispatch tests passed');

@@ -14,6 +14,33 @@ A candidate is reviewed against the repository's current decisions, in this orde
 
 A later explicit decision supersedes an older one. A reviewer must search the repository for the feature and its decision history before changing behavior. Existing correct behavior is evidence to preserve, not an invitation to redesign it.
 
+## Readiness states
+
+American Rider uses three separate readiness states so external commercial commissioning is never
+mistaken for unfinished software.
+
+**CODE / PRODUCT READY** means the exact candidate SHA passes the deterministic repository gates:
+typecheck, localization, backend/security/economics/state-machine tests, Firestore rules, platform
+exports, adversarial trace, deterministic commissioning and scale-architecture stress. Test-mode or
+emulated provider behavior may support this state. It does not assert legal approval, production
+provider capacity, physical-device behavior or permission to accept public Travel.
+
+**COMMISSIONING READY** means CODE / PRODUCT READY plus an installable preview/release candidate and
+no known repository defect blocking the intended launch product. Remaining gates are discrete
+external commissioning items: production credentials/provider events, physical-device acceptance,
+controlled live-money reconciliation, required legal/insurance review, restricted-facility permits
+where service is to be enabled, and production deployment evidence. A restricted facility or
+uncommissioned market may remain fail-closed without preventing this state.
+
+**COMMERCIAL GO** means the external evidence package also passes for the same immutable candidate
+SHA. Only this state authorizes the release process to represent the platform as commercially
+commissioned.
+
+Pre-funding policy: do not purchase production scale, permits for disabled facilities, multi-market
+commissioning, or professional attestations merely to prove that source code works. Exhaust
+deterministic, simulator/emulator and test-provider verification first. External evidence remains
+pending rather than being fabricated or converted into a software defect.
+
 ## Release verdict
 
 Commercial release is **GO** only when all rows below have evidence at the exact candidate SHA. Anything else is **NO-GO** or **CONDITIONAL / external gate pending**. A new exploratory finding after GO reopens only the affected gate; it does not make readiness an infinite subjective search.

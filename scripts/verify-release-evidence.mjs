@@ -13,7 +13,7 @@ const failures=[];
 if (!/^[0-9a-f]{40}$/i.test(expectedSha)) failures.push('expected candidate SHA must be a full 40-character git SHA');
 if (m.candidateSha !== expectedSha) failures.push('manifest candidateSha does not equal candidate under review');
 if (!m.environment || !/production/i.test(m.environment)) failures.push('environment must identify production/production-validation');
-const required=['insurance','productionConfiguration','stripe','checkr','firebase','scheduler','routingTolls','transit','emailSupport','phoneVerification','documentStorage','push','iosPhysicalDevices','androidPhysicalDevice','smartTravelLive','liveMoneyReconciliation','uxRubric'];
+const required=['insurance','productionConfiguration','stripe','checkr','firebase','scheduler','routingTolls','transit','emailSupport','phoneVerification','documentStorage','push','iosPhysicalDevices','androidPhysicalDevice','smartTravelLive','liveMoneyReconciliation','marketCommissioning','stagingLoad','uxRubric'];
 for (const name of required) {
   const g=m.gates?.[name];
   if (!g) { failures.push(name+': missing gate'); continue; }
@@ -51,3 +51,11 @@ if (failures.length) {
 console.log('COMMERCIAL RELEASE EVIDENCE: PASS');
 console.log('candidate '+expectedSha);
 console.log(required.length+' external gates have evidence and independent review');
+
+const mc=m.gates?.marketCommissioning?.details||{};
+if(!Array.isArray(mc.activeRegions)||!mc.activeRegions.length) failures.push('marketCommissioning: activeRegions missing');
+for(const k of ['jurisdictionReviewed','permitsAndRestrictedPlacesReviewed','pricingEvidenceReviewed','holdoutValidationPassed','regulatoryEconomicsReviewed','routingValidated','tollAuthoritiesReviewed','paymentsValidated','stressValidated']) if(mc[k]!==true) failures.push('marketCommissioning: '+k+' was not attested true');
+const load=m.gates?.stagingLoad?.details||{};
+if(!String(load.travelRateProfile||'').trim()) failures.push('stagingLoad: travelRateProfile missing');
+for(const k of ['p50Ms','p95Ms','p99Ms','errorRate','firestoreReadsPerDispatch','tollFallbackRate']) if(!Number.isFinite(Number(load[k]))||Number(load[k])<0) failures.push('stagingLoad: '+k+' missing/invalid');
+if(load.providerQuotasReviewed!==true) failures.push('stagingLoad: providerQuotasReviewed was not attested true');

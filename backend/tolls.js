@@ -79,6 +79,12 @@ async function resolveTolls(from, to, { departureTime = 'any' } = {}) {
  */
 async function resolveTollsCostAware(from, to, opts = {}) {
   let route = opts.route || null;
+  // A caller that already attempted to select the authoritative road route must not trigger a
+  // second route selection here. A transient second answer could make tolls describe a
+  // different physical path than the fare. Unknown is safer than split-route authority.
+  if (!route && opts.routeAttempted === true) {
+    return { status: 'unknown', tollCents: null, reason: 'authoritative_route_unavailable' };
+  }
   if (!route) {
     try { route = await require('./streets').routeCar(from, to); } catch { route = null; }
   }

@@ -54,7 +54,15 @@ Commercial release is blocked until the signed release candidate has been walked
 
 The evidence package must include a complete reachable-screen inventory plus critical-path/state matrix covering Traveler, Operator, Family/Teen and Smart Travel; empty/loading/error/offline/restart states; small and large supported device layouts; accessibility checks; and terminology/copy review. Every material finding is either fixed on the candidate and re-tested or explicitly blocks release. A sample of attractive screens is not evidence of whole-product readiness.
 
-## 7. Evidence manifest and sign-off
+## 7. Market commissioning and staging load
+
+Every active service region must have market-specific evidence for jurisdiction, permits and restricted places, pricing calibration and hold-out validation, regulatory economics, routing, toll authorities, payments and stress behavior. A jurisdiction registry entry or generated county file is architecture, not commissioning evidence.
+
+Run a production-equivalent staging load campaign against the candidate architecture and configured provider quotas. Record the workload profile plus p50/p95/p99 quote/dispatch latency, error rate, Firestore reads per dispatch, toll-provider fallback rate and quota review. Source/CPU tests establish invariants but do not certify Firestore, routing, payment or provider throughput.
+
+**Pass:** each active region is explicitly named and commissioned; the workload is representative of launch and planned scale; no hidden fleet-size-dependent query appears; provider quotas and observed latency/error behavior are within the release operating envelope. Missing credentials or an unexecuted load campaign remains pending, never inferred from CI.
+
+## 8. Evidence manifest and sign-off
 
 Copy `release-evidence.template.json` to an evidence file outside the public repository or in an access-controlled release system. Every gate requires `result: "pass"`, the exact candidate SHA, UTC execution time, executor/reviewer and at least one durable evidence reference. `npm run release:evidence -- /secure/path/evidence.json <candidate-sha>` validates completeness without inspecting the underlying sensitive artifact.
 

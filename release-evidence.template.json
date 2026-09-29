@@ -187,5 +187,21 @@
         "providerQuotasReviewed": false
       }
     }
+  },
+  "readiness": {
+    "product": {
+      "result": "pending",
+      "candidateSha": "REPLACE_WITH_FULL_SHA",
+      "evidence": []
+    },
+    "commissioning": {
+      "result": "pending",
+      "installableCandidate": false,
+      "knownRepositoryBlockers": [],
+      "externalPending": []
+    },
+    "commercialGo": {
+      "result": "pending"
+    }
   }
 }

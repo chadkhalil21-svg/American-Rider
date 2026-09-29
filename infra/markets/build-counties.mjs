@@ -1,4 +1,4 @@
-// Regenerates backend/markets/fl-counties.json — the county boundaries backend/markets.js uses
+// Generates authoritative county boundary packages for one state or the entire U.S. — backend/markets.js loads every package
 // to decide which market a pickup is in.
 //
 // SOURCE: U.S. Census Bureau cartographic boundary file cb_2021_us_county_500k (1:500,000), as
@@ -9,7 +9,7 @@
 // Cartographic boundaries follow the shoreline, so no point is given to a county it is not in.
 // Coordinates are kept to 5 decimal places (about 1 metre).
 //
-// Run:  node infra/markets/build-counties.mjs [path-to-county.json]   (downloads when no path)
+// Run: node infra/markets/build-counties.mjs [path-to-county.json] [STATE|ALL]\n// Default STATE is FL for backwards compatibility. ALL writes every state/territory package.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -25,11 +25,19 @@ const sha = crypto.createHash('sha256').update(raw).digest('hex');
 if (sha !== EXPECT_SHA256) console.warn(`note: source sha256 ${sha} differs from the recorded one — review the diff before committing.`);
 
 const round = (c) => (typeof c[0] === 'number' ? [+c[0].toFixed(5), +c[1].toFixed(5)] : c.map(round));
-const counties = JSON.parse(raw)
-  .features.filter((f) => f.properties.STATEFP === '12') // Florida
-  .map((f) => ({ fips: f.properties.GEOID, name: f.properties.NAME, geometry: { type: f.geometry.type, coordinates: round(f.geometry.coordinates) } }))
-  .sort((a, b) => a.fips.localeCompare(b.fips));
-
-const out = path.join(here, '..', '..', 'backend', 'markets', 'fl-counties.json');
-fs.writeFileSync(out, JSON.stringify({ source: 'U.S. Census Bureau cb_2021_us_county_500k (1:500,000)', sourceSha256: sha, state: 'FL', counties }));
-console.log(`wrote ${counties.length} counties (${sha.slice(0, 12)}) to ${out}`);
+const data=JSON.parse(raw);
+const jurisdictionPath=path.join(here,'..','..','backend','jurisdictions','us.json');
+const jurisdictions=JSON.parse(fs.readFileSync(jurisdictionPath)).jurisdictions;
+const requested=String(process.argv[3]||'FL').toUpperCase();
+const targets=requested==='ALL'?jurisdictions:jurisdictions.filter(j=>j.code===requested);
+if(!targets.length)throw new Error('Unknown U.S. jurisdiction '+requested);
+for(const j of targets){
+ const counties=data.features
+  .filter(f=>f.properties.STATEFP===j.fips)
+  .map(f=>({fips:f.properties.GEOID,name:f.properties.NAME,geometry:{type:f.geometry.type,coordinates:round(f.geometry.coordinates)}}))
+  .sort((a,b)=>a.fips.localeCompare(b.fips));
+ if(!counties.length){console.warn('no county-equivalent features for '+j.code);continue;}
+ const out=path.join(here,'..','..','backend','markets',j.code.toLowerCase()+'-counties.json');
+ fs.writeFileSync(out,JSON.stringify({source:'U.S. Census Bureau cb_2021_us_county_500k (1:500,000)',sourceSha256:sha,state:j.code,counties}));
+ console.log('wrote '+counties.length+' county-equivalents for '+j.code+' to '+out);
+}

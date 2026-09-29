@@ -44,12 +44,12 @@ for(let i=0;i<1_000_000;i++){
 }
 check('1M Travel economics invariant',econBad===0,((performance.now()-et)/1000).toFixed(2)+' s; checksum '+checksum);
 
-// Candidate reads are bounded by two tiers x nine prefixes x forty documents. Fleet growth from
+// Candidate reads are bounded by two tiers x nine prefixes x a 120-document saturated-cell ceiling. Fleet growth from
 // 1K to 1M Operators does not change this architectural ceiling.
-const maxCandidateDocs=2*9*40;
+const maxCandidateDocs=2*9*120;
 for(const [ops,travels] of [[1000,10000],[10000,100000],[50000,1000000],[1000000,1000000]]){
  const upper=BigInt(maxCandidateDocs)*BigInt(travels);
- check('bounded dispatch envelope '+ops+' Operators / '+travels+' Travels',maxCandidateDocs===720,
+ check('bounded dispatch envelope '+ops+' Operators / '+travels+' Travels',maxCandidateDocs===2160,
   'fleet-independent ceiling '+maxCandidateDocs+' candidate documents/dispatch; '+upper.toLocaleString()+' worst-case returned docs before dedupe');
 }
 

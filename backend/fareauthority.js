@@ -5,22 +5,25 @@ const { fareCentsFor, fareCentsForCoords, applyTravelClass } = require('./fares'
 const { outsideMarket, outsideMarketMessage } = require('./market');
 const { governmentFeesFor, permitRequired, permitRequiredMessage } = require('./fees');
 const { resolveTollsCostAware } = require('./tolls');
+const { routeCar } = require('./streets');
 
-function priceRoute(body) {
+function priceRoute(body, selectedRoute = null) {
   const withClass = (cents) => applyTravelClass(cents, body?.travelClass || body?.cls);
   const away = outsideMarket(body?.pickup, body?.dest);
   if (away) return { outsideMarket: away, reason: outsideMarketMessage(away) };
   const blocked = permitRequired(body?.pickup, body?.dest);
   if (blocked) return { permitRequired: blocked, reason: permitRequiredMessage(blocked) };
 
-  const byCoords = fareCentsForCoords(body?.pickup, body?.dest);
+  const routeMetrics = selectedRoute ? { routedMiles: selectedRoute.distanceMeters / 1609.344, routedMinutes: selectedRoute.durationSec / 60 } : null;
+  const byCoords = fareCentsForCoords(body?.pickup, body?.dest, routeMetrics);
   if (byCoords) {
     return {
       travelCostCents: withClass(byCoords.travelCostCents),
       miles: byCoords.miles,
       minutes: byCoords.minutes,
       timedBy: byCoords.timedBy,
-      pricedBy: 'distance',
+      pricedBy: selectedRoute ? 'routed-distance' : 'estimated-distance',
+      routeProvider: selectedRoute?.provider || null,
       governmentFees: governmentFeesFor(body?.pickup, body?.dest),
     };
   }
@@ -55,11 +58,17 @@ async function journeyFor({ db, uid, journeyNo }) {
 }
 
 async function authoritativeFare({ body, uid = null, email = null, db = null, cardCountryFor = null }) {
-  const route = priceRoute(body);
+  // One selected road route is the physical authority for both fare distance/time and toll
+  // analysis. This prevents quoting one modeled path while resolving tolls on another.
+  let selectedRoute = null;
+  if (body?.pickup && body?.dest) {
+    try { selectedRoute = await routeCar(body.pickup, body.dest); } catch { selectedRoute = null; }
+  }
+  const route = priceRoute(body, selectedRoute);
   if (!route || route.outsideMarket || route.permitRequired) return route;
   const requestedJourneyNo = String(body?.journeyNo || '').trim();
   const tollPromise = body?.pickup && body?.dest
-    ? resolveTollsCostAware(body.pickup, body.dest)
+    ? resolveTollsCostAware(body.pickup, body.dest, { route: selectedRoute })
     : Promise.resolve({ status: 'unknown', tollCents: null, reason: 'coordinates_required' });
   const [cardCountry, journey, toll] = await Promise.all([
     uid && cardCountryFor ? cardCountryFor({ uid, email }) : null,

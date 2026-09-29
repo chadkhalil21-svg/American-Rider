@@ -31,6 +31,7 @@
 // reason: every fact it is given comes from the record. With no key configured the ladder
 // still runs on the thresholds alone, and says less.
 const { distanceMiles, matchOperator, coverageLapsed } = require('./matching');
+const { nearbyOperatorCandidates } = require('./geooperators');
 const { screeningReady } = require('./screening');
 const { assessOperator } = require('./qualification');
 const { connectAccountStatus } = require('./payments');

@@ -21,7 +21,13 @@ assert.equal(unpriced.status,'unknown');
 const fs=require('node:fs'), path=require('node:path');
 const authority=fs.readFileSync(path.join(__dirname,'fareauthority.js'),'utf8');
 const server=fs.readFileSync(path.join(__dirname,'server.js'),'utf8');
-assert.ok(authority.includes('resolveTolls(body.pickup, body.dest)'),'fare authority resolves tolls server-side');
+assert.ok(authority.includes('resolveTollsCostAware(body.pickup, body.dest)'),'fare authority uses cost-aware server-side toll resolution');
 assert.ok(server.includes("code: 'toll_unavailable'"),'Travel paths expose fail-closed toll state');
 assert.ok(!/req\.body[^\n]*tollCents/.test(server),'client toll amount is never authoritative');
 console.log('all toll-authority tests passed');
+
+const streets=fs.readFileSync(path.join(__dirname,'streets.js'),'utf8');
+const tolls=fs.readFileSync(path.join(__dirname,'tolls.js'),'utf8');
+assert.ok(streets.includes('steps=true'),'OSRM exposes route steps for free toll-class detection');
+assert.ok(streets.includes("i.classes.includes('toll')"),'OSRM route checks OSM toll class');
+assert.ok(tolls.includes("route?.provider === 'osrm' && route.tollRelevant === false"),'clear OSRM routes bypass paid toll lookup');

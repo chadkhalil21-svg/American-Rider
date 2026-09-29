@@ -2860,7 +2860,7 @@ app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, requireOperationalRea
   if (!priced) {
     return res.status(400).json({ error: 'A destination position or known destination is required to dispatch.' });
   }
-  if (priced.pricedBy !== 'distance') {
+  if (!['routed-distance', 'estimated-distance'].includes(priced.pricedBy)) {
     return res.status(400).json({ error: 'A valid pickup and destination position are required to create Travel.', code: 'route_geometry_required' });
   }
   if (priced.tollStatus === 'unknown') {

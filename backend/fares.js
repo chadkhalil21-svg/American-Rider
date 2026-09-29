@@ -240,19 +240,16 @@ function fareCentsForCoords(pickup, dest, route) {
  * The same price, beside what a street router says about the trip — for comparing the
  * straight-line model with driven distance and time BEFORE any price changes.
  *   { travelCostCents, miles, routedMiles, routedMinutes, provider }
- * travelCostCents and miles are exactly fareCentsForCoords(); routedMiles, routedMinutes and
- * provider are null when no provider answers. THIS CHANGES NO PRICE. Pricing stays
- * synchronous, stays straight-line × 1.3, and stays above.
+ * When routing answers, its driven distance and duration are the pricing inputs. When routing
+ * cannot answer, the explicit estimated-distance fallback remains available and is labelled
+ * by fareCentsForCoords() as estimated rather than routed.
  */
 async function quoteWithRoute(pickup, dest) {
-  const priced = fareCentsForCoords(pickup, dest);
-  if (!priced) return null;
   let route = null;
-  try {
-    route = await require('./streets').routeCar(pickup, dest);
-  } catch {
-    route = null;
-  }
+  try { route = await require('./streets').routeCar(pickup, dest); } catch { route = null; }
+  const metrics = route ? { routedMiles: route.distanceMeters / 1609.344, routedMinutes: route.durationSec / 60 } : null;
+  const priced = fareCentsForCoords(pickup, dest, metrics);
+  if (!priced) return null;
   return {
     travelCostCents: priced.travelCostCents,
     miles: priced.miles,

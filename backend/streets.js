@@ -20,7 +20,7 @@ const OSRM_TIMEOUT_MS = 6000;
 async function routeOsrm(base, from, to) {
   const url =
     `${base.replace(/\/+$/, '')}/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}` +
-    `?overview=full&geometries=geojson&alternatives=false&steps=false`;
+    `?overview=full&geometries=geojson&alternatives=false&steps=true`;
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), OSRM_TIMEOUT_MS);
   try {
@@ -35,6 +35,15 @@ async function routeOsrm(base, from, to) {
       durationSec: Math.round(route.duration),
       distanceMeters: Math.round(route.distance),
       provider: 'osrm',
+      // The self-hosted OSRM profile derives road classes from OSM. Toll is therefore a
+      // zero-marginal-cost relevance signal: a clear OSRM route does not need a paid toll lookup.
+      tollRelevant: Array.isArray(route.legs) && route.legs.some((leg) =>
+        Array.isArray(leg?.steps) && leg.steps.some((step) =>
+          Array.isArray(step?.intersections) && step.intersections.some((i) =>
+            Array.isArray(i?.classes) && i.classes.includes('toll')
+          )
+        )
+      ),
     };
   } catch {
     return null; // down or too slow — the next provider takes over

@@ -4,7 +4,7 @@ const { quote } = require('./payments');
 const { fareCentsFor, fareCentsForCoords, applyTravelClass } = require('./fares');
 const { outsideMarket, outsideMarketMessage } = require('./market');
 const { governmentFeesFor, permitRequired, permitRequiredMessage } = require('./fees');
-const { resolveTolls } = require('./tolls');
+const { resolveTollsCostAware } = require('./tolls');
 
 function priceRoute(body) {
   const withClass = (cents) => applyTravelClass(cents, body?.travelClass || body?.cls);
@@ -59,7 +59,7 @@ async function authoritativeFare({ body, uid = null, email = null, db = null, ca
   if (!route || route.outsideMarket || route.permitRequired) return route;
   const requestedJourneyNo = String(body?.journeyNo || '').trim();
   const tollPromise = body?.pickup && body?.dest
-    ? resolveTolls(body.pickup, body.dest)
+    ? resolveTollsCostAware(body.pickup, body.dest)
     : Promise.resolve({ status: 'unknown', tollCents: null, reason: 'coordinates_required' });
   const [cardCountry, journey, toll] = await Promise.all([
     uid && cardCountryFor ? cardCountryFor({ uid, email }) : null,

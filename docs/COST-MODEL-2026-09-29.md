@@ -19,7 +19,13 @@ Current Connect pricing when the platform controls pricing:
 - $2 per monthly active connected account (active when a payout is sent to bank/debit card);
 - 0.25% + $0.25 per payout;
 - 0.25% of payout volume for funds routing/platform management;
-- Instant Payout: 1% of payout volume.
+- Connect Instant Payout: 1% of payout volume.
+
+These are distinct services, not three card-processing charges. Card processing accepts the
+Traveler's payment. Connect funds-routing moves the Operator share through the platform architecture.
+Connect payout pricing applies when accumulated connected-account funds are sent to a bank/debit
+card. The repository's 0.50% variable line combines the two percentage-based Connect components;
+its 6-cent line amortizes the fixed 25-cent-per-payout component under an assumed payout cadence.
 Source: https://stripe.com/connect/pricing
 
 `backend/economics.js` currently models:
@@ -206,3 +212,80 @@ Every forecast must show, separately:
 
 This prevents a $0.25 provision from being mistaken for a $0.25 vendor bill and prevents cheap
 infrastructure from being mistaken for fully loaded profitability.
+
+
+## 8. Payout-cost correction
+
+The current 6-cent fixed payout allowance is a **planning assumption**, not an intrinsic per-Travel
+Stripe fee. Stripe supports daily, weekly, monthly and manual payout timing. The 25-cent fixed
+Connect payout component therefore belongs mathematically to a payout event:
+
+```
+fixed payout cost per Travel = $0.25 × standard payout count / completed Travels
+```
+
+Examples:
+- 20 Travels + 4 standard payouts/month = 5.0 cents/Travel;
+- 100 Travels + 4 payouts = 1.0 cent/Travel;
+- 200 Travels + 4 payouts = 0.5 cent/Travel.
+
+Operator-elected Instant Payout must be configured so its incremental Instant Payout fee is borne
+by the electing Operator rather than socialized across Travelers/other Operators, subject to the
+actual Connect account configuration. American Rider must not promise that ordinary Connect payout
+cost disappears merely because an Operator chooses Instant Payout: the platform's contracted
+Connect pricing and the incremental instant fee are separate concepts.
+
+Before commercial launch, replace the hard-coded 6-cent long-run assumption in management reporting
+with actual monthly payout-event accounting. Quote-time economics may retain a conservative
+allowance until enough payout behavior exists to estimate it safely.
+
+## 9. Platform Fee floor versus contribution floor
+
+These are independent controls.
+
+Current:
+- minimum Platform Fee = $2.00;
+- minimum contribution after modeled costs/provisions = $0.75.
+
+A proposed $2.50 minimum Platform Fee does **not** mathematically create $1.25 contribution.
+Illustrative domestic-card results under the current cost model:
+
+| Travel Fare | current minimum fee / contribution | $2.50 fee floor / contribution | fee needed for $1.25 contribution |
+|---:|---:|---:|---:|
+| $10 | $2.00 / $0.84 | $2.50 / $1.32 | $2.50 / $1.32 |
+| $20 | $2.16 / $0.75 | $2.50 / $1.08 | about $2.67 / $1.25 |
+| $30 | $2.40 / $0.75 | $2.50 / $0.84 | about $2.92 / $1.25 |
+| $50 | $2.90 / $0.75 | $2.90 / $0.75 | about $3.41 / $1.25 |
+| $100 | $4.13 / $0.75 | $4.13 / $0.75 | about $4.65 / $1.25 |
+
+If the business policy is "$2.50 minimum Platform Fee **and** at least $1.25 contribution," both
+constants must change and the solver should remain responsible for raising the fee above $2.50 when
+necessary. Do not change either production constant until market-position tests show the resulting
+Traveler Totals remain inside the approved competitive band.
+
+## 10. Adverse-event control and reserve measurement
+
+Do not invent an American Rider chargeback percentage before launch. Measure:
+- payment authorization failure rate (failed attempts / attempts);
+- dispute count rate (disputes / settled card transactions);
+- dispute dollar loss rate (net lost principal + fees / settled card volume);
+- fraud loss rate;
+- refund/service-credit rate and unrecovered processing cost;
+- reconciliation adjustments;
+- recovery/win rate and time to resolution.
+
+Payment failures that are declined before a successful charge are principally conversion/service
+events, not automatically cash losses. Fraud/disputes that settle and are later reversed can be
+cash losses. Keep these categories separate.
+
+External risk guardrails are controls, not forecasts. Visa's VAMP metric combines fraud and
+dispute counts over settled card-not-present transactions; card-network monitoring thresholds are
+far too high to be treated as an acceptable American Rider operating target. Stripe notes that
+chargeback rates vary materially by industry and business model. American Rider's 25-cent reserve
+must therefore be recalibrated from its own cohort loss data after launch.
+
+Operational controls required at launch: Stripe Radar/risk signals, idempotent PaymentIntents and
+webhooks, authenticated Traveler/account binding, receipt/route/Travel-number evidence retention,
+refund authority/audit trail, dispute webhook queue, evidence packet generation, reconciliation
+exceptions, and weekly risk reporting. Reserve review monthly initially; never lower it from a
+small sample.

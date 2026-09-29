@@ -1,19 +1,12 @@
 // Bounded geographic Operator retrieval for dispatch.
 //
-// Firestore has no native radius query. Its documented pattern is to store a geohash, query
-// bounded geohash ranges, then apply exact distance filtering. We use the same pattern without
-// trusting the geohash as distance authority: matching.js still computes Haversine distance and
-// all eligibility gates. The database query exists only to keep candidate reads bounded.
-//
-// Two search tiers cover ordinary urban and regional pickup. Each tier asks at most nine
-// prefixes and caps each prefix. Therefore a dispatch can never turn into "read every available
-// Operator", even with a million-Operator fleet.
+// Firestore has no native radius query. Operators store a geohash; dispatch queries bounded
+// neighboring geohash cells and matching.js remains the exact distance/eligibility authority.
+// Cell centers are derived from the geohash's actual decoded bounds, not fixed degree offsets,
+// so the neighborhood construction remains valid across latitudes and the antimeridian.
 const BASE32='0123456789bcdefghjkmnpqrstuvwxyz';
 const PER_PREFIX_LIMIT=40;
-const TIERS=Object.freeze([
-  {precision:5, latStep:0.044, lngStep:0.044},   // ~5 km cells
-  {precision:4, latStep:0.176, lngStep:0.352},  // ~20 x 39 km cells
-]);
+const TIERS=Object.freeze([{precision:5},{precision:4}]);
 
 function encodeGeohash(lat,lng,precision=7){
   lat=Number(lat);lng=Number(lng);
@@ -27,23 +20,34 @@ function encodeGeohash(lat,lng,precision=7){
   }
   return out;
 }
+function decodeBounds(hash){
+  let lat=[-90,90],lng=[-180,180],even=true;
+  for(const ch of String(hash||'')){
+    const n=BASE32.indexOf(ch); if(n<0)return null;
+    for(let mask=16;mask;mask>>=1){
+      const r=even?lng:lat,mid=(r[0]+r[1])/2;
+      if(n&mask)r[0]=mid;else r[1]=mid;
+      even=!even;
+    }
+  }
+  return {lat,lng};
+}
+function wrapLng(lng){while(lng>180)lng-=360;while(lng<-180)lng+=360;return lng;}
 function prefixes(point,tier){
-  const set=new Set();
+  const center=encodeGeohash(point?.lat,point?.lng,tier.precision); if(!center)return [];
+  const b=decodeBounds(center); if(!b)return [];
+  const latSpan=b.lat[1]-b.lat[0],lngSpan=b.lng[1]-b.lng[0],set=new Set();
   for(const dy of [-1,0,1])for(const dx of [-1,0,1]){
-    const lat=Math.max(-89.999999,Math.min(89.999999,Number(point.lat)+dy*tier.latStep));
-    let lng=Number(point.lng)+dx*tier.lngStep;while(lng>180)lng-=360;while(lng<-180)lng+=360;
-    set.add(encodeGeohash(lat,lng,tier.precision));
+    const lat=Math.max(-89.999999,Math.min(89.999999,Number(point.lat)+dy*latSpan));
+    set.add(encodeGeohash(lat,wrapLng(Number(point.lng)+dx*lngSpan),tier.precision));
   }
   return [...set].filter(Boolean);
 }
 async function queryTier(db,point,tier,{excludeIds=new Set(),limitPerPrefix=PER_PREFIX_LIMIT}={}){
   const out=new Map();
   await Promise.all(prefixes(point,tier).map(async prefix=>{
-    const snap=await db.collection('operators')
-      .where('available','==',true)
-      .orderBy('geohash')
-      .startAt(prefix).endAt(prefix+'\uf8ff')
-      .limit(limitPerPrefix).get();
+    const snap=await db.collection('operators').where('available','==',true)
+      .orderBy('geohash').startAt(prefix).endAt(prefix+'\uf8ff').limit(limitPerPrefix).get();
     for(const d of snap.docs){
       if(excludeIds.has(String(d.id)))continue;
       const x={id:d.id,...d.data()};
@@ -52,12 +56,13 @@ async function queryTier(db,point,tier,{excludeIds=new Set(),limitPerPrefix=PER_
   }));
   return [...out.values()];
 }
+// Return the union of bounded tiers. Do not stop merely because an inner tier contains records:
+// those records can all fail screening, insurance, presence, class or commissioning gates. The
+// exact matcher chooses the nearest eligible Operator from the bounded union.
 async function nearbyOperatorCandidates(db,point,opts={}){
   if(!encodeGeohash(point?.lat,point?.lng,1))return [];
-  for(const tier of TIERS){
-    const rows=await queryTier(db,point,tier,opts);
-    if(rows.length)return rows;
-  }
-  return [];
+  const all=new Map();
+  for(const tier of TIERS)for(const row of await queryTier(db,point,tier,opts))all.set(String(row.id),row);
+  return [...all.values()];
 }
-module.exports={encodeGeohash,nearbyOperatorCandidates,prefixes,TIERS,PER_PREFIX_LIMIT};
+module.exports={encodeGeohash,decodeBounds,nearbyOperatorCandidates,prefixes,TIERS,PER_PREFIX_LIMIT};

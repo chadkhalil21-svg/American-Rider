@@ -71,6 +71,7 @@ const { destinationsNear } = require('./places');
 const { ready: voiceReady, reason: voiceReason, accessToken: voiceToken, connectTwiml } = require('./voice');
 const { REGIONS, defaultRegion } = require('./regions');
 const { presenceStale, coverageLapsed, matchOperator, etaMinutes } = require('./matching');
+const { encodeGeohash, nearbyOperatorCandidates } = require('./geooperators');
 // DISCLOSURE IS IMPORTED FOR .statute, and leaving it out is how the acknowledge route below
 // threw `DISCLOSURE is not defined` for a day — every operator who read the disclosure was
 // refused when they said so, and could not go on duty. The 25 disclosure tests all passed:
@@ -295,20 +296,22 @@ app.get('/health', async (req, res) => {
       // TIME-BOUNDED, because this endpoint is read by people during an incident — the moment
       // the database is least likely to answer. A diagnostic that hangs when things are broken
       // is a diagnostic that is never available when it is needed.
-      const snap = await Promise.race([
-        adminDb().collection('operators').get(),
+      // Aggregation counts do not download every Operator document. Dispatchable eligibility
+      // is intentionally not approximated here: it is a per-Operator authority decision.
+      const [allCount, availableCount] = await Promise.race([
+        Promise.all([
+          adminDb().collection('operators').count().get(),
+          adminDb().collection('operators').where('available', '==', true).count().get(),
+        ]),
         new Promise((_, rej) =>
-          setTimeout(() => rej(new Error('fleet read timed out')), FLEET_READ_TIMEOUT_MS).unref(),
+          setTimeout(() => rej(new Error('fleet count timed out')), FLEET_READ_TIMEOUT_MS).unref(),
         ),
       ]);
-      const ops = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       fleet = {
-        operators: ops.length,
-        available: ops.filter((o) => o.available).length,
-        dispatchable: ops.filter(
-          (o) => o.available && !presenceStale(o) && !coverageLapsed(o) && !o.screeningBlocked,
-        ).length,
-        reason: null,
+        operators: allCount.data().count,
+        available: availableCount.data().count,
+        dispatchable: null,
+        reason: 'dispatchable count is evaluated at bounded geographic dispatch, not by scanning the fleet',
       };
     } catch (e) {
       fleet = { operators: null, available: null, dispatchable: null, reason: e.message };
@@ -1028,6 +1031,7 @@ app.post('/operator/online', requireAuth, requireOperationalReadiness, async (re
         screeningCheckedAt: screened ? Date.now() : null,
         lat,
         lng,
+        geohash: encodeGeohash(lat, lng),
         available: b.available !== false,
         onlineAt: Date.now(),
       },
@@ -2815,9 +2819,8 @@ app.post('/scheduled/sweep', runSweep);
 // presence freshness, insurance, disclosure, screening, commissioning, documents, Travel
 // class and distance. Keeping those rules in one gate prevents query optimization from becoming
 // a second qualification system.
-async function availableOperatorCandidates(db) {
-  const snap = await db.collection('operators').where('available', '==', true).get();
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+async function availableOperatorCandidates(db, pickup, excludeIds = new Set()) {
+  return nearbyOperatorCandidates(db, pickup, { excludeIds });
 }
 
 // Human-facing Travel Numbers identify the authoritative pickup market, never a client label.
@@ -2883,7 +2886,7 @@ app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, requireOperationalRea
 
   let fleet;
   try {
-    fleet = await availableOperatorCandidates(db);
+    fleet = await availableOperatorCandidates(db, pickup);
   } catch (e) {
     // "We could not read the fleet" and "nobody is on duty" are different answers and must not
     // render the same — the client draws a retry for one and a wait for the other.

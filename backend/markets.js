@@ -54,6 +54,17 @@ function distanceKm(g,x,y){const k=Math.cos(y*Math.PI/180);let best=Infinity;for
 function marketFor(p){if(!isCoord(p))return null;const x=Number(p.lng),y=Number(p.lat),all=markets();const hit=all.find(m=>contains(m.geometry,x,y));if(hit)return hit;const near=all.filter(m=>distanceKm(m.geometry,x,y)*1000<=SHORE_M);return near.length===1?near[0]:null;}
 const marketStatus=p=>marketFor(p)?.status==='active'?'active':'waitlist';
 const servesPoint=p=>marketStatus(p)==='active';
-function tripOutsideMarkets(pickup,dest){const m=marketFor(pickup),pickupOk=m?.status==='active',r=pickupOk?regionById(m.regionId):null;const dr=regionFor(dest);const destOk=!!r&&dr?.id===r.id;if(!pickupOk&&!destOk)return'both';if(!pickupOk)return'pickup';if(!destOk)return'destination';return null;}
+function tripOutsideMarkets(pickup,dest){
+ const m=marketFor(pickup), pickupOk=m?.status==='active', r=pickupOk?regionById(m.regionId):null;
+ // Endpoint labels are independent: an invalid pickup is "pickup" even when the destination
+ // would be serviceable from some other origin. Only classify both when neither endpoint can
+ // participate in any configured service region.
+ const destRegion=regionFor(dest);
+ if(!pickupOk){
+   const pickupRegion=regionFor(pickup);
+   return !pickupRegion && !destRegion ? 'both' : 'pickup';
+ }
+ return destRegion?.id===r.id ? null : 'destination';
+}
 function listMarkets(){return markets().filter(m=>m.status==='active'||m.regionId).map(({id,name,state,fips,regionId,status})=>({id,name,state,fips,regionId,status}));}
 module.exports={marketFor,marketStatus,servesPoint,tripOutsideMarkets,listMarkets,markets,SHORE_M,boundaryPackages};

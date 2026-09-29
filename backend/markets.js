@@ -8,7 +8,7 @@
 // Adding Texas, California, or another jurisdiction is data ingestion, not a code fork.
 const fs=require('node:fs');
 const path=require('node:path');
-const {regionById,REGIONS}=require('./regions');
+const {regionById,regionFor,REGIONS}=require('./regions');
 const {readKey}=require('./env');
 const {regionReady}=require('./market-admission');
 const SHORE_M=100;
@@ -54,6 +54,6 @@ function distanceKm(g,x,y){const k=Math.cos(y*Math.PI/180);let best=Infinity;for
 function marketFor(p){if(!isCoord(p))return null;const x=Number(p.lng),y=Number(p.lat),all=markets();const hit=all.find(m=>contains(m.geometry,x,y));if(hit)return hit;const near=all.filter(m=>distanceKm(m.geometry,x,y)*1000<=SHORE_M);return near.length===1?near[0]:null;}
 const marketStatus=p=>marketFor(p)?.status==='active'?'active':'waitlist';
 const servesPoint=p=>marketStatus(p)==='active';
-function tripOutsideMarkets(pickup,dest){const m=marketFor(pickup),pickupOk=m?.status==='active',r=pickupOk?regionById(m.regionId):null;const destMarket=marketFor(dest);const destOk=!!r&&!!destMarket&&destMarket.regionId===r.id;if(!pickupOk&&!destOk)return'both';if(!pickupOk)return'pickup';if(!destOk)return'destination';return null;}
+function tripOutsideMarkets(pickup,dest){const m=marketFor(pickup),pickupOk=m?.status==='active',r=pickupOk?regionById(m.regionId):null;const dr=regionFor(dest);const destOk=!!r&&dr?.id===r.id;if(!pickupOk&&!destOk)return'both';if(!pickupOk)return'pickup';if(!destOk)return'destination';return null;}
 function listMarkets(){return markets().filter(m=>m.status==='active'||m.regionId).map(({id,name,state,fips,regionId,status})=>({id,name,state,fips,regionId,status}));}
 module.exports={marketFor,marketStatus,servesPoint,tripOutsideMarkets,listMarkets,markets,SHORE_M,boundaryPackages};

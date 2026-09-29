@@ -66,4 +66,26 @@ async function resolveTolls(from, to, { departureTime = 'any' } = {}) {
   }
 }
 
-module.exports = { resolveTolls, parseHereTolls, HERE_TOLL_URL, TIMEOUT_MS };
+/**
+ * Cost-aware toll resolution.
+ * 1. Ask our own street router whether the selected route contains an OSM toll road class.
+ * 2. A definitive OSRM "no toll class" is clear at zero provider cost.
+ * 3. A toll-relevant route, or a router that cannot make that determination, falls through to
+ *    the toll-price authority. Today that final authority is HERE; jurisdiction-maintained
+ *    official rate registries can be inserted before HERE without changing callers.
+ *
+ * We deliberately do not infer "clear" from an unavailable/OTP route because absence of
+ * evidence is not evidence of no toll.
+ */
+async function resolveTollsCostAware(from, to, opts = {}) {
+  let route = opts.route || null;
+  if (!route) {
+    try { route = await require('./streets').routeCar(from, to); } catch { route = null; }
+  }
+  if (route?.provider === 'osrm' && route.tollRelevant === false) {
+    return { status: 'clear', tollCents: 0, provider: 'osrm-osm', reason: 'route_has_no_toll_class' };
+  }
+  return resolveTolls(from, to, opts);
+}
+
+module.exports = { resolveTolls, resolveTollsCostAware, parseHereTolls, HERE_TOLL_URL, TIMEOUT_MS };

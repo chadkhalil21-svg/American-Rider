@@ -1,0 +1,11 @@
+const assert=require('node:assert/strict');const fs=require('node:fs');
+const U=require('./jurisdictions/us.json');const A=require('./market-admission');const R=require('./regions');
+assert.equal(U.jurisdictions.length,56);
+assert.equal(new Set(U.jurisdictions.map(x=>x.code)).size,56);
+for(const code of ['FL','TX','CA','NY','DC','PR'])assert.ok(U.jurisdictions.some(x=>x.code===code));
+assert.equal(U.jurisdictions.find(x=>x.code==='TX').status,'uncommissioned');
+assert.equal(A.regionReady(R.regionById('fl-southeast')),true,A.regionAdmissionProblems(R.regionById('fl-southeast')).join('; '));
+const markets=fs.readFileSync(__dirname+'/markets.js','utf8');
+assert.ok(markets.includes("filter(x=>/-counties\\.json$/.test(x))"),'boundary packages are data-driven');
+assert.ok(!markets.includes("require('./markets/fl-counties.json')"),'market engine does not embed Florida boundary data');
+console.log('all national market-admission tests passed');

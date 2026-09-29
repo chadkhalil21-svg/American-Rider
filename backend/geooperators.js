@@ -6,6 +6,7 @@
 // so the neighborhood construction remains valid across latitudes and the antimeridian.
 const BASE32='0123456789bcdefghjkmnpqrstuvwxyz';
 const PER_PREFIX_LIMIT=40;
+const SATURATION_LIMIT=120;
 const TIERS=Object.freeze([{precision:5},{precision:4}]);
 
 function encodeGeohash(lat,lng,precision=7){
@@ -43,11 +44,17 @@ function prefixes(point,tier){
   }
   return [...set].filter(Boolean);
 }
-async function queryTier(db,point,tier,{excludeIds=new Set(),limitPerPrefix=PER_PREFIX_LIMIT}={}){
+async function queryTier(db,point,tier,{excludeIds=new Set(),limitPerPrefix=PER_PREFIX_LIMIT,saturationLimit=SATURATION_LIMIT}={}){
   const out=new Map();
   await Promise.all(prefixes(point,tier).map(async prefix=>{
-    const snap=await db.collection('operators').where('available','==',true)
+    let snap=await db.collection('operators').where('available','==',true)
       .orderBy('geohash').startAt(prefix).endAt(prefix+'\uf8ff').limit(limitPerPrefix).get();
+    // A full prefix page is ambiguous: there may be more Operators hidden behind the
+    // lexicographic cutoff. Escalate only that saturated cell, still to a hard ceiling.
+    if(snap.docs.length===limitPerPrefix && saturationLimit>limitPerPrefix){
+      snap=await db.collection('operators').where('available','==',true)
+        .orderBy('geohash').startAt(prefix).endAt(prefix+'\uf8ff').limit(saturationLimit).get();
+    }
     for(const d of snap.docs){
       if(excludeIds.has(String(d.id)))continue;
       const x={id:d.id,...d.data()};
@@ -65,4 +72,4 @@ async function nearbyOperatorCandidates(db,point,opts={}){
   for(const tier of TIERS)for(const row of await queryTier(db,point,tier,opts))all.set(String(row.id),row);
   return [...all.values()];
 }
-module.exports={encodeGeohash,decodeBounds,nearbyOperatorCandidates,prefixes,TIERS,PER_PREFIX_LIMIT};
+module.exports={encodeGeohash,decodeBounds,nearbyOperatorCandidates,prefixes,TIERS,PER_PREFIX_LIMIT,SATURATION_LIMIT};

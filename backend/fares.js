@@ -256,6 +256,7 @@ async function quoteWithRoute(pickup, dest) {
     routedMiles: route ? Math.round((route.distanceMeters / 1609.344) * 10) / 10 : null,
     routedMinutes: route ? Math.round(route.durationSec / 60) : null,
     provider: route ? route.provider : null,
+    timedBy: priced.timedBy,
   };
 }
 

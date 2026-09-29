@@ -110,9 +110,12 @@ function fareCentsFor(destination) {
 // Uber's is $2.74 to $4.12. We do not have to choose between a cheaper travel and a better-paid
 // operator; we can do both, out of the difference in what the platform keeps. Choosing between
 // them would have meant one half of the proposition was marketing.
-const BASE_CENTS = 100; // $1.00 to start any trip
-const PER_MILE_CENTS = 85; // $0.85 per mile — the operator's floor lives here; do not cut it
-const PER_MINUTE_CENTS = 15; // $0.15 per minute
+// Compatibility exports describe the CURRENT South Florida production record only. Runtime
+// pricing below never uses these as a geographic default.
+const CURRENT_FL_PRICING = require('./market-pricing').pricingForRegion('fl-southeast');
+const BASE_CENTS = CURRENT_FL_PRICING.baseCents;
+const PER_MILE_CENTS = CURRENT_FL_PRICING.perMileCents;
+const PER_MINUTE_CENTS = CURRENT_FL_PRICING.perMinuteCents;
 
 // WHY A TIME TERM AT ALL. Distance-only pricing pays an operator the same for five miles in
 // twelve minutes and five miles in forty. In Miami traffic that is a straight transfer from the
@@ -123,7 +126,7 @@ const PER_MINUTE_CENTS = 15; // $0.15 per minute
 // so a no-pass-through Standard Travel starts at $5.00. Government fees and tolls, when
 // applicable, are true pass-throughs and may raise the final Total.
 const MIN_TOTAL_CENTS = 500;
-const MINIMUM_CENTS = MIN_TOTAL_CENTS - 200; // $3 fare + $2 absolute platform-fee floor
+const MINIMUM_CENTS = CURRENT_FL_PRICING.minimumFareCents; // compatibility export; runtime uses the market record
 
 // Straight-line distance under-states how far a car actually drives (roads bend, one-ways,
 // causeways). This multiplier approximates real driving distance, and is used ONLY when no
@@ -213,15 +216,18 @@ function fareCentsForCoords(pickup, dest, route) {
   if (outsideMarket(pickup, dest)) return null;
 
   if (!isCoord(pickup) || !isCoord(dest)) return null;
+  // No default market. If geography has no explicit pricing record, there is no honest fare.
+  const pricing = require('./market-pricing').pricingForTrip(pickup, dest);
+  if (!pricing) return null;
   // The router's driven distance when it answered, else straight line times the factor. A
   // routed distance needs no circuity guess: it IS the road.
   const routedMiles = Number(route?.routedMiles);
   const routed = Number.isFinite(routedMiles) && routedMiles > 0;
   const miles = routed ? routedMiles : straightLineMiles(pickup, dest) * ROAD_WINDING_FACTOR;
   const minutes = minutesFor(miles, Number(route?.routedMinutes));
-  const raw = BASE_CENTS + Math.round(miles * PER_MILE_CENTS) + Math.round(minutes * PER_MINUTE_CENTS);
+  const raw = pricing.baseCents + Math.round(miles * pricing.perMileCents) + Math.round(minutes * pricing.perMinuteCents);
   return {
-    travelCostCents: Math.max(MINIMUM_CENTS, raw),
+    travelCostCents: Math.max(pricing.minimumFareCents, raw),
     miles: Math.round(miles * 10) / 10,
     minutes: Math.round(minutes * 10) / 10,
     // So a quote can say whether the time term was measured or assumed, rather than implying

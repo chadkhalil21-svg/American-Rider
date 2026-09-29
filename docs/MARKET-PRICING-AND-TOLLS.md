@@ -62,3 +62,25 @@ fall through to HERE rather than guessing.
 - no market promoted without evidence and hold-out tests;
 - economics solver remains centralized and identical across markets except explicit
   jurisdictional pass-throughs/configuration.
+
+
+## Market-admission contract
+
+A market is not made ACTIVE by geography alone. Before activation it must have, at minimum:
+
+- an explicit pricing record with dated local evidence; no national/default fare coefficients;
+- production-router validation and short/medium/long route hold-outs;
+- jurisdiction law/disclosure configuration and the correct screening cadence;
+- Operator/TNC insurance architecture for that jurisdiction;
+- corporate/regulatory assessments classified as fixed, percentage-of-revenue, per-Travel, or pass-through;
+- airport/seaport/other authority-controlled places default-denied until permits and fees are verified;
+- toll authority/fallback coverage;
+- the common unit-economic invariant re-run over the local fare distribution.
+
+Texas example: statewide TNC authority does not make Austin/Dallas/Houston one economic pricing
+market. The state supplies the regulatory jurisdiction; economically coherent local geographies
+supply fare evidence. California likewise may have multiple pricing markets under one regulatory
+jurisdiction.
+
+Activation is atomic. Missing local pricing, insurance, screening, regulatory-cost or permit
+evidence means WAITLIST/UNAVAILABLE, never inheritance from South Florida.

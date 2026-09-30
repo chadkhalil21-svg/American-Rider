@@ -17,3 +17,10 @@ const apple = fs.readFileSync('src/state/appleSignIn.ts','utf8');
 assert.match(apple, /code === 'ERR_REQUEST_CANCELED'/);
 assert.match(apple, /reason: 'no_identity_token'/);
 console.log('provider auth failure-state invariants: PASS');
+
+const appleNonce = fs.readFileSync('src/state/appleSignIn.ts','utf8');
+assert.match(appleNonce, /Crypto\.getRandomBytes\(length\)/, 'Apple sign-in must use a cryptographically random nonce');
+assert.match(appleNonce, /CryptoDigestAlgorithm\.SHA256, rawNonce/, 'Apple must receive the SHA-256 nonce');
+assert.match(appleNonce, /nonce: hashedNonce/, 'Apple request must be bound to the hashed nonce');
+assert.match(appleNonce, /idToken: apple\.identityToken, rawNonce/, 'Firebase credential must receive the original raw nonce');
+console.log('Apple nonce binding invariants: PASS');

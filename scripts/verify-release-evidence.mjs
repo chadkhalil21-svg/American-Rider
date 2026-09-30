@@ -43,6 +43,14 @@ for (const k of ['jurisdictionRuleReviewed','continuingStatusMonitoringValidated
 const langs=new Set(ins.translationsReviewed||[]);
 for (const lang of ['ES','FR','IT','DE']) if (!langs.has(lang)) failures.push('insurance: '+lang+' disclosure not reviewed');
 
+const mc=m.gates?.marketCommissioning?.details||{};
+if(!Array.isArray(mc.activeRegions)||!mc.activeRegions.length) failures.push('marketCommissioning: activeRegions missing');
+for(const k of ['jurisdictionReviewed','permitsAndRestrictedPlacesReviewed','pricingEvidenceReviewed','holdoutValidationPassed','regulatoryEconomicsReviewed','routingValidated','tollAuthoritiesReviewed','paymentsValidated','stressValidated']) if(mc[k]!==true) failures.push('marketCommissioning: '+k+' was not attested true');
+const load=m.gates?.stagingLoad?.details||{};
+if(!String(load.travelRateProfile||'').trim()) failures.push('stagingLoad: travelRateProfile missing');
+for(const k of ['p50Ms','p95Ms','p99Ms','errorRate','firestoreReadsPerDispatch','tollFallbackRate']) if(!Number.isFinite(Number(load[k]))||Number(load[k])<0) failures.push('stagingLoad: '+k+' missing/invalid');
+if(load.providerQuotasReviewed!==true) failures.push('stagingLoad: providerQuotasReviewed was not attested true');
+
 if (failures.length) {
   console.error('COMMERCIAL RELEASE EVIDENCE: FAIL');
   for (const f of failures) console.error(' - '+f);
@@ -52,10 +60,3 @@ console.log('COMMERCIAL RELEASE EVIDENCE: PASS');
 console.log('candidate '+expectedSha);
 console.log(required.length+' external gates have evidence and independent review');
 
-const mc=m.gates?.marketCommissioning?.details||{};
-if(!Array.isArray(mc.activeRegions)||!mc.activeRegions.length) failures.push('marketCommissioning: activeRegions missing');
-for(const k of ['jurisdictionReviewed','permitsAndRestrictedPlacesReviewed','pricingEvidenceReviewed','holdoutValidationPassed','regulatoryEconomicsReviewed','routingValidated','tollAuthoritiesReviewed','paymentsValidated','stressValidated']) if(mc[k]!==true) failures.push('marketCommissioning: '+k+' was not attested true');
-const load=m.gates?.stagingLoad?.details||{};
-if(!String(load.travelRateProfile||'').trim()) failures.push('stagingLoad: travelRateProfile missing');
-for(const k of ['p50Ms','p95Ms','p99Ms','errorRate','firestoreReadsPerDispatch','tollFallbackRate']) if(!Number.isFinite(Number(load[k]))||Number(load[k])<0) failures.push('stagingLoad: '+k+' missing/invalid');
-if(load.providerQuotasReviewed!==true) failures.push('stagingLoad: providerQuotasReviewed was not attested true');

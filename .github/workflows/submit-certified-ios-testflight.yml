@@ -15,7 +15,7 @@ jobs:
       ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
       ASC_KEY_ID: LS74L322NV
       ASC_ISSUER_ID: 2fa282d5-2b2c-4820-8fe9-6928ac1e8d33
-      CERTIFIED_SHA: f4dc955eea364c4826d4bb8dfec24c603c306bd9
+      CERTIFIED_SHA: 7e8eed301e79aff8378d7344619ac3183db007e0
 
     steps:
       - name: Check out certified candidate

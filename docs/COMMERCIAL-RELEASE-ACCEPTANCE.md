@@ -89,3 +89,4 @@ The Operator Inbox is American Rider → Operator institutional correspondence, 
 ## Evidence rule
 
 No row is PASS because code "looks correct." Automated checks prove deterministic code boundaries. Physical-device behavior, provider behavior, legal/compliance structure and production configuration require their own evidence. The release decision is made once, against the complete matrix at one immutable candidate SHA.
+

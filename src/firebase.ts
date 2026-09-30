@@ -35,11 +35,16 @@ export const app = initializeApp(firebaseConfig);
 // browser declaration surface for firebase/auth under Expo and therefore omits this RN-only
 // export. Keep the cast isolated here; the native export is also verified by the iOS export gate.
 const getReactNativePersistence = (fbAuth as unknown as {
-  getReactNativePersistence: (storage: typeof AsyncStorage) => Persistence;
+  getReactNativePersistence?: (storage: typeof AsyncStorage) => Persistence;
 }).getReactNativePersistence;
 
 function createAuth(): Auth {
   if (Platform.OS === 'web') return getAuth(app);
+  if (typeof getReactNativePersistence !== 'function') {
+    throw Object.assign(new Error('firebase/native-persistence-unavailable'), {
+      code: 'firebase/native-persistence-unavailable',
+    });
+  }
   try {
     return initializeAuth(app, { persistence: getReactNativePersistence(AsyncStorage) });
   } catch (e: unknown) {

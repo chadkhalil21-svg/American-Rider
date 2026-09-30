@@ -45,30 +45,39 @@ jobs:
           test "$ACTUAL_SHA" = "$CERTIFIED_SHA" || { echo "::error::Refusing build: $ACTUAL_SHA != $CERTIFIED_SHA"; exit 1; }
           echo "Certified source verified: $ACTUAL_SHA"
 
-      - name: Reconstruct and verify App Store Connect private key
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p .ci
-          KEY_PATH="$GITHUB_WORKSPACE/.ci/AuthKey_${ASC_KEY_ID}.p8"
-          printf '%s' "$ASC_API_KEY_BASE64" | base64 --decode > "$KEY_PATH"
-          grep -q -- '-----BEGIN PRIVATE KEY-----' "$KEY_PATH"
-          grep -q -- '-----END PRIVATE KEY-----' "$KEY_PATH"
-          chmod 600 "$KEY_PATH"
-          echo "ASC_API_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
-
       - name: Build exact certified iOS candidate
         shell: bash
         run: |
           set -euo pipefail
           npx --yes eas-cli@latest build --platform ios --profile production --non-interactive --wait
 
+      - name: Configure owner-controlled App Store Connect key for submission
+        shell: bash
+        run: |
+          set -euo pipefail
+          KEY_PATH="$RUNNER_TEMP/AuthKey_${ASC_KEY_ID}.p8"
+          printf '%s' "$ASC_API_KEY_BASE64" | base64 --decode > "$KEY_PATH"
+          grep -q -- '-----BEGIN PRIVATE KEY-----' "$KEY_PATH"
+          grep -q -- '-----END PRIVATE KEY-----' "$KEY_PATH"
+          chmod 600 "$KEY_PATH"
+          node - "$KEY_PATH" "$ASC_KEY_ID" "$ASC_ISSUER_ID" <<'NODE'
+          const fs = require('fs');
+          const [keyPath, keyId, issuerId] = process.argv.slice(2);
+          const p = 'eas.json';
+          const j = JSON.parse(fs.readFileSync(p, 'utf8'));
+          j.submit ??= {};
+          j.submit.production ??= {};
+          j.submit.production.ios ??= {};
+          Object.assign(j.submit.production.ios, {
+            ascApiKeyPath: keyPath,
+            ascApiKeyId: keyId,
+            ascApiKeyIssuerId: issuerId
+          });
+          fs.writeFileSync(p, JSON.stringify(j, null, 2) + '\n');
+          NODE
+
       - name: Submit exact build to TestFlight
         shell: bash
-        env:
-          EXPO_ASC_API_KEY_PATH: ${{ env.ASC_API_KEY_PATH }}
-          EXPO_ASC_KEY_ID: ${{ env.ASC_KEY_ID }}
-          EXPO_ASC_ISSUER_ID: ${{ env.ASC_ISSUER_ID }}
         run: |
           set -euo pipefail
           npx --yes eas-cli@latest submit --platform ios --latest --profile production --non-interactive --wait --verbose

@@ -15,6 +15,7 @@
 // Until 1 and 2 exist the button is offered only where the device says it can serve it, and
 // a failure is reported as what it is rather than as the traveler's mistake.
 import * as AppleAuthentication from 'expo-apple-authentication';
+import * as Crypto from 'expo-crypto';
 import {
   OAuthProvider,
   reauthenticateWithCredential,
@@ -45,13 +46,22 @@ function safeAuthReason(e: unknown): string {
   return typeof code === 'string' && code.length <= 100 ? code : 'auth/unknown';
 }
 
+function randomNonce(length = 32): string {
+  const alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';
+  const bytes = Crypto.getRandomBytes(length);
+  return Array.from(bytes, b => alphabet[b % alphabet.length]).join('');
+}
+
 async function appleCredential(): Promise<
   | { ok: true; credential: ReturnType<OAuthProvider['credential']>; apple: AppleAuthentication.AppleAuthenticationCredential }
   | { ok: false; cancelled: boolean; reason?: string }
 > {
   let apple: AppleAuthentication.AppleAuthenticationCredential;
+  const rawNonce = randomNonce();
+  const hashedNonce = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, rawNonce);
   try {
     apple = await AppleAuthentication.signInAsync({
+      nonce: hashedNonce,
       requestedScopes: [
         AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
         AppleAuthentication.AppleAuthenticationScope.EMAIL,
@@ -69,7 +79,7 @@ async function appleCredential(): Promise<
   return {
     ok: true,
     apple,
-    credential: provider.credential({ idToken: apple.identityToken }),
+    credential: provider.credential({ idToken: apple.identityToken, rawNonce }),
   };
 }
 

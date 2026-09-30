@@ -165,7 +165,7 @@ function legalSentence(text: string, nodes: Record<string, React.ReactNode>) {
 
 export function AuthScreen() {
   const { t, language, setLanguage, languages } = useLanguage();
-  const { signUp, signIn, resetPassword, busy, error, setOnboarding } = useAuth();
+  const { signUp, signIn, resetPassword, busy, error, diagnosticCode, setOnboarding } = useAuth();
   // Chad's entry architecture. `appleReady` is the device's own answer, not an assumption;
   // `google.ready` is true only when this build carries the client ids Google needs.
   const [entry, setEntry] = useState('');
@@ -598,6 +598,7 @@ export function AuthScreen() {
           </>
         )}
         {error ? <Text style={s.error}>{error}</Text> : null}
+        {diagnosticCode ? <Text style={s.diagnostic}>Diagnostic: {diagnosticCode}</Text> : null}
 
         <View style={{ flex: 1 }} />
 

@@ -45,13 +45,7 @@ jobs:
           test "$ACTUAL_SHA" = "$CERTIFIED_SHA" || { echo "::error::Refusing build: $ACTUAL_SHA != $CERTIFIED_SHA"; exit 1; }
           echo "Certified source verified: $ACTUAL_SHA"
 
-      - name: Advance remote iOS build number
-        shell: bash
-        run: |
-          set -euo pipefail
-          npx --yes eas-cli@latest build:version:set --platform ios --profile production --non-interactive
-
-      - name: Build exact certified iOS candidate
+       - name: Build exact certified iOS candidate
         shell: bash
         run: |
           set -euo pipefail

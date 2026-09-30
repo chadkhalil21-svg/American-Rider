@@ -4,7 +4,7 @@
 // Security comes from Firebase Auth + Firestore Security Rules, not from hiding these.
 import { initializeApp } from 'firebase/app';
 import * as fbAuth from 'firebase/auth';
-import { getAuth, initializeAuth, type Auth, type Persistence } from 'firebase/auth';
+import { initializeAuth, type Auth, type Persistence } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
@@ -39,12 +39,17 @@ const getRNPersistence = (
 ).getReactNativePersistence;
 
 function createAuth(): Auth {
-  if (Platform.OS === 'web' || !getRNPersistence) return getAuth(app);
+  if (Platform.OS === 'web') return fbAuth.getAuth(app);
+  if (!getRNPersistence) {
+    throw new Error('Firebase React Native persistence is unavailable in this native build.');
+  }
   try {
     return initializeAuth(app, { persistence: getRNPersistence(AsyncStorage) });
-  } catch {
-    // Already initialized (Fast Refresh re-runs this module) — reuse that instance.
-    return getAuth(app);
+  } catch (e: unknown) {
+    // Reuse only a genuinely pre-initialized Auth instance. Do not silently downgrade a
+    // native persistence/configuration failure to memory-only authentication.
+    if ((e as { code?: string })?.code === 'auth/already-initialized') return fbAuth.getAuth(app);
+    throw e;
   }
 }
 

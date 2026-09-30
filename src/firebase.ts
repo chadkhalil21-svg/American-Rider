@@ -3,7 +3,8 @@
 // This web config is NOT secret — Firebase config is designed to live in the app.
 // Security comes from Firebase Auth + Firestore Security Rules, not from hiding these.
 import { initializeApp } from 'firebase/app';
-import { getAuth, getReactNativePersistence, initializeAuth, type Auth } from 'firebase/auth';
+import * as fbAuth from 'firebase/auth';
+import { getAuth, initializeAuth, type Auth, type Persistence } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
@@ -30,6 +31,13 @@ export const app = initializeApp(firebaseConfig);
 // session to disk, so it survives force-quits, reboots, and app updates — you sign in
 // once, like Uber. On web, getAuth() already persists in the browser.
 //
+// Metro resolves Firebase's React Native bundle at runtime. TypeScript currently resolves the
+// browser declaration surface for firebase/auth under Expo and therefore omits this RN-only
+// export. Keep the cast isolated here; the native export is also verified by the iOS export gate.
+const getReactNativePersistence = (fbAuth as unknown as {
+  getReactNativePersistence: (storage: typeof AsyncStorage) => Persistence;
+}).getReactNativePersistence;
+
 function createAuth(): Auth {
   if (Platform.OS === 'web') return getAuth(app);
   try {

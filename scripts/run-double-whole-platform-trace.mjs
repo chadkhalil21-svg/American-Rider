@@ -6,7 +6,7 @@ const server = fs.readFileSync('backend/server.js','utf8');
 const endpoints=[...server.matchAll(/(?:app|router)\.(get|post|put|patch|delete)\(\s*['"`]([^'"`]+)/g)].map(m=>m[1].toUpperCase()+' '+m[2]).sort();
 
 const suites=[
- 'accountauth','auth','accountclosure','securityintegrity','abuse',
+ 'accountauth','auth','authconfiguration','accountclosure','securityintegrity','abuse',
  'markets','market','jurisdiction','documents','qualification','screening','adverse','disclosure','insurance-monitoring','operatorfees',
  'gate','dispatchgate','dispatchfailure','acceptance','travelparty','travelprogress','travelmoney','faremodel','economics','payments','idempotency','settle','refundexposure','remittance','paidwith','paymentarchitecture',
  'sched','scheduledparty','schedulerlease','smart','smartauthority','smartcontinuity','smartfallback','smartmultimarket','smarttravel','transit','tolls',

@@ -15,6 +15,7 @@
 // Until 1 and 2 exist the button is offered only where the device says it can serve it, and
 // a failure is reported as what it is rather than as the traveler's mistake.
 import * as AppleAuthentication from 'expo-apple-authentication';
+import * as Crypto from 'expo-crypto';
 import {
   OAuthProvider,
   reauthenticateWithCredential,
@@ -40,13 +41,27 @@ export async function appleSignInAvailable(): Promise<boolean> {
 // somebody decided to display it.
 export type AppleResult = { ok: true } | { ok: false; cancelled: boolean; reason?: string };
 
+function safeAuthReason(e: unknown): string {
+  const code = (e as { code?: unknown })?.code;
+  return typeof code === 'string' && code.length <= 100 ? code : 'auth/unknown';
+}
+
+function randomNonce(length = 32): string {
+  const alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';
+  const bytes = Crypto.getRandomBytes(length);
+  return Array.from(bytes, b => alphabet[b % alphabet.length]).join('');
+}
+
 async function appleCredential(): Promise<
   | { ok: true; credential: ReturnType<OAuthProvider['credential']>; apple: AppleAuthentication.AppleAuthenticationCredential }
   | { ok: false; cancelled: boolean; reason?: string }
 > {
   let apple: AppleAuthentication.AppleAuthenticationCredential;
+  const rawNonce = randomNonce();
+  const hashedNonce = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, rawNonce);
   try {
     apple = await AppleAuthentication.signInAsync({
+      nonce: hashedNonce,
       requestedScopes: [
         AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
         AppleAuthentication.AppleAuthenticationScope.EMAIL,
@@ -55,7 +70,7 @@ async function appleCredential(): Promise<
   } catch (e: unknown) {
     const code = (e as { code?: string })?.code;
     if (code === 'ERR_REQUEST_CANCELED') return { ok: false, cancelled: true };
-    return { ok: false, cancelled: false, reason: (e as Error)?.message };
+    return { ok: false, cancelled: false, reason: safeAuthReason(e) };
   }
   if (!apple.identityToken) {
     return { ok: false, cancelled: false, reason: 'no_identity_token' };
@@ -64,7 +79,7 @@ async function appleCredential(): Promise<
   return {
     ok: true,
     apple,
-    credential: provider.credential({ idToken: apple.identityToken }),
+    credential: provider.credential({ idToken: apple.identityToken, rawNonce }),
   };
 }
 
@@ -92,7 +107,7 @@ export async function signInWithApple(): Promise<AppleResult> {
     }
     return { ok: true };
   } catch (e: unknown) {
-    return { ok: false, cancelled: false, reason: (e as Error)?.message };
+    return { ok: false, cancelled: false, reason: safeAuthReason(e) };
   }
 }
 
@@ -106,6 +121,6 @@ export async function reauthenticateWithApple(): Promise<AppleResult> {
     await reauthenticateWithCredential(user, authResult.credential);
     return { ok: true };
   } catch (e: unknown) {
-    return { ok: false, cancelled: false, reason: (e as Error)?.message };
+    return { ok: false, cancelled: false, reason: safeAuthReason(e) };
   }
 }

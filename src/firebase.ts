@@ -31,20 +31,27 @@ export const app = initializeApp(firebaseConfig);
 // session to disk, so it survives force-quits, reboots, and app updates — you sign in
 // once, like Uber. On web, getAuth() already persists in the browser.
 //
-// getReactNativePersistence only exists in the React Native build of @firebase/auth
-// (firebase/auth re-exports it, but the shipped browser types don't declare it), hence
-// the lookup off the namespace rather than a named import.
-const getRNPersistence = (
-  fbAuth as unknown as { getReactNativePersistence?: (store: unknown) => Persistence }
-).getReactNativePersistence;
+// Metro resolves Firebase's React Native bundle at runtime. TypeScript currently resolves the
+// browser declaration surface for firebase/auth under Expo and therefore omits this RN-only
+// export. Keep the cast isolated here; the native export is also verified by the iOS export gate.
+const getReactNativePersistence = (fbAuth as unknown as {
+  getReactNativePersistence?: (storage: typeof AsyncStorage) => Persistence;
+}).getReactNativePersistence;
 
 function createAuth(): Auth {
-  if (Platform.OS === 'web' || !getRNPersistence) return getAuth(app);
+  if (Platform.OS === 'web') return getAuth(app);
+  if (typeof getReactNativePersistence !== 'function') {
+    throw Object.assign(new Error('firebase/native-persistence-unavailable'), {
+      code: 'firebase/native-persistence-unavailable',
+    });
+  }
   try {
-    return initializeAuth(app, { persistence: getRNPersistence(AsyncStorage) });
-  } catch {
-    // Already initialized (Fast Refresh re-runs this module) — reuse that instance.
-    return getAuth(app);
+    return initializeAuth(app, { persistence: getReactNativePersistence(AsyncStorage) });
+  } catch (e: unknown) {
+    // Reuse only a genuinely pre-initialized Auth instance. Do not silently downgrade a
+    // native persistence/configuration failure to memory-only authentication.
+    if ((e as { code?: string })?.code === 'auth/already-initialized') return getAuth(app);
+    throw e;
   }
 }
 

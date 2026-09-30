@@ -21,7 +21,7 @@
       "bundleIdentifier": "com.americanrider.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "CFBundleDisplayName": "American Rider",
+        "CFBundleDisplayName": "American",
         "NSSupportsLiveActivities": true,
         "UIBackgroundModes": [
           "location",

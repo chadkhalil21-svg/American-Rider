@@ -43,6 +43,11 @@ export const googleSignInConfigured =
 // `reason` is a CODE, never a sentence — see appleSignIn.ts.
 export type GoogleResult = { ok: true } | { ok: false; cancelled: boolean; reason?: string };
 
+function safeAuthReason(e: unknown): string {
+  const code = (e as { code?: unknown })?.code;
+  return typeof code === 'string' && code.length <= 100 ? code : 'auth/unknown';
+}
+
 /**
  * The hook form is what expo-auth-session provides: it must be created during render, and
  * `promptAsync` is what the button calls. Returns { request, signIn } so a screen can hide
@@ -90,7 +95,7 @@ export function useGoogleSignIn() {
       if (!idToken) return { ok: false, cancelled: false, reason: 'no_identity_token' };
       return { ok: true, credential: GoogleAuthProvider.credential(idToken) };
     } catch (e: unknown) {
-      return { ok: false, cancelled: false, reason: (e as Error)?.message };
+      return { ok: false, cancelled: false, reason: safeAuthReason(e) };
     }
   };
 
@@ -101,7 +106,7 @@ export function useGoogleSignIn() {
       await signInWithCredential(auth, result.credential);
       return { ok: true };
     } catch (e: unknown) {
-      return { ok: false, cancelled: false, reason: (e as Error)?.message };
+      return { ok: false, cancelled: false, reason: safeAuthReason(e) };
     }
   };
 
@@ -114,7 +119,7 @@ export function useGoogleSignIn() {
       await reauthenticateWithCredential(user, result.credential);
       return { ok: true };
     } catch (e: unknown) {
-      return { ok: false, cancelled: false, reason: (e as Error)?.message };
+      return { ok: false, cancelled: false, reason: safeAuthReason(e) };
     }
   };
 

@@ -34,5 +34,19 @@ assert.match(apple,/signInWithCredential\(auth, authResult\.credential\)/, 'Appl
 console.log('PASS production Firebase project is coherent across app and backend');
 console.log('PASS Google OAuth clients and iOS callback scheme are coherent');
 console.log('PASS Apple native capability declarations are present');
-console.log('PASS all three sign-in paths establish Firebase authentication in source');
-console.log('NOTE live provider enablement, OAuth consent/configuration, Firebase API-key restrictions, and device callback/session persistence require live commissioning evidence');
+assert.match(authContext,/createUserWithEmailAndPassword\(auth/, 'password sign-up must establish Firebase auth');
+assert.match(authContext,/sendPasswordResetEmail\(auth/, 'password recovery must use Firebase auth');
+assert.match(firebase,/initializeAuth\(app, \{ persistence: getReactNativePersistence\(AsyncStorage\) \}\)/,
+  'native Firebase auth must initialize with persistent React Native storage');
+console.log('PASS all three sign-in paths exchange credentials into Firebase authentication in source');
+console.log('NOTE source coherence is not live authentication proof: provider console configuration, API-key restrictions, native provider callbacks, token exchange, and restored sessions remain commissioning evidence');
+
+// One session authority must drive navigation for every provider.
+const layout = fs.readFileSync('app/_layout.tsx','utf8');
+assert.match(layout, /const \{ user, initializing, onboarding \} = useAuth\(\)/,
+  'application gate must consume the shared Firebase-backed auth context');
+assert.match(layout, /\(!user \|\| onboarding\)/,
+  'front door must remain closed until Firebase publishes a user and onboarding completes');
+assert.match(authContext, /onAuthStateChanged\(auth, \(u\) => \{[\s\S]*setUser\(u\)/,
+  'Firebase auth-state listener must publish the user consumed by the app gate');
+console.log('PASS provider sessions converge on the Firebase auth-state application gate');

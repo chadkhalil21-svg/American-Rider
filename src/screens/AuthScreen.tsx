@@ -9,7 +9,7 @@
 // Review opens those links and the free-tier server sleeps. See src/config.ts.
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Image, Linking, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Image, Linking, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Text } from '../components/AppText';
 import { Screen } from '../components/UI';
 import { LEGAL_URL, PAYMENT_SERVER_URL } from '../config';
@@ -166,7 +166,7 @@ function legalSentence(text: string, nodes: Record<string, React.ReactNode>) {
 
 export function AuthScreen() {
   const { t, language, setLanguage, languages } = useLanguage();
-  const { signUp, signIn, resetPassword, busy, error, setOnboarding } = useAuth();
+  const { signUp, signIn, resetPassword, busy, error, diagnosticCode, setOnboarding } = useAuth();
   // Chad's entry architecture. `appleReady` is the device's own answer, not an assumption;
   // `google.ready` is true only when this build carries the client ids Google needs.
   const [entry, setEntry] = useState('');
@@ -609,6 +609,9 @@ export function AuthScreen() {
           </>
         )}
         {error ? <Text style={s.error}>{error}</Text> : null}
+        {Platform.OS === 'web' && process.env.EXPO_PUBLIC_AUTH_PREVIEW_BYPASS === '1' && diagnosticCode ? (
+          <Text style={s.previewDiagnostic}>Preview diagnostic: {diagnosticCode}</Text>
+        ) : null}
 
         <View style={{ flex: 1 }} />
 
@@ -827,6 +830,7 @@ const s = StyleSheet.create({
     color: colors.muted,
   },
   field: { paddingVertical: 12, fontSize: 16, color: colors.ink },
+  previewDiagnostic: { fontSize: 12, color: colors.muted, textAlign: 'center', marginTop: 8 },
   error: { color: colors.red, fontSize: 13.5, marginTop: 14, textAlign: 'center' },
   switch: { textAlign: 'center', fontSize: 13, color: colors.muted },
   helper: { fontSize: 12.5, color: colors.faint, marginTop: 10 },

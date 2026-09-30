@@ -49,6 +49,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          python3 -m pip install --quiet PyJWT cryptography
           KEY_PATH="$RUNNER_TEMP/AuthKey_${ASC_KEY_ID}.p8"
           printf '%s' "$ASC_API_KEY_BASE64" | base64 --decode > "$KEY_PATH"
           grep -q -- '-----BEGIN PRIVATE KEY-----' "$KEY_PATH"
@@ -104,7 +105,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m pip install --quiet PyJWT cryptography
           npx --yes eas-cli@latest build --platform ios --profile production --non-interactive --wait --json > "$RUNNER_TEMP/eas-build.json"
           node - "$RUNNER_TEMP/eas-build.json" <<'NODE'
           const fs = require('fs');

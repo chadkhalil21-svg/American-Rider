@@ -66,4 +66,36 @@ async function resolveTolls(from, to, { departureTime = 'any' } = {}) {
   }
 }
 
-module.exports = { resolveTolls, parseHereTolls, HERE_TOLL_URL, TIMEOUT_MS };
+/**
+ * Cost-aware toll resolution.
+ * 1. Ask our own street router whether the selected route contains an OSM toll road class.
+ * 2. A definitive OSRM "no toll class" is clear at zero provider cost.
+ * 3. A toll-relevant route, or a router that cannot make that determination, falls through to
+ *    the toll-price authority. Today that final authority is HERE; jurisdiction-maintained
+ *    official rate registries can be inserted before HERE without changing callers.
+ *
+ * We deliberately do not infer "clear" from an unavailable/OTP route because absence of
+ * evidence is not evidence of no toll.
+ */
+async function resolveTollsCostAware(from, to, opts = {}) {
+  let route = opts.route || null;
+  // A caller that already attempted to select the authoritative road route must not trigger a
+  // second route selection here. A transient second answer could make tolls describe a
+  // different physical path than the fare. Unknown is safer than split-route authority.
+  if (!route && opts.routeAttempted === true) {
+    return { status: 'unknown', tollCents: null, reason: 'authoritative_route_unavailable' };
+  }
+  if (!route) {
+    try { route = await require('./streets').routeCar(from, to); } catch { route = null; }
+  }
+  // An OSM/OSRM negative is only authoritative after the market's toll-facility coverage has
+  // been certified against the responsible public authorities. OSM can be incomplete; absence
+  // of toll=yes must never become a nationwide $0 assumption.
+  const region = require('./regions').regionForTrip(from, to);
+  if (route?.provider === 'osrm' && route.tollRelevant === false && region?.tollCoverage?.certified === true) {
+    return { status: 'clear', tollCents: 0, provider: 'osrm-osm-certified', reason: 'certified_market_route_has_no_toll_class' };
+  }
+  return resolveTolls(from, to, opts);
+}
+
+module.exports = { resolveTolls, resolveTollsCostAware, parseHereTolls, HERE_TOLL_URL, TIMEOUT_MS };

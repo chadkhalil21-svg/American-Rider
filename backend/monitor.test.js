@@ -6,6 +6,7 @@ const MIN = 60 * 1000;
 function makeDb(seed) {
   const data = JSON.parse(JSON.stringify(seed));
   const db = {
+    __data: data,
     collection: (col) => ({
       doc: (id) => ({
         async get() { const d = data[col]?.[id]; return { exists: !!d, id, data: () => JSON.parse(JSON.stringify(d)) }; },
@@ -47,7 +48,16 @@ function inject(dbHandle, { aiKey = false } = {}) {
     const p = require.resolve(path.join(ROOT, rel));
     require.cache[p] = { id: p, filename: p, loaded: true, exports, children: [], paths: [] };
   }
-  delete require.cache[require.resolve(path.join(ROOT, 'monitor.js'))];
+  // Re-offer dispatch uses the production bounded-geographic candidate authority. Stub only
+  // its storage query here; qualification remains real and fail-closed below.
+  const gp = require.resolve(path.join(ROOT, './geooperators.js'));
+  const realGeo = require(gp);
+  require.cache[gp] = { id: gp, filename: gp, loaded: true, exports: {
+    ...realGeo,
+    nearbyOperatorCandidates: async (_db, _point, { excludeIds = new Set() } = {}) =>
+      Object.entries(dbHandle.__data?.operators || {}).filter(([id]) => !excludeIds.has(id)).map(([id, o]) => ({ id, ...o })),
+  }, children: [], paths: [] };
+    delete require.cache[require.resolve(path.join(ROOT, 'monitor.js'))];
   return require(path.join(ROOT, 'monitor.js'));
 }
 

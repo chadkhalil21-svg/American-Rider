@@ -56,7 +56,9 @@
     "release:evidence": "node scripts/verify-release-evidence.mjs",
     "backend:lint": "npm run lint --prefix backend",
     "commission:deterministic": "node scripts/run-deterministic-commissioning.mjs",
-    "commission:whole-platform-twice": "node scripts/run-double-whole-platform-trace.mjs"
+    "commission:whole-platform-twice": "node scripts/run-double-whole-platform-trace.mjs",
+    "calibrate:miami-fares": "node scripts/calibrate-market-fares.mjs data/miami-fare-calibration.json",
+    "calibrate:market-fares": "node scripts/calibrate-market-fares.mjs"
   },
   "private": true,
   "allowScripts": {

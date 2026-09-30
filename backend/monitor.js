@@ -31,6 +31,7 @@
 // reason: every fact it is given comes from the record. With no key configured the ladder
 // still runs on the thresholds alone, and says less.
 const { distanceMiles, matchOperator, coverageLapsed } = require('./matching');
+const { nearbyOperatorCandidates } = require('./geooperators');
 const { screeningReady } = require('./screening');
 const { assessOperator } = require('./qualification');
 const { connectAccountStatus } = require('./payments');
@@ -547,17 +548,6 @@ async function sweepAssignments({ now = Date.now() } = {}) {
     return { ok: false, reason: e.message, pending: 0 };
   }
 
-  // Read at most once per sweep, and only if some travel actually needs re-offering. A quiet
-  // minute must not cost a fleet read.
-  let fleetCache = null;
-  const fleetOnce = async () => {
-    if (!fleetCache) {
-      const ops = await db.collection('operators').get();
-      fleetCache = ops.docs.map((d) => ({ id: d.id, ...d.data() }));
-    }
-    return fleetCache;
-  };
-
   for (const ride of rows) {
     const age = now - (Number(ride.createdAt) || now);
 
@@ -594,38 +584,20 @@ async function sweepAssignments({ now = Date.now() } = {}) {
     // Unanswered. Find somebody else, excluding everyone who has already had it.
     const declined = Array.isArray(ride.declinedBy) ? ride.declinedBy : [];
     const exclude = new Set([...declined, ride.operatorId]);
-    let fleet = [];
-    try {
-      // ONCE PER SWEEP, NOT ONCE PER TRAVEL. This read the whole fleet inside the loop, so
-      // ten unanswered travels meant ten full reads of `operators` every minute — and every
-      // sweep on this tick spends the same daily Firestore allowance. scheduler.js hoists its
-      // fleet read for exactly this reason; this one never did, and the project reached 47,000
-      // reads a day against a 50,000 ceiling on a database with 166 writes in it.
-      //
-      // The exclusions are per-travel, so they stay in the loop. Only the READ is shared.
-      fleet = (await fleetOnce()).filter((o) => !exclude.has(o.id)).filter((o) => !coverageLapsed(o));
-    } catch {
-      continue;
-    }
-
     const pickup = { lat: Number(ride.pickupLat), lng: Number(ride.pickupLng) };
-    // Fall back to the operator's own last position when there is no pickup on the record.
     const from = Number.isFinite(pickup.lat)
       ? pickup
       : { lat: Number(ride.opLat), lng: Number(ride.opLng) };
-    // NO POSITION, SO NO SEARCH — BUT SAY SO. This used to be a bare `continue`, and the
-    // comment above it said app-booked rides "carry no pickup coordinates" as though that
-    // were a tolerable condition rather than a bug. It was not: dispatch.ts received the
-    // pickup and never stored it, so EVERY travel booked in the app landed here and was
-    // dropped. Not notified, not reoffered, not stranded, no case — invisible in all five
-    // counters, with `pending` climbing and a paid traveler waiting on somebody who was
-    // never coming.
-    //
-    // dispatch.ts writes pickupLat/pickupLng now, so this should be unreachable for anything
-    // booked since. Records written before it still land here, and a sweep that cannot act
-    // on a travel must report that it could not rather than looking like it had nothing to do.
     if (!Number.isFinite(from.lat)) {
       out.positionless.push(ride.id);
+      continue;
+    }
+
+    let fleet = [];
+    try {
+      fleet = (await nearbyOperatorCandidates(db, from, { excludeIds: exclude }))
+        .filter((o) => !coverageLapsed(o));
+    } catch {
       continue;
     }
 

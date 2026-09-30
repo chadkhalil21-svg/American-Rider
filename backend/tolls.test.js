@@ -21,7 +21,17 @@ assert.equal(unpriced.status,'unknown');
 const fs=require('node:fs'), path=require('node:path');
 const authority=fs.readFileSync(path.join(__dirname,'fareauthority.js'),'utf8');
 const server=fs.readFileSync(path.join(__dirname,'server.js'),'utf8');
-assert.ok(authority.includes('resolveTolls(body.pickup, body.dest)'),'fare authority resolves tolls server-side');
+assert.ok(authority.includes('resolveTollsCostAware(body.pickup, body.dest, { route: selectedRoute, routeAttempted: true })'),'fare authority passes the same selected road route to cost-aware toll resolution');
+assert.ok(authority.includes('routeCar(body.pickup, body.dest)'),'fare authority selects one road route before pricing and toll resolution');
 assert.ok(server.includes("code: 'toll_unavailable'"),'Travel paths expose fail-closed toll state');
 assert.ok(!/req\.body[^\n]*tollCents/.test(server),'client toll amount is never authoritative');
 console.log('all toll-authority tests passed');
+
+const streets=fs.readFileSync(path.join(__dirname,'streets.js'),'utf8');
+const tolls=fs.readFileSync(path.join(__dirname,'tolls.js'),'utf8');
+assert.ok(streets.includes('steps=true'),'OSRM exposes route steps for free toll-class detection');
+assert.ok(streets.includes("i.classes.includes('toll')"),'OSRM route checks OSM toll class');
+assert.ok(tolls.includes("region?.tollCoverage?.certified === true"),'OSRM negative bypass requires certified official-authority market coverage');
+assert.ok(!tolls.includes("provider: 'osrm-osm', reason: 'route_has_no_toll_class'"),'uncertified OSM negative cannot silently become zero toll');
+assert.ok(tolls.includes("opts.routeAttempted === true"),'toll authority cannot select a second route after fare routing was attempted');
+assert.ok(tolls.includes("reason: 'authoritative_route_unavailable'"),'missing authoritative route becomes unknown, never a second-route toll answer');

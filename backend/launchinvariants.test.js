@@ -22,7 +22,7 @@ for (const route of ['/operator/online', '/fare-quote', '/create-payment-intent'
   const line = server.split('\\n').find((x) => x.includes(`app.post('${route}'`)) || '';
   assert.ok(line.includes('requireOperationalReadiness'), `${route} is gated by production readiness`);
 }
-assert.ok(server.includes(".collection('operators').where('available', '==', true).get()"), 'dispatch prefilters to available Operators');
+assert.ok(server.includes('nearbyOperatorCandidates(db, pickup'), 'dispatch retrieves a bounded geographic Operator candidate set');
 
 const party=read('backend/travelparty.js');
 assert.ok(party.includes("['self','other_adult','teen']"), 'Teen Travel is an explicit server-authoritative party mode');
@@ -54,7 +54,7 @@ console.log('✓ scheduler authorization readiness is observable');
 console.log('✓ toll authority readiness is observable');
 console.log('✓ production posture disables demonstration fleet independently of Stripe mode');
 console.log('✓ production Travel/payment operations fail closed on missing dependencies');
-console.log('✓ dispatch prefilters to available Operators before authoritative matching');
+console.log('✓ dispatch uses bounded geographic candidates before authoritative matching');
 console.log('✓ another-person identity is server authoritative');
 console.log('✓ Teen Travel is bound to Family authorization');
 console.log('✓ Smart Travel two-charge economics is explicit');

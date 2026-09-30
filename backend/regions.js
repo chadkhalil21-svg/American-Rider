@@ -101,6 +101,10 @@ const REGIONS = Object.freeze([
     name: 'South Florida',
     state: 'FL',
     counties: ['Miami-Dade', 'Broward', 'Palm Beach'],
+    marketFips: ['12086', '12011', '12099'],
+    activeMarketFips: ['12086', '12011', '12099'],
+    geographyEvidence: { status: 'verified', authority: 'U.S. Census Bureau county boundaries' },
+    tollPolicy: { status: 'verified', failClosed: true, nationalDiscovery: 'FHWA toll-facility inventory', liveAuthority: 'facility operator or HERE fallback' },
     // WHOSE LAW APPLIES HERE. See the note above REGIONS.
     jurisdiction: {
       state: 'Florida',

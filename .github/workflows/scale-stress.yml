@@ -1,0 +1,30 @@
+name: Scale Stress Twice
+
+on:
+  pull_request:
+    branches: [release/current]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scale-stress:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm ci --prefix backend
+      - name: Run scale architecture and workload campaign twice
+        run: node scripts/run-scale-stress-twice.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: scale-stress-twice
+          path: artifacts/scale/scale-stress-twice.json
+          if-no-files-found: error

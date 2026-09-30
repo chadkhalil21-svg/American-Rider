@@ -104,7 +104,7 @@ for (const k of ['OTP_URL', 'OTP_URL_FL_SOUTHEAST', 'OSRM_URL', 'OSRM_URL_FL_SOU
   const viaOsrm = await withFetch(f, () => S.routeCar(BRICKELL, MIA_KERB));
   check('with an OSRM set, the route comes from it', viaOsrm && viaOsrm.provider === 'osrm', JSON.stringify(viaOsrm).slice(0, 120));
   check('  asked in OSRM\'s own form, lng,lat;lng,lat, with the full geometry',
-    f.calls.length === 1 && f.calls[0].url === 'http://osrm.test/route/v1/driving/-80.1918,25.7617;-80.2789,25.7953?overview=full&geometries=geojson&alternatives=false&steps=false', f.calls[0] && f.calls[0].url);
+    f.calls.length === 1 && f.calls[0].url === 'http://osrm.test/route/v1/driving/-80.1918,25.7617;-80.2789,25.7953?overview=full&geometries=geojson&alternatives=false&steps=true', f.calls[0] && f.calls[0].url);
   check('  coordinates come back as {lat,lng}, whole seconds and metres',
     viaOsrm && viaOsrm.coords.length === 4 && viaOsrm.coords[0].lat === BRICKELL.lat && viaOsrm.coords[0].lng === BRICKELL.lng && viaOsrm.durationSec === 799 && viaOsrm.distanceMeters === 12900);
   check('  and OTP is not asked', !f.calls.some((c) => /otp/.test(c.url)));
@@ -155,11 +155,12 @@ for (const k of ['OTP_URL', 'OTP_URL_FL_SOUTHEAST', 'OSRM_URL', 'OSRM_URL_FL_SOU
   check('thin leaves a short line alone', thin(LINE).length === 4 && thin(many, 10).length === 10);
   check('fetchRoute outside the market is null', (await withFetch(f, () => fetchRoute(SAN_FRANCISCO, MIA_KERB))) === null);
 
-  // 7. quoteWithRoute: the price beside the route, and the price unchanged
+  // 7. quoteWithRoute: the selected road route is the pricing authority when available.
   const priced = fareCentsForCoords(BRICKELL, MIA_KERB);
   f = standIn({ otp: OTP_CAR });
   const q = await withFetch(f, () => quoteWithRoute(BRICKELL, MIA_KERB));
-  check('quoteWithRoute prices exactly as fareCentsForCoords', q && q.travelCostCents === priced.travelCostCents && q.miles === priced.miles, JSON.stringify(q));
+  const routedPrice = fareCentsForCoords(BRICKELL, MIA_KERB, { routedMiles: 13119.6 / 1609.344, routedMinutes: 841 / 60 });
+  check('quoteWithRoute prices from the selected road route', q && q.travelCostCents === routedPrice.travelCostCents && q.miles === routedPrice.miles && q.timedBy === 'router', JSON.stringify(q));
   check('  and reports the routed miles and minutes and the provider', q && q.routedMiles === 8.2 && q.routedMinutes === 14 && q.provider === 'otp', JSON.stringify(q));
   const qDown = await withFetch(standIn({ otp: new Error('fetch failed') }), () => quoteWithRoute(BRICKELL, MIA_KERB));
   check('  with no router the price stands and the routed fields are null', qDown && qDown.travelCostCents === priced.travelCostCents && qDown.routedMiles === null && qDown.routedMinutes === null && qDown.provider === null, JSON.stringify(qDown));

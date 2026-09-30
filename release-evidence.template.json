@@ -150,6 +150,58 @@
         "smallAndLargeDeviceLayoutsReviewed": false,
         "noPlaceholderOrSimulatedProductionExperience": false
       }
+    },
+    "marketCommissioning": {
+      "result": "pending",
+      "executedAt": null,
+      "executor": null,
+      "reviewer": null,
+      "evidence": [],
+      "details": {
+        "activeRegions": [],
+        "jurisdictionReviewed": false,
+        "permitsAndRestrictedPlacesReviewed": false,
+        "pricingEvidenceReviewed": false,
+        "holdoutValidationPassed": false,
+        "regulatoryEconomicsReviewed": false,
+        "routingValidated": false,
+        "tollAuthoritiesReviewed": false,
+        "paymentsValidated": false,
+        "stressValidated": false
+      }
+    },
+    "stagingLoad": {
+      "result": "pending",
+      "executedAt": null,
+      "executor": null,
+      "reviewer": null,
+      "evidence": [],
+      "details": {
+        "travelRateProfile": null,
+        "p50Ms": null,
+        "p95Ms": null,
+        "p99Ms": null,
+        "errorRate": null,
+        "firestoreReadsPerDispatch": null,
+        "tollFallbackRate": null,
+        "providerQuotasReviewed": false
+      }
+    }
+  },
+  "readiness": {
+    "product": {
+      "result": "pending",
+      "candidateSha": "REPLACE_WITH_FULL_SHA",
+      "evidence": []
+    },
+    "commissioning": {
+      "result": "pending",
+      "installableCandidate": false,
+      "knownRepositoryBlockers": [],
+      "externalPending": []
+    },
+    "commercialGo": {
+      "result": "pending"
     }
   }
 }

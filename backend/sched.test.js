@@ -35,6 +35,7 @@ function makeDb(seed) {
         return {
           async get() { return snap(rowsFor()); },
           limit: (n) => ({ async get() { return snap(rowsFor().slice(0, n)); } }),
+          orderBy: () => ({ startAt: () => ({ endAt: () => ({ limit: (n) => ({ async get() { return snap(rowsFor().slice(0, n)); } }) }) }) }),
         };
       },
       async get() {

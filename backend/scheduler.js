@@ -25,6 +25,7 @@
 // drive it. On a free Render instance the process sleeps when idle and an interval sleeps with
 // it, so the ping is not a nicety — it is what makes the free tier work at all. See
 // docs/SCHEDULED-TRAVEL.md.
+const { nearbyOperatorCandidates } = require('./geooperators');
 const { matchOperator, etaMinutes, coverageLapsed } = require('./matching');
 const { screeningReady } = require('./screening');
 const { adminDb, adminStatus } = require('./firebase-admin');
@@ -95,19 +96,8 @@ async function sweepScheduled({ now = Date.now() } = {}) {
   if (!due.length) return report;
   report.considered = due.length;
 
-  // Read the fleet ONCE for the whole sweep rather than per reservation.
-  let fleet = [];
-  try {
-    const ops = await db.collection('operators').get();
-    fleet = ops.docs
-      .map((d) => ({ id: d.id, ...d.data() }))
-      .filter((o) => !coverageLapsed(o));
-  } catch (e) {
-    return { ok: false, reason: `could not read the fleet: ${e.message}`, considered: due.length };
-  }
-
-  // Operators already given a travel in THIS sweep are not offered a second one. Without this
-  // two reservations at the same minute both go to the nearest operator.
+  // Candidate retrieval is geographic and bounded per reservation. Reading the entire fleet
+  // once was cheaper than once per reservation, but still O(fleet) and therefore not scalable.
   const taken = new Set();
 
   for (const docSnap of due) {
@@ -126,8 +116,15 @@ async function sweepScheduled({ now = Date.now() } = {}) {
       continue;
     }
 
+    let fleet = [];
+    try {
+      fleet = await nearbyOperatorCandidates(db, pickup, { excludeIds: taken });
+    } catch (e) {
+      report.failed.push({ id, reason: `could not read nearby Operators: ${e.message}` });
+      continue;
+    }
     const match = matchOperator(
-      fleet.filter((o) => !taken.has(o.id)),
+      fleet,
       pickup,
       r.travelClass || 'Standard',
       // The screening gate: once a provider is live, only operators with a recorded pass.

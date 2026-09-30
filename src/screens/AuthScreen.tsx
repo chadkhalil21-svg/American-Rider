@@ -165,7 +165,7 @@ function legalSentence(text: string, nodes: Record<string, React.ReactNode>) {
 
 export function AuthScreen() {
   const { t, language, setLanguage, languages } = useLanguage();
-  const { signUp, signIn, resetPassword, busy, error, diagnosticCode, setOnboarding } = useAuth();
+  const { signUp, signIn, resetPassword, busy, error, setOnboarding } = useAuth();
   // Chad's entry architecture. `appleReady` is the device's own answer, not an assumption;
   // `google.ready` is true only when this build carries the client ids Google needs.
   const [entry, setEntry] = useState('');
@@ -598,7 +598,6 @@ export function AuthScreen() {
           </>
         )}
         {error ? <Text style={s.error}>{error}</Text> : null}
-        {diagnosticCode ? <Text style={s.diagnostic}>Diagnostic: {diagnosticCode}</Text> : null}
 
         <View style={{ flex: 1 }} />
 
@@ -817,7 +816,6 @@ const s = StyleSheet.create({
   },
   field: { paddingVertical: 12, fontSize: 16, color: colors.ink },
   error: { color: colors.red, fontSize: 13.5, marginTop: 14, textAlign: 'center' },
-  diagnostic: { fontSize: 12, color: colors.muted, textAlign: 'center', marginTop: 6 },
   switch: { textAlign: 'center', fontSize: 13, color: colors.muted },
   helper: { fontSize: 12.5, color: colors.faint, marginTop: 10 },
   // Password recovery is intentionally quiet, but never visually inert.

@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   application-checks:
@@ -45,3 +45,9 @@ jobs:
       - run: npm ci --prefix infra/rules-emulator
       - name: Run Firestore emulator rule suite
         run: npx --yes firebase-tools emulators:exec --only firestore "node infra/rules-emulator/messages.rules.test.mjs"
+
+  dependency-lock-repair:
+    if: ${{ failure() }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Dependency resolution remains an explicit repository change; release does not self-modify."

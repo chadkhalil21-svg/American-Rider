@@ -7,5 +7,5 @@ assert.match(firebase, /projectId: 'american-rider-35688'/);
 assert.match(firebase, /if \(!getRNPersistence\) \{/);
 assert.match(firebase, /throw new Error\('firebase/native-persistence-unavailable/);
 assert.match(firebase, /code === 'auth\/already-initialized'/);
-assert.doesNotMatch(firebase, /getRNPersistence/);
+assert.doesNotMatch(firebase, /Platform\.OS === 'web' \|\| !getReactNativePersistence/);
 console.log('native auth bootstrap invariants: PASS');

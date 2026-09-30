@@ -24,3 +24,11 @@ assert.match(appleNonce, /CryptoDigestAlgorithm\.SHA256, rawNonce/, 'Apple must 
 assert.match(appleNonce, /nonce: hashedNonce/, 'Apple request must be bound to the hashed nonce');
 assert.match(appleNonce, /idToken: apple\.identityToken, rawNonce/, 'Firebase credential must receive the original raw nonce');
 console.log('Apple nonce binding invariants: PASS');
+
+// Native-production contract: Google credential acquisition must not regress to the
+// generic browser/AuthSession helper. Expo's production guidance uses a native Google
+// sign-in module; Firebase then accepts the resulting ID token via GoogleAuthProvider.
+const googleNative = fs.readFileSync('src/state/googleSignIn.ts','utf8');
+assert.doesNotMatch(googleNative, /expo-auth-session\/providers\/google/,
+  'production Google sign-in must use a native provider integration, not generic AuthSession');
+console.log('Google native credential-acquisition invariant: PASS');

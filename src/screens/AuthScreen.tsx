@@ -15,6 +15,7 @@ import { Screen } from '../components/UI';
 import { LEGAL_URL, PAYMENT_SERVER_URL } from '../config';
 import Svg, { Path } from 'react-native-svg';
 
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { appleSignInAvailable, signInWithApple } from '../state/appleSignIn';
 import { googleSignInConfigured, useGoogleSignIn } from '../state/googleSignIn';
 
@@ -391,7 +392,17 @@ export function AuthScreen() {
 
           {(appleReady || SSO_PREVIEW) && (
             <>
-              <SsoButton label={t('auth.continueWithApple')} onPress={onApple} glyph="apple" primary />
+              {appleReady ? (
+                <AppleAuthentication.AppleAuthenticationButton
+                  buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+                  buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                  cornerRadius={13}
+                  style={s.appleButton}
+                  onPress={onApple}
+                />
+              ) : (
+                <SsoButton label={t('auth.continueWithApple')} onPress={onApple} glyph="apple" primary />
+              )}
               <View style={{ height: 10 }} />
             </>
           )}
@@ -679,6 +690,7 @@ const s = StyleSheet.create({
     fontWeight: '600',
   },
   tagline: { textAlign: 'center', fontSize: 14.5, color: colors.ink2, letterSpacing: 0.1, marginTop: 20, lineHeight: 20 },
+  appleButton: { width: '100%', height: 52 },
   btn: { borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   btnRow: { flexDirection: 'row', justifyContent: 'center', gap: 10 },
   btnInk: { backgroundColor: colors.ink },

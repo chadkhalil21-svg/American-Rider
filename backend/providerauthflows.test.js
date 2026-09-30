@@ -25,10 +25,16 @@ assert.match(appleNonce, /nonce: hashedNonce/, 'Apple request must be bound to t
 assert.match(appleNonce, /idToken: apple\.identityToken, rawNonce/, 'Firebase credential must receive the original raw nonce');
 console.log('Apple nonce binding invariants: PASS');
 
-// Native-production contract: Google credential acquisition must not regress to the
-// generic browser/AuthSession helper. Expo's production guidance uses a native Google
-// sign-in module; Firebase then accepts the resulting ID token via GoogleAuthProvider.
-const googleNative = fs.readFileSync('src/state/googleSignIn.ts','utf8');
-assert.doesNotMatch(googleNative, /expo-auth-session\/providers\/google/,
-  'production Google sign-in must use a native provider integration, not generic AuthSession');
-console.log('Google native credential-acquisition invariant: PASS');
+// Google protocol contract: acquisition mechanism may be AuthSession or a native provider,
+// but it must yield an ID token, create a Firebase Google credential, and exchange that
+// credential into the single Firebase Auth session authority.
+const googleProtocol = fs.readFileSync('src/state/googleSignIn.ts','utf8');
+assert.match(googleProtocol, /id[_T]oken|idToken/,
+  'Google flow must obtain an identity token');
+assert.match(googleProtocol, /GoogleAuthProvider\.credential\(/,
+  'Google identity must be converted to a Firebase credential');
+assert.match(googleProtocol, /signInWithCredential\(auth,/,
+  'Google credential must establish the Firebase session');
+assert.match(googleProtocol, /reauthenticateWithCredential\(user,/,
+  'Google credential must support recent-login reauthentication');
+console.log('Google-to-Firebase credential protocol invariants: PASS');

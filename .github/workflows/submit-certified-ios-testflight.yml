@@ -45,7 +45,7 @@ jobs:
           test "$ACTUAL_SHA" = "$CERTIFIED_SHA" || { echo "::error::Refusing build: $ACTUAL_SHA != $CERTIFIED_SHA"; exit 1; }
           echo "Certified source verified: $ACTUAL_SHA"
 
-       - name: Pin next iOS build number locally
+      - name: Pin next iOS build number locally
         shell: bash
         run: |
           set -euo pipefail

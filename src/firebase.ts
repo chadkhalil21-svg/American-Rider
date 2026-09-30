@@ -3,8 +3,7 @@
 // This web config is NOT secret — Firebase config is designed to live in the app.
 // Security comes from Firebase Auth + Firestore Security Rules, not from hiding these.
 import { initializeApp } from 'firebase/app';
-import * as fbAuth from 'firebase/auth';
-import { initializeAuth, type Auth, type Persistence } from 'firebase/auth';
+import { getAuth, getReactNativePersistence, initializeAuth, type Auth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
@@ -31,24 +30,14 @@ export const app = initializeApp(firebaseConfig);
 // session to disk, so it survives force-quits, reboots, and app updates — you sign in
 // once, like Uber. On web, getAuth() already persists in the browser.
 //
-// getReactNativePersistence only exists in the React Native build of @firebase/auth
-// (firebase/auth re-exports it, but the shipped browser types don't declare it), hence
-// the lookup off the namespace rather than a named import.
-const getRNPersistence = (
-  fbAuth as unknown as { getReactNativePersistence?: (store: unknown) => Persistence }
-).getReactNativePersistence;
-
 function createAuth(): Auth {
-  if (Platform.OS === 'web') return fbAuth.getAuth(app);
-  if (!getRNPersistence) {
-    throw new Error('firebase/native-persistence-unavailable');
-  }
+  if (Platform.OS === 'web') return getAuth(app);
   try {
-    return initializeAuth(app, { persistence: getRNPersistence(AsyncStorage) });
+    return initializeAuth(app, { persistence: getReactNativePersistence(AsyncStorage) });
   } catch (e: unknown) {
     // Reuse only a genuinely pre-initialized Auth instance. Do not silently downgrade a
     // native persistence/configuration failure to memory-only authentication.
-    if ((e as { code?: string })?.code === 'auth/already-initialized') return fbAuth.getAuth(app);
+    if ((e as { code?: string })?.code === 'auth/already-initialized') return getAuth(app);
     throw e;
   }
 }

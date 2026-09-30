@@ -817,6 +817,7 @@ const s = StyleSheet.create({
   },
   field: { paddingVertical: 12, fontSize: 16, color: colors.ink },
   error: { color: colors.red, fontSize: 13.5, marginTop: 14, textAlign: 'center' },
+  diagnostic: { fontSize: 12, color: colors.muted, textAlign: 'center', marginTop: 6 },
   switch: { textAlign: 'center', fontSize: 13, color: colors.muted },
   helper: { fontSize: 12.5, color: colors.faint, marginTop: 10 },
   // Password recovery is intentionally quiet, but never visually inert.

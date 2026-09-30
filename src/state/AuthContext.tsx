@@ -23,6 +23,7 @@ type AuthState = {
   initializing: boolean;
   busy: boolean;
   error: string | null;
+  diagnosticCode: string | null;
   signUp: (email: string, password: string, name?: string, mobile?: string) => Promise<boolean>;
   // True while the post-signup onboarding steps (code, role, ready) are on screen —
   // keeps the front-door overlay up even though Firebase already has a user.
@@ -84,6 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [busy, setBusy] = useState(false);
   const [onboarding, setOnboarding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [diagnosticCode, setDiagnosticCode] = useState<string | null>(null);
 
   useEffect(() => {
     return onAuthStateChanged(auth, (u) => {
@@ -95,10 +97,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const run = async (fn: () => Promise<unknown>) => {
     setBusy(true);
     setError(null);
+    setDiagnosticCode(null);
     try {
       await fn();
     } catch (e: any) {
-      setError(friendly(e?.code ?? ''));
+      const code = typeof e?.code === 'string' ? e.code : 'auth/unknown';
+      setDiagnosticCode(code);
+      setError(friendly(code));
     } finally {
       setBusy(false);
     }
@@ -128,6 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signUp: async (email, password, name, mobile) => {
       setBusy(true);
       setError(null);
+      setDiagnosticCode(null);
       try {
         const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
         if (name) await updateProfile(cred.user, { displayName: name.trim() });
@@ -159,7 +165,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         return true;
       } catch (e: any) {
-        setError(friendly(e?.code ?? ''));
+        const code = typeof e?.code === 'string' ? e.code : 'auth/unknown';
+        setDiagnosticCode(code);
+        setError(friendly(code));
         return false;
       } finally {
         setBusy(false);
@@ -258,6 +266,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }),
     onboarding,
     setOnboarding,
+    diagnosticCode,
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

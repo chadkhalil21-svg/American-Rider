@@ -40,3 +40,13 @@ assert.match(firebase,/initializeAuth\(app, \{ persistence: getReactNativePersis
   'native Firebase auth must initialize with persistent React Native storage');
 console.log('PASS all three sign-in paths exchange credentials into Firebase authentication in source');
 console.log('NOTE source coherence is not live authentication proof: provider console configuration, API-key restrictions, native provider callbacks, token exchange, and restored sessions remain commissioning evidence');
+
+// One session authority must drive navigation for every provider.
+const layout = fs.readFileSync('app/_layout.tsx','utf8');
+assert.match(layout, /const \{ user, initializing, onboarding \} = useAuth\(\)/,
+  'application gate must consume the shared Firebase-backed auth context');
+assert.match(layout, /\(!user \|\| onboarding\)/,
+  'front door must remain closed until Firebase publishes a user and onboarding completes');
+assert.match(authContext, /onAuthStateChanged\(auth, \(u\) => \{[\s\S]*setUser\(u\)/,
+  'Firebase auth-state listener must publish the user consumed by the app gate');
+console.log('PASS provider sessions converge on the Firebase auth-state application gate');

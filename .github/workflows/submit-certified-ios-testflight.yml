@@ -45,34 +45,7 @@ jobs:
           test "$ACTUAL_SHA" = "$CERTIFIED_SHA" || { echo "::error::Refusing build: $ACTUAL_SHA != $CERTIFIED_SHA"; exit 1; }
           echo "Certified source verified: $ACTUAL_SHA"
 
-      - name: Pin next iOS build number locally
-        shell: bash
-        run: |
-          set -euo pipefail
-          node - <<'NODE'
-          const fs = require('fs');
-          const p = 'eas.json';
-          const j = JSON.parse(fs.readFileSync(p, 'utf8'));
-          j.cli.appVersionSource = 'local';
-          j.build.production.autoIncrement = false;
-          fs.writeFileSync(p, JSON.stringify(j, null, 2) + '\n');
-
-          const appPath = fs.existsSync('app.json') ? 'app.json' : null;
-          if (!appPath) throw new Error('app.json not found; refusing to guess build-number location.');
-          const app = JSON.parse(fs.readFileSync(appPath, 'utf8'));
-          app.expo ??= {};
-          app.expo.ios ??= {};
-          app.expo.ios.buildNumber = '9';
-          fs.writeFileSync(appPath, JSON.stringify(app, null, 2) + '\n');
-          NODE
-
-      - name: Build exact certified iOS candidate as build 9
-        shell: bash
-        run: |
-          set -euo pipefail
-          npx --yes eas-cli@latest build --platform ios --profile production --non-interactive --wait
-
-      - name: Configure owner-controlled App Store Connect key for submission
+      - name: Configure owner-controlled App Store Connect key and select build number
         shell: bash
         run: |
           set -euo pipefail
@@ -81,24 +54,72 @@ jobs:
           grep -q -- '-----BEGIN PRIVATE KEY-----' "$KEY_PATH"
           grep -q -- '-----END PRIVATE KEY-----' "$KEY_PATH"
           chmod 600 "$KEY_PATH"
-          node - "$KEY_PATH" "$ASC_KEY_ID" "$ASC_ISSUER_ID" <<'NODE'
+          echo "ASC_API_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
+
+          python3 - "$KEY_PATH" "$ASC_KEY_ID" "$ASC_ISSUER_ID" <<'PY'
+          import base64, json, sys, time, urllib.parse, urllib.request
+          key_path, key_id, issuer_id = sys.argv[1:]
+          try:
+              import jwt
+          except ImportError:
+              raise SystemExit("PyJWT is required for App Store Connect build discovery")
+          with open(key_path, "rb") as fh:
+              private_key = fh.read()
+          token = jwt.encode(
+              {"iss": issuer_id, "iat": int(time.time()), "exp": int(time.time()) + 600, "aud": "appstoreconnect-v1"},
+              private_key, algorithm="ES256", headers={"kid": key_id, "typ": "JWT"})
+          q = urllib.parse.urlencode({
+              "filter[app]": "6798078543",
+              "filter[preReleaseVersion.version]": "1.0.0",
+              "filter[preReleaseVersion.platform]": "IOS",
+              "fields[builds]": "version",
+              "limit": "200",
+          })
+          req = urllib.request.Request("https://api.appstoreconnect.apple.com/v1/builds?" + q,
+                                       headers={"Authorization": "Bearer " + token})
+          with urllib.request.urlopen(req) as resp:
+              data = json.load(resp)
+          nums = [int(x["attributes"]["version"]) for x in data.get("data", [])
+                  if str(x.get("attributes", {}).get("version", "")).isdigit()]
+          next_build = max(nums, default=0) + 1
+          with open("app.json") as fh:
+              app = json.load(fh)
+          app.setdefault("expo", {}).setdefault("ios", {})["buildNumber"] = str(next_build)
+          with open("app.json", "w") as fh:
+              json.dump(app, fh, indent=2); fh.write("\n")
+          with open("eas.json") as fh:
+              eas = json.load(fh)
+          eas.setdefault("cli", {})["appVersionSource"] = "local"
+          eas.setdefault("build", {}).setdefault("production", {})["autoIncrement"] = False
+          ios = eas.setdefault("submit", {}).setdefault("production", {}).setdefault("ios", {})
+          ios.update({"ascApiKeyPath": key_path, "ascApiKeyId": key_id, "ascApiKeyIssuerId": issuer_id})
+          with open("eas.json", "w") as fh:
+              json.dump(eas, fh, indent=2); fh.write("\n")
+          with open("/tmp/next_build_number", "w") as fh:
+              fh.write(str(next_build))
+          print("Selected next unused iOS build number:", next_build)
+          PY
+
+      - name: Build exact certified iOS candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet PyJWT cryptography
+          npx --yes eas-cli@latest build --platform ios --profile production --non-interactive --wait --json > "$RUNNER_TEMP/eas-build.json"
+          node - "$RUNNER_TEMP/eas-build.json" <<'NODE'
           const fs = require('fs');
-          const [keyPath, keyId, issuerId] = process.argv.slice(2);
-          const p = 'eas.json';
-          const j = JSON.parse(fs.readFileSync(p, 'utf8'));
-          j.submit ??= {};
-          j.submit.production ??= {};
-          j.submit.production.ios ??= {};
-          Object.assign(j.submit.production.ios, {
-            ascApiKeyPath: keyPath,
-            ascApiKeyId: keyId,
-            ascApiKeyIssuerId: issuerId
-          });
-          fs.writeFileSync(p, JSON.stringify(j, null, 2) + '\n');
+          const p = process.argv[2];
+          const data = JSON.parse(fs.readFileSync(p, 'utf8'));
+          const row = Array.isArray(data) ? data[0] : data;
+          const id = row?.id;
+          if (!id) throw new Error('EAS build completed without a build ID.');
+          fs.appendFileSync(process.env.GITHUB_ENV, 'EAS_BUILD_ID=' + id + '\n');
+          console.log('Exact EAS build ID:', id);
           NODE
 
       - name: Submit exact build to TestFlight
         shell: bash
         run: |
           set -euo pipefail
-          npx --yes eas-cli@latest submit --platform ios --latest --profile production --non-interactive --wait --verbose
+          test -n "$EAS_BUILD_ID" || { echo "::error::Exact EAS build ID is unavailable."; exit 1; }
+          npx --yes eas-cli@latest submit --platform ios --id "$EAS_BUILD_ID" --profile production --non-interactive --wait --verbose

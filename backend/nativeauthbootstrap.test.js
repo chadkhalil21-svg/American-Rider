@@ -5,7 +5,7 @@ const app = JSON.parse(fs.readFileSync('app.json','utf8'));
 assert.equal(app.expo.ios.infoPlist.CFBundleDisplayName, 'American');
 assert.match(firebase, /projectId: 'american-rider-35688'/);
 assert.match(firebase, /if \(!getRNPersistence\) \{/);
-assert.match(firebase, /throw new Error\('Firebase React Native persistence is unavailable/);
+assert.match(firebase, /throw new Error\('firebase/native-persistence-unavailable/);
 assert.match(firebase, /code === 'auth\/already-initialized'/);
 assert.doesNotMatch(firebase, /if \(Platform\.OS === 'web' \|\| !getRNPersistence\) return getAuth/);
 console.log('native auth bootstrap invariants: PASS');

@@ -41,7 +41,7 @@ const getRNPersistence = (
 function createAuth(): Auth {
   if (Platform.OS === 'web') return fbAuth.getAuth(app);
   if (!getRNPersistence) {
-    throw new Error('Firebase React Native persistence is unavailable in this native build.');
+    throw new Error('firebase/native-persistence-unavailable');
   }
   try {
     return initializeAuth(app, { persistence: getRNPersistence(AsyncStorage) });

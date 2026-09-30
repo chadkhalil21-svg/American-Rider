@@ -40,6 +40,11 @@ export async function appleSignInAvailable(): Promise<boolean> {
 // somebody decided to display it.
 export type AppleResult = { ok: true } | { ok: false; cancelled: boolean; reason?: string };
 
+function safeAuthReason(e: unknown): string {
+  const code = (e as { code?: unknown })?.code;
+  return typeof code === 'string' && code.length <= 100 ? code : 'auth/unknown';
+}
+
 async function appleCredential(): Promise<
   | { ok: true; credential: ReturnType<OAuthProvider['credential']>; apple: AppleAuthentication.AppleAuthenticationCredential }
   | { ok: false; cancelled: boolean; reason?: string }
@@ -55,7 +60,7 @@ async function appleCredential(): Promise<
   } catch (e: unknown) {
     const code = (e as { code?: string })?.code;
     if (code === 'ERR_REQUEST_CANCELED') return { ok: false, cancelled: true };
-    return { ok: false, cancelled: false, reason: (e as Error)?.message };
+    return { ok: false, cancelled: false, reason: safeAuthReason(e) };
   }
   if (!apple.identityToken) {
     return { ok: false, cancelled: false, reason: 'no_identity_token' };
@@ -92,7 +97,7 @@ export async function signInWithApple(): Promise<AppleResult> {
     }
     return { ok: true };
   } catch (e: unknown) {
-    return { ok: false, cancelled: false, reason: (e as Error)?.message };
+    return { ok: false, cancelled: false, reason: safeAuthReason(e) };
   }
 }
 
@@ -106,6 +111,6 @@ export async function reauthenticateWithApple(): Promise<AppleResult> {
     await reauthenticateWithCredential(user, authResult.credential);
     return { ok: true };
   } catch (e: unknown) {
-    return { ok: false, cancelled: false, reason: (e as Error)?.message };
+    return { ok: false, cancelled: false, reason: safeAuthReason(e) };
   }
 }

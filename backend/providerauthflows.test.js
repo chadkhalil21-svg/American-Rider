@@ -1,0 +1,19 @@
+const fs = require('node:fs');
+const assert = require('node:assert/strict');
+
+for (const path of ['src/state/googleSignIn.ts', 'src/state/appleSignIn.ts']) {
+  const src = fs.readFileSync(path, 'utf8');
+  assert.match(src, /function safeAuthReason\(e: unknown\): string/);
+  assert.match(src, /typeof code === 'string' && code\.length <= 100 \? code : 'auth\/unknown'/);
+  assert.doesNotMatch(src, /reason: \(e as Error\)\?\.message/,
+    path + ' must never propagate arbitrary provider error messages');
+  assert.match(src, /signInWithCredential\(auth,/,
+    path + ' must exchange the provider credential into Firebase Auth');
+}
+const google = fs.readFileSync('src/state/googleSignIn.ts','utf8');
+assert.match(google, /result\.type === 'cancel' \|\| result\.type === 'dismiss'/);
+assert.match(google, /reason: 'no_identity_token'/);
+const apple = fs.readFileSync('src/state/appleSignIn.ts','utf8');
+assert.match(apple, /code === 'ERR_REQUEST_CANCELED'/);
+assert.match(apple, /reason: 'no_identity_token'/);
+console.log('provider auth failure-state invariants: PASS');

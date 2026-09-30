@@ -12,7 +12,7 @@ jobs:
     timeout-minutes: 30
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-      CERTIFIED_SHA: c6c04aff0ab685eda348319df360743962856fd5
+      CERTIFIED_SHA: 7c92654811df52dde471fb1abf157ff945ba7767
 
     steps:
       - name: Check out certified release

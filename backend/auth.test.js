@@ -39,8 +39,8 @@ const { verifyIdToken, requireAuth } = require(path.join(__dirname, 'auth.js'));
 const mint = (claims) =>
   jwt.sign(
     {
-      aud: 'american-rider',
-      iss: 'https://securetoken.google.com/american-rider',
+      aud: 'american-rider-35688',
+      iss: 'https://securetoken.google.com/american-rider-35688',
       sub: 'uid-123',
       exp: Math.floor(Date.now() / 1000) + 600,
       iat: Math.floor(Date.now() / 1000),

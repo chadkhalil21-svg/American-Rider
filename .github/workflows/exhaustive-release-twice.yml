@@ -1,0 +1,45 @@
+name: Exhaustive Release Campaign Twice
+
+on:
+  pull_request:
+    branches: [release/current]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exhaustive-twice:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci
+      - run: npm ci --prefix backend
+      - run: npm ci --prefix infra/rules-emulator
+      - name: Exhaustive pass 1
+        run: |
+          npm run check
+          npm run commission:deterministic
+          npm run commission:whole-platform-twice
+          node scripts/run-scale-stress-twice.mjs
+          npx expo export --platform web --output-dir dist-exhaustive-p1-web
+          npx expo export --platform ios --output-dir dist-exhaustive-p1-ios
+          npx expo export --platform android --output-dir dist-exhaustive-p1-android
+      - name: Exhaustive pass 2
+        run: |
+          npm run check
+          npm run commission:deterministic
+          npm run commission:whole-platform-twice
+          node scripts/run-scale-stress-twice.mjs
+          npx expo export --platform web --output-dir dist-exhaustive-p2-web
+          npx expo export --platform ios --output-dir dist-exhaustive-p2-ios
+          npx expo export --platform android --output-dir dist-exhaustive-p2-android

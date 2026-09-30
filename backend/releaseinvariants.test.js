@@ -64,7 +64,7 @@ assert.ok(opInboxScreen.includes("if (!recorded)"), 'Operator Inbox UI must fail
 assert.ok(operatorContext.includes("watchTravelThread("), 'Operator Travel chat must read the authoritative Travel thread');
 assert.ok(operatorContext.includes("sendTravelMessage({"), 'Operator Travel chat must send through server-authoritative messaging');
 assert.equal(operatorContext.includes("replySeeShortly"), false, 'Operator Travel chat must not fabricate Traveler replies');
-assert.equal(appConfig.expo.ios.infoPlist.CFBundleDisplayName, 'American Rider', 'iOS display name must carry full brand');
+assert.equal(appConfig.expo.ios.infoPlist.CFBundleDisplayName, 'American', 'iOS Home Screen display name must be American');
 
 console.log('✓ one-transfer Stripe architecture');
 console.log('✓ durable provider crash recovery');

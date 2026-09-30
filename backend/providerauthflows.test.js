@@ -38,3 +38,11 @@ assert.match(googleProtocol, /signInWithCredential\(auth,/,
 assert.match(googleProtocol, /reauthenticateWithCredential\(user,/,
   'Google credential must support recent-login reauthentication');
 console.log('Google-to-Firebase credential protocol invariants: PASS');
+
+// Expo's iOS production contract requires the native Apple authentication control.
+const authScreen = fs.readFileSync('src/screens/AuthScreen.tsx','utf8');
+assert.match(authScreen, /AppleAuthentication\.AppleAuthenticationButton/,
+  'iOS Apple sign-in must be initiated by Expo native AppleAuthenticationButton');
+assert.match(authScreen, /AppleAuthenticationButtonType\.CONTINUE/,
+  'native Apple control must use an approved Apple button type');
+console.log('Apple native control invariant: PASS');

@@ -3067,6 +3067,28 @@ app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, requireOperationalRea
   }
 });
 
+// Cancel a scheduled reservation only while it is still a reservation. The transaction closes
+// the race with the scheduler: once dispatch has advanced it, the Traveler must cancel the
+// resulting Travel through the normal Travel cancellation/refund lifecycle.
+app.delete('/travel/schedule/:id', requireAuth, async (req, res) => {
+  const db = adminDb();
+  if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
+  const ref = db.collection('scheduled_rides').doc(String(req.params.id || ''));
+  try {
+    const out = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) return { status: 404, body: { ok: false, code: 'not_found' } };
+      const row = snap.data() || {};
+      if (String(row.travelerUid || '') !== String(req.uid)) return { status: 403, body: { ok: false, code: 'forbidden' } };
+      const status = String(row.status || 'reserved');
+      if (status !== 'reserved') return { status: 409, body: { ok: false, code: 'already_advanced', status } };
+      tx.update(ref, { status: 'cancelled', closedReason: 'Cancelled by Traveler.', cancelledAt: Date.now() });
+      return { status: 200, body: { ok: true } };
+    });
+    return res.status(out.status).json(out.body);
+  } catch (e) { return res.status(502).json({ ok: false, error: e.message }); }
+});
+
 // Create a scheduled reservation with the same server authority as immediate dispatch.
 // The time and labels are traveler inputs. Fare, distance, fees and Travel Number are not.
 app.post('/travel/schedule', requireAuth, LIMITS.dispatch, requireOperationalReadiness, async (req, res) => {

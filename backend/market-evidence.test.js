@@ -16,3 +16,7 @@ assert.deepEqual(E.planProblems('tx-austin'),['tx-austin: no market evidence pla
 assert.equal(A.regionReady(R.regionById('fl-southeast')),true);
 
 console.log('national market evidence registry tests passed');
+
+const panel=E.source('controlled-public-price-panel');
+assert.match(panel.caveat,/Human-controlled audit evidence/);
+assert.match(panel.caveat,/No automated access/);

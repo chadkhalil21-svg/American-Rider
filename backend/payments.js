@@ -13,6 +13,7 @@
 
 const Stripe = require('stripe');
 const { readKey, hasInvalidHeaderChars, describeInvalidChars } = require('./env');
+const { adminDb } = require('./firebase-admin');
 const {
   MIN_PLATFORM_FEE_CENTS,
   isDomesticCard,
@@ -237,18 +238,62 @@ function quote(travelCostCents, journey, governmentFees, cardCountry, tollCents)
  */
 async function customerForTraveler({ uid, email }) {
   const stripe = getStripe();
+  const accountUid = String(uid || '');
+  if (!accountUid) throw new Error('Firebase uid is required for Stripe Customer ownership');
+  const db = adminDb();
+  const ownerRef = db ? db.collection('stripe_customers').doc(accountUid) : null;
+
+  if (ownerRef) {
+    const owned = await ownerRef.get();
+    if (owned.exists && owned.data()?.customerId) {
+      const customer = await stripe.customers.retrieve(String(owned.data().customerId));
+      if (!customer || customer.deleted) throw new Error('Authoritative Stripe Customer is unavailable');
+      if (String(customer.metadata?.uid || '') !== accountUid) {
+        throw new Error('Stripe Customer ownership mismatch');
+      }
+      return customer;
+    }
+  }
+
+  // Legacy adoption only: Search may locate a Customer created before the durable ownership
+  // registry existed. It is never adopted unless Stripe itself corroborates this Firebase uid.
   const found = await stripe.customers.search({
-    query: `metadata['uid']:'${String(uid).replace(/'/g, '')}'`,
-    limit: 1,
+    query: `metadata['uid']:'${accountUid.replace(/'/g, '')}'`,
+    limit: 2,
   });
-  if (found.data[0]) return found.data[0];
-  // Stripe Search is only a fast lookup, not our uniqueness primitive. Its index can lag and
-  // concurrent first-use requests can both observe "not found". Deterministic Customer creation
-  // makes those races converge on the same Stripe Customer for this immutable Firebase uid.
-  return stripe.customers.create(
-    { email: email || undefined, metadata: { uid: String(uid) } },
-    { idempotencyKey: `ar_customer_${String(uid)}` },
-  );
+  const matches = Array.isArray(found?.data)
+    ? found.data.filter(c => !c.deleted && String(c.metadata?.uid || '') === accountUid)
+    : [];
+  if (matches.length > 1) throw new Error('Multiple Stripe Customers exist for this account');
+  let customer = matches[0] || null;
+
+  if (!customer) {
+    customer = await stripe.customers.create(
+      { email: email || undefined, metadata: { uid: accountUid } },
+      { idempotencyKey: `ar_customer_${accountUid}` },
+    );
+  }
+  if (String(customer.metadata?.uid || '') !== accountUid) throw new Error('Stripe Customer ownership mismatch');
+
+  if (ownerRef) {
+    // create() prevents a stale first-use request from overwriting a mapping established by a
+    // concurrent request. If another writer won, verify and use its authoritative Customer.
+    try {
+      await ownerRef.create({ customerId: String(customer.id), uid: accountUid, createdAt: Date.now() });
+    } catch {
+      const winner = await ownerRef.get();
+      const winnerId = winner.exists ? String(winner.data()?.customerId || '') : '';
+      if (!winnerId) throw new Error('Stripe Customer ownership could not be persisted');
+      if (winnerId !== String(customer.id)) {
+        const authoritative = await stripe.customers.retrieve(winnerId);
+        if (!authoritative || authoritative.deleted || String(authoritative.metadata?.uid || '') !== accountUid) {
+          throw new Error('Stripe Customer ownership mismatch');
+        }
+        customer = authoritative;
+      }
+    }
+  }
+  return customer;
 }
 
 // ——— THE TRAVELER'S SAVED PAYMENT METHODS ———————————————————————————————————————————

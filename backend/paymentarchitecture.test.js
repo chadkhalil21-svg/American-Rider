@@ -20,4 +20,10 @@ assert.ok(p.includes("code === '6' || code === 'already-exists' || code === 'alr
 assert.ok(p.includes('if (!alreadyExists) throw e'), 'registry permission/network/quota failures propagate instead of masquerading as ownership conflicts');
 const server = fs.readFileSync(path.join(__dirname,'server.js'),'utf8');
 assert.ok(server.includes("require('./runtime-mode')"), 'HTTP readiness uses shared runtime-mode authority');
+assert.ok(p.includes('inspectStripeCustomerOwnership'), 'payment layer exposes read-only duplicate-Customer inventory');
+assert.ok(p.includes('paymentIntentsHasMore'), 'reconciliation inventory discloses when Stripe history is paginated rather than pretending completeness');
+const ops = fs.readFileSync(path.join(__dirname,'ops.js'),'utf8');
+assert.ok(ops.includes("app.get('/ops/stripe-customers'"), 'named Operations has an authenticated reconciliation evidence endpoint');
+assert.ok(ops.includes("action: 'stripe_customer_reconciliation_inspected'"), 'financial identity inspection is audit logged');
+assert.ok(ops.includes('mutationPerformed: false'), 'reconciliation endpoint is explicitly non-mutating');
 console.log('✓ one money architecture: charge platform, transfer on completed Travel');

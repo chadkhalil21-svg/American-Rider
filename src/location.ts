@@ -9,17 +9,21 @@
 // It also priced wrongly: the fare is quoted from the departure coordinates, so anyone not
 // in Brickell was quoted for a journey that started somewhere they were not.
 import * as Location from 'expo-location';
-import { DEP_PLACES, type DepPlace } from './data';
+import { type DepPlace } from './data';
 
-/** The honest fallback: a named pickup the traveler can change, never a guess. */
-export const DEFAULT_DEPARTURE: DepPlace = DEP_PLACES[1]; // "Home — Brickell City Centre"
+/** Unresolved means exactly that: no invented neighbourhood and no coordinates. */
+export const DEFAULT_DEPARTURE: DepPlace = {
+  name: 'Current location',
+  short: 'Current location',
+};
 
 /**
  * Resolve the device's real position into a departure.
  *
  * Returns null when we cannot establish it — permission refused, location off, a timeout,
  * or the simulator with no position set. Null means "say nothing", NOT "assume Brickell":
- * the caller keeps the named fallback, which is honest because the traveler chose it.
+ * the caller keeps a coordinate-free unresolved state. Location-dependent destinations,
+ * maps, routing and quotes therefore remain closed until a real device fix exists.
  *
  * Never throws. A pickup that cannot be resolved must degrade to a name the traveler can
  * correct, never to a crash or an invented street.

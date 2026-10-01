@@ -140,6 +140,7 @@ export default {
     insuranceDisclosure: 'Informativa assicurativa di legge',
     partRead: 'Letto',
     openAllParts: 'Apra le %{n} parti per continuare',
+
   },
   traveler: {
     beginTravel: 'Iniziare il Viaggio',
@@ -1086,6 +1087,8 @@ export default {
     familySendMessage: 'Invia Messaggio',
     familyMessageFailed: 'Il messaggio non è stato inviato.',
 
+    msgNotSent: "Messaggio non inviato. Controlli la connessione e riprovi.",
+  },
   },
   legal: {
     termsTitle: 'Termini di Servizio',
@@ -1107,6 +1110,5 @@ export default {
     lostRecording: "Registrazione…",
     lostLocated: "Oggetto trovato",
     lostNotFound: "Oggetto non trovato",
-    msgNotSent: "Messaggio non inviato. Controlli la connessione e riprovi.",
   },
 } as const;

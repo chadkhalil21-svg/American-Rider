@@ -17,6 +17,7 @@ import { PaymentConfigProvider } from '../src/state/PaymentConfigContext';
 import { OperatorProvider } from '../src/state/OperatorContext';
 import { RideProvider } from '../src/state/RideContext';
 import { colors } from '../src/theme';
+import { auth } from '../src/firebase';
 
 // The Stack is always mounted (so expo-router routing works). Until the user is
 // signed in, the sign-up screen is shown as a full-screen overlay on top of it.
@@ -66,8 +67,16 @@ function AppGate() {
     // launched a terminated app. Expo explicitly exposes the last response for this cold-start
     // case. Consume it only after Firebase has restored an account so notification data cannot
     // route through authenticated surfaces underneath the sign-in overlay.
+    const notificationUid = user.uid;
     void getInitialNotificationData().then(async (data) => {
+      // The native response lookup is asynchronous. If account scope changed while it was
+      // pending, this response belonged to the account that installed this effect—not the
+      // account now on screen. Drop and consume it rather than routing it into another account.
       if (!live || !data) return;
+      if (auth.currentUser?.uid !== notificationUid) {
+        await clearInitialNotificationResponse();
+        return;
+      }
       open(data);
       await clearInitialNotificationResponse();
     });

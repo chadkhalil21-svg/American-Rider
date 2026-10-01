@@ -6,10 +6,8 @@
 // reported "RESOLVED" over a bag nobody had looked for yet.
 //
 // THE RULE THIS FILE KEEPS: a status is written only once the thing it describes has
-// happened. `reported` means a record exists. `operator-notified` means named operators are
-// on the document. Nothing here can write `located` or `returned`, because only an operator
-// can know those — and the operator side is not built yet. So the screen shows a ladder with
-// the traveler standing on the rung they are actually on, and no higher.
+// happened. `reported` means a record exists; server-side Operator recovery owns later facts.
+// The Traveler client never promotes a report to located, returned, or return-arranged.
 import {
   addDoc,
   collection,
@@ -17,12 +15,11 @@ import {
   getDocs,
   onSnapshot,
   query,
-  updateDoc,
   where,
 } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { PAYMENT_SERVER_URL } from '../config';
-import { returnOperator, type RideRecord } from './dispatch';
+import { type RideRecord } from './dispatch';
 
 /**
  * The ladder, in order. `resolved` is deliberately not a value: an item is not resolved, it
@@ -251,31 +248,7 @@ export async function fetchMyLostItems(): Promise<LostItem[]> {
   }
 }
 
-export type ArrangeResult =
-  | { ok: true; ret: LostItemReturn }
-  | { ok: false; reason: 'no-operator' | 'write-failed' | 'signed-out' | 'travel-unknown' };
-
-/**
- * Arrange the return. THE PLATFORM CHOOSES; the traveler is never asked to negotiate.
- *
- * Path 1 — THE ORIGINAL OPERATOR, when they are still working. No cost: they have the item
- * already and their next travel can pass by. Tried first because it is the best outcome for
- * everyone.
- *
- * Path 2 — ANY OPERATOR, dispatched like a small delivery: whoever is nearest, paid the same
- * 99%. This is the answer when the original operator has finished for the day or left the
- * area, and it is the case worth getting right — the item is a passenger with no opinions,
- * and an operator who has finished their day is not penalised for having finished it.
- *
- * Either way it is a real dispatched travel, priced by the same server that prices every
- * other travel. When there are no coordinates to price from, `priced` comes back false and
- * the screen must show no amount rather than an invented one.
- */
-export async function arrangeReturn(args: {
-  item: LostItem;
-  /** Where the traveler wants the item brought. */
-  destination: { lat: number; lng: number } | null;
-}): Promise<ArrangeResult> {
+): Promise<ArrangeResult> {
   const uid = auth.currentUser?.uid;
   if (!uid) return { ok: false, reason: 'signed-out' };
 

@@ -14,6 +14,8 @@ const STATE='market_reference_state';
 const MAX_OBSERVATIONS_PER_SOURCE=5000;
 const HOUR=60*60*1000;
 
+function firestoreReady(){return !!adminDb();}
+
 function median(xs){if(!xs.length)return null;const a=[...xs].sort((x,y)=>x-y),m=Math.floor(a.length/2);return a.length%2?a[m]:Math.round((a[m-1]+a[m])/2);}
 function cellKey(o){return [o.serviceClass,o.daypart||'any',o.weekdayWeekend||'any',o.calendarClass||'ordinary',o.regulatedLocationClass||'ordinary'].join('|');}
 
@@ -67,4 +69,4 @@ async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false
   return report;
 }
 async function currentReference(marketId){const db=adminDb();if(!db)return null;const s=await db.collection(SNAP).doc(marketId).get();return s.exists?s.data():null;}
-module.exports={median,cellKey,persistObservations,recomputeMarket,runMarketReferenceSweep,currentReference};
+module.exports={median,cellKey,persistObservations,recomputeMarket,runMarketReferenceSweep,currentReference,firestoreReady};

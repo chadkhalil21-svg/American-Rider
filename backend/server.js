@@ -3176,7 +3176,16 @@ app.post('/travel/schedule', requireAuth, LIMITS.dispatch, requireOperationalRea
       financialIdentityGeneration: paymentIdentity.financialIdentityGeneration,
       status: 'reserved', createdAt: Date.now(),
     };
-    await ref.create(record);
+    const created = await db.runTransaction(async (tx) => {
+      const fenceRef = db.collection('account_operation_fences').doc(String(req.uid));
+      const closedRef = db.collection('account_closures').doc(String(req.uid));
+      const [fence, closed] = await Promise.all([tx.get(fenceRef), tx.get(closedRef)]);
+      if ((fence.exists && fence.data()?.closing === true) ||
+          (closed.exists && closed.data()?.operationallyClosed === true)) return false;
+      tx.create(ref, record);
+      return true;
+    });
+    if (!created) return res.status(409).json({ code:'account_closing', error:'This account cannot create new scheduled Travel.' });
     res.json({ id: ref.id, ...record });
   } catch (e) {
     res.status(502).json({ error: e.message });

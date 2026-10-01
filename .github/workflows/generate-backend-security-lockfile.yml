@@ -29,6 +29,7 @@ jobs:
         working-directory: backend
         run: node -e "const a=require('./npm-audit-production.json'); if ((a.metadata?.vulnerabilities?.total ?? 0) !== 0) { console.error(JSON.stringify(a.metadata?.vulnerabilities)); process.exit(1) }"
       - name: Upload generated lockfile and audit
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: backend-security-lockfile

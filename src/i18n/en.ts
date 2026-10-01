@@ -1113,6 +1113,7 @@ export default {
     familyMessageFailed: 'The message was not sent.',
 
     msgNotSent: "Message not sent. Check your connection and try again.",
+    lostOperatorInboxDelivered: "Delivered to %{names} in the Operator inbox.",
   },
 
   // ---- LEGAL ----------------------------------------------------------------------------

@@ -39,6 +39,7 @@ export default function OperatorCommunicate() {
   const [msgs, setMsgs] = useState<TravelMessage[]>([]);
   const [threadError, setThreadError] = useState<string | null>(null);
   const [unsent, setUnsent] = useState(false);
+  const [sending, setSending] = useState(false);
   const traveler = op.op?.traveler ?? t('traveler.yourTravelerLower');
   const initials = op.op?.tInit ?? 'AR';
   // `no` is the travel number on an active operation; `tripNo` is what it is called on
@@ -55,7 +56,8 @@ export default function OperatorCommunicate() {
 
   const send = async () => {
     const t = draft.trim();
-    if (!t || !tripNo) return;
+    if (!t || !tripNo || sending) return;
+    setSending(true);
     setUnsent(false);
     const stored = await sendTravelMessage({
       rideId: op.op?.rideId,
@@ -67,6 +69,7 @@ export default function OperatorCommunicate() {
     // NOT OPTIMISTIC ABOUT DELIVERY. The message appears because the live thread picks it up,
     // so a write that failed shows nothing — and says so, rather than leaving an operator
     // believing the traveler was told something they were not.
+    setSending(false);
     if (!stored) setUnsent(true);
     else setDraft('');
   };
@@ -116,7 +119,8 @@ export default function OperatorCommunicate() {
         />
         <Pressable
           onPress={send}
-          style={({ pressed }) => [styles.sendBtn, pressed && { opacity: 0.86 }]}
+          disabled={sending || !draft.trim()}
+          style={({ pressed }) => [styles.sendBtn, (pressed || sending) && { opacity: 0.86 }]}
         >
           <Text style={styles.sendText}>{t('traveler.send')}</Text>
         </Pressable>

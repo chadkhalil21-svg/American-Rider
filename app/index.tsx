@@ -148,6 +148,8 @@ export default function Home() {
   // whose receipt the row opens. A traveler with three different destinations still sees
   // three rows, so nothing is hidden — only the repetition goes.
   const [menuOpen, setMenuOpen] = useState(false);
+  const [schedCancelBusy, setSchedCancelBusy] = useState(false);
+  const [schedCancelFailed, setSchedCancelFailed] = useState(false);
   const { note, showNote } = useNote();
 
   // The drawer head speaks for the signed-in account — named and initialed by the
@@ -516,12 +518,22 @@ export default function Home() {
                 <Text style={styles.upcomingOpen}>{t('traveler.view')} ›</Text>
               </Pressable>
             ) : (
-              <Pressable onPress={ride.cancelScheduled} hitSlop={8}>
-                <Text style={styles.upcomingCancel}>{t('traveler.cancel2')}</Text>
+              <Pressable
+                disabled={schedCancelBusy}
+                onPress={async () => {
+                  if (schedCancelBusy) return;
+                  setSchedCancelBusy(true); setSchedCancelFailed(false);
+                  const ok = await ride.cancelScheduled();
+                  setSchedCancelBusy(false); if (!ok) setSchedCancelFailed(true);
+                }}
+                hitSlop={8}
+              >
+                <Text style={styles.upcomingCancel}>{schedCancelBusy ? t('traveler.familyWorking') : t('traveler.cancel2')}</Text>
               </Pressable>
             )}
           </View>
 
+          {schedCancelFailed && <Text style={styles.upcomingFail}>{t('traveler.cancelFailed')}</Text>}
           {ride.schedState?.status === 'unmatched' && (
             <Text style={styles.upcomingFail}>
               {ride.schedState.closedReason || t('traveler.noOperatorAvailable')} {t('traveler.noChargeMade')}

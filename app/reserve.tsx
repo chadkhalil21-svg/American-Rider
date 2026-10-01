@@ -138,6 +138,11 @@ export default function TravelConfirmation() {
   const chooseDestination = React.useCallback(
     async (place: Place, opts?: { keepSearchOpen?: boolean }) => {
       const req = ++priceReq.current;
+      // A new itinerary invalidates the old quote immediately. Never let a prior or zero
+      // provisional fare acquire the appearance of an authoritative price while requoting.
+      ride.setQuotedFareCents(null);
+      ride.setQuotedFeeLines([]);
+      ride.setTripCoords(null);
       ride.setArrival(place);
       if (!opts?.keepSearchOpen) {
         setSearching(false);
@@ -271,7 +276,10 @@ export default function TravelConfirmation() {
   // THE SAME SUM THE SERVER CHARGES, per class: the class fare, the platform fee on it, and
   // any government fee fenced for this trip. The chosen class's figure is ride.travelerTotal,
   // the one derivation every money screen reads; these rows use the same three lines.
-  const baseCents = ride.quotedFareCents ?? Math.round(ride.arrival.cost * 100);
+  // A class amount exists only when this exact itinerary has an authoritative server quote.
+  // `arrival.cost` may be zero/provisional during geocoding and must never become a displayed fare.
+  const quoteReady = smartLeg || (!pricing && !priceFailed && !unavailable && ride.quotedFareCents != null);
+  const baseCents = ride.quotedFareCents ?? 0;
   const governmentFee = ride.quotedFeeLines.reduce((sum, l) => sum + l.cents, 0) / 100;
   const allIn = (key: string) => {
     const fare = applyClassCents(baseCents, key) / 100;
@@ -594,7 +602,7 @@ export default function TravelConfirmation() {
                           key={cls.key}
                           accessibilityRole="radio"
                           accessibilityState={{ checked: on }}
-                          accessibilityLabel={`${t(classNameKey(cls.key))}, ${fmt(allIn(cls.key))}`}
+                          accessibilityLabel={`${t(classNameKey(cls.key))}, ${quoteReady ? fmt(allIn(cls.key)) : '—'}`}
                           onPress={() => ride.setTravelClass(cls.key)}
                         >
                           <View style={[styles.row, i > 0 && styles.hair]}>
@@ -731,7 +739,7 @@ export default function TravelConfirmation() {
           <View style={styles.footer}>
             <Card style={styles.totalCard}>
               <Text style={styles.totalLabel}>{t('traveler.totalTravelCost')}</Text>
-              {pricing ? (
+              {pricing || (!quoteReady && !priceFailed && !unavailable) ? (
                 <Text style={styles.totalState}>{t('traveler.calculating')}</Text>
               ) : priceFailed || unavailable ? (
                 <Text style={styles.totalState}>{t('traveler.unavailable')}</Text>

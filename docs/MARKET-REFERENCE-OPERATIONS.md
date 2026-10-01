@@ -8,7 +8,7 @@ American Rider maintains two deliberately separate clocks.
 
 Observe eligible external evidence hourly when a lawful/public/licensed source supports that cadence. Recompute the robust condition-matched reference hourly. Promote a production reference no more than daily, and only after the existing evidence, source-concentration, router, hold-out and economics gates pass.
 
-Eligible sources follow the existing hierarchy: government/public transaction microdata and independent controlled audits first; independent/field contemporaneous panels for local validation; platform-published prices only as secondary validation. Never scrape or automate access contrary to source terms, and never let one competitor, one route or one quote determine production.
+Eligible sources follow the existing hierarchy: government/public transaction microdata and independent controlled audits first; independent/field contemporaneous panels for local validation; platform-published prices only as secondary validation. Never scrape or automate access contrary to source terms, and never let one competitor, one route or one quote determine production. Never ingest competitors' nonpublic competitively sensitive data or participate in a shared competitor pricing/recommendation system; American Rider makes its pricing decisions independently from public, licensed, government and independent evidence.
 
 If no fresh eligible external evidence exists, retain the last verified production reference and mark freshness/coverage degraded. Do not invent a market movement.
 

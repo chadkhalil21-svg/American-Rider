@@ -20,6 +20,7 @@ const { webhookReady } = require('./webhook');
 const { emailReady } = require('./email');
 const { screeningReady } = require('./screening');
 const { monthlyRemittance } = require('./remittance');
+const { inspectStripeCustomerOwnership } = require('./payments');
 const { REQUIRED_DOCS, resolveDocument, setSuspension, assessAndRecord } = require('./qualification');
 const { disclosureStale } = require('./matching');
 const { applyIndependentConfirmation, continuingStatus } = require('./insurance-monitoring');
@@ -559,6 +560,40 @@ function mount(app, express, deps = {}) {
       res.json(snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => b.at - a.at));
     } catch (e) {
       res.status(500).json({ error: e.message });
+    }
+  });
+
+  // FINANCIAL IDENTITY RECONCILIATION IS READ-ONLY HERE. A duplicate Stripe Customer is not
+  // something Operations may resolve by guessing. This endpoint inventories the evidence needed
+  // for a deliberate repair without mutating Customer ownership.
+  app.get('/ops/stripe-customers', async (req, res) => {
+    if (!configured() || !signedIn(req)) return res.status(401).json({ error: 'Sign in at /ops first' });
+    const db = dbOf();
+    if (!db) return res.status(503).json({ error: adminStatus().reason || 'Firestore is not configured' });
+    const uid = String(req.query?.uid || '').trim();
+    if (!uid) return res.status(400).json({ error: 'uid is required' });
+    try {
+      const [ownerSnap, scheduledSnap, customers] = await Promise.all([
+        db.collection('stripe_customers').doc(uid).get(),
+        db.collection('scheduled_rides').where('travelerUid', '==', uid).get(),
+        inspectStripeCustomerOwnership(uid),
+      ]);
+      const scheduledReferences = scheduledSnap.docs
+        .map(d => ({ id:d.id, status:d.data()?.status || null, stripeCustomerId:d.data()?.stripeCustomerId || null, stripePaymentMethodId:d.data()?.stripePaymentMethodId || null, atMs:d.data()?.atMs || null }))
+        .filter(r => r.stripeCustomerId || r.stripePaymentMethodId);
+      await db.collection('audit_log').add({
+        at: Date.now(), subject: uid, actor: actorOf(req), action: 'stripe_customer_reconciliation_inspected',
+        customerCount: customers.length, scheduledReferenceCount: scheduledReferences.length,
+      });
+      return res.json({
+        uid,
+        authoritativeCustomerId: ownerSnap.exists ? ownerSnap.data()?.customerId || null : null,
+        customers,
+        scheduledReferences,
+        mutationPerformed: false,
+      });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
     }
   });
 

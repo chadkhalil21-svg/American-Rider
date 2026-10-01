@@ -34,6 +34,8 @@ const login = context.indexOf('await deleteUser(u);');
 const localWipe = context.indexOf('await clearAllStorage();');
 assert(recent >= 0 && recent < operational && operational < login && login < localWipe);
 assert(!context.includes("deleteDoc(doc(db, 'users'"), 'client must not own irreversible profile PII deletion');
+const deleteFlow=context.slice(context.indexOf('deleteAccount:'),context.indexOf('// THE DEVICE IS CLEARED BEFORE THE SESSION ENDS'));
+assert(!deleteFlow.includes('await clearPushToken()'), 'permanent deletion does not repeat push mutation after strict server closure');
 const server = fs.readFileSync(require.resolve('./server'), 'utf8');
 const closeRoute = server.slice(server.indexOf("app.post('/account/close'"), server.indexOf('// --- Legal pages'));
 assert(closeRoute.indexOf("collection('users').doc(String(req.uid)).delete()") > closeRoute.indexOf('dropToken(String(req.uid), null, true)'), 'server retires device ownership before profile PII');

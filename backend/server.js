@@ -443,7 +443,7 @@ app.post('/push/register', requireAuth, LIMITS.push, async (req, res) => {
   if (!/^(ExponentPushToken|ExpoPushToken)\\[[A-Za-z0-9_-]{10,200}\\]$/.test(token)) return res.status(400).json({ error: 'A valid Expo push token is required' });
   const platform = String(req.body?.platform || '');
   if (!['ios','android'].includes(platform)) return res.status(400).json({ error: 'A valid push platform is required' });
-  const allowedPrefs = new Set(['travelUpdates','operatorUpdates','familyUpdates','receipts']);
+  const allowedPrefs = new Set(['enroute','arrived','complete']);
   const rawPrefs = req.body?.prefs && typeof req.body.prefs === 'object' && !Array.isArray(req.body.prefs) ? req.body.prefs : null;
   const prefs = rawPrefs ? Object.fromEntries(Object.entries(rawPrefs).filter(([k,v]) => allowedPrefs.has(k) && typeof v === 'boolean')) : null;
   const uid = String(req.uid);

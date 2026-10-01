@@ -14,7 +14,7 @@ function chicagoWeekend(iso){const d=new Date(iso).getUTCDay();return d===0||d==
 async function collectChicago({marketId='il-chicago'}={}){
   // City of Chicago 2026 TNP dataset. Fare and total are rounded by the publisher; provenance
   // remains attached so calibration can weight it appropriately.
-  const base='https://data.cityofchicago.org/resource/8bbv-3wbe.json';
+  const base='https://data.cityofchicago.org/resource/6dvr-xwnh.json';
   const params=new URLSearchParams({
     '$limit':'1000',
     '$order':'trip_start_timestamp DESC',
@@ -28,7 +28,7 @@ async function collectChicago({marketId='il-chicago'}={}){
       serviceClass:'standard',routedMiles:Number(r.trip_miles),routedMinutes:Number(r.trip_seconds)/60,
       travelerTotalCents:Math.round(Number(r.trip_total)*100),daypart:chicagoDaypart(observedAt),
       weekdayWeekend:chicagoWeekend(observedAt),calendarClass:'ordinary',regulatedLocationClass:'ordinary',
-      provenance:'City of Chicago Transportation Network Providers - Trips (2026), dataset 8bbv-3wbe',
+      provenance:'City of Chicago Transportation Network Providers - Trips (2025-), dataset 6dvr-xwnh',
     });
   });
 }

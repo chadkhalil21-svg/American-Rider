@@ -1,0 +1,17 @@
+const assert=require('node:assert/strict');
+const {assessPublicSource,FITNESS}=require('./public-source-discovery');
+const {verifiedSource}=require('./public-source-registry');
+const chi=verifiedSource('chicago-tnp-open-data');
+assert.ok(chi.assessment.fitness.includes(FITNESS.FARE_REFERENCE));
+assert.ok(chi.assessment.problems.some(x=>x.includes('250 cents')));
+assert.equal(chi.endpoint,'https://data.cityofchicago.org/resource/6dvr-xwnh.json');
+const ny=verifiedSource('nyc-tlc-hvfhv');
+assert.ok(!ny.assessment.fitness.includes(FITNESS.FARE_REFERENCE));
+assert.ok(ny.assessment.fitness.includes(FITNESS.TRIP_SHAPE));
+const pay=verifiedSource('nyc-hvfhv-driver-pay');
+assert.ok(pay.assessment.fitness.includes(FITNESS.REGULATORY_FLOOR));
+assert.ok(!pay.assessment.fitness.includes(FITNESS.FARE_REFERENCE));
+const aggregate=verifiedSource('nyc-tlc-aggregate-fares');
+assert.ok(!aggregate.assessment.fitness.includes(FITNESS.FARE_REFERENCE));
+assert.deepEqual(assessPublicSource({}).fitness,[]);
+console.log('national public-source fitness tests passed');

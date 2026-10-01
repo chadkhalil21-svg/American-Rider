@@ -51,7 +51,10 @@ async function verifyTeenPin({rideId,operatorUid,pin,now=Date.now()}){
   if(!['accepted','arrived'].includes(String(r.status)))return {ok:false,status:409,error:'Pickup verification is not available in this Travel state'};
   if(r.teenPickup?.verifiedAt)return {ok:true,status:200,required:true,verified:true};
   if(!/^\d{4}$/.test(String(pin||''))||digest(rideId,pin)!==r.teenPickup?.hash){tx.set(ref,{teenPickup:{...r.teenPickup,failedAttempts:Number(r.teenPickup?.failedAttempts||0)+1,lastFailedAt:now}},{merge:true});return {ok:false,status:403,error:'The pickup code is not correct',code:'teen_pin_invalid'};}
-  tx.set(ref,{teenPickup:{...r.teenPickup,verifiedAt:now,verifiedBy:String(operatorUid)}},{merge:true});return {ok:true,status:200,required:true,verified:true};
+  // Verification is the end of the PIN's operational life. Retain the audit fact, not
+  // recoverable credential material that no longer serves a purpose.
+  const {hash:_hash,sealedPin:_sealedPin,...audit}=r.teenPickup||{};
+  tx.set(ref,{teenPickup:{...audit,verifiedAt:now,verifiedBy:String(operatorUid),credentialRetiredAt:now}},{merge:true});return {ok:true,status:200,required:true,verified:true};
  });
 }
 function teenMayBoard(ride){return ride?.party?.teen!==true||!!ride?.teenPickup?.verifiedAt;}

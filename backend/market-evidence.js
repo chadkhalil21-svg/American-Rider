@@ -44,13 +44,6 @@ const NATIONAL_SOURCE_CATALOG=Object.freeze({
     public:true,
     primaryEligible:true,
   }),
-  'nyc-tlc-hvfhv':Object.freeze({
-    type:SOURCE_TYPES.GOVERNMENT_TRIPS,
-    authority:'NYC Taxi & Limousine Commission',
-    coverage:'New York City, NY',
-    public:true,
-    primaryEligible:true,
-  }),
   'california-cpuc-tnc-public':Object.freeze({
     type:SOURCE_TYPES.GOVERNMENT_TRIPS,
     authority:'California Public Utilities Commission',

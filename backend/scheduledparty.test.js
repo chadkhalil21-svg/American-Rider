@@ -41,6 +41,11 @@ assert.ok(pushSource.includes('retryable: true'), 'push transport exceptions are
 assert.ok(pushSource.includes("code === 'DeviceNotRegistered'"), 'invalid device token is terminal rather than endlessly retried');
 assert.ok(scheduler.includes('late && !recoverySnap.exists'), 'expired reservation cannot create a fresh Travel or charge after the dispatch window');
 assert.ok(scheduler.includes('dispatch window expired'), 'scheduler records explicit stale-dispatch failure rather than dispatching hours late');
+const recoveryPos=scheduler.indexOf('RECOVERY PRECEDES FRESH DISPATCH');
+assert.ok(recoveryPos > 0 && recoveryPos < scheduler.indexOf('nearbyOperatorCandidates'), 'existing deterministic Travel is recovered before any fresh fleet lookup');
+assert.ok(recoveryPos < scheduler.indexOf('chargeScheduledTravel'), 'existing deterministic Travel is recovered before any payment attempt');
+assert.ok(scheduler.includes("recovered: true"), 'recovered Travel is explicitly distinguishable in scheduler evidence');
+assert.ok(scheduler.includes("!effectiveOperator.id || !existing.paymentIntentId"), 'recovery fails closed if committed Operator or payment identity is incomplete');
 
 console.log('✓ scheduled Travel preserves Booker/Traveler party semantics');
 console.log('✓ scheduled Teen Travel uses Family authorization');

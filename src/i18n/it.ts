@@ -1106,6 +1106,7 @@ export default {
     lostOperatorInboxDelivered: "Consegnato a %{names} nella casella dell’Operatore.",
     notifSaveFailed: "La preferenza di notifica non è stata salvata. Riprovi.",
     cancelFailed: "Il Viaggio non è stato annullato. Riprovi.",
+    lostReturnHuman: "Patron Support coordina la restituzione dopo che l’Operatore ha localizzato l’oggetto. Nessun Viaggio di restituzione, addebito o assegnazione viene mostrato finché non esiste realmente.",
   },
 
   legal: {

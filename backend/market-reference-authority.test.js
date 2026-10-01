@@ -1,8 +1,12 @@
 const assert=require('node:assert/strict');
-const {qualification}=require('./market-reference-authority');
+const {qualification,referenceScopeForPickup}=require('./market-reference-authority');
 const plan={minimumIndependentFamilies:2};
 assert.equal(qualification(null,plan).ok,false);
 assert.equal(qualification({evidenceFamilies:['government-trips'],latestObservedAt:'2026-09-01T00:00:00Z',cells:{}},plan).ok,false);
 assert.equal(qualification({evidenceFamilies:['government-trips','independent-audit'],latestObservedAt:'2026-09-01T00:00:00Z',cells:{}},plan).ok,true);
 assert.equal(qualification({evidenceFamilies:['government-trips','independent-audit'],cells:{}},plan).ok,false);
+assert.equal(referenceScopeForPickup({lat:25.7959,lng:-80.287}),'fl-miami-dade');
+assert.equal(referenceScopeForPickup({lat:26.0742,lng:-80.1506}),'fl-broward');
+assert.equal(referenceScopeForPickup({lat:26.6832,lng:-80.0956}),'fl-palm-beach');
+assert.equal(referenceScopeForPickup({lat:41.8781,lng:-87.6298}),null);
 console.log('market-reference runtime authority tests passed');

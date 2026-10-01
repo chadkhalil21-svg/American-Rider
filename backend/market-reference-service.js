@@ -17,7 +17,9 @@ const HOUR=60*60*1000;
 function firestoreReady(){return !!adminDb();}
 
 function median(xs){if(!xs.length)return null;const a=[...xs].sort((x,y)=>x-y),m=Math.floor(a.length/2);return a.length%2?a[m]:Math.round((a[m-1]+a[m])/2);}
-function cellKey(o){return [o.serviceClass,o.daypart||'any',o.weekdayWeekend||'any',o.calendarClass||'ordinary',o.regulatedLocationClass||'ordinary'].join('|');}
+function distanceBand(miles){const n=Number(miles);return n<3?'0-3':n<7?'3-7':n<15?'7-15':n<30?'15-30':'30+';}
+function durationBand(minutes){const n=Number(minutes);return n<10?'0-10':n<20?'10-20':n<40?'20-40':n<60?'40-60':'60+';}
+function cellKey(o){return [o.serviceClass,distanceBand(o.routedMiles),durationBand(o.routedMinutes),o.daypart||'any',o.weekdayWeekend||'any',o.calendarClass||'ordinary',o.regulatedLocationClass||'ordinary'].join('|');}
 
 async function persistObservations(db,rows){
   let written=0;
@@ -41,7 +43,8 @@ async function recomputeMarket(db,marketId,{now=Date.now(),lookbackDays=90}={}){
     if(referenceTotalCents===null)continue;
     cells[key]={referenceTotalCents,targetTotalCents:targetTotalCents(referenceTotalCents),observations:rows.length,sources:[...new Set(rows.map(x=>x.sourceId))],asOf:new Date(now).toISOString()};
   }
-  const out={marketId,asOf:new Date(now).toISOString(),lookbackDays,observations:snap.size,sourceCount:sources.size,evidenceFamilies:[...families],cells};
+  const latestObservedAt=[...groups.values()].flat().map(x=>x.observedAt).sort().at(-1)||null;
+  const out={marketId,asOf:new Date(now).toISOString(),latestObservedAt,lookbackDays,observations:snap.size,sourceCount:sources.size,evidenceFamilies:[...families],cells};
   await db.collection(SNAP).doc(marketId).set(out);
   return out;
 }
@@ -69,4 +72,4 @@ async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false
   return report;
 }
 async function currentReference(marketId){const db=adminDb();if(!db)return null;const s=await db.collection(SNAP).doc(marketId).get();return s.exists?s.data():null;}
-module.exports={median,cellKey,persistObservations,recomputeMarket,runMarketReferenceSweep,currentReference,firestoreReady};
+module.exports={median,distanceBand,durationBand,cellKey,persistObservations,recomputeMarket,runMarketReferenceSweep,currentReference,firestoreReady};

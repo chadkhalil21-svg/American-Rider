@@ -61,4 +61,9 @@ assert.ok(scheduledClient.includes('/travel/schedule/${encodeURIComponent(id)}/c
 assert.ok(rideContext.includes("if (result !== 'cancelled') return result"), 'local scheduled state survives any unconfirmed cancellation');
 assert.ok(home.includes("result === 'dispatch_in_progress'"), 'home reports when dispatch wins cancellation race');
 assert.ok(home.includes("status === 'payment_integrity_hold'"), 'traveler sees payment integrity quarantine');
+const family = fs.readFileSync(path.join(__dirname,'family.js'),'utf8');
+const closure = fs.readFileSync(path.join(__dirname,'accountclosure.js'),'utf8');
+assert.ok((family.match(/runTransaction/g)||[]).length >= 2 && family.includes("Number(v.claimedAt)>0") && family.includes("Number(current.claimedAt)>0"), 'Family revocation and age-out cannot cancel after scheduler claim');
+assert.ok(!closure.includes('d.ref.delete()'), 'account closure preserves scheduled Travel records as durable evidence');
+assert.ok(closure.includes("code:'scheduled_travel_in_progress'"), 'account closure fails closed when scheduled dispatch owns a reservation');
 console.log('✓ one money architecture: charge platform, transfer on completed Travel');

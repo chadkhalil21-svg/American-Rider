@@ -10,7 +10,8 @@ for(const id of ['fl-miami-dade','fl-broward','fl-palm-beach']){
   assert.equal(E.planForRegion(id).regionId,'fl-southeast');
 }
 assert.ok(E.source('chicago-tnp-open-data').primaryEligible);
-assert.equal(E.source('nyc-tlc-hvfhv').primaryEligible,false);\nassert.equal(E.source('california-cpuc-tnc-public').primaryEligible,false);
+assert.equal(E.source('nyc-tlc-hvfhv').primaryEligible,false);
+assert.equal(E.source('california-cpuc-tnc-public').primaryEligible,false);
 assert.equal(E.source('american-rider-field-panel').primaryEligible,false);
 assert.deepEqual(E.planProblems('tx-austin'),['tx-austin: no market evidence plan']);
 assert.equal(A.regionReady(R.regionById('fl-southeast')),true);

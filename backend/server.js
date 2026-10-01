@@ -3062,7 +3062,16 @@ app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, requireOperationalRea
   };
 
   try {
-    await ref.create(ride);
+    const created = await db.runTransaction(async (tx) => {
+      const fenceRef = db.collection('account_operation_fences').doc(String(req.uid));
+      const closedRef = db.collection('account_closures').doc(String(req.uid));
+      const [fence, closed] = await Promise.all([tx.get(fenceRef), tx.get(closedRef)]);
+      if ((fence.exists && fence.data()?.closing === true) ||
+          (closed.exists && closed.data()?.operationallyClosed === true)) return false;
+      tx.create(ref, ride);
+      return true;
+    });
+    if (!created) return res.status(409).json({ code:'account_closing', error:'This account cannot create new Travel.' });
     const teenPickup = await provisionTeenPin({ rideRef: ref, rideId: ref.id, party });
     if (teenPickup.required && party.teenUid) await notify({ uid: party.teenUid, kind: 'teen_pickup_code', title: 'Your pickup code', body: `Give ${teenPickup.pin} to your Operator after confirming the vehicle and Operator.`, data: { screen: '/ride', rideId: ref.id, tripNo } });
     if (teenPickup.required && party.guardianUid && party.guardianUid !== party.teenUid) await notify({ uid: party.guardianUid, kind: 'guardian_travel', title: 'Teen Travel assigned', body: `${party.travelerName}'s Travel has been assigned. You can follow it in American Rider.`, data: { screen: '/family', rideId: ref.id, tripNo } });

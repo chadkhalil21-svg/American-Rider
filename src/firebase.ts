@@ -10,7 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyAQMJ1ikGvhrmCZY9D00jM6EM2r2m0V4OY',
+  apiKey: 'AIzaSyAQMJ1ikGvhrmCZY9D0OjM6EM2r2m0V4OY',
   authDomain: 'american-rider-35688.firebaseapp.com',
   projectId: 'american-rider-35688',
   storageBucket: 'american-rider-35688.firebasestorage.app',

@@ -544,15 +544,22 @@ export default function Status() {
               <Text style={styles.keepBtnText}>{t('traveler.keepTravel')}</Text>
             </Pressable>
             <Pressable
-              onPress={() => {
-                ride.cancelRide();
-                router.dismissTo('/');
+              disabled={cancelBusy}
+              onPress={async () => {
+                if (cancelBusy) return;
+                setCancelBusy(true);
+                setCancelFailed(false);
+                const ok = await ride.cancelRide();
+                setCancelBusy(false);
+                if (ok) router.dismissTo('/');
+                else setCancelFailed(true);
               }}
               style={styles.yesCancelBtn}
             >
-              <Text style={styles.yesCancelText}>{t('traveler.yesCancel')}</Text>
+              <Text style={styles.yesCancelText}>{cancelBusy ? t('traveler.familyWorking') : t('traveler.yesCancel')}</Text>
             </Pressable>
           </View>
+          {cancelFailed ? <Text style={styles.cancelNote}>{t('traveler.cancelFailed')}</Text> : null}
         </View>
       ) : complete ? (
         <PrimaryButton

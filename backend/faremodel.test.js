@@ -31,7 +31,7 @@ check('the verified route prices at a $7.53 fare — $1.00 + 5.04 miles + 15 min
 // Rider total and the 99% operator distribution for the calibration route.
 const allIn = chad.travelCostCents + platformFeeCents(chad.travelCostCents, 'US');
 check('the calibration route includes the complete platform fee in the traveler total',
-  allIn === 953, `ours all-in ${usd(allIn)}`);
+  allIn === 1003, `ours all-in ${usd(allIn)}`);
 check('the operator receives exactly 99% of the $7.53 Travel Fare',
   chad.travelCostCents - commissionCents(chad.travelCostCents) === 746,
   `operator ${usd(chad.travelCostCents - commissionCents(chad.travelCostCents))}`);
@@ -72,11 +72,11 @@ check('a tenth of a mile further never costs more than 20 cents more', worstJump
 
 // ---- The floor is on what the traveler pays ---------------------------------------------
 const tiny = fareCentsForCoords(HOME, { lat: 25.769, lng: -80.1936 });
-check('the shortest possible travel costs the traveler exactly $5.00',
+check('the shortest possible travel costs the traveler exactly $5.50',
   tiny.travelCostCents + platformFeeCents(tiny.travelCostCents, 'US') === MIN_TOTAL_CENTS,
   `${usd(tiny.travelCostCents + platformFeeCents(tiny.travelCostCents, 'US'))}`);
-check('the no-pass-through minimum remains the intended $5.00 product floor',
-  MIN_TOTAL_CENTS === 500);
+check('the no-pass-through minimum remains the intended $5.50 product floor',
+  MIN_TOTAL_CENTS === 550);
 
 // ---- The named table has not been left behind -------------------------------------------
 // It priced every destination under the old model for two months. A table that disagrees with

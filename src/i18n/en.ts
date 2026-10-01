@@ -11,7 +11,6 @@ export default {
     continueWithApple: 'Continue with Apple',
     continueWithGoogle: 'Continue with Google',
     orDivider: 'or',
-    emailOrMobileField: 'Email Address',
     continueLabel: 'Continue',
     ssoNotConfigured: 'This sign-in is not configured in this build yet.',
     appleUnavailable: 'Apple could not complete the sign-in. Try again, or use your email address.',

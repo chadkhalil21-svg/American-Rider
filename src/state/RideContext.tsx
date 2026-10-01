@@ -75,6 +75,9 @@ export type SchedInfo = {
   /** The instant the travel is due. Without it a reservation cannot be read back as
    *  upcoming, which is why a scheduled travel used to vanish on the next launch. */
   atMs: number;
+  /** Civil appointment shown to the traveler; the server validates it in the pickup market timezone. */
+  civilDate?: string;
+  civilTime?: string;
 };
 export type PaymentState = {
   status: 'idle' | 'processing' | 'paid' | 'failed';

@@ -1105,6 +1105,7 @@ export default {
 
     msgNotSent: "Nachricht nicht gesendet. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
     lostOperatorInboxDelivered: "An %{names} im Operator-Postfach zugestellt.",
+    notifSaveFailed: "Die Benachrichtigungseinstellung wurde nicht gespeichert. Versuchen Sie es erneut.",
   },
 
   legal: {

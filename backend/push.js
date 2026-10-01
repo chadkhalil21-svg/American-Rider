@@ -91,7 +91,9 @@ async function notify({ uid, kind, title, body, data }) {
         sound: 'default',
         channelId: rule.channel,
         priority: 'high',
-        data: { kind, ...(data || {}) },
+        // Bind every notification to the account it was created for. A handset may later
+        // sign into another account while an old OS notification remains tappable.
+        data: { kind, ...(data || {}), recipientUid: String(uid) },
       }),
     });
     const out = await res.json().catch(() => ({}));

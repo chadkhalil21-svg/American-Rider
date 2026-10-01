@@ -21,6 +21,14 @@ const NATIONAL_SOURCE_CATALOG=Object.freeze({
     primaryEligible:true,
     caveat:'Requires commercial license/contract and field-level validation for intended pricing use.',
   }),
+  'massachusetts-tnc-report':Object.freeze({
+    type:SOURCE_TYPES.GOVERNMENT_TRIPS,
+    authority:'Massachusetts TNC Division',
+    coverage:'Massachusetts',
+    public:true,
+    primaryEligible:false,
+    caveat:'Public reports support trip shape/demand and market commissioning; do not treat as passenger-fare evidence unless the current published fields explicitly contain usable charges.',
+  }),
   'nyc-tlc-hvfhv':Object.freeze({
     type:SOURCE_TYPES.GOVERNMENT_TRIPS,
     authority:'NYC Taxi & Limousine Commission',
@@ -75,6 +83,12 @@ const NATIONAL_SOURCE_CATALOG=Object.freeze({
 });
 
 const MARKET_EVIDENCE_PLANS=Object.freeze({
+  'ma-statewide':Object.freeze({
+    sources:Object.freeze(['massachusetts-tnc-report','independent-controlled-audit','gridwise-analytics']),
+    minimumIndependentFamilies:2,
+    liveCollectorRequiredForContinuousMonitoring:true,
+    bootstrapReference:null,
+  }),
   'il-chicago':Object.freeze({
     sources:Object.freeze(['chicago-tnp-open-data','independent-controlled-audit','gridwise-analytics']),
     minimumIndependentFamilies:2,

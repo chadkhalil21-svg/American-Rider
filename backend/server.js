@@ -501,6 +501,9 @@ app.post('/account/close', requireAuth, async (req, res) => {
     // Permanent account deletion depends on this endpoint. Retire device ownership here,
     // under server authority, so a client/network failure after this response cannot orphan it.
     await dropToken(String(req.uid), null, true);
+    // Profile PII retirement is server-owned so permanent identity deletion remains resumable.
+    // Durable Travel/payment/safety/qualification records are intentionally retained elsewhere.
+    await adminDb().collection('users').doc(String(req.uid)).delete();
     return res.json(out);
   } catch (e) {
     console.error('[account] close failed:', e.message);

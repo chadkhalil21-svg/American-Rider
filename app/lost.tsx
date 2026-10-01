@@ -15,14 +15,12 @@
 //   d. the return, both paths, chosen by the platform — the traveler does not negotiate
 //   e. a status that is true, and never the word Resolved
 import * as ImagePicker from 'expo-image-picker';
-import * as Location from 'expo-location';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Text } from '../src/components/AppText';
 import { RideRecord } from '../src/backend/dispatch';
 import {
-  arrangeReturn,
   reportLostItem,
   lostItemPhotoUrl,
   watchLostItem,
@@ -48,7 +46,7 @@ import { travelDateTime } from '../src/dates';
 import { useAuth } from '../src/state/AuthContext';
 import { useRide } from '../src/state/RideContext';
 import { useLanguage } from '../src/state/LanguageContext';
-import { colors, fmt } from '../src/theme';
+import { colors } from '../src/theme';
 
 type Step = 'travel' | 'describe' | 'filed';
 
@@ -94,8 +92,6 @@ export default function LostItemScreen() {
   const [filing, setFiling] = useState(false);
   const [item, setItem] = useState<LostItem | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
-  const [arranging, setArranging] = useState(false);
-  const [arrangeError, setArrangeError] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) ride.refreshMyRides();
@@ -194,36 +190,6 @@ export default function LostItemScreen() {
     setStep('filed');
   };
 
-  const doArrangeReturn = async () => {
-    if (!item || arranging) return;
-    setArranging(true);
-    setArrangeError(null);
-    // Where the item is going: where the traveler is now. Without it the return is still
-    // dispatched, it simply carries no price rather than an invented one.
-    let destination: { lat: number; lng: number } | null = null;
-    try {
-      const perm = await Location.requestForegroundPermissionsAsync();
-      if (perm.granted) {
-        const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-        destination = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-      }
-    } catch {
-      // No position — handled above.
-    }
-    const res = await arrangeReturn({ item, destination });
-    setArranging(false);
-    if (!res.ok) {
-      setArrangeError(
-        res.reason === 'no-operator'
-          ? t('traveler.lostNoCarrier')
-          : res.reason === 'travel-unknown'
-            ? t('traveler.lostReturnOnConfirm')
-            : t('traveler.lostReturnFailed'),
-      );
-      return;
-    }
-    setItem({ ...item, return: res.ret, status: 'return-arranged' });
-  };
 
   const openThread = () => {
     const tripNo = item?.tripNo ?? item?.candidateTripNos[0] ?? ride.lastTrip.no;
@@ -503,59 +469,13 @@ export default function LostItemScreen() {
         ) : null}
       </Card>
 
-      {/* d · THE RETURN — both paths, and the platform picks. */}
+      {/* Return coordination remains human until an authoritative paid/free return-Travel
+          lifecycle exists. Do not label operator selection as a dispatch or charge. */}
       <SectionLabel style={styles.lbl}>{t('traveler.returnLabel')}</SectionLabel>
-      {ret ? (
-        <Card style={styles.returnCard}>
-          <Text style={styles.returnPath}>
-            {ret.path === 'original-operator'
-              ? t('traveler.lostWhoDrove', { name: ret.operatorName })
-              : t('traveler.lostNearestToYou', { name: ret.operatorName })}
-          </Text>
-          <Text style={styles.returnBody}>
-            {ret.path === 'original-operator'
-              ? t('traveler.lostStillWorking')
-              : t('traveler.lostOwnDispatch')}
-          </Text>
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>{t('traveler.returnTravel')}</Text>
-            {ret.costCents === 0 && ret.priced ? (
-              <Text style={styles.priceFree}>{t('traveler.noCharge')}</Text>
-            ) : ret.priced ? (
-              <Num size={17} weight="600">
-                {fmt(ret.costCents / 100)}
-              </Num>
-            ) : (
-              <Text style={styles.priceLabel}>{t('traveler.quotedWhenDispatched')}</Text>
-            )}
-          </View>
-          <Text style={styles.returnNote}>
-            {t('traveler.movesOnConfirm')}
-          </Text>
-        </Card>
-      ) : (
-        <Card style={styles.returnCard}>
-          <Text style={styles.returnBody}>{t('traveler.lostReturnHow')}</Text>
-          {arrangeError && <Text style={styles.error}>{arrangeError}</Text>}
-          {/* A report that went to every operator in the window has no "your operator" yet.
-              Dispatching a return to whichever of them happened to be free would be naming
-              a car we have no reason to think the item is in. */}
-          {!item.tripNo ? (
-            <Text style={styles.returnNote}>
-              {item.notifiedOperatorNames.length === 1
-                ? t('traveler.lostReportWentToOne')
-                : t('traveler.lostReportWentTo', { n: item.notifiedOperatorNames.length })}
-            </Text>
-          ) : (
-            <PrimaryButton
-              label={arranging ? t('traveler.busyArranging') : t('traveler.arrangeTheReturn')}
-              onPress={doArrangeReturn}
-              disabled={arranging}
-              style={{ marginTop: 14 }}
-            />
-          )}
-        </Card>
-      )}
+      <Card style={styles.returnCard}>
+        <Text style={styles.returnBody}>{t('traveler.lostReturnHuman')}</Text>
+        {item?.caseNo ? <Text style={styles.returnNote}>{t('traveler.lostCaseNumber', { caseNo: item.caseNo })}</Text> : null}
+      </Card>
 
       {/* c · TALK TO THE OPERATOR — required, and scoped to the travel. */}
       <OutlineButton

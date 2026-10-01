@@ -46,7 +46,7 @@ import {
   updateTravelActivity,
 } from '../backend/liveActivity';
 import {
-  deleteScheduledRide,
+  cancelScheduledRide,
   fetchScheduledRide,
   saveScheduledRide,
   watchScheduledRide,
@@ -271,7 +271,7 @@ export type RideStore = {
   /** What the dispatcher has done with it: still waiting, operator sent, or why not. */
   schedState: ScheduledRide | null;
   scheduleRide: (info: SchedInfo) => void;
-  cancelScheduled: () => void;
+  cancelScheduled: () => Promise<'cancelled' | 'dispatch_in_progress' | 'not_cancellable' | 'failed'>;
 
   // audio
   share: boolean;
@@ -1510,20 +1510,22 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     [arrival, departure, travelClass, tripCoords, travelParty],
   );
 
-  const cancelScheduled = useCallback(() => {
+  const cancelScheduled = useCallback(async () => {
+    const id = schedIdRef.current;
+    if (!id) return 'failed' as const;
+    const result = await cancelScheduledRide(id);
+    if (result !== 'cancelled') return result;
     setScheduled(false);
     setSchedInfo(null);
     setSchedSaved(null);
     setSchedState(null);
     setSchedId(null);
-    // Nothing may re-load a reservation the traveler has just cancelled — without this the
-    // loader below could race the delete and put the card straight back on the home screen.
+    // A confirmed server cancellation must not be reloaded during this session.
     schedLoadRef.current = 'done';
-    if (schedIdRef.current) {
-      deleteScheduledRide(schedIdRef.current);
-      schedIdRef.current = null;
-    }
+    schedIdRef.current = null;
+    return 'cancelled' as const;
   }, []);
+
 
   // Read the reservation back once the traveler's own travel has loaded — which is what
   // makes "scheduled" survive a force-quit rather than being a card that disappears. Runs

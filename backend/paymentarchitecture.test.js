@@ -70,7 +70,7 @@ assert.ok(closure.includes("code:'scheduled_travel_in_progress'"), 'account clos
 assert.ok(closure.includes("collection('account_operation_fences').doc(uid)") && closure.includes('finally'), 'account closure places and always retires a transient scheduler fence');
 assert.ok(scheduler.includes("collection('account_operation_fences').doc(travelerUid)") && scheduler.includes("fence.data()?.closing === true"), 'scheduler claim honors account closure fence transactionally');
 assert.ok(server.includes('async function accountAcceptsNewWork(db, uid)'), 'new-work routes share one account closure gate');
-for (const route of ["/operator/online", "/travel/dispatch", "/travel/schedule"]) { const i=server.indexOf(`app.post('${route}'`); assert.ok(i>=0 && server.slice(i,i+1800).includes('accountAcceptsNewWork'), `${route} rejects closing or closed accounts`); }
+for (const route of ["/operator/online", "/travel/dispatch", "/travel/schedule"]) { const i=server.indexOf(`app.post('${route}'`); const next=server.indexOf("app.post('",i+10); assert.ok(i>=0 && server.slice(i,next>i?next:undefined).includes('accountAcceptsNewWork'), `${route} rejects closing or closed accounts`); }
 const dispatchRoute=server.slice(server.indexOf("app.post('/travel/dispatch'"),server.indexOf("app.post('/travel/schedule'"));
 assert.ok(dispatchRoute.includes('tx.create(ref, ride)') && dispatchRoute.includes("collection('account_operation_fences')") && dispatchRoute.includes("collection('account_closures')"), 'immediate Travel creation serializes with closure fence');
 const onlineRoute=server.slice(server.indexOf("app.post('/operator/online'"),server.indexOf("app.post('/operator/offline'"));
@@ -80,6 +80,8 @@ assert.ok(scheduleRoute.includes('tx.create(ref, record)') && scheduleRoute.incl
 const authContext = fs.readFileSync(path.join(__dirname,'..','src','state','AuthContext.tsx'),'utf8');
 const closeRoute=server.slice(server.indexOf("app.post('/account/close'"),server.indexOf('// --- Legal pages'));
 assert.ok(closeRoute.includes("collection('users').doc(String(req.uid)).delete()"), 'profile PII retirement is server-authoritative before Firebase identity deletion');
+assert.ok(closeRoute.includes('pushRetired:true') && closeRoute.includes('profileRetired:true') && closeRoute.includes('serverCleanupComplete:true'), 'server checkpoints each irreversible account cleanup phase for crash recovery');
+assert.ok(closeRoute.indexOf('pushRetired:true') < closeRoute.indexOf('profileRetired:true') && closeRoute.indexOf('profileRetired:true') < closeRoute.indexOf('serverCleanupComplete:true'), 'account cleanup completion is recorded only after push and profile retirement checkpoints');
 assert.ok(!authContext.includes("deleteDoc(doc(db, 'users'"), 'client no longer owns irreversible profile deletion');
 assert.ok(authContext.indexOf('await deleteUser(u)') < authContext.indexOf('await clearAllStorage()'), 'remote identity deletion succeeds before irreversible local account wipe');
 assert.ok(authContext.includes("if (!u) await clearAccountStorage().catch(() => {})"), 'auth disappearance is a crash-recovery backstop for account-scoped device cleanup');

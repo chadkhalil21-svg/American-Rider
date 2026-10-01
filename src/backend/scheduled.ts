@@ -11,7 +11,6 @@
 // the traveler's screen say what has actually happened rather than what was hoped for.
 import {
   collection,
-  deleteDoc,
   doc,
   getDocs,
   onSnapshot,
@@ -174,13 +173,15 @@ export function watchScheduledRide(
   }
 }
 
-/** Cancel it. Returns whether the record is actually gone. */
+/** Cancel only while the server still considers this a reservation. */
 export async function deleteScheduledRide(id: string): Promise<boolean> {
   if (!id) return false;
   try {
-    await deleteDoc(doc(db, 'scheduled_rides', id));
-    return true;
-  } catch {
-    return false;
-  }
+    const token = await auth.currentUser?.getIdToken();
+    if (!token) return false;
+    const res = await fetch(`${PAYMENT_SERVER_URL}/travel/schedule/${encodeURIComponent(id)}`, {
+      method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
+    });
+    return res.ok;
+  } catch { return false; }
 }

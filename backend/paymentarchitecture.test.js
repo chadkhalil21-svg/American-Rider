@@ -69,4 +69,8 @@ assert.ok(!closure.includes('d.ref.delete()'), 'account closure preserves schedu
 assert.ok(closure.includes("code:'scheduled_travel_in_progress'"), 'account closure fails closed when scheduled dispatch owns a reservation');
 assert.ok(closure.includes("collection('account_operation_fences').doc(uid)") && closure.includes('finally'), 'account closure places and always retires a transient scheduler fence');
 assert.ok(scheduler.includes("collection('account_operation_fences').doc(travelerUid)") && scheduler.includes("fence.data()?.closing === true"), 'scheduler claim honors account closure fence transactionally');
+assert.ok(server.includes('async function accountAcceptsNewWork(db, uid)'), 'new-work routes share one account closure gate');
+for (const route of ["/operator/online", "/travel/dispatch", "/travel/schedule"]) { const i=server.indexOf(`app.post('${route}'`); assert.ok(i>=0 && server.slice(i,i+1800).includes('accountAcceptsNewWork'), `${route} rejects closing or closed accounts`); }
+const scheduleRoute=server.slice(server.indexOf("app.post('/travel/schedule'"),server.indexOf('// --- Who can bring a lost item back'));
+assert.ok(scheduleRoute.includes('tx.create(ref, record)') && scheduleRoute.includes("collection('account_operation_fences')") && scheduleRoute.includes("collection('account_closures')"), 'scheduled booking creation serializes with closure fence');
 console.log('✓ one money architecture: charge platform, transfer on completed Travel');

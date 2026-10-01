@@ -18,6 +18,7 @@ import { t } from '../i18n';
 import { clearAccountStorage, clearAllStorage } from './accountStorage';
 import { closeOperationalAccount } from '../backend/account';
 import { clearPushToken } from '../backend/push';
+import { stopBackgroundPresence } from '../backend/presence';
 
 type AuthState = {
   user: User | null;
@@ -245,6 +246,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // while a scheduled Travel or an on-duty Operator remains could dispatch or charge
         // an account that can no longer control that work.
         await closeOperationalAccount();
+        // The OS task is device-local and survives React/Firebase teardown. Stop it while this
+        // account still owns the session; otherwise deletion can leave iOS/Android waking the
+        // app for background location even though the server correctly refuses the renewal.
+        await stopBackgroundPresence();
         // 3. Their profile document (name, mobile, email). Transport, payment, safety and
         // qualification records are not deleted from the phone; their retention needs a
         // separate policy and privileged server handling.
@@ -267,6 +272,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // signs into this handset, leaking required Travel/safety notifications across accounts.
         // Best-effort by design: clearPushToken never throws, so a transient Firestore failure
         // cannot trap somebody inside an account they are trying to leave.
+        await stopBackgroundPresence();
         await clearPushToken();
         await clearAccountStorage();
         await fbSignOut(auth);

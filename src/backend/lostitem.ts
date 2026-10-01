@@ -60,6 +60,9 @@ export type LostItem = {
   candidateTripNos: string[];
   notifiedOperatorIds: string[];
   notifiedOperatorNames: string[];
+  /** Number of durable Operator inbox deliveries acknowledged by the server. */
+  operatorDeliveryCount?: number;
+  operatorDeliveryAt?: number | null;
   description: string;
   photoUrl: string | null;
   /** Private R2 object key; access is granted by the authenticated backend. */

@@ -30,8 +30,8 @@ check('every other country is international',
 // ---- The schedules actually differ, or none of this wiring is worth anything ------------
 check('the two card-cost schedules produce their audited $100 fees',
   platformFeeCents(10000, 'US') === 413 && platformFeeCents(10000, 'GB') === 577);
-check('the $2 floor controls only where it really covers both schedules',
-  platformFeeCents(500, 'US') === 200 && platformFeeCents(500, 'GB') === 200);
+check('the $2.50 floor controls only where it really covers both schedules',
+  platformFeeCents(500, 'US') === 250 && platformFeeCents(500, 'GB') === 250);
 check('quote() carries card economics through to the traveler total',
   quote(10000, undefined, undefined, 'GB').travelerPays - quote(10000, undefined, undefined, 'US').travelerPays === 164);
 

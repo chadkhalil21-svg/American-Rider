@@ -13,6 +13,14 @@ const SOURCE_TYPES=Object.freeze({
 });
 
 const NATIONAL_SOURCE_CATALOG=Object.freeze({
+  'gridwise-analytics':Object.freeze({
+    type:SOURCE_TYPES.LICENSED_MARKET_DATA,
+    authority:'Gridwise Analytics',
+    coverage:'U.S. national and metro coverage subject to contract',
+    public:false,
+    primaryEligible:true,
+    caveat:'Requires commercial license/contract and field-level validation for intended pricing use.',
+  }),
   'chicago-tnp-open-data':Object.freeze({
     type:SOURCE_TYPES.GOVERNMENT_TRIPS,
     authority:'City of Chicago',
@@ -60,7 +68,7 @@ const NATIONAL_SOURCE_CATALOG=Object.freeze({
 
 const MARKET_EVIDENCE_PLANS=Object.freeze({
   'fl-southeast':Object.freeze({
-    sources:Object.freeze(['independent-controlled-audit','american-rider-field-panel','licensed-market-data']),
+    sources:Object.freeze(['independent-controlled-audit','american-rider-field-panel','gridwise-analytics']),
     minimumIndependentFamilies:2,
     liveCollectorRequiredForContinuousMonitoring:true,
     bootstrapReference:'existing evidence-gated production record',

@@ -130,6 +130,8 @@ const { provisionTeenPin, verifyTeenPin } = require('./teenpickup');
 const { listPlatformMessages, markPlatformMessageRead } = require('./platforminbox');
 const { page } = require('./shell');
 const { screeningReady, screeningCurrent, sweepScreening } = require('./screening');
+const { runMarketReferenceSweep } = require('./market-reference-service');
+const { configuredCollectors: marketReferenceCollectors } = require('./market-evidence-collectors');
 
 const app = express();
 // One proxy in front (Render). Makes req.ip the caller rather than the proxy, which the
@@ -1691,7 +1693,7 @@ let lastSweep = { at: 0, report: null };
  * Promise.all.
  */
 async function runAllSweeps() {
-  const [scheduled, monitor, assignments, screening, settlements, providerEvents, operatorFees, familyAgeOut, insuranceMonitoring] = await Promise.allSettled([
+  const [scheduled, monitor, assignments, screening, settlements, providerEvents, operatorFees, familyAgeOut, insuranceMonitoring, marketReference] = await Promise.allSettled([
     sweepScheduled(),
     sweepMonitor(),
     sweepAssignments(),
@@ -1705,6 +1707,7 @@ async function runAllSweeps() {
     }),
     family.sweepFamilyAgeOut(),
     sweepInsuranceMonitoring({ db: adminDb(), requestConfirmation: issueInsuranceConfirmationRequest, notify }),
+    runMarketReferenceSweep({ collectors: marketReferenceCollectors() }),
   ]);
   const unwrap = (r) => (r.status === 'fulfilled' ? r.value : { ok: false, reason: String(r.reason) });
   return {
@@ -1717,6 +1720,7 @@ async function runAllSweeps() {
     operatorFees: unwrap(operatorFees),
     familyAgeOut: unwrap(familyAgeOut),
     insuranceMonitoring: unwrap(insuranceMonitoring),
+    marketReference: unwrap(marketReference),
   };
 }
 

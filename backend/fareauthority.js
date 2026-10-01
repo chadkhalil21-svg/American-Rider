@@ -103,7 +103,7 @@ async function authoritativeFare({ body, uid = null, email = null, db = null, ca
       quoteForFare:(fare)=>quote(fare,null,route.governmentFees,cardCountry,tollForQuote),
     });
     route.travelCostCents=solved.fareCents;
-    marketPricing={applied:solved.reason==='market reference',reason:solved.reason,regionId:marketReference.regionId,referenceAsOf:marketReference.referenceAsOf,referenceTotalCents:marketReference.referenceTotalCents,targetControlledTotalCents:marketReference.targetTotalCents,referenceCell:marketReference.key,sources:marketReference.sources};
+    marketPricing={applied:solved.reason==='market reference',reason:solved.reason,regionId:marketReference.regionId,marketId:marketReference.marketId,referenceAsOf:marketReference.referenceAsOf,referenceTotalCents:marketReference.referenceTotalCents,targetControlledTotalCents:marketReference.targetTotalCents,referenceCell:marketReference.key,sources:marketReference.sources};
   } else if(journey) marketPricing={applied:false,reason:'smart-journey combined economics'};
   const breakdown = quote(route.travelCostCents,journey,route.governmentFees,cardCountry,tollForQuote);
   return { ...route, ...breakdown, marketPricing, journey, cardCountry: cardCountry || null };

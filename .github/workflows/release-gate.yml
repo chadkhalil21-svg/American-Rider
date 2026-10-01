@@ -2,6 +2,8 @@ name: Release Gate
 
 on:
   pull_request:
+  push:
+    branches: [release/current]
   workflow_dispatch:
 
 permissions:

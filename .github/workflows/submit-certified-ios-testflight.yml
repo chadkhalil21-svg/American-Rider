@@ -2,6 +2,11 @@ name: Build and submit certified iOS candidate to TestFlight
 
 on:
   workflow_dispatch:
+    inputs:
+      certified_sha:
+        description: 'Exact release/current SHA to build and submit'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -15,7 +20,7 @@ jobs:
       ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
       ASC_KEY_ID: LS74L322NV
       ASC_ISSUER_ID: 2fa282d5-2b2c-4820-8fe9-6928ac1e8d33
-      CERTIFIED_SHA: 7e8eed301e79aff8378d7344619ac3183db007e0
+      CERTIFIED_SHA: ${{ inputs.certified_sha }}
 
     steps:
       - name: Check out certified candidate
@@ -43,7 +48,10 @@ jobs:
           set -euo pipefail
           ACTUAL_SHA="$(git rev-parse HEAD)"
           test "$ACTUAL_SHA" = "$CERTIFIED_SHA" || { echo "::error::Refusing build: $ACTUAL_SHA != $CERTIFIED_SHA"; exit 1; }
-          echo "Certified source verified: $ACTUAL_SHA"
+          git fetch origin release/current --depth=1
+          RELEASE_SHA="$(git rev-parse FETCH_HEAD)"
+          test "$ACTUAL_SHA" = "$RELEASE_SHA" || { echo "::error::Refusing stale/non-current candidate: $ACTUAL_SHA != release/current $RELEASE_SHA"; exit 1; }
+          echo "Certified release/current source verified: $ACTUAL_SHA"
 
       - name: Configure owner-controlled App Store Connect key and select build number
         shell: bash

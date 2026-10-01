@@ -3,6 +3,8 @@ name: Deterministic Commissioning
 on:
   pull_request:
     branches: [release/current]
+  push:
+    branches: [release/current]
   workflow_dispatch:
 
 jobs:

@@ -26,7 +26,7 @@
 // corporate budget. The pricing function is intentionally centralized so that changing one
 // audited allowance changes every quote and every invariant test together.
 
-const MIN_PLATFORM_FEE_CENTS = 200;
+const MIN_PLATFORM_FEE_CENTS = 250;
 const DOMESTIC_CARD_BPS = 290;      // 2.9%
 const INTERNATIONAL_CARD_BPS = 440; // 2.9% + 1.5%
 const STRIPE_FIXED_CENTS = 30;

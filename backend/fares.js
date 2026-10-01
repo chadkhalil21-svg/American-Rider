@@ -125,7 +125,7 @@ const PER_MINUTE_CENTS = CURRENT_FL_PRICING.perMinuteCents;
 // floor is $2.00 and economics.js confirms that the $2 floor controls at the $3 minimum fare,
 // so a no-pass-through Standard Travel starts at $5.00. Government fees and tolls, when
 // applicable, are true pass-throughs and may raise the final Total.
-const MIN_TOTAL_CENTS = 500;
+const MIN_TOTAL_CENTS = 550;
 const MINIMUM_CENTS = CURRENT_FL_PRICING.minimumFareCents; // compatibility export; runtime uses the market record
 
 // Straight-line distance under-states how far a car actually drives (roads bend, one-ways,

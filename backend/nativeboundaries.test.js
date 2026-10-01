@@ -36,6 +36,8 @@ assert.match(authContext,/import \{ clearPushToken \} from '\.\.\/backend\/push'
 assert.match(authContext,/import \{ stopBackgroundPresence \} from '\.\.\/backend\/presence';/);
 assert.match(authContext,/const ONBOARDING_KEY = 'ar:auth-onboarding'/, 'interrupted signup must have durable account-bound state');
 assert.match(authContext,/AsyncStorage\.setItem\(ONBOARDING_KEY, cred\.user\.uid\)/, 'signup gate must be persisted after Firebase assigns the UID');
+assert.match(authContext,/const created = auth\.currentUser;/, 'signup failure path must detect an account that Firebase already created');
+assert.match(authContext,/AsyncStorage\.setItem\(ONBOARDING_KEY, created\.uid\)/, 'partially completed account creation must remain behind durable onboarding');
 assert.match(authContext,/await AsyncStorage\.getItem\(ONBOARDING_KEY\)/, 'Firebase restoration must restore interrupted onboarding state');
 assert.match(authScreen,/if \(user && onboarding\) setStep\('select'\)/, 'interrupted signup must resume at role selection rather than restart authentication');
 const signOutBody = authContext.slice(authContext.indexOf('signOut: () =>'), authContext.indexOf('onboarding,', authContext.indexOf('signOut: () =>')));

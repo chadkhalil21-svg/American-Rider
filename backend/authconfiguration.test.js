@@ -47,6 +47,6 @@ assert.match(layout, /const \{ user, initializing, onboarding \} = useAuth\(\)/,
   'application gate must consume the shared Firebase-backed auth context');
 assert.match(layout, /\(!user \|\| onboarding\)/,
   'front door must remain closed until Firebase publishes a user and onboarding completes');
-assert.match(authContext, /onAuthStateChanged\(auth, \(u\) => \{[\s\S]*setUser\(u\)/,
+assert.match(authContext, /onAuthStateChanged\(auth, async \(u\) => \{[\s\S]*setUser\(u\)/,
   'Firebase auth-state listener must publish the user consumed by the app gate');
 console.log('PASS provider sessions converge on the Firebase auth-state application gate');

@@ -144,10 +144,9 @@ export async function reportLostItem(args: {
     description: args.description.trim().slice(0, 2000),
     photoUrl,
     ...(photoObjectKey ? { photoObjectKey } : {}),
-    // The document naming the operators IS the notification, so the two are written in one
-    // step and the status can never run ahead of it. With no operator on the travel record
-    // there is nobody to notify and the report stops at `reported`.
-    status: operatorIds.length > 0 ? 'operator-notified' : 'reported',
+    // A database relation is not a notification. The server advances this only after it has
+    // created a durable Operator inbox message (push is an additional delivery channel).
+    status: 'reported',
     createdAt: now,
     statusAt: now,
     return: null,

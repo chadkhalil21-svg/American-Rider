@@ -24,6 +24,8 @@ const GUARDRAILS = Object.freeze({
   minimumIndependentEvidenceFamilies: 2,
   prohibitPersonalizedPricing: true,
   prohibitProtectedClassSignals: true,
+  prohibitNonpublicCompetitorData: true,
+  prohibitSharedCompetitorPricingRecommendations: true,
   prohibitUnboundedMultiplier: true,
   declaredEmergencyDisablesUpwardDynamicAdjustment: true,
   emergencyBaselineDays: 30,

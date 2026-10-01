@@ -183,6 +183,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         return true;
       } catch (e: any) {
+        // createUserWithEmailAndPassword signs Firebase in before the later onboarding marker,
+        // profile and verification work runs. If anything after creation fails, do not report
+        // "signup failed" while silently leaving an authenticated account behind. Preserve the
+        // UID-bound onboarding marker when an account exists so this process—or a relaunch—
+        // resumes safely at role selection.
+        const created = auth.currentUser;
+        if (created) {
+          try { await AsyncStorage.setItem(ONBOARDING_KEY, created.uid); } catch { /* UI gate remains */ }
+          setOnboarding(true);
+        }
         const code = typeof e?.code === 'string' ? e.code : 'auth/unknown';
         setDiagnosticCode(code);
         setError(friendly(code));

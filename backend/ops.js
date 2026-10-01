@@ -229,10 +229,11 @@ async function board() {
   }
 
   const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
-  const [ridesSnap, opsSnap, schedSnap, caseSnap, pendingSnap] = await Promise.all([
+  const [ridesSnap, opsSnap, schedSnap, integritySnap, caseSnap, pendingSnap] = await Promise.all([
     db.collection('rides').get(),
     db.collection('operators').get(),
     db.collection('scheduled_rides').where('status', '==', 'reserved').get(),
+    db.collection('scheduled_rides').where('status', '==', 'payment_integrity_hold').get(),
     db.collection('support_tickets').where('status', '==', 'open').get(),
     // THE EXCEPTION QUEUE. The snapshot is only an index for this query; every gate re-assesses.
     db.collection('users').where('qualification.status', 'in', ['exception', 'refused', 'suspended']).get(),
@@ -244,6 +245,7 @@ async function board() {
   const rides = ridesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const operators = opsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const scheduled = schedSnap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => a.atMs - b.atMs);
+  const paymentIntegrity = integritySnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const cases = caseSnap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => b.createdAt - a.createdAt);
 
   const underway = rides.filter((r) => UNDERWAY.includes(r.status)).sort((a, b) => b.createdAt - a.createdAt);
@@ -267,6 +269,7 @@ async function board() {
   if (noReceipt.length) alarms.push(`${noReceipt.length} receipt${noReceipt.length > 1 ? 's' : ''} not delivered`);
   const waiting = pending.filter((u) => u.qualification?.status === 'exception');
   if (waiting.length) alarms.push(`${waiting.length} operator exception${waiting.length > 1 ? 's' : ''} to decide`);
+  if (paymentIntegrity.length) alarms.push(`${paymentIntegrity.length} scheduled payment integrity exception${paymentIntegrity.length > 1 ? 's' : ''}`);
   // Real operators only — the demonstration stand-ins are never stored.
   const staleDisclosure = operators.filter((o) => disclosureStale(o));
 

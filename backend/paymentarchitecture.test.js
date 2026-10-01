@@ -24,6 +24,7 @@ assert.ok(p.includes('inspectStripeCustomerOwnership'), 'payment layer exposes r
 assert.ok(p.includes('financialIdentityAuthorization'), 'Customer-dependent money activity has a server-owned reconciliation authorization generation');
 assert.ok((p.match(/await assertFinancialIdentityAuthorization\(uid, financialAuth\.generation\)/g)||[]).length >= 2, 'authorization generation is rechecked at immediate and scheduled PaymentIntent creation boundaries');
 assert.ok((p.match(/financialIdentityGeneration: String\(financialAuth\.generation\)/g)||[]).length >= 2, 'immediate and scheduled Stripe records retain the authorizing financial identity generation');
+assert.ok(p.includes('financialIdentityGeneration: financialAuth.generation'), 'scheduled charge returns its authorizing generation for crash-recovery evidence');
 assert.ok(p.includes('paymentIntentsHasMore'), 'reconciliation inventory discloses when Stripe history is paginated rather than pretending completeness');
 const ops = fs.readFileSync(path.join(__dirname,'ops.js'),'utf8');
 assert.ok(ops.includes("app.get('/ops/stripe-customers'"), 'named Operations has an authenticated reconciliation evidence endpoint');
@@ -33,4 +34,9 @@ assert.ok(ops.includes("app.post('/ops/stripe-customers/hold'"), 'named Operatio
 assert.ok(ops.includes("action:'financial_identity_hold_placed', generation"), 'financial identity hold placement and generation are audit logged');
 assert.ok(ops.includes('const generation = Math.max(0, Number(current.data()?.generation) || 0) + 1'), 'placing a hold advances the monotonic financial identity generation');
 assert.ok(!ops.includes("app.post('/ops/stripe-customers/release'"), 'no unsafe manual release exists before a complete reconciliation protocol');
+const scheduler = fs.readFileSync(path.join(__dirname,'scheduler.js'),'utf8');
+assert.ok(server.includes('financialIdentityGeneration: paymentIdentity.financialIdentityGeneration'), 'scheduled reservation freezes the financial identity generation with Customer and PaymentMethod');
+assert.ok(scheduler.includes('financialIdentityGeneration: r.financialIdentityGeneration'), 'scheduler passes the frozen generation to off-session charging');
+assert.ok(scheduler.includes('paymentCheckpointGeneration: paid.financialIdentityGeneration'), 'successful scheduled charge checkpoint retains generation evidence');
+assert.ok(p.includes("code:'financial_identity_generation_required'"), 'legacy scheduled payment identity cannot be charged without generation evidence');
 console.log('✓ one money architecture: charge platform, transfer on completed Travel');

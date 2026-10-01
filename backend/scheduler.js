@@ -29,7 +29,7 @@ const { nearbyOperatorCandidates } = require('./geooperators');
 const { matchOperator, etaMinutes, coverageLapsed } = require('./matching');
 const { screeningReady } = require('./screening');
 const { adminDb, adminStatus } = require('./firebase-admin');
-const { chargeScheduledTravel, operatorPayoutAccount, connectAccountStatus } = require('./payments');
+const { chargeScheduledTravel, verifyScheduledPaymentCheckpoint, operatorPayoutAccount, connectAccountStatus } = require('./payments');
 const { assessOperator } = require('./qualification');
 const { fileTicket } = require('./tickets');
 const { notify } = require('./push');
@@ -303,7 +303,13 @@ async function sweepScheduled({ now = Date.now() } = {}) {
       // Stripe succeeded on an earlier sweep but the process died before Travel creation.
       // The reservation checkpoint is authoritative recovery evidence; do not require the card
       // still to be saved and do not initiate another charge.
-      paid = { ok: true, paymentIntentId: String(r.paymentIntentId), chargedCents: Number(r.chargedCents), financialIdentityGeneration: r.paymentCheckpointGeneration, recovered: true };
+      paid = await verifyScheduledPaymentCheckpoint({
+        paymentIntentId: r.paymentIntentId,
+        uid: r.travelerUid,
+        reservationId: id,
+        chargedCents: r.chargedCents,
+        financialIdentityGeneration: r.paymentCheckpointGeneration,
+      });
     } else {
       paid = await chargeScheduledTravel({
         travelCostCents: fareCents,

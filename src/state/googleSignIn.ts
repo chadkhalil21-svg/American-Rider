@@ -37,8 +37,7 @@ export const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
  * serve the control, which is the same class of fault as offering a button that does nothing —
  * it just failed harder.
  */
-export const googleSignInConfigured =
-  Platform.OS === 'web' ? !!GOOGLE_WEB_CLIENT_ID : !!GOOGLE_IOS_CLIENT_ID;
+export const googleSignInConfigured = Platform.OS === 'web' ? true : !!GOOGLE_IOS_CLIENT_ID;
 
 // `reason` is a CODE, never a sentence — see appleSignIn.ts.
 export type GoogleResult = { ok: true } | { ok: false; cancelled: boolean; reason?: string };
@@ -53,6 +52,20 @@ function safeAuthReason(e: unknown): string {
  * `promptAsync` is what the button calls. Returns { request, signIn } so a screen can hide
  * the control until Google is genuinely ready to answer.
  */
+export async function signInWithGoogleWeb(): Promise<GoogleResult> {
+  if (Platform.OS !== 'web') return { ok: false, cancelled: false, reason: 'wrong_platform' };
+  try {
+    await signInWithPopup(auth, new GoogleAuthProvider());
+    return { ok: true };
+  } catch (e: unknown) {
+    const code = safeAuthReason(e);
+    if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+      return { ok: false, cancelled: true };
+    }
+    return { ok: false, cancelled: false, reason: code };
+  }
+}
+
 export function useGoogleSignIn() {
   // `webClientId`, NOT `clientId`. expo-auth-session's Google provider takes the id per
   // platform and validates that the current one is present; `clientId` is not the web key and
@@ -104,18 +117,7 @@ export function useGoogleSignIn() {
     // project's configured Google provider/handler instead of Expo AuthSession's web
     // redirect URI, which must be separately allow-listed in Google Cloud and produced
     // redirect_uri_mismatch on the deployed platform.
-    if (Platform.OS === 'web') {
-      try {
-        await signInWithPopup(auth, new GoogleAuthProvider());
-        return { ok: true };
-      } catch (e: unknown) {
-        const code = safeAuthReason(e);
-        if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
-          return { ok: false, cancelled: true };
-        }
-        return { ok: false, cancelled: false, reason: code };
-      }
-    }
+    if (Platform.OS === 'web') return signInWithGoogleWeb();
     const result = await googleCredential();
     if (!result.ok) return result;
     try {

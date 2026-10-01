@@ -66,4 +66,6 @@ const closure = fs.readFileSync(path.join(__dirname,'accountclosure.js'),'utf8')
 assert.ok((family.match(/runTransaction/g)||[]).length >= 2 && (family.match(/claimedAt\)>0/g)||[]).length >= 2, 'Family revocation and age-out cannot cancel after scheduler claim');
 assert.ok(!closure.includes('d.ref.delete()'), 'account closure preserves scheduled Travel records as durable evidence');
 assert.ok(closure.includes("code:'scheduled_travel_in_progress'"), 'account closure fails closed when scheduled dispatch owns a reservation');
+assert.ok(closure.includes("collection('account_operation_fences').doc(uid)") && closure.includes('finally'), 'account closure places and always retires a transient scheduler fence');
+assert.ok(scheduler.includes("collection('account_operation_fences').doc(travelerUid)") && scheduler.includes("fence.data()?.closing === true"), 'scheduler claim honors account closure fence transactionally');
 console.log('✓ one money architecture: charge platform, transfer on completed Travel');

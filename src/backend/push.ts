@@ -64,10 +64,10 @@ export async function registerForPush(prefs?: PushPrefs): Promise<{
     }
 
     const existing = await Notifications.getPermissionsAsync();
-    let granted = existing.granted || existing.ios?.status === 3; // 3 = AUTHORIZED
+    let granted = existing.granted || existing.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL || existing.ios?.status === Notifications.IosAuthorizationStatus.EPHEMERAL;
     if (!granted) {
       const asked = await Notifications.requestPermissionsAsync();
-      granted = asked.granted || asked.ios?.status === 3;
+      granted = asked.granted || asked.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL || asked.ios?.status === Notifications.IosAuthorizationStatus.EPHEMERAL;
     }
     if (!granted) return { token: null, reason: t('traveler.errNotifsOff') };
 

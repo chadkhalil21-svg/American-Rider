@@ -8,8 +8,9 @@ async function json(url){
   return r.json();
 }
 
-function chicagoDaypart(iso){const h=new Date(iso).getUTCHours();return h<6?'overnight':h<10?'morning':h<16?'midday':h<20?'evening':'night';}
-function chicagoWeekend(iso){const d=new Date(iso).getUTCDay();return d===0||d===6?'weekend':'weekday';}
+function chicagoParts(iso){const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/Chicago',hour:'numeric',hourCycle:'h23',weekday:'short'}).formatToParts(new Date(iso));return Object.fromEntries(parts.map(p=>[p.type,p.value]));}
+function chicagoDaypart(iso){const h=Number(chicagoParts(iso).hour);return h<6?'overnight':h<10?'morning':h<16?'midday':h<20?'evening':'night';}
+function chicagoWeekend(iso){return ['Sat','Sun'].includes(chicagoParts(iso).weekday)?'weekend':'weekday';}
 
 async function collectChicago({marketId='il-chicago'}={}){
   // City of Chicago 2026 TNP dataset. Fare and total are rounded by the publisher; provenance

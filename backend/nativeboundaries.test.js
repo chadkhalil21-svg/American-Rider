@@ -23,6 +23,8 @@ assert.match(push,/auth\.currentUser\?\.uid !== uid/, 'push registration must re
 assert.match(push,/if \(auth\.currentUser\?\.uid !== uid\) return false;/, 'push preference write must reject a stale account identity');
 assert.match(push,/pushToken: token/);
 assert.match(push,/Notifications\.addPushTokenListener/, 'runtime token rotation must be observed');
+assert.match(push,/const responseId = res\.notification\.request\.identifier/, 'notification response replay must have a stable deduplication key');
+assert.match(push,/responseId === lastResponseId/, 'duplicate notification responses must not navigate twice');
 assert.match(push,/void registerForPush\(\)/, 'a rotated native token must refresh the Expo token stored for this account');
 
 assert.match(presence,/TaskManager\.defineTask\(PRESENCE_TASK/);

@@ -77,9 +77,23 @@ function dollarFigures(text) {
   return out;
 }
 
-function expiredOn(expiry, now) {
-  const end = Date.parse(`${expiry}T23:59:59Z`);
-  return !Number.isNaN(end) && end < now;
+function localDateKey(now, timeZone) {
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(new Date(now));
+    const get = (type) => parts.find((p) => p.type === type)?.value || '';
+    return `${get('year')}-${get('month')}-${get('day')}`;
+  } catch {
+    return '';
+  }
+}
+function expiredOn(expiry, now, timeZone) {
+  const today = localDateKey(now, timeZone);
+  // YYYY-MM-DD compares lexicographically. A policy remains valid throughout its stated
+  // expiration date in the configured jurisdiction's civil day; the device timezone/clock is
+  // irrelevant because `now` is supplied by the server.
+  return !!today && String(expiry) < today;
 }
 
 const finding = (gate, kind, code, item, reason) => ({ gate, kind, code, item: item || null, reason: reason || '' });
@@ -228,7 +242,9 @@ function documentFindings(kind, d, now, ctx = {}) {
   if (!expiry || Number.isNaN(Date.parse(`${expiry}T00:00:00Z`))) {
     return Q('exception', 'document_expiry_unknown', 'No expiry date is on record.');
   }
-  if (expiredOn(expiry, now)) return Q('incomplete', 'document_expired', `Expired ${expiry}. Submit a current one.`);
+  const { rule: dateRule } = insuranceRuleForUser(ctx.user);
+  const timeZone = dateRule?.timeZone || 'UTC';
+  if (expiredOn(expiry, now, timeZone)) return Q('incomplete', 'document_expired', `Expired ${expiry}. Submit a current one.`);
 
   if (kind === 'insurance') {
     // The checks the platform has always made, unchanged: commercial use, and $1,000,000.

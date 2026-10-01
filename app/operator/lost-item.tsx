@@ -5,6 +5,7 @@ import { Text } from '../../src/components/AppText';
 import { Card, LetterheadBar, PrimaryButton, Screen, SectionLabel, Title } from '../../src/components/UI';
 import { fetchOperatorLostItem, respondOperatorLostItem, type OperatorLostItem } from '../../src/backend/operatorLostItem';
 import { colors } from '../../src/theme';
+import { t } from '../../src/i18n';
 
 export default function OperatorLostItemScreen() {
   const router = useRouter();
@@ -15,16 +16,16 @@ export default function OperatorLostItemScreen() {
   const [busy, setBusy] = useState<'located'|'not-found'|null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
-    if (!id) { setError('This report could not be opened.'); return; }
+    if (!id) { setError(t('operator.lostOpenFailed')); return; }
     fetchOperatorLostItem(id).then((x) => {
       setItem(x); setSelectedTrip(x.tripNo || (x.candidateTripNos.length === 1 ? x.candidateTripNos[0] : null));
-    }).catch(() => setError('This lost-item report is unavailable.'));
+    }).catch(() => setError(t('operator.lostUnavailable')));
   }, [id]);
   const needsTrip = useMemo(() => !!item && !item.tripNo && item.candidateTripNos.length > 1, [item]);
   const respond = async (outcome: 'located'|'not-found') => {
     if (!item || busy) return;
     if (outcome === 'located' && needsTrip && !selectedTrip) {
-      setError('Select the Travel in which you found the item.');
+      setError(t('operator.lostSelectTravel'));
       return;
     }
     setBusy(outcome); setError(null);
@@ -33,32 +34,32 @@ export default function OperatorLostItemScreen() {
       const fresh = await fetchOperatorLostItem(item.id);
       setItem(fresh);
     } catch (e: any) {
-      setError(e?.message || 'This update could not be recorded.');
+      setError(e?.message || t('operator.lostUpdateFailed'));
     } finally { setBusy(null); }
   };
   return <Screen>
     <LetterheadBar onBack={() => router.back()} />
-    <Title>Lost Item</Title>
-    <Text style={styles.sub}>Check the vehicle before recording an answer. Your response updates the Traveler’s report.</Text>
+    <Title>{t('operator.lostTitle')}</Title>
+    <Text style={styles.sub}>{t('operator.lostInstruction')}</Text>
     {error ? <Text style={styles.error}>{error}</Text> : null}
     {item ? <>
-      <SectionLabel style={styles.label}>ITEM</SectionLabel>
+      <SectionLabel style={styles.label}>{t('operator.lostItemLabel')}</SectionLabel>
       <Card style={styles.card}><Text style={styles.body}>{item.description}</Text></Card>
       {needsTrip ? <>
-        <SectionLabel style={styles.label}>TRAVEL</SectionLabel>
-        <Text style={styles.sub}>Select the Travel only if you located the item in that vehicle journey.</Text>
+        <SectionLabel style={styles.label}>{t('operator.lostTravelLabel')}</SectionLabel>
+        <Text style={styles.sub}>{t('operator.lostTravelInstruction')}</Text>
         {item.candidateTripNos.map((no) => <Pressable key={no} onPress={() => setSelectedTrip(no)}>
           <Card style={[styles.choice, selectedTrip === no && styles.selected]}>
             <Text style={styles.body}>{selectedTrip === no ? '✓ ' : ''}{no}</Text>
           </Card>
         </Pressable>)}
-      </> : item.tripNo ? <Text style={styles.trip}>Travel {item.tripNo}</Text> : null}
+      </> : item.tripNo ? <Text style={styles.trip}>{t('operator.lostTravelNumber', { no: item.tripNo })}</Text> : null}
       {item.response ? <Card style={styles.card}>
-        <Text style={styles.body}>{item.response.outcome === 'located' ? 'You recorded that the item was located.' : 'You recorded that the item was not found.'}</Text>
+        <Text style={styles.body}>{item.response.outcome === 'located' ? t('operator.lostRecordedLocated') : t('operator.lostRecordedNotFound')}</Text>
       </Card> : <>
-        <PrimaryButton label={busy === 'located' ? 'Recording…' : 'Item Located'} onPress={() => respond('located')} disabled={!!busy} style={{marginTop:24}} />
+        <PrimaryButton label={busy === 'located' ? t('operator.lostRecording') : t('operator.lostLocated')} onPress={() => respond('located')} disabled={!!busy} style={{marginTop:24}} />
         <Pressable onPress={() => respond('not-found')} disabled={!!busy} style={styles.notFound}>
-          <Text style={styles.notFoundText}>{busy === 'not-found' ? 'Recording…' : 'Item Not Found'}</Text>
+          <Text style={styles.notFoundText}>{busy === 'not-found' ? t('operator.lostRecording') : t('operator.lostNotFound')}</Text>
         </Pressable>
       </>}
     </> : null}

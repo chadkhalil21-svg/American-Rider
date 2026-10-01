@@ -56,7 +56,6 @@ export default function OperatorCommunicate() {
   const send = async () => {
     const t = draft.trim();
     if (!t || !tripNo) return;
-    setDraft('');
     setUnsent(false);
     const stored = await sendTravelMessage({
       rideId: op.op?.rideId,
@@ -69,6 +68,7 @@ export default function OperatorCommunicate() {
     // so a write that failed shows nothing — and says so, rather than leaving an operator
     // believing the traveler was told something they were not.
     if (!stored) setUnsent(true);
+    else setDraft('');
   };
 
   return (

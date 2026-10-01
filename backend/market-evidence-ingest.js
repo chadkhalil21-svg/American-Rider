@@ -29,7 +29,7 @@ function normalizeObservation(raw){
     weekdayWeekend:raw.weekdayWeekend?String(raw.weekdayWeekend):null,
     calendarClass:raw.calendarClass?String(raw.calendarClass):null,
     regulatedLocationClass:raw.regulatedLocationClass?String(raw.regulatedLocationClass):null,
-    provenance:raw.provenance?String(raw.provenance):null,
+    providerKey:raw.providerKey?String(raw.providerKey):null,\n    confidence:raw.confidence?String(raw.confidence):null,\n    provenance:raw.provenance?String(raw.provenance):null,
   });
 }
 module.exports={normalizeObservation};

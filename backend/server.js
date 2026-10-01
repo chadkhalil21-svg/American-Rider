@@ -69,7 +69,7 @@ const { outsideMarket, outsideMarketMessage } = require('./market');
 const { permitRequired, permitRequiredMessage } = require('./fees');
 const { destinationsNear } = require('./places');
 const { ready: voiceReady, reason: voiceReason, accessToken: voiceToken, connectTwiml } = require('./voice');
-const { REGIONS, defaultRegion } = require('./regions');
+const { REGIONS, defaultRegion, regionFor } = require('./regions');
 const { presenceStale, coverageLapsed, matchOperator, etaMinutes } = require('./matching');
 const { encodeGeohash, nearbyOperatorCandidates } = require('./geooperators');
 // DISCLOSURE IS IMPORTED FOR .statute, and leaving it out is how the acknowledge route below
@@ -3018,6 +3018,24 @@ app.post('/travel/schedule', requireAuth, LIMITS.dispatch, requireOperationalRea
   const atMs = Number(b.atMs);
   if (!Number.isFinite(pickup.lat) || !Number.isFinite(pickup.lng) || !Number.isFinite(atMs)) {
     return res.status(400).json({ error: 'A pickup position and scheduled time are required' });
+  }
+  const pickupRegion = regionFor(pickup);
+  if (!pickupRegion) return res.status(409).json({ error: 'The pickup is outside an active service region.', code: 'scheduled_market_required' });
+  // A scheduled instant originates on a phone, whose clock or timezone can be changed. Require
+  // the client's displayed civil date/time to agree with that epoch in the pickup market.
+  // The server therefore accepts an instant only when it represents what the traveler was shown.
+  const civilDate = String(b.civilDate || '');
+  const civilTime = String(b.civilTime || '');
+  const civil = new Intl.DateTimeFormat('en-CA', {
+    timeZone: pickupRegion.timezone, year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(new Date(atMs));
+  const part = (type) => civil.find((p) => p.type === type)?.value || '';
+  const serverDate = `${part('year')}-${part('month')}-${part('day')}`;
+  const serverTime = `${part('hour')}:${part('minute')}`;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(civilDate) || !/^\d{2}:\d{2}$/.test(civilTime) ||
+      civilDate !== serverDate || civilTime !== serverTime) {
+    return res.status(400).json({ error: 'Scheduled time does not match the pickup market clock.', code: 'scheduled_time_mismatch' });
   }
   if (atMs <= Date.now()) {
     return res.status(400).json({ error: 'Scheduled Travel must be set for a future time.', code: 'scheduled_time_required' });

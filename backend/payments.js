@@ -329,6 +329,12 @@ async function savedPaymentMethodFor(customer) {
   return methods.data.find((m) => m.id === defaultId) || methods.data[0] || null;
 }
 
+async function scheduledPaymentIdentity({ uid, email }) {
+  const customer = await customerForTraveler({ uid, email });
+  const pm = await savedPaymentMethodFor(customer);
+  return pm ? { customerId: String(customer.id), paymentMethodId: String(pm.id) } : null;
+}
+
 async function listPaymentMethods({ uid, email }) {
   const stripe = getStripe();
   const customer = await customerForTraveler({ uid, email });
@@ -947,7 +953,7 @@ async function probeNetwork() {
  * `travelCostCents` and `uid` back off Stripe's own record hours later, and a scheduled
  * travel must settle through the same path as any other.
  */
-async function chargeScheduledTravel({ travelCostCents, uid, email, tripNo, reservationId, dep, dest, governmentFees, cardCountry, tollCents = 0 }) {
+async function chargeScheduledTravel({ travelCostCents, uid, email, tripNo, reservationId, dep, dest, governmentFees, cardCountry, tollCents = 0, customerId = null, paymentMethodId = null }) {
   const stripe = getStripe();
   const q = quote(travelCostCents, undefined, governmentFees, cardCountry, tollCents);
   try {
@@ -965,8 +971,8 @@ async function chargeScheduledTravel({ travelCostCents, uid, email, tripNo, rese
         return { ok:true, paymentIntentId: prior.id, chargedCents: Number(prior.amount), breakdown:q, recovered:true };
       }
     }
-    const customer = await customerForTraveler({ uid, email });
-    const pm = await savedPaymentMethodFor(customer);
+    const customer = customerId ? { id: String(customerId) } : await customerForTraveler({ uid, email });
+    const pm = paymentMethodId ? { id: String(paymentMethodId) } : await savedPaymentMethodFor(customer);
     if (!pm) {
       return { ok: false, code: 'no_saved_card', error: 'No card on file for this traveler' };
     }
@@ -1135,7 +1141,7 @@ module.exports = {
   operatorPayoutAccount,
   quote, commissionCents, platformFeeCents, isDomesticCard, defaultCardCountry, journeyFeeCents, createPaymentIntent, resumePaymentIntent, chargeRide, refundTravel,
   MIN_PLATFORM_FEE_CENTS,
-  customerForTraveler, connectAccountFor, connectOnboardingLink, connectAccountStatus,
+  customerForTraveler, scheduledPaymentIdentity, connectAccountFor, connectOnboardingLink, connectAccountStatus,
   transferToOperator, paidWithFromIntent, refundableFor, connectDashboardLink, pingStripe, probeNetwork,
   transferFixed, chargeScheduledTravel, createScreeningIntent, chargeOperatorAccountFee,
   describePaymentMethod, listPaymentMethods, createSetupIntent, setDefaultPaymentMethod, detachPaymentMethod,

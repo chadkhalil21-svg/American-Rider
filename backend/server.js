@@ -58,6 +58,8 @@ const LIMITS = {
   announce: perAccount({ name: 'announce', limit: 60, windowMs: 60 * 60 * 1000 }),
   voice: perAccount({ name: 'voice', limit: 30, windowMs: 60 * 60 * 1000 }),
   market: perAccount({ name: 'market', limit: 20, windowMs: 60 * 60 * 1000 }),
+  // Token acquisition/rotation is rare in normal use; bound authenticated ownership churn.
+  push: perAccount({ name: 'push', limit: 20, windowMs: 60 * 60 * 1000 }),
   // Each status check asks Firebase Auth and Stripe; the review screen polls every 30 seconds.
   qualification: perAccount({ name: 'qualification', limit: 240, windowMs: 60 * 60 * 1000 }),
   waitlist: perAccount({ name: 'waitlist', limit: 5, windowMs: 24 * 60 * 60 * 1000 }),
@@ -434,9 +436,16 @@ app.get('/config', (req, res) => {
 // deletion cannot cause a later dispatch or charge under a login that no longer exists.
 // Push-token ownership is server-authoritative. The same physical Expo token may not remain
 // attached to two accounts when an old session failed to clean itself up offline.
-app.post('/push/register', requireAuth, async (req, res) => {
+app.post('/push/register', requireAuth, LIMITS.push, async (req, res) => {
   const token = String(req.body?.token || '').trim();
-  if (!token || token.length > 512) return res.status(400).json({ error: 'A valid push token is required' });
+  // Expo currently issues ExponentPushToken[...] and ExpoPushToken[...]. Reject arbitrary
+  // strings so authenticated callers cannot manufacture an unbounded ownership index.
+  if (!/^(ExponentPushToken|ExpoPushToken)\\[[A-Za-z0-9_-]{10,200}\\]$/.test(token)) return res.status(400).json({ error: 'A valid Expo push token is required' });
+  const platform = String(req.body?.platform || '');
+  if (!['ios','android'].includes(platform)) return res.status(400).json({ error: 'A valid push platform is required' });
+  const allowedPrefs = new Set(['travelUpdates','operatorUpdates','familyUpdates','receipts']);
+  const rawPrefs = req.body?.prefs && typeof req.body.prefs === 'object' && !Array.isArray(req.body.prefs) ? req.body.prefs : null;
+  const prefs = rawPrefs ? Object.fromEntries(Object.entries(rawPrefs).filter(([k,v]) => allowedPrefs.has(k) && typeof v === 'boolean')) : null;
   const uid = String(req.uid);
   const db = adminDb();
   const ownerRef = db.collection('push_token_owners').doc(require('node:crypto').createHash('sha256').update(token).digest('hex'));
@@ -464,15 +473,15 @@ app.post('/push/register', requireAuth, async (req, res) => {
     }
     if (oldOwnerRef && oldOwnerSnap?.exists && String(oldOwnerSnap.data()?.uid || '') === uid) tx.delete(oldOwnerRef);
     tx.set(userRef, {
-      pushToken: token, pushPlatform: String(req.body?.platform || ''), pushUpdatedAt: Date.now(),
-      ...(req.body?.prefs && typeof req.body.prefs === 'object' ? { pushPrefs: req.body.prefs } : {}),
+      pushToken: token, pushPlatform: platform, pushUpdatedAt: Date.now(),
+      ...(prefs ? { pushPrefs: prefs } : {}),
     }, { merge: true });
     tx.set(ownerRef, { uid, updatedAt: Date.now() }, { merge: true });
   });
   res.json({ ok: true });
 });
 
-app.post('/push/clear', requireAuth, async (req, res) => {
+app.post('/push/clear', requireAuth, LIMITS.push, async (req, res) => {
   await dropToken(String(req.uid));
   res.json({ ok: true });
 });

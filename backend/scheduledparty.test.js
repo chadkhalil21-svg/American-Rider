@@ -46,6 +46,8 @@ assert.ok(recoveryPos > 0 && recoveryPos < scheduler.indexOf('nearbyOperatorCand
 assert.ok(recoveryPos < scheduler.indexOf('chargeScheduledTravel'), 'existing deterministic Travel is recovered before any payment attempt');
 assert.ok(scheduler.includes("recovered: true"), 'recovered Travel is explicitly distinguishable in scheduler evidence');
 assert.ok(scheduler.includes("!effectiveOperator.id || !existing.paymentIntentId"), 'recovery fails closed if committed Operator or payment identity is incomplete');
+assert.ok(scheduler.includes('chargedCents: paid.chargedCents'), 'fresh deterministic Travel persists the authoritative charged amount');
+assert.ok(scheduler.includes('chargedCents: Number(existing.chargedCents) || 0'), 'recovery reuses persisted charge fact rather than reconstructing money');
 
 console.log('✓ scheduled Travel preserves Booker/Traveler party semantics');
 console.log('✓ scheduled Teen Travel uses Family authorization');

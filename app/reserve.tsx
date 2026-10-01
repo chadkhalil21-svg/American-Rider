@@ -25,6 +25,7 @@ import {
 import { Text } from '../src/components/AppText';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { destinationsNear, type Destination } from '../src/backend/destinations';
+import { searchPlaces, type PlaceSuggestion } from '../src/backend/placeSearch';
 import { fetchQuote, geocodePlace, isUnavailable } from '../src/backend/fares';
 import { joinWaitlist } from '../src/backend/connect';
 import { fetchSmartQuote } from '../src/backend/smart';
@@ -310,6 +311,17 @@ export default function TravelConfirmation() {
     return () => { live = false; };
   }, [depLat, depLng]);
 
+  const [placeSuggestions, setPlaceSuggestions] = useState<PlaceSuggestion[]>([]);
+  useEffect(() => {
+    if (!searching || query.trim().length < 2) { setPlaceSuggestions([]); return undefined; }
+    const controller = new AbortController();
+    const anchor = ride.pickupPin ?? (depLat != null && depLng != null ? { lat: depLat, lng: depLng } : null);
+    const timer = setTimeout(() => {
+      searchPlaces(query, anchor, controller.signal).then(setPlaceSuggestions);
+    }, 180);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [query, searching, depLat, depLng, ride.pickupPin]);
+
   const q = query.trim().toLowerCase();
   // THE SHORTCUTS ARE THE SERVER'S, FOR THE REGION THE TRAVELER IS IN. They were a Miami-Dade
   // list compiled into the app: a traveler in Fort Lauderdale — inside our market — typed "b"
@@ -318,10 +330,11 @@ export default function TravelConfirmation() {
   //
   // Places we hold no permit for never appear, because the server does not list them.
   const matched = nearby.filter((p) => q === '' || p.name.toLowerCase().includes(q)).slice(0, 4);
+  const liveMatched = q.length >= 2 ? placeSuggestions.slice(0, 6) : [];
   // Anything the traveler types that isn't one of our shortcuts is still a real place —
   // offer to look it up rather than dead-ending with "no places found".
   const typedPlace: Place | null =
-    q !== '' && matched.length === 0
+    q !== '' && matched.length === 0 && liveMatched.length === 0
       ? { name: query.trim(), short: query.trim(), cost: 0, meta: 'Looking up…' }
       : null;
   // The demo capitalizes the typed place for display; the booked name stays as typed
@@ -496,9 +509,21 @@ export default function TravelConfirmation() {
           </Card>
 
           {/* The demo's results card: pin rows with the estimated travel time. */}
-          {searching && (matched.length > 0 || typedPlace) && (
+          {searching && (liveMatched.length > 0 || matched.length > 0 || typedPlace) && (
             <Card style={styles.resultsCard}>
-              {matched.map((p, i) => (
+              {liveMatched.map((p, i) => (
+                <Pressable key={p.id} accessibilityRole="button" onPress={() => chooseDestination({ name: p.title, short: p.title, cost: 0, meta: '', lat: p.lat, lng: p.lng })}>
+                  <View style={[styles.resultRow, i > 0 && styles.hair]}>
+                    <View style={[styles.pin, { backgroundColor: colors.ink }]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.resultName}>{p.title}</Text>
+                      {!!p.subtitle && <Text style={styles.resultMeta}>{p.subtitle}</Text>}
+                    </View>
+                    <Chev />
+                  </View>
+                </Pressable>
+              ))}
+              {matched.filter((p) => !liveMatched.some((s) => Math.abs(s.lat-p.lat) < 0.00001 && Math.abs(s.lng-p.lng) < 0.00001)).map((p, i) => (
                 <Pressable
                   key={p.name}
                   accessibilityRole="button"

@@ -1107,6 +1107,7 @@ export default {
     lostOperatorInboxDelivered: "An %{names} im Operator-Postfach zugestellt.",
     notifSaveFailed: "Die Benachrichtigungseinstellung wurde nicht gespeichert. Versuchen Sie es erneut.",
     cancelFailed: "Die Reise wurde nicht storniert. Versuchen Sie es erneut.",
+    lostReturnHuman: "Patron Support koordiniert die Rückgabe, nachdem der Operator den Gegenstand gefunden hat. Eine Rückfahrt, Belastung oder Zuweisung wird erst angezeigt, wenn sie tatsächlich besteht.",
   },
 
   legal: {

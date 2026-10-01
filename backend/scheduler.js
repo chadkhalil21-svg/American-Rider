@@ -317,6 +317,7 @@ async function sweepScheduled({ now = Date.now() } = {}) {
         cardCountry: r.cardCountry || null,
         customerId: r.stripeCustomerId || null,
         paymentMethodId: r.stripePaymentMethodId || null,
+        financialIdentityGeneration: r.financialIdentityGeneration,
       });
       if (paid.ok) {
         // Minimize the Stripe→Firestore crash window. This checkpoint precedes Travel creation

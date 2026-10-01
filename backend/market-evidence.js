@@ -99,6 +99,26 @@ const NATIONAL_SOURCE_CATALOG=Object.freeze({
   }),
 });
 
+const FLORIDA_PUBLIC_EVIDENCE=Object.freeze({
+  statewide:Object.freeze([
+    'fdot-open-transportation-data',
+    'controlled-public-price-panel',
+    'ridewise-public-rate-cards',
+    'taxifare-public-observed',
+  ]),
+  metros:Object.freeze({
+    'fl-miami-dade':Object.freeze({corroboration:['taxifare-miami','taxifare-mia','public-platform-route-averages'],regulated:['miami-dade-public-tnc-and-for-hire-records']}),
+    'fl-broward':Object.freeze({corroboration:['taxifare-fll','taxifare-south-florida-routes','public-platform-route-averages'],regulated:['broward-tnc-airport-port-audits']}),
+    'fl-palm-beach':Object.freeze({corroboration:['public-platform-route-averages','taxifare-south-florida-routes'],regulated:['palm-beach-public-airport-and-transport-records']}),
+    'fl-orlando':Object.freeze({corroboration:['taxifare-orlando','taxifare-sfb','public-platform-route-averages']}),
+    'fl-tampa-bay':Object.freeze({corroboration:['taxifare-tampa','taxifare-tampa-bay','taxifare-tpa','public-platform-route-averages']}),
+    'fl-jacksonville':Object.freeze({corroboration:['taxifare-jacksonville','taxifare-jax','public-platform-route-averages']}),
+    'fl-southwest':Object.freeze({corroboration:['taxifare-fort-myers-naples','taxifare-rsw','public-platform-route-averages']}),
+    'fl-sarasota-bradenton':Object.freeze({corroboration:['taxifare-sarasota','taxifare-srq','public-platform-route-averages']}),
+  }),
+  rule:'These are discovery/commissioning inputs, not automatic production authority. Every activated Florida service market still requires its own condition-matched evidence cells and promotion gates.',
+});
+
 const MARKET_EVIDENCE_PLANS=Object.freeze({
   'ma-statewide':Object.freeze({
     sources:Object.freeze(['massachusetts-tnc-report','independent-controlled-audit','gridwise-analytics']),
@@ -154,4 +174,4 @@ function planProblems(regionId){
   return out;
 }
 
-module.exports={SOURCE_TYPES,NATIONAL_SOURCE_CATALOG,MARKET_EVIDENCE_PLANS,source,planForRegion,planProblems};
+module.exports={SOURCE_TYPES,NATIONAL_SOURCE_CATALOG,FLORIDA_PUBLIC_EVIDENCE,MARKET_EVIDENCE_PLANS,source,planForRegion,planProblems};

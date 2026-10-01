@@ -24,6 +24,9 @@ assert.match(push,/void registerForPush\(\)/, 'a rotated native token must refre
 
 assert.match(presence,/TaskManager\.defineTask\(PRESENCE_TASK/);
 assert.match(presence,/requestBackgroundPermissionsAsync\(\)/);
+assert.match(presence,/getForegroundPermissionsAsync\(\)/, 'registered presence must re-check current foreground authorization');
+assert.match(presence,/getBackgroundPermissionsAsync\(\)/, 'registered presence must re-check current background authorization');
+assert.match(presence,/Location\.stopLocationUpdatesAsync\(PRESENCE_TASK\)\.catch/, 'revoked permission must retire stale background task registration');
 assert.match(presence,/startLocationUpdatesAsync\(PRESENCE_TASK/);
 assert.match(presence,/pausesUpdatesAutomatically: false/);
 assert.match(presence,/showsBackgroundLocationIndicator: true/);

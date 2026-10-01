@@ -8,7 +8,7 @@ import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
-import { clearInitialNotificationResponse, getInitialNotificationData, onNotificationTap, registerForPush } from '../src/backend/push';
+import { clearInitialNotificationResponse, getInitialNotificationData, onNotificationTap, onPushTokenChange, registerForPush } from '../src/backend/push';
 import { pingSweep } from '../src/backend/heartbeat';
 import { AuthScreen } from '../src/screens/AuthScreen';
 import { AuthProvider, useAuth } from '../src/state/AuthContext';
@@ -42,9 +42,11 @@ function AppGate() {
   useEffect(() => {
     if (!user || onboarding || Platform.OS === 'web') return;
     registerForPush();
+    const unsubscribeToken = onPushTokenChange();
     // And wake the server on the way past. A free instance that has been idle takes about
     // thirty seconds to come up; doing it now means the first real request does not wait.
     pingSweep();
+    return unsubscribeToken;
   }, [user, onboarding]);
 
   // Tapping a notification opens the thing it was about.

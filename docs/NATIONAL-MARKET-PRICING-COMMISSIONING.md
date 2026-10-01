@@ -17,7 +17,7 @@ For every service market, commissioning must establish:
 
 Use the strongest evidence actually available in each market.
 
-Government/open trip records are preferred when they contain usable fare, time and geography fields. Known examples include Chicago TNP trip data and NYC TLC high-volume FHV trip records. California CPUC public TNC data is an eligible program but fields and availability must be verified for the relevant reporting period before fare use.
+Government/open trip records are preferred only when the public schema actually contains usable passenger-fare, time and geography fields. Chicago TNP trip data currently satisfies that standard. NYC TLC high-volume FHV public records and Massachusetts reports are valuable structural evidence but are not assumed to provide Chicago-equivalent passenger-fare microdata. California CPUC reporting is free public evidence, but passenger-fare eligibility remains disabled until the relevant public-period schema is verified.
 
 Where public data is absent or too stale/coarse, use an approved independent controlled audit and/or a commercially licensed national/metro dataset. Gridwise Analytics is identified as a candidate licensed source because it advertises national/metro customer-pricing and record-level rideshare data. A contract, permitted use, schema validation and credentials are required before its data may be treated as active.
 

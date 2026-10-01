@@ -120,6 +120,68 @@ async function sweepScheduled({ now = Date.now() } = {}) {
       continue;
     }
 
+    if (recoverySnap.exists) {
+      // RECOVERY PRECEDES FRESH DISPATCH. Once this deterministic Travel exists, payment and
+      // Operator identity are committed facts. Do not require a new fleet match, re-charge the
+      // card, or silently rematch a different Operator merely because reservation bookkeeping
+      // crashed after Travel creation.
+      const existing = recoverySnap.data() || {};
+      if (String(existing.reservationId || '') !== id || String(existing.travelerUid || '') !== String(r.travelerUid)) {
+        report.failed.push({ id, reason: 'scheduled Travel identity collision' });
+        continue;
+      }
+      const effectiveOperator = {
+        id: existing.operatorId,
+        name: existing.operatorName || '',
+        car: existing.operatorCar || '',
+        plate: existing.operatorPlate || '',
+      };
+      if (!effectiveOperator.id || !existing.paymentIntentId) {
+        report.failed.push({ id, reason: 'existing scheduled Travel is incomplete' });
+        continue;
+      }
+      const rideRef = recoveryRef;
+      let effectState = existing.dispatchEffects || {};
+      const emitRecovered = async (key, message) => {
+        if (effectState[key]?.completed === true) return;
+        const out = await notify(message);
+        const at = Date.now(), attempts = Number(effectState[key]?.attempts || 0) + 1;
+        const marker = out?.retryable
+          ? { attempts, lastAttemptAt: at, completed: false, ok: false, reason: out?.reason || null }
+          : { attempts, at, completed: true, ok: !!out?.ok, reason: out?.reason || null };
+        await rideRef.update({ [`dispatchEffects.${key}`]: marker });
+        effectState = { ...effectState, [key]: marker };
+      };
+      taken.add(String(effectiveOperator.id));
+      await emitRecovered('operatorAssigned', {
+        uid: effectiveOperator.id, kind: 'travel_assigned', title: 'Scheduled travel assigned',
+        body: `${r.dep || 'Pickup'} to ${r.dest || 'destination'}. Open to accept.`,
+        data: { screen: '/operator', rideId: rideRef.id, tripNo: r.tripNo || '' },
+      });
+      await emitRecovered('travelerAssigned', {
+        uid: r.travelerUid, kind: 'operator_assigned', title: 'Your operator is on the way',
+        body: `${effectiveOperator.name || 'An operator'} is ${Number(existing.operatorEtaMin) || 0} minutes from ${r.dep || 'your pickup'}.`,
+        data: { screen: '/ride', rideId: rideRef.id, tripNo: r.tripNo || '' },
+      });
+      const teenPickup = await provisionTeenPin({ rideRef, rideId: rideRef.id, party: r.party || null, now });
+      if (teenPickup.required && !teenPickup.ok) {
+        report.failed.push({ id, reason: teenPickup.error || 'Teen pickup code unavailable' });
+        continue;
+      }
+      if (teenPickup.required && r.party?.teenUid) await emitRecovered('teenPickupCode', { uid:r.party.teenUid, kind:'teen_pickup_code', title:'Your pickup code', body:`Give ${teenPickup.pin} to your Operator after confirming the vehicle and Operator.`, data:{screen:'/ride',rideId:rideRef.id,tripNo:r.tripNo||''} });
+      if (teenPickup.required && r.party?.guardianUid && r.party.guardianUid !== r.party.teenUid) await emitRecovered('guardianAssigned', { uid:r.party.guardianUid, kind:'guardian_travel', title:'Teen Travel assigned', body:`${r.party.travelerName || 'Teen Traveler'}'s scheduled Travel has been assigned.`, data:{screen:'/ride',rideId:rideRef.id,tripNo:r.tripNo||''} });
+      await touch(db, id, {
+        status: 'dispatched', claimedAt: null, rideId: rideRef.id,
+        operatorId: effectiveOperator.id, operatorName: effectiveOperator.name || '',
+        etaMin: Number(existing.operatorEtaMin) || 0,
+        paymentIntentId: existing.paymentIntentId,
+        chargedCents: Number(existing.costCents) || Number(r.costCents) || Number(r.travelCostCents) || 0,
+        dispatchedAt: existing.createdAt || now, paymentError: null,
+      });
+      report.dispatched.push({ id, rideId: rideRef.id, tripNo: r.tripNo || '', operator: effectiveOperator.name, etaMin: Number(existing.operatorEtaMin) || 0, recovered: true });
+      continue;
+    }
+
     const pickup = { lat: Number(r.pickupLat), lng: Number(r.pickupLng) };
     const havePickup = Number.isFinite(pickup.lat) && Number.isFinite(pickup.lng);
 

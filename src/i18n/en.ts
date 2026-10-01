@@ -1131,6 +1131,7 @@ export default {
     lostOperatorInboxDelivered: "Delivered to %{names} in the Operator inbox.",
     notifSaveFailed: "Notification preference was not saved. Try again.",
     cancelFailed: "Travel was not cancelled. Try again.",
+    lostReturnHuman: "Patron Support coordinates the return after the Operator locates the item. No return Travel, charge, or assignment is shown until it actually exists.",
   },
 
   // ---- LEGAL ----------------------------------------------------------------------------

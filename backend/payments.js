@@ -14,7 +14,6 @@
 const Stripe = require('stripe');
 const { readKey, hasInvalidHeaderChars, describeInvalidChars } = require('./env');
 const { adminDb } = require('./firebase-admin');
-const { productionMode } = require('./runtime-mode');
 const {
   MIN_PLATFORM_FEE_CENTS,
   isDomesticCard,
@@ -242,7 +241,7 @@ async function customerForTraveler({ uid, email }) {
   const accountUid = String(uid || '');
   if (!accountUid) throw new Error('Firebase uid is required for Stripe Customer ownership');
   const db = adminDb();
-  if (!db && productionMode()) throw new Error('Stripe Customer ownership registry is unavailable');
+  if (!db) throw new Error('Stripe Customer ownership registry is unavailable');
   const ownerRef = db ? db.collection('stripe_customers').doc(accountUid) : null;
 
   if (ownerRef) {
@@ -282,7 +281,13 @@ async function customerForTraveler({ uid, email }) {
     // concurrent request. If another writer won, verify and use its authoritative Customer.
     try {
       await ownerRef.create({ customerId: String(customer.id), uid: accountUid, createdAt: Date.now() });
-    } catch {
+    } catch (e) {
+      // Only a genuine create conflict means another request may have established ownership.
+      // Network, permission, quota and service failures must propagate; they are not evidence
+      // that a winner exists and must never be disguised as an identity reconciliation event.
+      const code = String(e?.code || '').toLowerCase();
+      const alreadyExists = code === '6' || code === 'already-exists' || code === 'already_exists';
+      if (!alreadyExists) throw e;
       const winner = await ownerRef.get();
       const winnerId = winner.exists ? String(winner.data()?.customerId || '') : '';
       if (!winnerId) throw new Error('Stripe Customer ownership could not be persisted');

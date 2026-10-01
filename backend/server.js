@@ -92,7 +92,7 @@ const { planTrip } = require('./assistant');
 const { resolveIssue, supportMessage, replySender, MAX_OUT_OF_POCKET_CENTS } = require('./support');
 const { resolveOperatorIssue } = require('./operatorsupport');
 const { fileTicket, updateTicketLocation, listTickets } = require('./tickets');
-const { lostItemTicket, stampLostItemCase } = require('./lostitem');
+const { lostItemTicket, stampLostItemCase, notifyLostItemOperators, operatorLostItem, respondLostItem } = require('./lostitem');
 const { adminDb, adminStatus, accountDisabled } = require('./firebase-admin');
 const { closeOperationalAccount } = require('./accountclosure');
 const { acceptOffer } = require('./eligibility');
@@ -1286,7 +1286,33 @@ app.post('/lost-item', requireAuth, requireVerifiedEmail, LIMITS.lostItem, async
   if (filed.ok) {
     await stampLostItemCase({ itemId: (req.body || {}).itemId, uid: req.uid, caseNo: filed.caseNo });
   }
-  res.json({ ok: filed.ok, caseNo: filed.caseNo });
+  // A named Operator is not a notified Operator. Create a durable inbox message (with push
+  // as a delivery channel) and advance the status only after at least one message exists.
+  const operatorDelivery = await notifyLostItemOperators({
+    itemId: (req.body || {}).itemId,
+    uid: req.uid,
+  }).catch(() => ({ ok: false, delivered: 0 }));
+  res.json({
+    ok: filed.ok || operatorDelivery.ok,
+    caseNo: filed.caseNo,
+    operatorNotified: !!operatorDelivery.ok,
+    operatorDeliveryCount: Number(operatorDelivery.delivered || 0),
+  });
+});
+
+// --- Lost-item Operator recovery: a report is actionable, not merely named. ----------------
+app.get('/operator/lost-item/:id', requireAuth, async (req, res) => {
+  const out = await operatorLostItem({ itemId: req.params.id, operatorUid: req.uid });
+  return res.status(out.ok ? 200 : out.status || 500).json(out);
+});
+app.post('/operator/lost-item/:id/respond', requireAuth, async (req, res) => {
+  const out = await respondLostItem({
+    itemId: req.params.id,
+    operatorUid: req.uid,
+    outcome: req.body?.outcome,
+    tripNo: req.body?.tripNo || null,
+  });
+  return res.status(out.ok ? 200 : out.status || 500).json(out);
 });
 
 // --- Emergency: a traveler has opened the emergency screen. ------------------------------

@@ -110,7 +110,7 @@ async function notify({ uid, kind, title, body, data }) {
   }
 }
 
-async function dropToken(uid, expectedToken = null) {
+async function dropToken(uid, expectedToken = null, strict = false) {
   const db = adminDb();
   if (!db) return;
   try {
@@ -129,8 +129,10 @@ async function dropToken(uid, expectedToken = null) {
         if (owner.exists && String(owner.data()?.uid || '') === String(uid)) tx.delete(ownerRef);
       }
     });
-  } catch {
-    /* notification delivery must not crash because cleanup failed */
+  } catch (e) {
+    // Notification delivery/sign-out cleanup is best effort; permanent account closure may
+    // request strict cleanup so deletion cannot orphan a device-token ownership record.
+    if (strict) throw e;
   }
 }
 

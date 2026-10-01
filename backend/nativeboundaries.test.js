@@ -29,9 +29,15 @@ assert.match(presence,/pausesUpdatesAutomatically: false/);
 assert.match(presence,/showsBackgroundLocationIndicator: true/);
 
 assert.match(authContext,/import \{ clearPushToken \} from '\.\.\/backend\/push';/);
+assert.match(authContext,/import \{ stopBackgroundPresence \} from '\.\.\/backend\/presence';/);
 const signOutBody = authContext.slice(authContext.indexOf('signOut: () =>'), authContext.indexOf('onboarding,', authContext.indexOf('signOut: () =>')));
+assert.ok(signOutBody.indexOf('await stopBackgroundPresence()') >= 0, 'sign-out must stop the OS background location task');
 assert.ok(signOutBody.indexOf('await clearPushToken()') >= 0, 'sign-out must detach this device from the departing account');
 assert.ok(signOutBody.indexOf('await clearPushToken()') < signOutBody.indexOf('await fbSignOut(auth)'), 'push token must be detached while the departing Firebase identity is still available');
+const deleteBody = authContext.slice(authContext.indexOf('deleteAccount: (reauthenticate)'), authContext.indexOf('// THE DEVICE IS CLEARED BEFORE THE SESSION ENDS'));
+assert.ok(deleteBody.indexOf('await closeOperationalAccount()') >= 0, 'deletion must close server-side operations');
+assert.ok(deleteBody.indexOf('await stopBackgroundPresence()') > deleteBody.indexOf('await closeOperationalAccount()'), 'deletion must stop native presence after server-side operations are closed');
+assert.ok(deleteBody.indexOf('await stopBackgroundPresence()') < deleteBody.indexOf('await deleteUser(u)'), 'native background task must stop before Firebase identity deletion');
 
 assert.match(push,/getLastNotificationResponseAsync\(\)/, 'cold-start notification response must be recoverable');
 assert.match(push,/clearLastNotificationResponseAsync\(\)/, 'consumed cold-start response must be cleared');

@@ -441,16 +441,28 @@ app.post('/push/register', requireAuth, async (req, res) => {
   const db = adminDb();
   const ownerRef = db.collection('push_token_owners').doc(require('node:crypto').createHash('sha256').update(token).digest('hex'));
   await db.runTransaction(async (tx) => {
+    const userRef = db.collection('users').doc(uid);
+    // Firestore transactions require all reads before writes. Read the target owner, current
+    // account and (when needed) previous account before mutating any document.
     const ownerSnap = await tx.get(ownerRef);
+    const userSnap = await tx.get(userRef);
     const previousUid = ownerSnap.exists ? String(ownerSnap.data()?.uid || '') : '';
+    const previousToken = userSnap.exists ? String(userSnap.data()?.pushToken || '') : '';
+    let previousRef = null, previousSnap = null;
     if (previousUid && previousUid !== uid) {
-      const previousRef = db.collection('users').doc(previousUid);
-      const previousSnap = await tx.get(previousRef);
-      if (previousSnap.exists && String(previousSnap.data()?.pushToken || '') === token) {
-        tx.set(previousRef, { pushToken: null, pushUpdatedAt: Date.now() }, { merge: true });
-      }
+      previousRef = db.collection('users').doc(previousUid);
+      previousSnap = await tx.get(previousRef);
     }
-    tx.set(db.collection('users').doc(uid), {
+    if (previousRef && previousSnap?.exists && String(previousSnap.data()?.pushToken || '') === token) {
+      tx.set(previousRef, { pushToken: null, pushUpdatedAt: Date.now() }, { merge: true });
+    }
+    // Token rotation by the same account must retire X's owner index before assigning Y.
+    if (previousToken && previousToken !== token) {
+      const oldOwnerRef = db.collection('push_token_owners').doc(require('node:crypto').createHash('sha256').update(previousToken).digest('hex'));
+      const oldOwnerSnap = await tx.get(oldOwnerRef);
+      if (oldOwnerSnap.exists && String(oldOwnerSnap.data()?.uid || '') === uid) tx.delete(oldOwnerRef);
+    }
+    tx.set(userRef, {
       pushToken: token, pushPlatform: String(req.body?.platform || ''), pushUpdatedAt: Date.now(),
       ...(req.body?.prefs && typeof req.body.prefs === 'object' ? { pushPrefs: req.body.prefs } : {}),
     }, { merge: true });

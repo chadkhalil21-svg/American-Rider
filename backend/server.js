@@ -453,15 +453,16 @@ app.post('/push/register', requireAuth, async (req, res) => {
       previousRef = db.collection('users').doc(previousUid);
       previousSnap = await tx.get(previousRef);
     }
+    let oldOwnerRef = null, oldOwnerSnap = null;
+    if (previousToken && previousToken !== token) {
+      oldOwnerRef = db.collection('push_token_owners').doc(require('node:crypto').createHash('sha256').update(previousToken).digest('hex'));
+      oldOwnerSnap = await tx.get(oldOwnerRef);
+    }
+    // WRITE PHASE — no transaction reads below this point.
     if (previousRef && previousSnap?.exists && String(previousSnap.data()?.pushToken || '') === token) {
       tx.set(previousRef, { pushToken: null, pushUpdatedAt: Date.now() }, { merge: true });
     }
-    // Token rotation by the same account must retire X's owner index before assigning Y.
-    if (previousToken && previousToken !== token) {
-      const oldOwnerRef = db.collection('push_token_owners').doc(require('node:crypto').createHash('sha256').update(previousToken).digest('hex'));
-      const oldOwnerSnap = await tx.get(oldOwnerRef);
-      if (oldOwnerSnap.exists && String(oldOwnerSnap.data()?.uid || '') === uid) tx.delete(oldOwnerRef);
-    }
+    if (oldOwnerRef && oldOwnerSnap?.exists && String(oldOwnerSnap.data()?.uid || '') === uid) tx.delete(oldOwnerRef);
     tx.set(userRef, {
       pushToken: token, pushPlatform: String(req.body?.platform || ''), pushUpdatedAt: Date.now(),
       ...(req.body?.prefs && typeof req.body.prefs === 'object' ? { pushPrefs: req.body.prefs } : {}),

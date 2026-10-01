@@ -8,7 +8,7 @@ import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
-import { onNotificationTap, registerForPush } from '../src/backend/push';
+import { clearInitialNotificationResponse, getInitialNotificationData, onNotificationTap, registerForPush } from '../src/backend/push';
 import { pingSweep } from '../src/backend/heartbeat';
 import { AuthScreen } from '../src/screens/AuthScreen';
 import { AuthProvider, useAuth } from '../src/state/AuthContext';
@@ -49,12 +49,28 @@ function AppGate() {
 
   // Tapping a notification opens the thing it was about.
   useEffect(() => {
-    if (Platform.OS === 'web') return;
-    return onNotificationTap((data) => {
+    if (Platform.OS === 'web' || !user || onboarding) return;
+    let live = true;
+    const open = (data: Record<string, unknown>) => {
       const screen = typeof data?.screen === 'string' ? data.screen : null;
       if (screen) router.navigate(screen as never);
+    };
+
+    // A listener is sufficient while JS is alive, but not for the notification response that
+    // launched a terminated app. Expo explicitly exposes the last response for this cold-start
+    // case. Consume it only after Firebase has restored an account so notification data cannot
+    // route through authenticated surfaces underneath the sign-in overlay.
+    void getInitialNotificationData().then(async (data) => {
+      if (!live || !data) return;
+      open(data);
+      await clearInitialNotificationResponse();
     });
-  }, [router]);
+    const unsubscribe = onNotificationTap(open);
+    return () => {
+      live = false;
+      unsubscribe();
+    };
+  }, [router, user, onboarding]);
 
   return (
     <View style={{ flex: 1 }}>

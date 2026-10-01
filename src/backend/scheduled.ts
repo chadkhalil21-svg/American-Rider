@@ -39,6 +39,9 @@ export type ScheduledRide = {
   cost: number;
   /** When the travel is due, as a real instant — what decides whether it is still upcoming. */
   atMs: number;
+  /** Civil appointment the traveler selected; server validates it in the pickup market timezone. */
+  civilDate?: string;
+  civilTime?: string;
 
   // ---- What the dispatcher needs. -------------------------------------------------------
   /** Pickup and destination as the traveler will read them. */

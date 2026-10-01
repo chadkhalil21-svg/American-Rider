@@ -1,0 +1,70 @@
+// Executable market-reference service.
+//
+// Collectors are intentionally provider-neutral. A collector fetches lawful evidence and returns
+// normalized observations; this service persists them, builds robust cell references, and writes
+// candidate snapshots. Production fare coefficients remain separately promotion-gated.
+const { adminDb }=require('./firebase-admin');
+const { normalizeObservation }=require('./market-evidence-ingest');
+const { targetTotalCents }=require('./pricing-policy');
+const { planForRegion }=require('./market-evidence');
+
+const OBS='market_reference_observations';
+const SNAP='market_reference_snapshots';
+const STATE='market_reference_state';
+const MAX_OBSERVATIONS_PER_SOURCE=5000;
+const HOUR=60*60*1000;
+
+function median(xs){if(!xs.length)return null;const a=[...xs].sort((x,y)=>x-y),m=Math.floor(a.length/2);return a.length%2?a[m]:Math.round((a[m-1]+a[m])/2);}
+function cellKey(o){return [o.serviceClass,o.daypart||'any',o.weekdayWeekend||'any',o.calendarClass||'ordinary',o.regulatedLocationClass||'ordinary'].join('|');}
+
+async function persistObservations(db,rows){
+  let written=0;
+  for(const raw of rows.slice(0,MAX_OBSERVATIONS_PER_SOURCE)){
+    const o=normalizeObservation(raw);
+    const id=require('node:crypto').createHash('sha256').update([o.marketId,o.sourceId,o.observedAt,o.routedMiles,o.routedMinutes,o.travelerTotalCents].join('|')).digest('hex');
+    await db.collection(OBS).doc(id).set(o,{merge:false});
+    written++;
+  }
+  return written;
+}
+
+async function recomputeMarket(db,marketId,{now=Date.now(),lookbackDays=90}={}){
+  const since=new Date(now-lookbackDays*86400000).toISOString();
+  const snap=await db.collection(OBS).where('marketId','==',marketId).where('observedAt','>=',since).limit(10000).get();
+  const groups=new Map(),sources=new Set(),families=new Set();
+  snap.forEach(d=>{const o=d.data();const k=cellKey(o);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(o);sources.add(o.sourceId);families.add(o.sourceType);});
+  const cells={};
+  for(const [key,rows] of groups){
+    const referenceTotalCents=median(rows.map(x=>Number(x.travelerTotalCents)).filter(Number.isInteger));
+    if(referenceTotalCents===null)continue;
+    cells[key]={referenceTotalCents,targetTotalCents:targetTotalCents(referenceTotalCents),observations:rows.length,sources:[...new Set(rows.map(x=>x.sourceId))],asOf:new Date(now).toISOString()};
+  }
+  const out={marketId,asOf:new Date(now).toISOString(),lookbackDays,observations:snap.size,sourceCount:sources.size,evidenceFamilies:[...families],cells};
+  await db.collection(SNAP).doc(marketId).set(out);
+  return out;
+}
+
+async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false}={}){
+  const db=adminDb();
+  if(!db)return{ok:false,reason:'no database'};
+  const markets=Object.keys(require('./market-evidence').MARKET_EVIDENCE_PLANS);
+  const report={ok:true,markets:{}};
+  for(const marketId of markets){
+    const plan=planForRegion(marketId);
+    const stateRef=db.collection(STATE).doc(marketId),stateSnap=await stateRef.get(),state=stateSnap.exists?stateSnap.data():{};
+    if(!force&&state.lastSweepAt&&now-Number(state.lastSweepAt)<HOUR){report.markets[marketId]={skipped:'cadence',lastSweepAt:state.lastSweepAt};continue;}
+    let written=0;const results=[];
+    for(const sourceId of plan.sources){
+      const collect=collectors[sourceId];
+      if(typeof collect!=='function'){results.push({sourceId,ok:false,reason:'collector not configured'});continue;}
+      try{const rows=await collect({marketId,now});const n=await persistObservations(db,Array.isArray(rows)?rows:[]);written+=n;results.push({sourceId,ok:true,observations:n});}
+      catch(e){results.push({sourceId,ok:false,reason:e.message});}
+    }
+    const reference=await recomputeMarket(db,marketId,{now});
+    await stateRef.set({lastSweepAt:now,lastSweepIso:new Date(now).toISOString(),lastWritten:written,lastReferenceAsOf:reference.asOf,collectorResults:results},{merge:true});
+    report.markets[marketId]={written,reference,collectors:results};
+  }
+  return report;
+}
+async function currentReference(marketId){const db=adminDb();if(!db)return null;const s=await db.collection(SNAP).doc(marketId).get();return s.exists?s.data():null;}
+module.exports={median,cellKey,persistObservations,recomputeMarket,runMarketReferenceSweep,currentReference};

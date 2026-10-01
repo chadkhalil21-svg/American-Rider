@@ -18,7 +18,7 @@ function fakeDb({ traveler = [], operator = [], scheduled = [] } = {}) {
     collection(name) {
       return {
         where(field) { return { get: async () => ({ docs: name === 'scheduled_rides' ? scheduledRefs() : rideRefs(rideRows[field] || []) }) }; },
-        doc(id) { return { set: async (value, options) => { operations.push(['set', `${name}/${id}`, value, options]); } }; },
+        doc(id) { return { set: async (value, options) => { operations.push(['set', `${name}/${id}`, value, options]); }, delete: async () => { operations.push(['delete', `${name}/${id}`]); } }; },
       };
     },
     async runTransaction(fn) {
@@ -47,15 +47,18 @@ function fakeDb({ traveler = [], operator = [], scheduled = [] } = {}) {
   const db = fakeDb({ traveler: ['completed:T-1'], operator: ['cancelled:T-2'], scheduled: ['future:S-1', 'future:S-2'] });
   assert.deepStrictEqual(await closeOperationalAccount({ db, uid: 'u', now: 123 }), { ok: true, operationallyClosed: true, cancelledScheduled: 2 });
   assert.deepStrictEqual(db.operations, [
+    ['set', 'account_operation_fences/u', { closing: true, startedAt: 123 }, { merge: true }],
     ['update', 'future:S-1', { status: 'cancelled', cancelledAt: 123, closedReason: 'Account closed.', claimedAt: null }],
     ['update', 'future:S-2', { status: 'cancelled', cancelledAt: 123, closedReason: 'Account closed.', claimedAt: null }],
     ['set', 'operators/u', { available: false, offlineAt: 123, lat: null, lng: null }, { merge: true }],
     ['set', 'account_closures/u', { operationallyClosed: true, closedAt: 123, cancelledScheduled: 2 }, { merge: true }],
+    ['delete', 'account_operation_fences/u'],
   ]);
 
   const claimed = fakeDb({ scheduled: ['future:claimed'] });
   assert.deepStrictEqual(await closeOperationalAccount({ db: claimed, uid: 'u', now: 123 }), { ok:false, code:'scheduled_travel_in_progress' });
   assert.equal(claimed.operations.some((x)=>x[0]==='set' && x[1]==='account_closures/u'), false, 'claimed scheduled Travel blocks durable account closure');
+  assert.equal(claimed.operations.at(-1)?.[1], 'account_operation_fences/u', 'blocked closure retires its transient fence');
   const server = fs.readFileSync(require.resolve('./server'), 'utf8');
   assert.match(server, /app\.post\('\/account\/close', requireAuth,/);
   const client = fs.readFileSync(require.resolve('../src/backend/account.ts'), 'utf8');

@@ -136,7 +136,7 @@ async function sweepScheduled({ now = Date.now() } = {}) {
         car: existing.operatorCar || '',
         plate: existing.operatorPlate || '',
       };
-      if (!effectiveOperator.id || !existing.paymentIntentId) {
+      if (!effectiveOperator.id || !existing.paymentIntentId || !Number.isFinite(Number(existing.chargedCents)) || Number(existing.chargedCents) <= 0) {
         report.failed.push({ id, reason: 'existing scheduled Travel is incomplete' });
         continue;
       }
@@ -175,7 +175,7 @@ async function sweepScheduled({ now = Date.now() } = {}) {
         operatorId: effectiveOperator.id, operatorName: effectiveOperator.name || '',
         etaMin: Number(existing.operatorEtaMin) || 0,
         paymentIntentId: existing.paymentIntentId,
-        chargedCents: Number(existing.costCents) || Number(r.costCents) || Number(r.travelCostCents) || 0,
+        chargedCents: Number(existing.chargedCents) || 0,
         dispatchedAt: existing.createdAt || now, paymentError: null,
       });
       report.dispatched.push({ id, rideId: rideRef.id, tripNo: r.tripNo || '', operator: effectiveOperator.name, etaMin: Number(existing.operatorEtaMin) || 0, recovered: true });
@@ -391,6 +391,7 @@ async function sweepScheduled({ now = Date.now() } = {}) {
         // Settlement reads this when the traveler's app has no intent to name — see
         // POST /travel/settle.
         paymentIntentId: paid.paymentIntentId,
+        chargedCents: paid.chargedCents,
       });
 
       taken.add(effectiveOperator.id);

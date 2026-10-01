@@ -1121,6 +1121,7 @@ export default {
 
     msgNotSent: "Mensaje no enviado. Revise su conexión e inténtelo de nuevo.",
     lostOperatorInboxDelivered: "Entregado a %{names} en la bandeja del Operador.",
+    notifSaveFailed: "La preferencia de notificaciones no se guardó. Inténtelo de nuevo.",
   },
 
   legal: {

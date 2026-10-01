@@ -1095,6 +1095,7 @@ export default {
     familyMessageFailed: 'Le message n’a pas été envoyé.',
 
     msgNotSent: "Message non envoyé. Vérifiez votre connexion et réessayez.",
+    lostOperatorInboxDelivered: "Remis à %{names} dans la boîte de réception de l’Opérateur.",
   },
 
   },

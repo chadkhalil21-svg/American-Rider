@@ -39,9 +39,9 @@ async function recomputeMarket(db,marketId,{now=Date.now(),lookbackDays=90}={}){
   snap.forEach(d=>{const o=d.data();const k=cellKey(o);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(o);sources.add(o.sourceId);families.add(o.sourceType);});
   const cells={};
   for(const [key,rows] of groups){
-    const referenceTotalCents=median(rows.map(x=>Number(x.travelerTotalCents)).filter(Number.isInteger));
+    // Prevent a high-volume source from numerically overwhelming independent sources: first\n    // reduce each source to its own robust median, then take the median across sources.\n    const bySource=new Map();\n    for(const row of rows){if(!bySource.has(row.sourceId))bySource.set(row.sourceId,[]);bySource.get(row.sourceId).push(Number(row.travelerTotalCents));}\n    const sourceMedians=[...bySource.values()].map(xs=>median(xs.filter(Number.isInteger))).filter(Number.isInteger);\n    const referenceTotalCents=median(sourceMedians);
     if(referenceTotalCents===null)continue;
-    cells[key]={referenceTotalCents,targetTotalCents:targetTotalCents(referenceTotalCents),observations:rows.length,sources:[...new Set(rows.map(x=>x.sourceId))],evidenceFamilies:[...new Set(rows.map(x=>x.sourceType))],latestObservedAt:rows.map(x=>x.observedAt).filter(Boolean).sort().at(-1)||null,asOf:new Date(now).toISOString()};
+    const providerCounts={};for(const r of rows){const k=r.providerKey||r.sourceId;providerCounts[k]=(providerCounts[k]||0)+1;}\n    const maxProviderShare=rows.length?Math.max(...Object.values(providerCounts))/rows.length:1;\n    cells[key]={referenceTotalCents,targetTotalCents:targetTotalCents(referenceTotalCents),observations:rows.length,sources:[...bySource.keys()],sourceMedians,evidenceFamilies:[...new Set(rows.map(x=>x.sourceType))],providers:Object.keys(providerCounts),maxProviderShare,latestObservedAt:rows.map(x=>x.observedAt).filter(Boolean).sort().at(-1)||null,asOf:new Date(now).toISOString()};
   }
   const latestObservedAt=[...groups.values()].flat().map(x=>x.observedAt).sort().at(-1)||null;
   // Recompute produces a CANDIDATE. It is deliberately not production authority until an

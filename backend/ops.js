@@ -580,9 +580,10 @@ function mount(app, express, deps = {}) {
         const ref = db.collection('financial_identity_holds').doc(uid);
         const current = await tx.get(ref);
         if (current.exists && current.data()?.active === true) return;
-        tx.set(ref, { active:true, placedAt:now, placedBy:actor, note }, { merge:true });
+        const generation = Math.max(0, Number(current.data()?.generation) || 0) + 1;
+        tx.set(ref, { active:true, generation, placedAt:now, placedBy:actor, note }, { merge:true });
         tx.set(db.collection('audit_log').doc(), {
-          at:now, subject:uid, actor, action:'financial_identity_hold_placed', note,
+          at:now, subject:uid, actor, action:'financial_identity_hold_placed', generation, note,
         });
       });
       return res.json({ ok:true, uid, active:true });

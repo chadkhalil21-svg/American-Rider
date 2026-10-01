@@ -1181,11 +1181,34 @@ async function chargeOperatorAccountFee({ uid, email, month, amountCents }) {
   }
 }
 
+async function inspectStripeCustomerOwnership(uid) {
+  const stripe = getStripe();
+  const accountUid = String(uid || '');
+  if (!accountUid) throw new Error('Firebase uid is required');
+  const found = await stripe.customers.search({
+    query: `metadata['uid']:'${accountUid.replace(/'/g, '')}'`,
+    limit: 100,
+  });
+  const customers = [];
+  for (const c of (found.data || []).filter(x => !x.deleted && String(x.metadata?.uid || '') === accountUid)) {
+    const methods = await stripe.paymentMethods.list({ customer: c.id, type: 'card', limit: 100 });
+    const intents = await stripe.paymentIntents.list({ customer: c.id, limit: 100 });
+    customers.push({
+      id: String(c.id),
+      email: c.email || null,
+      created: Number(c.created) || null,
+      paymentMethods: (methods.data || []).map(m => ({ id:String(m.id), brand:m.card?.brand || null, last4:m.card?.last4 || null, expMonth:m.card?.exp_month || null, expYear:m.card?.exp_year || null })),
+      paymentIntents: (intents.data || []).map(pi => ({ id:String(pi.id), status:pi.status, amount:Number(pi.amount)||0, created:Number(pi.created)||null, reservationId:pi.metadata?.reservationId || null, tripNo:pi.metadata?.tripNo || null })),
+    });
+  }
+  return customers;
+}
+
 module.exports = {
   operatorPayoutAccount,
   quote, commissionCents, platformFeeCents, isDomesticCard, defaultCardCountry, journeyFeeCents, createPaymentIntent, resumePaymentIntent, chargeRide, refundTravel,
   MIN_PLATFORM_FEE_CENTS,
-  customerForTraveler, scheduledPaymentIdentity, connectAccountFor, connectOnboardingLink, connectAccountStatus,
+  customerForTraveler, scheduledPaymentIdentity, inspectStripeCustomerOwnership, connectAccountFor, connectOnboardingLink, connectAccountStatus,
   transferToOperator, paidWithFromIntent, refundableFor, connectDashboardLink, pingStripe, probeNetwork,
   transferFixed, chargeScheduledTravel, createScreeningIntent, chargeOperatorAccountFee,
   describePaymentMethod, listPaymentMethods, createSetupIntent, setDefaultPaymentMethod, detachPaymentMethod,

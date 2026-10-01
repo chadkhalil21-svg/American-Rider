@@ -236,6 +236,17 @@ function quote(travelCostCents, journey, governmentFees, cardCountry, tollCents)
  * Keyed on the Firebase uid in metadata rather than on email: an email can change hands, a
  * uid cannot, and this is the record a refund's ownership check ultimately rests on.
  */
+async function assertNoFinancialIdentityHold(uid) {
+  const db = adminDb();
+  if (!db) throw new Error('Stripe Customer ownership registry is unavailable');
+  const snap = await db.collection('financial_identity_holds').doc(String(uid || '')).get();
+  if (snap.exists && snap.data()?.active === true) {
+    const err = new Error('Financial identity reconciliation is in progress');
+    err.code = 'financial_identity_hold';
+    throw err;
+  }
+}
+
 async function customerForTraveler({ uid, email }) {
   const stripe = getStripe();
   const accountUid = String(uid || '');
@@ -243,12 +254,7 @@ async function customerForTraveler({ uid, email }) {
   const db = adminDb();
   if (!db) throw new Error('Stripe Customer ownership registry is unavailable');
   const ownerRef = db.collection('stripe_customers').doc(accountUid);
-  const holdSnap = await db.collection('financial_identity_holds').doc(accountUid).get();
-  if (holdSnap.exists && holdSnap.data()?.active === true) {
-    const err = new Error('Financial identity reconciliation is in progress');
-    err.code = 'financial_identity_hold';
-    throw err;
-  }
+  await assertNoFinancialIdentityHold(accountUid);
 
   if (ownerRef) {
     const owned = await ownerRef.get();
@@ -546,6 +552,7 @@ async function createPaymentIntent({ travelCostCents, uid, email, tripNo, rideId
   // No tripNo, no key. A Travel Number is what makes the key specific to one travel; keying on
   // uid and amount alone would make two genuinely different travels at the same fare collide,
   // and the second traveler would be handed the first one's intent.
+  await assertNoFinancialIdentityHold(uid);
   const pi = await stripe.paymentIntents.create(
     params,
     idempotencyForTravel('travel', uid, tripNo, params.amount),
@@ -1026,6 +1033,7 @@ async function chargeScheduledTravel({ travelCostCents, uid, email, tripNo, rese
     if (!pm) {
       return { ok: false, code: 'no_saved_card', error: 'No card on file for this traveler' };
     }
+    await assertNoFinancialIdentityHold(uid);
     const pi = await stripe.paymentIntents.create(
       {
         amount: q.travelerPays,

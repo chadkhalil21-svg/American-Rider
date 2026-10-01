@@ -1134,6 +1134,7 @@ export default {
     lostReturnHuman: "Patron Support coordinates the return after the Operator locates the item. No return Travel, charge, or assignment is shown until it actually exists.",
     familyRevokeUnable: "Family authorization could not be revoked. Try again.",
     inviteShareFailed: "The invitation could not be opened for sharing. Try again.",
+    lostCaseNumber: "Support case %{caseNo}",
   },
 
   // ---- LEGAL ----------------------------------------------------------------------------

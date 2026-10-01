@@ -243,7 +243,7 @@ export type RideStore = {
   resetIssue: () => void;
   pickIssue: (key: string) => void;
   /** Send the traveler's own words to the server, which decides what happens. */
-  submitDescription: (text: string) => void;
+  submitDescription: (text: string) => Promise<boolean>;
   /** A refund Patron Support issued on a travel: which one, and how much. */
   credited: { no: string; cents: number } | null;
 
@@ -1387,7 +1387,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   const submitDescription = useCallback(
     (text: string) => {
       const description = text.trim();
-      if (!description || !issue) return;
+      if (!description || !issue) return Promise.resolve(false);
       const gen = ++issueGen.current;
       // THE TRAVEL THE CASE CONCERNS, from a record the app actually holds: this session's
       // travels first, then the account's stored records. Never a fallback to lastTrip — that
@@ -1427,7 +1427,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
             }
           : null;
       setIssueState('resolving');
-      submitIssue({
+      return submitIssue({
         category: issue,
         description,
         trip,
@@ -1438,9 +1438,15 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
         if (outcome.action === 'credit' && outcome.refunded && trip) {
           setCredited({ no: trip.no, cents: outcome.creditCents });
         }
-        if (gen !== issueGen.current) return; // this case was abandoned
+        if (gen !== issueGen.current) return true; // this case was abandoned
         setIssueResult(outcome);
         setIssueState('resolved');
+        return true;
+      }).catch(() => {
+        // Network/server failure is not a resolution. Return to the editable state so the
+        // Traveler can retry instead of leaving the case in an endless “assessing” state.
+        if (gen === issueGen.current) setIssueState('describing');
+        return false;
       });
     },
     [issue, issueTripNo, completedTrips],

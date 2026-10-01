@@ -448,16 +448,15 @@ export default function LostItemScreen() {
             note carries what is actually true underneath the label. */}
         <Rung
           label={t('traveler.operatorNotified')}
-          done={!!item && item.notifiedOperatorIds.length > 0}
+          done={!!item && Number(item.operatorDeliveryCount || 0) > 0}
           note={
             notified.length === 0
               ? t('traveler.lostNoOperatorRecorded')
-              : item?.caseNo
-                ? t('traveler.lostCarryingCase', {
-                    names: notified.join(', '),
-                    caseNo: item.caseNo,
-                  })
-                : t('traveler.lostNotPassedToSpecialist', { names: notified.join(', ') })
+              : Number(item.operatorDeliveryCount || 0) > 0
+                ? t('traveler.lostOperatorInboxDelivered', { names: notified.join(', ') })
+                : item?.caseNo
+                  ? t('traveler.lostCarryingCase', { names: notified.join(', '), caseNo: item.caseNo })
+                  : t('traveler.lostNotPassedToSpecialist', { names: notified.join(', ') })
           }
         />
         <Rung

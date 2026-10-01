@@ -53,8 +53,12 @@ assert.ok(scheduler.includes('paymentCheckpointAt'), 'successful scheduled payme
 assert.ok(scheduler.includes('r.paymentIntentId && Number.isFinite(Number(r.chargedCents))'), 'retry recovers a checkpointed charge without requiring the saved card again');
 assert.ok(scheduler.indexOf('paymentCheckpointAt') < scheduler.indexOf('rideRef.create'), 'payment checkpoint is persisted before deterministic Travel creation');
 assert.ok(payments.includes("reservationId: String(reservationId)"), 'Stripe scheduled payment carries deterministic reservation identity');
-assert.ok(payments.includes('stripe.paymentIntents.search'), 'scheduled charge helper searches Stripe for success from a pre-checkpoint crash');
-assert.ok(payments.includes("scheduled_payment_mismatch"), 'recovered Stripe payment fails closed if its amount differs from the reservation');
+assert.ok(server.includes('stripeCustomerId: paymentIdentity.customerId'), 'scheduled reservation freezes its Stripe Customer identity');
+assert.ok(server.includes('stripePaymentMethodId: paymentIdentity.paymentMethodId'), 'scheduled reservation freezes its chosen PaymentMethod identity');
+assert.ok(scheduler.includes('customerId: r.stripeCustomerId'), 'scheduler reuses frozen Customer identity during idempotent charge recovery');
+assert.ok(scheduler.includes('paymentMethodId: r.stripePaymentMethodId'), 'scheduler reuses frozen PaymentMethod identity during idempotent charge recovery');
+const scheduledCharge=payments.slice(payments.indexOf('async function chargeScheduledTravel'), payments.indexOf('/**\n * A PaymentIntent for the operator', payments.indexOf('async function chargeScheduledTravel')));
+assert.ok(!scheduledCharge.includes('paymentIntents.search'), 'scheduled charge critical path does not depend on Stripe Search consistency');
 
 console.log('✓ scheduled Travel preserves Booker/Traveler party semantics');
 console.log('✓ scheduled Teen Travel uses Family authorization');

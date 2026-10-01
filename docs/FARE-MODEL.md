@@ -47,7 +47,7 @@ Stripe costs, Connect costs, pass-through processing and rounding.
 - 25 cents operating/infrastructure allowance per separately charged Travel; and
 - at least 75 cents modeled platform contribution per separately charged Travel.
 
-The absolute Platform Fee floor is $2.00.
+The absolute Platform Fee floor is $2.50. This national floor is independent of geography; the solver raises it whenever payment, payout, pass-through, reserve, overhead, or required-contribution economics demand more.
 
 Unknown card country is priced on the international-safe schedule. A first foreign card is not
 allowed to become a deliberately loss-making exception.
@@ -60,9 +60,9 @@ it can be enabled.
 
 | Travel Fare | US-issued card | International/unknown card |
 |---:|---:|---:|
-| $5 | $2.00 | $2.00 |
-| $10 | $2.01 | $2.20 |
-| $20 | $2.26 | $2.61 |
+| $5 | $2.50 | $2.50 |
+| $10 | $2.50 | $2.50 |
+| $20 | $2.50 | $2.61 |
 | $30 | $2.51 | $3.02 |
 | $40 | $2.75 | $3.43 |
 | $50 | $3.00 | $3.83 |
@@ -127,7 +127,7 @@ The release gate must prove, exhaustively across the tested fare domain, that:
 
 1. app and server pricing agree to the cent;
 2. every selected fee meets the modeled contribution target;
-3. one cent less fails whenever the $2 floor is not controlling;
+3. one cent less fails whenever the $2.50 floor is not controlling;
 4. government fees and tolls cannot create a hidden subsidy;
 5. unknown cards are internationally safe; and
 6. Smart Travel funds each separately charged leg's fixed economics.

@@ -1104,6 +1104,7 @@ export default {
 
     msgNotSent: "Messaggio non inviato. Controlli la connessione e riprovi.",
     lostOperatorInboxDelivered: "Consegnato a %{names} nella casella dell’Operatore.",
+    notifSaveFailed: "La preferenza di notifica non è stata salvata. Riprovi.",
   },
 
   legal: {

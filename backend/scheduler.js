@@ -104,6 +104,21 @@ async function sweepScheduled({ now = Date.now() } = {}) {
     const r = docSnap.data();
     const id = docSnap.id;
     const late = now > r.atMs + GRACE_MS;
+    // A scheduler outage must not turn a stale reservation into an hours-late fresh charge and
+    // dispatch. Existing deterministic Travels are recovery work; only never-created Travels
+    // expire here.
+    const recoveryRef = db.collection('rides').doc(`scheduled_${id}`);
+    const recoverySnap = await recoveryRef.get();
+    if (late && !recoverySnap.exists) {
+      await close(db, id, 'unmatched', 'The scheduled dispatch window expired before a Travel was created.');
+      await notify({
+        uid: r.travelerUid, kind: 'scheduled_failed', title: 'Scheduled travel was not dispatched',
+        body: 'The dispatch window passed before your Travel could be created. Nothing was charged.',
+        data: { screen: '/', tripNo: r.tripNo || '' },
+      });
+      report.failed.push({ id, reason: 'dispatch window expired' });
+      continue;
+    }
 
     const pickup = { lat: Number(r.pickupLat), lng: Number(r.pickupLng) };
     const havePickup = Number.isFinite(pickup.lat) && Number.isFinite(pickup.lng);

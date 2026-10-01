@@ -563,6 +563,34 @@ function mount(app, express, deps = {}) {
     }
   });
 
+  // A named Operations actor may freeze Customer-dependent money activity before inspecting
+  // duplicate financial identities. There is deliberately no release endpoint yet: clearing the
+  // hold must be coupled to a complete, verified reconciliation protocol rather than a guess.
+  app.post('/ops/stripe-customers/hold', express.urlencoded({ extended: false }), async (req, res) => {
+    if (!configured() || !signedIn(req)) return res.status(401).json({ error: 'Sign in at /ops first' });
+    const db = dbOf();
+    if (!db) return res.status(503).json({ error: adminStatus().reason || 'Firestore is not configured' });
+    const uid = String(req.body?.uid || '').trim();
+    const note = String(req.body?.note || '').trim();
+    if (!uid || !note) return res.status(400).json({ error: 'uid and note are required' });
+    const actor = actorOf(req);
+    const now = Date.now();
+    try {
+      await db.runTransaction(async tx => {
+        const ref = db.collection('financial_identity_holds').doc(uid);
+        const current = await tx.get(ref);
+        if (current.exists && current.data()?.active === true) return;
+        tx.set(ref, { active:true, placedAt:now, placedBy:actor, note }, { merge:true });
+        tx.set(db.collection('audit_log').doc(), {
+          at:now, subject:uid, actor, action:'financial_identity_hold_placed', note,
+        });
+      });
+      return res.json({ ok:true, uid, active:true });
+    } catch (e) {
+      return res.status(500).json({ error:e.message });
+    }
+  });
+
   // FINANCIAL IDENTITY RECONCILIATION IS READ-ONLY HERE. A duplicate Stripe Customer is not
   // something Operations may resolve by guessing. This endpoint inventories the evidence needed
   // for a deliberate repair without mutating Customer ownership.

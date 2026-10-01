@@ -6,7 +6,6 @@ export default {
     continueWithApple: 'Continua con Apple',
     continueWithGoogle: 'Continua con Google',
     orDivider: 'oppure',
-    emailOrMobileField: 'Indirizzo e-mail',
     continueLabel: 'Continua',
     ssoNotConfigured: 'Questo accesso non è ancora configurato in questa versione.',
     appleUnavailable: 'Apple non ha potuto completare l’accesso. Riprovi o usi il suo indirizzo e-mail.',

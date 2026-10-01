@@ -111,7 +111,16 @@ export async function requestBackgroundPresence(): Promise<boolean> {
  */
 export async function startBackgroundPresence(): Promise<boolean> {
   try {
-    if (await TaskManager.isTaskRegisteredAsync(PRESENCE_TASK)) return true;
+    if (await TaskManager.isTaskRegisteredAsync(PRESENCE_TASK)) {
+      // Registration is not authorization. The Operator may have revoked "Always" location
+      // in Settings while the OS task record still exists. Re-read both permissions before
+      // claiming locked-phone presence is available; stop a stale task on revocation.
+      const fg = await Location.getForegroundPermissionsAsync();
+      const bg = await Location.getBackgroundPermissionsAsync();
+      if (fg.status === 'granted' && bg.status === 'granted') return true;
+      await Location.stopLocationUpdatesAsync(PRESENCE_TASK).catch(() => undefined);
+      return false;
+    }
     const granted = await requestBackgroundPresence();
     if (!granted) return false;
     await Location.startLocationUpdatesAsync(PRESENCE_TASK, {

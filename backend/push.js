@@ -68,16 +68,16 @@ async function recipient(uid) {
  */
 async function notify({ uid, kind, title, body, data }) {
   const rule = KINDS[kind];
-  if (!rule) return { ok: false, reason: `unknown notification kind: ${kind}` };
+  if (!rule) return { ok: false, retryable: false, reason: `unknown notification kind: ${kind}` };
 
   const { token, prefs } = await recipient(uid);
-  if (!token) return { ok: false, reason: 'no push token for this account' };
+  if (!token) return { ok: false, retryable: false, reason: 'no push token for this account' };
 
   // An unset preference means ON. A person who has never opened the Notifications screen has
   // not refused anything, and treating silence as refusal would mean nobody is ever told
   // their operator has arrived.
   if (!rule.required && rule.pref && prefs[rule.pref] === false) {
-    return { ok: false, reason: `declined by preference: ${rule.pref}` };
+    return { ok: false, retryable: false, reason: `declined by preference: ${rule.pref}` };
   }
 
   try {
@@ -102,11 +102,14 @@ async function notify({ uid, kind, title, body, data }) {
       // DeviceNotRegistered means the app was deleted or the token rotated. Dropped, so we
       // stop sending into the void — and so a reinstall re-registers cleanly.
       if (ticket?.details?.error === 'DeviceNotRegistered') await dropToken(uid, token);
-      return { ok: false, reason: ticket.message || 'push rejected' };
+      const code = String(ticket?.details?.error || '');
+      const terminal = code === 'DeviceNotRegistered' || code === 'MessageTooBig' || code === 'InvalidCredentials';
+      return { ok: false, retryable: !terminal, reason: ticket.message || 'push rejected' };
     }
-    return { ok: true, id: ticket?.id || null };
+    if (!res.ok) return { ok: false, retryable: res.status >= 500 || res.status === 429, reason: `push http ${res.status}` };
+    return { ok: true, retryable: false, id: ticket?.id || null };
   } catch (e) {
-    return { ok: false, reason: e.message };
+    return { ok: false, retryable: true, reason: e.message };
   }
 }
 

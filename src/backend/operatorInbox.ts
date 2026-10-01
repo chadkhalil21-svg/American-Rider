@@ -46,6 +46,8 @@ export type AssignedTravel = {
     luggage: boolean;
   };
   costCents: number;
+  /** Authoritative Travel Fare before Platform Fee/pass-throughs. */
+  travelCostCents: number;
   status: string;
   createdAt: number;
   /** When the status last changed. Distinguishes a journey underway from one that never
@@ -135,6 +137,7 @@ export function watchAssignedTravel(
                   }
                 : undefined,
               costCents: Number(x.costCents ?? 0),
+              travelCostCents: Number(x.travelCostCents ?? 0),
               status: String(x.status ?? ''),
               createdAt: Number(x.createdAt ?? 0),
               statusAt: Number(x.statusAt ?? 0),

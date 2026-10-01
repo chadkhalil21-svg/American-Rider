@@ -1105,6 +1105,7 @@ export default {
     familyMessageFailed: 'El mensaje no se envió.',
 
     msgNotSent: "Mensaje no enviado. Revise su conexión e inténtelo de nuevo.",
+    lostOperatorInboxDelivered: "Entregado a %{names} en la bandeja del Operador.",
   },
 
   },

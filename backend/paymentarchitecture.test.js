@@ -10,6 +10,9 @@ assert.ok(p.includes('idempotencyKey: `ar_customer_${accountUid}`'), 'Stripe Cus
 assert.ok(p.includes("collection('stripe_customers').doc(accountUid)"), 'Firebase uid has a durable server-owned Stripe Customer mapping');
 assert.ok(p.includes("stripe.customers.retrieve(String(owned.data().customerId))"), 'mapped Customer is retrieved directly rather than rediscovered by search');
 assert.ok(p.includes("Stripe Customer ownership mismatch"), 'Customer metadata mismatch fails closed');
+assert.ok(p.includes("if (!customer || customer.deleted) throw new Error('Authoritative Stripe Customer is unavailable')"), 'deleted mapped Customer fails closed rather than creating a replacement');
+const mappedBranch=p.slice(p.indexOf('if (ownerRef)'), p.indexOf('// Legacy adoption only'));
+assert.ok(!mappedBranch.includes('customers.create'), 'mapped Customer failure path cannot manufacture a replacement Customer');
 assert.ok(p.includes("Multiple Stripe Customers exist for this account"), 'ambiguous legacy Customer ownership fails closed rather than silently adopting one');
 assert.ok(p.includes('await ownerRef.create'), 'first-use mapping is create-only so concurrent requests cannot overwrite ownership');
 assert.ok(p.includes("if (!db) throw new Error('Stripe Customer ownership registry is unavailable')"), 'Customer provisioning never runs without its durable ownership registry');

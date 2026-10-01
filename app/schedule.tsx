@@ -446,6 +446,14 @@ export default function Schedule() {
             arr: ride.arrival.name, // the demo's splash names the destination in full
             cost: ride.travelerTotal, // the same price the traveler was shown — see travelerTotal
             atMs: scheduledAt(),
+            civilDate: (() => {
+              const d = new Date(scheduledAt());
+              return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            })(),
+            civilTime: (() => {
+              const mins = toMinutes(chosenTime, ride.schedPeriod);
+              return `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
+            })(),
           };
           ride.scheduleRide(info);
           setDoneInfo(info); // the demo's splash, then Done → home

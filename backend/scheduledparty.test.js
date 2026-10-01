@@ -43,8 +43,10 @@ assert.ok(pushSource.includes("code === 'DeviceNotRegistered'"), 'invalid device
 assert.ok(scheduler.includes('late && !recoverySnap.exists'), 'expired reservation cannot create a fresh Travel or charge after the dispatch window');
 assert.ok(scheduler.includes('dispatch window expired'), 'scheduler records explicit stale-dispatch failure rather than dispatching hours late');
 const recoveryPos=scheduler.indexOf('RECOVERY PRECEDES FRESH DISPATCH');
-assert.ok(recoveryPos > 0 && recoveryPos < scheduler.indexOf('nearbyOperatorCandidates'), 'existing deterministic Travel is recovered before any fresh fleet lookup');
-assert.ok(recoveryPos < scheduler.indexOf('chargeScheduledTravel'), 'existing deterministic Travel is recovered before any payment attempt');
+const fleetCallPos=scheduler.indexOf('nearbyOperatorCandidates(db, pickup');
+assert.ok(recoveryPos > 0 && fleetCallPos > recoveryPos, 'existing deterministic Travel is recovered before any fresh fleet lookup');
+const chargeCallPos=scheduler.indexOf('paid = await chargeScheduledTravel');
+assert.ok(chargeCallPos > recoveryPos, 'existing deterministic Travel is recovered before any payment attempt');
 assert.ok(scheduler.includes("recovered: true"), 'recovered Travel is explicitly distinguishable in scheduler evidence');
 assert.ok(scheduler.includes("!effectiveOperator.id || !existing.paymentIntentId"), 'recovery fails closed if committed Operator or payment identity is incomplete');
 assert.ok(scheduler.includes('chargedCents: paid.chargedCents'), 'fresh deterministic Travel persists the authoritative charged amount');

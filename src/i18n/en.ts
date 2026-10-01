@@ -155,6 +155,21 @@ export default {
     partRead: 'Read',
     openAllParts: 'Open all %{n} parts to continue',
 
+    lostOpenFailed: "This report could not be opened.",
+    lostUnavailable: "This lost-item report is unavailable.",
+    lostSelectTravel: "Select the Travel in which you found the item.",
+    lostUpdateFailed: "This update could not be recorded.",
+    lostTitle: "Lost Item",
+    lostInstruction: "Check the vehicle before recording an answer. Your response updates the Traveler’s report.",
+    lostItemLabel: "Item",
+    lostTravelLabel: "Travel",
+    lostTravelInstruction: "Select the Travel only if you located the item in that vehicle journey.",
+    lostTravelNumber: "Travel %{no}",
+    lostRecordedLocated: "You recorded that the item was located.",
+    lostRecordedNotFound: "You recorded that the item was not found.",
+    lostRecording: "Recording…",
+    lostLocated: "Item Located",
+    lostNotFound: "Item Not Found",
   },
 
   // ---- TRAVELER -------------------------------------------------------------------------
@@ -1120,31 +1135,10 @@ export default {
   // The documents themselves are served by the backend and translated there. This is the
   // notice that appears above a translated one, and it is not boilerplate: it is what makes a
   // convenience translation safe to offer at all.
-  },
-
-  // ---- LEGAL ----------------------------------------------------------------------------
-  // The documents themselves are served by the backend and translated there. This is the
-  // notice that appears above a translated one, and it is not boilerplate: it is what makes a
-  // convenience translation safe to offer at all.
   legal: {
     termsTitle: 'Terms of Service',
     privacyTitle: 'Privacy Policy',
     translationNotice:
       'This translation is provided so this document can be read in your language. The English version is the legally binding one.',
-    lostOpenFailed: "This report could not be opened.",
-    lostUnavailable: "This lost-item report is unavailable.",
-    lostSelectTravel: "Select the Travel in which you found the item.",
-    lostUpdateFailed: "This update could not be recorded.",
-    lostTitle: "Lost Item",
-    lostInstruction: "Check the vehicle before recording an answer. Your response updates the Traveler’s report.",
-    lostItemLabel: "Item",
-    lostTravelLabel: "Travel",
-    lostTravelInstruction: "Select the Travel only if you located the item in that vehicle journey.",
-    lostTravelNumber: "Travel %{no}",
-    lostRecordedLocated: "You recorded that the item was located.",
-    lostRecordedNotFound: "You recorded that the item was not found.",
-    lostRecording: "Recording…",
-    lostLocated: "Item Located",
-    lostNotFound: "Item Not Found",
   },
 } as const;

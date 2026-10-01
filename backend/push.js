@@ -101,7 +101,7 @@ async function notify({ uid, kind, title, body, data }) {
     if (ticket?.status === 'error') {
       // DeviceNotRegistered means the app was deleted or the token rotated. Dropped, so we
       // stop sending into the void — and so a reinstall re-registers cleanly.
-      if (ticket?.details?.error === 'DeviceNotRegistered') await dropToken(uid);
+      if (ticket?.details?.error === 'DeviceNotRegistered') await dropToken(uid, token);
       return { ok: false, reason: ticket.message || 'push rejected' };
     }
     return { ok: true, id: ticket?.id || null };
@@ -110,14 +110,28 @@ async function notify({ uid, kind, title, body, data }) {
   }
 }
 
-async function dropToken(uid) {
+async function dropToken(uid, expectedToken = null) {
   const db = adminDb();
   if (!db) return;
   try {
-    await db.collection('users').doc(String(uid)).set({ pushToken: null }, { merge: true });
+    const userRef = db.collection('users').doc(String(uid));
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(userRef);
+      if (!snap.exists) return;
+      const token = String(snap.data()?.pushToken || '');
+      // A DeviceNotRegistered response may arrive after this account has already registered a
+      // newer token. Never let an old provider response erase the replacement.
+      if (expectedToken && token !== String(expectedToken)) return;
+      tx.set(userRef, { pushToken: null, pushUpdatedAt: Date.now() }, { merge: true });
+      if (token) {
+        const ownerRef = db.collection('push_token_owners').doc(crypto.createHash('sha256').update(token).digest('hex'));
+        const owner = await tx.get(ownerRef);
+        if (owner.exists && String(owner.data()?.uid || '') === String(uid)) tx.delete(ownerRef);
+      }
+    });
   } catch {
-    /* see the header */
+    /* notification delivery must not crash because cleanup failed */
   }
 }
 
-module.exports = { notify, KINDS };
+module.exports = { notify, KINDS, dropToken };

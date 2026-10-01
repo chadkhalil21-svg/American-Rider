@@ -53,4 +53,12 @@ assert.ok(server.includes("tx.update(ref, { status:'cancelled'"), 'successful ca
 assert.ok(ops.includes("where('status', '==', 'payment_integrity_hold')"), 'Operations explicitly queries payment integrity quarantine');
 assert.ok(ops.includes('Payment integrity exceptions'), 'Operations visibly surfaces quarantined scheduled payments');
 assert.ok(!ops.includes('/ops/scheduled/retry') && !ops.includes('/ops/scheduled/release'), 'no generic Operations retry or release bypass exists');
+const scheduledClient = fs.readFileSync(path.join(__dirname,'..','src','backend','scheduled.ts'),'utf8');
+const rideContext = fs.readFileSync(path.join(__dirname,'..','src','state','RideContext.tsx'),'utf8');
+const home = fs.readFileSync(path.join(__dirname,'..','app','index.tsx'),'utf8');
+assert.ok(!scheduledClient.includes('deleteDoc('), 'client never deletes scheduled reservation directly');
+assert.ok(scheduledClient.includes('/travel/schedule/${encodeURIComponent(id)}/cancel'), 'client cancellation uses authoritative server endpoint');
+assert.ok(rideContext.includes("if (result !== 'cancelled') return result"), 'local scheduled state survives any unconfirmed cancellation');
+assert.ok(home.includes("result === 'dispatch_in_progress'"), 'home reports when dispatch wins cancellation race');
+assert.ok(home.includes("status === 'payment_integrity_hold'"), 'traveler sees payment integrity quarantine');
 console.log('✓ one money architecture: charge platform, transfer on completed Travel');

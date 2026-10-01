@@ -10,7 +10,7 @@ import { colors } from '../src/theme';
 export default function AccountName() {
   const goBack = useGoBack();
   const { t } = useLanguage();
-  const { user, setDisplayName, busy } = useAuth();
+  const { user, setDisplayName, busy, error } = useAuth();
   const current = user?.displayName?.trim() ?? '';
   const [name, setName] = useState(current);
   const clean = name.trim().slice(0, 40);
@@ -42,6 +42,7 @@ export default function AccountName() {
         </View>
       </Card>
 
+      {error ? <Text style={styles.error}>{error}</Text> : null}
       <View style={{ flex: 1, minHeight: 30 }} />
       <PrimaryButton
         label={busy ? t('traveler.busySaving') : t('traveler.save')}
@@ -58,4 +59,5 @@ const styles = StyleSheet.create({
   fieldWrap: { paddingTop: 14, paddingBottom: 4 },
   fieldLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 1.1, color: colors.muted, textTransform: 'uppercase' },
   field: { paddingVertical: 12, fontSize: 16, color: colors.ink },
+  error: { fontSize: 13, color: colors.ink2, marginTop: 14, lineHeight: 19 },
 });

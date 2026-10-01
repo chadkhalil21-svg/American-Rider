@@ -20,6 +20,7 @@ assert.match(push,/Notifications\.IosAuthorizationStatus\.EPHEMERAL/);
 assert.doesNotMatch(push,/ios\?\.status\s*===\s*3/);
 assert.match(push,/getExpoPushTokenAsync\(\{ projectId \}\)/);
 assert.match(push,/auth\.currentUser\?\.uid !== uid/, 'push registration must reject an account switch while native token acquisition is pending');
+assert.match(push,/if \(auth\.currentUser\?\.uid !== uid\) return false;/, 'push preference write must reject a stale account identity');
 assert.match(push,/pushToken: token/);
 assert.match(push,/Notifications\.addPushTokenListener/, 'runtime token rotation must be observed');
 assert.match(push,/void registerForPush\(\)/, 'a rotated native token must refresh the Expo token stored for this account');

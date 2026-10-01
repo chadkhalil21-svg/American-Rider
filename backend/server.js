@@ -491,7 +491,7 @@ app.post('/account/close', requireAuth, async (req, res) => {
     }
     // Permanent account deletion depends on this endpoint. Retire device ownership here,
     // under server authority, so a client/network failure after this response cannot orphan it.
-    await dropToken(String(req.uid));
+    await dropToken(String(req.uid), null, true);
     return res.json(out);
   } catch (e) {
     console.error('[account] close failed:', e.message);

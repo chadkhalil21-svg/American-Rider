@@ -4,7 +4,7 @@
 // The ten cases the founders asked for (22 Sept 2026), plus the deterministic checks behind them.
 const fs = require('fs');
 const path = require('path');
-const { assessOperator, assessAndRecord, resolveDocument, dollarFigures, REQUIRED_DOCS } = require('./qualification');
+const { assessOperator, assessAndRecord, resolveDocument, dollarFigures, REQUIRED_DOCS, localDateKey, expiredOn } = require('./qualification');
 const { acceptOffer } = require('./eligibility');
 const { DISCLOSURE_VERSION } = require('./disclosure');
 
@@ -409,6 +409,12 @@ const codes = (a) => a.blockers.map((b) => b.code);
     check('10b. named users win over the shared password everywhere', ops.opsAccounts().map((a) => a.name).join() === 'alice' && ops.opsAuthMode() === 'named');
     for (const k of ['OPS_USERS', 'OPS_PASSWORD', 'OPS_ALLOW_SHARED_PASSWORD', 'RENDER']) delete process.env[k];
   }
+
+  // ——— civil-day expiry / device-clock independence ————————————————————————————————
+  check('Florida civil day remains Sep 30 before local midnight', localDateKey(Date.parse('2026-10-01T03:59:59Z'), 'America/New_York') === '2026-09-30');
+  check('Florida civil day advances at local midnight', localDateKey(Date.parse('2026-10-01T04:00:00Z'), 'America/New_York') === '2026-10-01');
+  check('Sep 30 policy remains valid through Sep 30 in Florida', expiredOn('2026-09-30', Date.parse('2026-10-01T03:59:59Z'), 'America/New_York') === false);
+  check('Sep 30 policy expires when Florida reaches Oct 1', expiredOn('2026-09-30', Date.parse('2026-10-01T04:00:00Z'), 'America/New_York') === true);
 
   // ——— the pieces ————————————————————————————————————————————————————————————————
   check('dollar figures: $1,000,000 CSL', dollarFigures('$1,000,000 CSL').includes(1000000));

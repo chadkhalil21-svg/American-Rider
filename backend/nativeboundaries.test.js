@@ -73,4 +73,8 @@ assert.ok(server.includes("collection('push_token_owners')"), 'server maintains 
 assert.ok(server.includes("previousUid !== uid"), 'registering a token to a new account evicts its previous account binding');
 assert.ok(pushClient.includes('/push/register') && pushClient.includes('/push/clear'), 'native client uses server token ownership endpoints');
 assert.ok(!rules.includes("'pushToken', 'pushPlatform', 'pushUpdatedAt', 'pushPrefs'"), 'clients cannot directly bypass server token ownership');
+assert.ok(pushServer.includes('dropToken(uid, expectedToken = null)'), 'push retirement is ownership-aware and reusable');
+assert.ok(pushServer.includes('if (expectedToken && token !== String(expectedToken)) return'), 'stale DeviceNotRegistered response cannot erase a newer token');
+assert.ok(pushServer.includes("tx.delete(ownerRef)"), 'provider invalidation retires the token-owner index');
+assert.ok(authContext.includes('await clearPushToken();') && authContext.indexOf('await clearPushToken();') < authContext.indexOf('await deleteDoc'), 'account deletion retires push ownership before deleting the user profile');
 console.log('PASS native permission, push and background-presence configuration invariants');

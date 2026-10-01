@@ -1113,6 +1113,7 @@ export default {
     lostOperatorInboxDelivered: "Remis à %{names} dans la boîte de réception de l’Opérateur.",
     notifSaveFailed: "La préférence de notification n’a pas été enregistrée. Réessayez.",
     cancelFailed: "Le Voyage n’a pas été annulé. Réessayez.",
+    lostReturnHuman: "Patron Support coordonne le retour après que l’Opérateur a localisé l’objet. Aucun Voyage de retour, débit ou affectation n’est affiché avant d’exister réellement.",
   },
 
   legal: {

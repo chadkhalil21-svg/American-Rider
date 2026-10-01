@@ -101,11 +101,25 @@ const MARKET_EVIDENCE_PLANS=Object.freeze({
     liveCollectorRequiredForContinuousMonitoring:true,
     bootstrapReference:null,
   }),
+  // Region-level plan remains an admission contract only; runtime quotes never read its snapshot.
   'fl-southeast':Object.freeze({
-    sources:Object.freeze(['independent-controlled-audit','american-rider-field-panel','gridwise-analytics']),
-    minimumIndependentFamilies:2,
-    liveCollectorRequiredForContinuousMonitoring:true,
-    bootstrapReference:'existing evidence-gated production record',
+    admissionOnly:true,sources:Object.freeze(['independent-controlled-audit','american-rider-field-panel','gridwise-analytics']),
+    minimumIndependentFamilies:2,liveCollectorRequiredForContinuousMonitoring:true,bootstrapReference:'existing evidence-gated production record',
+  }),
+  // Pricing references are owned by the service market, not the broader operating region.
+  // South Florida shares legal/routing infrastructure but Miami-Dade, Broward and Palm Beach
+  // must never inherit one another's observed market price.
+  'fl-miami-dade':Object.freeze({
+    regionId:'fl-southeast',sources:Object.freeze(['independent-controlled-audit','american-rider-field-panel','gridwise-analytics']),
+    minimumIndependentFamilies:2,liveCollectorRequiredForContinuousMonitoring:true,bootstrapReference:'existing evidence-gated production record',
+  }),
+  'fl-broward':Object.freeze({
+    regionId:'fl-southeast',sources:Object.freeze(['independent-controlled-audit','american-rider-field-panel','gridwise-analytics']),
+    minimumIndependentFamilies:2,liveCollectorRequiredForContinuousMonitoring:true,bootstrapReference:'existing evidence-gated production record',
+  }),
+  'fl-palm-beach':Object.freeze({
+    regionId:'fl-southeast',sources:Object.freeze(['independent-controlled-audit','american-rider-field-panel','gridwise-analytics']),
+    minimumIndependentFamilies:2,liveCollectorRequiredForContinuousMonitoring:true,bootstrapReference:'existing evidence-gated production record',
   }),
 });
 

@@ -52,7 +52,8 @@ async function recomputeMarket(db,marketId,{now=Date.now(),lookbackDays=90}={}){
 async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false}={}){
   const db=adminDb();
   if(!db)return{ok:false,reason:'no database'};
-  const markets=Object.keys(require('./market-evidence').MARKET_EVIDENCE_PLANS);
+  const plans=require('./market-evidence').MARKET_EVIDENCE_PLANS;
+  const markets=Object.keys(plans).filter(id=>plans[id]?.admissionOnly!==true);
   const report={ok:true,markets:{}};
   for(const marketId of markets){
     const plan=planForRegion(marketId);

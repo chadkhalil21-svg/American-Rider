@@ -1108,6 +1108,8 @@ export default {
     notifSaveFailed: "Die Benachrichtigungseinstellung wurde nicht gespeichert. Versuchen Sie es erneut.",
     cancelFailed: "Die Reise wurde nicht storniert. Versuchen Sie es erneut.",
     lostReturnHuman: "Patron Support koordiniert die Rückgabe, nachdem der Operator den Gegenstand gefunden hat. Eine Rückfahrt, Belastung oder Zuweisung wird erst angezeigt, wenn sie tatsächlich besteht.",
+    familyRevokeUnable: "Die Familienautorisierung konnte nicht widerrufen werden. Versuchen Sie es erneut.",
+    inviteShareFailed: "Die Einladung konnte nicht zum Teilen geöffnet werden. Versuchen Sie es erneut.",
   },
 
   legal: {

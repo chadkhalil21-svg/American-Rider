@@ -1,0 +1,162 @@
+{
+  "asOf": "2026-10-01",
+  "market": "South Florida product-specific calibration audit",
+  "targetFraction": 0.95,
+  "productionRouterValidated": false,
+  "economicsValidated": true,
+  "doctrine": "Product-specific current observations only. Fit and holdout are separated. Independent aggregates are validation context, not silently treated as route quotes.",
+  "observations": [
+    {
+      "route": "Coral Gables → Miami",
+      "miles": 5,
+      "minutes": 18,
+      "observedTravelerTotalUsd": 14,
+      "product": "UberX",
+      "source": "https://www.uber.com/global/en/r/routes/coral-gables-fl-to-miami-fl/",
+      "role": "fit"
+    },
+    {
+      "route": "Homestead → Miami",
+      "miles": 18,
+      "minutes": 36,
+      "observedTravelerTotalUsd": 26,
+      "product": "UberX",
+      "source": "https://www.uber.com/global/en/r/routes/homestead-fl-to-miami-fl/",
+      "role": "fit"
+    },
+    {
+      "route": "Miami → Aventura",
+      "miles": 13,
+      "minutes": 30,
+      "observedTravelerTotalUsd": 40,
+      "product": "UberX",
+      "source": "https://www.uber.com/global/en/r/routes/miami-fl-to-aventura-fl/",
+      "role": "holdout"
+    },
+    {
+      "route": "Doral → Miami",
+      "miles": 8,
+      "minutes": 21,
+      "observedTravelerTotalUsd": 17,
+      "product": "UberX",
+      "source": "https://www.uber.com/global/en/r/routes/doral-fl-to-miami-fl/",
+      "role": "fit"
+    },
+    {
+      "route": "Miami → Miami Beach",
+      "miles": 8,
+      "minutes": 22,
+      "observedTravelerTotalUsd": 20,
+      "product": "UberX",
+      "source": "https://www.uber.com/global/en/r/routes/miami-fl-to-miami-beach-fl/",
+      "role": "fit"
+    },
+    {
+      "route": "North Miami → Aventura",
+      "miles": 5,
+      "minutes": 19,
+      "observedTravelerTotalUsd": 19,
+      "product": "UberX",
+      "source": "https://www.uber.com/global/en/r/routes/north-miami-fl-to-aventura-fl/",
+      "role": "fit"
+    },
+    {
+      "route": "Hialeah → Doral",
+      "miles": 6,
+      "minutes": 17,
+      "observedTravelerTotalUsd": 15,
+      "product": "UberX",
+      "source": "https://www.uber.com/global/en/r/routes/hialeah-fl-to-doral-fl/",
+      "role": "fit"
+    },
+    {
+      "route": "Coral Gables → Doral",
+      "miles": 10,
+      "minutes": 26,
+      "observedTravelerTotalUsd": 23,
+      "product": "UberX",
+      "source": "https://www.uber.com/global/en/r/routes/coral-gables-fl-to-doral-fl/",
+      "role": "fit"
+    },
+    {
+      "route": "Hollywood → Aventura",
+      "miles": 7,
+      "minutes": 20,
+      "observedTravelerTotalUsd": 17,
+      "product": "UberX",
+      "source": "https://www.uber.com/global/en/r/routes/hollywood-fl-to-aventura-fl/",
+      "role": "fit"
+    },
+    {
+      "route": "Miami → Cutler Bay",
+      "miles": 5,
+      "minutes": 14,
+      "observedTravelerTotalUsd": 15,
+      "product": "UberX",
+      "source": "https://www.uber.com/global/en/r/routes/miami-fl-to-cutler-bay-fl/",
+      "role": "fit"
+    },
+    {
+      "route": "Fort Lauderdale → Miami",
+      "miles": 27,
+      "minutes": 49,
+      "observedTravelerTotalUsd": 50,
+      "product": "UberX",
+      "source": "https://www.uber.com/global/en/r/routes/fort-lauderdale-fl-to-miami-fl/",
+      "role": "holdout"
+    },
+    {
+      "route": "Boca Raton → Fort Lauderdale",
+      "miles": 22,
+      "minutes": 35,
+      "observedTravelerTotalUsd": 42,
+      "product": "UberX",
+      "source": "https://www.uber.com/global/en/r/routes/boca-raton-fl-to-fort-lauderdale-fl/",
+      "role": "fit"
+    },
+    {
+      "route": "Fort Lauderdale → Hollywood",
+      "miles": 5,
+      "minutes": 16,
+      "observedTravelerTotalUsd": 14,
+      "product": "UberX",
+      "source": "https://www.uber.com/global/en/r/routes/fort-lauderdale-fl-to-hollywood-fl/",
+      "role": "holdout"
+    },
+    {
+      "route": "Fort Lauderdale → West Palm Beach",
+      "miles": 50,
+      "minutes": 57,
+      "observedTravelerTotalUsd": 67,
+      "product": "UberX",
+      "source": "https://www.uber.com/global/en/r/routes/fort-lauderdale-fl-to-west-palm-beach-fl/",
+      "role": "fit"
+    }
+  ],
+  "independentValidation": [
+    {
+      "source": "https://taxifare.org/us/miami",
+      "note": "Aggregated standard-class rideshare: $27.73 at ~8 mi/~21 min; 352 routes; Feb 2026."
+    },
+    {
+      "source": "https://taxifare.org/us/cutler-bay",
+      "note": "Aggregated Cutler Bay standard rideshare off-peak ~$31–$34 at ~8.5 mi/~22 min; 224 routes; Feb 2026."
+    },
+    {
+      "source": "https://getridewise.com/compare",
+      "note": "Miami standardized comparison: Uber $13.00 vs Lyft $12.40 for 5 mi/15 min; Uber $21.20 vs Lyft $20.15 for 10 mi/25 min; rate cards last verified Jun 2026."
+    },
+    {
+      "source": "https://www.lyft.com/rider/cities/miami-fl",
+      "note": "Lyft confirms Standard service in Miami and dynamic upfront pricing; public page does not expose route-specific historical Standard observations."
+    },
+    {
+      "source": "https://help.lyft.com/hc/en-us/all/articles/115013080308",
+      "note": "Lyft says estimates depend on route, ride type, availability and demand."
+    },
+    {
+      "source": "https://www.miamidade.gov/global/economy/consumer-protection/taxicabs-passenger-information.page",
+      "note": "Official Miami-Dade taxi tariff retained as an independent regulated transport reference, not rideshare fit data."
+    }
+  ]
+}

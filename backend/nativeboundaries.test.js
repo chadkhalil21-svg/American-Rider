@@ -5,6 +5,7 @@ const app = JSON.parse(fs.readFileSync('app.json','utf8')).expo;
 const push = fs.readFileSync('src/backend/push.ts','utf8');
 const presence = fs.readFileSync('src/backend/presence.ts','utf8');
 const authContext = fs.readFileSync('src/state/AuthContext.tsx','utf8');
+const layout = fs.readFileSync('app/_layout.tsx','utf8');
 
 assert.equal(app.ios.usesAppleSignIn, true);
 assert.ok(app.plugins.includes('expo-apple-authentication'));
@@ -29,5 +30,10 @@ assert.match(authContext,/import \{ clearPushToken \} from '\.\.\/backend\/push'
 const signOutBody = authContext.slice(authContext.indexOf('signOut: () =>'), authContext.indexOf('onboarding,', authContext.indexOf('signOut: () =>')));
 assert.ok(signOutBody.indexOf('await clearPushToken()') >= 0, 'sign-out must detach this device from the departing account');
 assert.ok(signOutBody.indexOf('await clearPushToken()') < signOutBody.indexOf('await fbSignOut(auth)'), 'push token must be detached while the departing Firebase identity is still available');
+
+assert.match(push,/getLastNotificationResponseAsync\(\)/, 'cold-start notification response must be recoverable');
+assert.match(push,/clearLastNotificationResponseAsync\(\)/, 'consumed cold-start response must be cleared');
+assert.match(layout,/getInitialNotificationData\(\)/, 'root navigation must inspect the notification that launched a terminated app');
+assert.match(layout,/Platform\.OS === 'web' \|\| !user \|\| onboarding/, 'notification routing must wait for authenticated account restoration');
 
 console.log('PASS native permission, push and background-presence configuration invariants');

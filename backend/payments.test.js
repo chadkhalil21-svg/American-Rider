@@ -29,10 +29,10 @@ check('unknown card country is international-safe', !isDomesticCard(null));
 // Exact examples from the canonical cost model.
 const expected = [
   // fare, US, international/unknown
-  [500, 200, 200],
-  [1000, 200, 210],
-  [2000, 216, 250],
-  [3000, 240, 291],
+  [500, 250, 250],
+  [1000, 250, 250],
+  [2000, 250, 250],
+  [3000, 250, 291],
   [4000, 265, 332],
   [5000, 290, 373],
   [6100, 318, 418],
@@ -50,7 +50,7 @@ for (const [fare, us, intl] of expected) {
 // Load only the pricing section of src/data.ts, transpile it with the project's own TypeScript,
 // and execute it. This proves the app fallback formula and server formula agree to the cent.
 const appSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'data.ts'), 'utf8');
-const start = appSource.indexOf('export const APP_FEE = 2.0;');
+const start = appSource.indexOf('export const APP_FEE = 2.5;');
 const stop = appSource.indexOf('// The coordination commission:', start);
 if (start < 0 || stop < 0) throw new Error('could not isolate pricing section in src/data.ts');
 const synthetic = appSource.slice(start, stop);

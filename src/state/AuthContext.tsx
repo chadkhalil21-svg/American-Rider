@@ -94,6 +94,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     return onAuthStateChanged(auth, async (u) => {
       setUser(u);
+      // A disappeared Firebase identity is the recovery boundary for sign-out/account deletion.
+      // Clear account-scoped device state even if the initiating flow crashed after remote teardown.
+      if (!u) await clearAccountStorage().catch(() => {});
       // Firebase survives process death. The post-signup gate must survive it too, otherwise
       // killing the app between account creation and role selection restores an authenticated
       // account underneath a freshly-false in-memory onboarding flag.

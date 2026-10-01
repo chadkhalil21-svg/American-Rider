@@ -11,7 +11,7 @@ import { updateProfile,
   verifyBeforeUpdateEmail,
   User,
 } from 'firebase/auth';
-import { deleteDoc, doc } from 'firebase/firestore';
+import { doc } from 'firebase/firestore';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth, db } from '../firebase';
@@ -280,18 +280,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Retire the device-token ownership while authentication still exists. Otherwise
         // deleting users/{uid} can orphan the server's token-owner index.
         await clearPushToken();
-        // 3. Their profile document (name, mobile, email). Transport, payment, safety and
-        // qualification records are not deleted from the phone; their retention needs a
-        // separate policy and privileged server handling.
-        // Fail closed. If the profile document cannot be removed, keep the login so the
-        // traveler can retry; deleting authentication while leaving profile PII behind would
-        // make the remaining record harder for its owner to control.
-        await deleteDoc(doc(db, 'users', u.uid));
-        // 4. Everything this app kept on the phone — role, operator qualification,
-        //    revenue, preferences, trusted contacts, the welcome flag.
-        await clearAllStorage();
-        // 5. The login itself. After this the app returns to the front door.
+        // 3. The server has already retired profile PII and future operational work.
+        // Delete the Firebase identity while the freshly reauthenticated credential is still
+        // available. If this fails, the login survives and the user can retry against the
+        // durable, idempotent server closure record instead of being left half-deleted locally.
         await deleteUser(u);
+        // 4. Only device-local state remains. Clear it after remote identity deletion succeeds;
+        // an interrupted delete therefore never destroys the local recovery path first.
+        await clearAllStorage();
       }),
     // THE DEVICE IS CLEARED BEFORE THE SESSION ENDS. Firebase sign-out alone left every
     // `ar:` value on the phone for the next person who signed in — see accountStorage.ts.

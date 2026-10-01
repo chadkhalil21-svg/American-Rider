@@ -15,6 +15,10 @@ function keyForQuote({serviceClass='standard',routedMiles,routedMinutes,region,n
   const t=localConditions(region,now);
   return [serviceClass,distanceBand(routedMiles),durationBand(routedMinutes),t.daypart,t.weekdayWeekend,calendarClass,regulatedLocationClass].join('|');
 }
+function referenceScopeForPickup(pickup){
+  const market=marketFor(pickup);
+  return market?.status==='active'?market.id:null;
+}
 function qualification(snapshot,plan){
   if(!snapshot)return {ok:false,reason:'reference missing'};
   const families=new Set(snapshot.evidenceFamilies||[]);
@@ -25,8 +29,9 @@ function qualification(snapshot,plan){
 }
 async function referenceForQuote({pickup,dest,serviceClass,routedMiles,routedMinutes,now=new Date()}){
   const region=regionForTrip(pickup,dest);if(!region)return {ok:false,reason:'region unavailable'};
-  const market=marketFor(pickup);if(!market||market.status!=='active')return {ok:false,reason:'service market unavailable',regionId:region.id};
-  const plan=planForRegion(market.id);if(!plan)return {ok:false,reason:'evidence plan unavailable',regionId:region.id,marketId:market.id};
+  const marketId=referenceScopeForPickup(pickup);if(!marketId)return {ok:false,reason:'service market unavailable',regionId:region.id};
+  const market=marketFor(pickup);
+  const plan=planForRegion(marketId);if(!plan)return {ok:false,reason:'evidence plan unavailable',regionId:region.id,marketId:market.id};
   const snapshot=await currentReference(market.id),q=qualification(snapshot,plan);
   if(!q.ok)return {...q,regionId:region.id,marketId:market.id};
   const key=keyForQuote({serviceClass,routedMiles,routedMinutes,region,now});
@@ -34,4 +39,4 @@ async function referenceForQuote({pickup,dest,serviceClass,routedMiles,routedMin
   if(!cell||!Number.isInteger(cell.targetTotalCents))return {ok:false,reason:'condition-matched reference unavailable',regionId:region.id,marketId:market.id,key};
   return {ok:true,regionId:region.id,marketId:market.id,key,referenceTotalCents:cell.referenceTotalCents,targetTotalCents:cell.targetTotalCents,referenceAsOf:snapshot.latestObservedAt,sources:cell.sources||[]};
 }
-module.exports={localConditions,keyForQuote,qualification,referenceForQuote};
+module.exports={localConditions,keyForQuote,referenceScopeForPickup,qualification,referenceForQuote};

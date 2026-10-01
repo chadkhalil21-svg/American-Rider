@@ -141,9 +141,9 @@ export default function OperatorTrip() {
       <View style={{ flex: 1 }} />
       <PrimaryButton
         label={t('operator.completeOperation')}
-        onPress={() => {
-          op.completeOp();
-          router.replace('/operator/complete');
+        onPress={async () => {
+          // Completion drives settlement and revenue. Never show the completion receipt first.
+          if (await op.completeOp()) router.replace('/operator/complete');
         }}
         style={{ marginTop: 24 }}
       />

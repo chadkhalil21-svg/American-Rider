@@ -6,6 +6,7 @@ const push = fs.readFileSync('src/backend/push.ts','utf8');
 const presence = fs.readFileSync('src/backend/presence.ts','utf8');
 const authContext = fs.readFileSync('src/state/AuthContext.tsx','utf8');
 const layout = fs.readFileSync('app/_layout.tsx','utf8');
+const authScreen = fs.readFileSync('src/screens/AuthScreen.tsx','utf8');
 
 assert.equal(app.ios.usesAppleSignIn, true);
 assert.ok(app.plugins.includes('expo-apple-authentication'));
@@ -33,6 +34,10 @@ assert.match(presence,/showsBackgroundLocationIndicator: true/);
 
 assert.match(authContext,/import \{ clearPushToken \} from '\.\.\/backend\/push';/);
 assert.match(authContext,/import \{ stopBackgroundPresence \} from '\.\.\/backend\/presence';/);
+assert.match(authContext,/const ONBOARDING_KEY = 'ar:auth-onboarding'/, 'interrupted signup must have durable account-bound state');
+assert.match(authContext,/AsyncStorage\.setItem\(ONBOARDING_KEY, cred\.user\.uid\)/, 'signup gate must be persisted after Firebase assigns the UID');
+assert.match(authContext,/await AsyncStorage\.getItem\(ONBOARDING_KEY\)/, 'Firebase restoration must restore interrupted onboarding state');
+assert.match(authScreen,/if \(user && onboarding\) setStep\('select'\)/, 'interrupted signup must resume at role selection rather than restart authentication');
 const signOutBody = authContext.slice(authContext.indexOf('signOut: () =>'), authContext.indexOf('onboarding,', authContext.indexOf('signOut: () =>')));
 assert.ok(signOutBody.indexOf('await stopBackgroundPresence()') >= 0, 'sign-out must stop the OS background location task');
 assert.ok(signOutBody.indexOf('await clearPushToken()') >= 0, 'sign-out must detach this device from the departing account');

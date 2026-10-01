@@ -41,10 +41,12 @@ async function recomputeMarket(db,marketId,{now=Date.now(),lookbackDays=90}={}){
   for(const [key,rows] of groups){
     const referenceTotalCents=median(rows.map(x=>Number(x.travelerTotalCents)).filter(Number.isInteger));
     if(referenceTotalCents===null)continue;
-    cells[key]={referenceTotalCents,targetTotalCents:targetTotalCents(referenceTotalCents),observations:rows.length,sources:[...new Set(rows.map(x=>x.sourceId))],asOf:new Date(now).toISOString()};
+    cells[key]={referenceTotalCents,targetTotalCents:targetTotalCents(referenceTotalCents),observations:rows.length,sources:[...new Set(rows.map(x=>x.sourceId))],evidenceFamilies:[...new Set(rows.map(x=>x.sourceType))],latestObservedAt:rows.map(x=>x.observedAt).filter(Boolean).sort().at(-1)||null,asOf:new Date(now).toISOString()};
   }
   const latestObservedAt=[...groups.values()].flat().map(x=>x.observedAt).sort().at(-1)||null;
-  const out={marketId,asOf:new Date(now).toISOString(),latestObservedAt,lookbackDays,observations:snap.size,sourceCount:sources.size,evidenceFamilies:[...families],cells};
+  // Recompute produces a CANDIDATE. It is deliberately not production authority until an
+  // explicit promotion record proves holdout, economics and router gates for this exact snapshot.
+  const out={marketId,asOf:new Date(now).toISOString(),latestObservedAt,lookbackDays,observations:snap.size,sourceCount:sources.size,evidenceFamilies:[...families],promotion:{status:'candidate'},cells};
   await db.collection(SNAP).doc(marketId).set(out);
   return out;
 }

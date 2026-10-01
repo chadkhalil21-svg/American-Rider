@@ -21,6 +21,7 @@ assert.equal(/transfer_data\s*:/.test(payments), false, 'payments.js must not cr
 assert.equal(/application_fee_amount\s*:/.test(payments), false, 'payments.js must not create application-fee charges');
 assert.ok(payments.includes("idempotencyKey: `ar_transfer_"), 'completed-Travel transfer must be idempotent');
 assert.ok(server.includes("keyMode !== 'test'"), 'terminal charge route must refuse live Stripe mode');
+assert.equal((server.match(/endsWith\('-distance'\) && priced\.tollStatus === 'unknown'/g)||[]).length, 2, 'quote and test charge must fail closed when routed toll verification is unknown');
 
 assert.ok(queue.includes("where('status', 'in', ['pending', 'processing'])"), 'expired processing events must be sweep candidates');
 assert.ok(queue.includes("x.status === 'processing' && Number(x.leaseUntil || 0) > now"), 'live provider lease must prevent concurrent processing');

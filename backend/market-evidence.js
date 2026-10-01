@@ -34,8 +34,8 @@ const NATIONAL_SOURCE_CATALOG=Object.freeze({
     authority:'NYC Taxi & Limousine Commission',
     coverage:'New York City, NY',
     public:true,
-    primaryEligible:true,
-    caveat:'Published monthly, typically about two months delayed; use as structural/reference evidence, not a real-time quote feed.',
+    primaryEligible:false,
+    caveat:'Free structural trip evidence. Passenger-fare eligibility stays off unless the current public HVFHV schema is verified to expose usable passenger charges.',
   }),
   'chicago-tnp-open-data':Object.freeze({
     type:SOURCE_TYPES.GOVERNMENT_TRIPS,
@@ -49,8 +49,8 @@ const NATIONAL_SOURCE_CATALOG=Object.freeze({
     authority:'California Public Utilities Commission',
     coverage:'California where public fields are sufficient',
     public:true,
-    primaryEligible:true,
-    caveat:'Public availability and redaction vary by reporting period; verify fields before fare use.',
+    primaryEligible:false,
+    caveat:'Free public TNC reporting; passenger-fare eligibility stays off until the relevant public-period schema is verified.',
   }),
   'ridewise-public-rate-cards':Object.freeze({
     type:SOURCE_TYPES.PLATFORM_PUBLICATION,
@@ -58,7 +58,7 @@ const NATIONAL_SOURCE_CATALOG=Object.freeze({
     coverage:'312 U.S. cities across all 50 states as published and periodically reverified',
     public:true,
     primaryEligible:false,
-    caveat:'Free independent publication and cross-check only. Preserve publication date/methodology; never treat one published rate card as a condition-matched live fare.',
+    caveat:'Structural calibration only: published Uber/Lyft rate-card components, not a contemporaneous upfront-price observation. Preserve publication date/methodology; never promote it alone.',
   }),
   'taxifare-public-observed':Object.freeze({
     type:SOURCE_TYPES.PLATFORM_PUBLICATION,
@@ -66,7 +66,7 @@ const NATIONAL_SOURCE_CATALOG=Object.freeze({
     coverage:'market-specific where published',
     public:true,
     primaryEligible:false,
-    caveat:'Free independent aggregate validation only. Respect its stated confidence/freshness and never promote it alone.',
+    caveat:'Observed-rideshare aggregate validation, not taxi pricing where the page identifies rideshare-only data. Respect sample size, confidence and freshness; never promote it alone.',
   }),
   'controlled-public-price-panel':Object.freeze({
     type:SOURCE_TYPES.FIELD_PANEL,

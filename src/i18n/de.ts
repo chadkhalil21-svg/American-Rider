@@ -7,7 +7,6 @@ export default {
     continueWithApple: 'Mit Apple fortfahren',
     continueWithGoogle: 'Mit Google fortfahren',
     orDivider: 'oder',
-    emailOrMobileField: 'E-Mail-Adresse',
     continueLabel: 'Fortfahren',
     ssoNotConfigured: 'Diese Anmeldung ist in dieser Version noch nicht konfiguriert.',
     appleUnavailable: 'Apple konnte die Anmeldung nicht abschließen. Versuchen Sie es erneut oder verwenden Sie Ihre E-Mail-Adresse.',

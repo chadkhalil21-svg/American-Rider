@@ -292,6 +292,7 @@ export default function PatronSupport() {
             // not have to wonder whether a machine is about to answer them.
             <Text style={styles.humanNote}>{t('traveler.alwaysReachesPerson')}</Text>
           )}
+          {ride.issueState === 'failed' ? <Text style={styles.humanNote}>{t('traveler.errReachARRetry')}</Text> : null}
           <PrimaryButton
             label={t('traveler.send')}
             onPress={() => ride.submitDescription(draft)}

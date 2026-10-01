@@ -6,10 +6,11 @@ const { pricingProblems } = require('./market-pricing');
 const insurance = require('./insurance-jurisdictions');
 const US = require('./jurisdictions/us.json');
 const tollAuthorities = require('./toll-authorities');
+const marketEvidence = require('./market-evidence');
 
 function regionAdmissionProblems(region) {
   if (!region) return ['region missing'];
-  const p = [...pricingProblems(region)];
+  const p = [...pricingProblems(region), ...marketEvidence.planProblems(region.id)];
   const j = region.jurisdiction;
   if (!j?.stateCode || !j?.tncStatute || !j?.disclosureStatute) p.push(`${region.id}: jurisdiction incomplete`);
   if (!Number.isInteger(j?.screeningYears) || j.screeningYears <= 0) p.push(`${region.id}: screening cadence missing`);

@@ -91,7 +91,7 @@ async function notify({ uid, kind, title, body, data }) {
         sound: 'default',
         channelId: rule.channel,
         priority: 'high',
-        data: { kind, ...(data || {}) },
+        data: { kind, ...(data || {}), recipientUid: String(uid) },
       }),
     });
     const out = await res.json().catch(() => ({}));

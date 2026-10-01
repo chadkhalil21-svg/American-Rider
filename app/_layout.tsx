@@ -51,10 +51,14 @@ function AppGate() {
   useEffect(() => {
     if (Platform.OS === 'web') return;
     return onNotificationTap((data) => {
+      // Push data is external input. Bind it to the active account and restrict navigation.
+      const recipientUid = typeof data?.recipientUid === 'string' ? data.recipientUid : null;
+      if (!user || !recipientUid || recipientUid !== user.uid) return;
       const screen = typeof data?.screen === 'string' ? data.screen : null;
-      if (screen) router.navigate(screen as never);
+      const allowed = new Set(['/ride', '/receipt', '/operator', '/operator/insurance', '/family']);
+      if (screen && allowed.has(screen)) router.navigate(screen as never);
     });
-  }, [router]);
+  }, [router, user]);
 
   return (
     <View style={{ flex: 1 }}>

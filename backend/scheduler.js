@@ -318,31 +318,33 @@ async function sweepScheduled({ now = Date.now() } = {}) {
 
       taken.add(effectiveOperator.id);
 
-      // External side effects are emitted only on first creation. A crash replay that finds
-      // the deterministic Travel must repair reservation bookkeeping, not send a second
-      // assignment or rotate/reissue a Teen pickup code.
-      if (!recoveringExistingRide) {
-        await notify({
-          uid: effectiveOperator.id,
-          kind: 'travel_assigned',
-          title: 'Scheduled travel assigned',
-          body: `${r.dep || 'Pickup'} to ${r.dest || 'destination'}. Open to accept.`,
-          data: { screen: '/operator', rideId: rideRef.id, tripNo: r.tripNo || '' },
-        });
-        await notify({
-          uid: r.travelerUid,
-          kind: 'operator_assigned',
-          title: 'Your operator is on the way',
-          body:
-            `${effectiveOperator.name || 'An operator'} is ${effectiveEtaMin} minutes from ` +
-            `${r.dep || 'your pickup'}.`,
-          data: { screen: '/ride', rideId: rideRef.id, tripNo: r.tripNo || '' },
-        });
+      // Each externally visible effect records its own completion on the deterministic Travel.
+      // Replay resumes only the missing effects. This avoids both duplicate delivery and the
+      // opposite failure: permanently skipping everything after a mid-sequence crash.
+      let effectState = existingRide.exists ? (existingRide.data()?.dispatchEffects || {}) : {};
+      const emitOnce = async (key, message) => {
+        if (effectState[key]) return;
+        const out = await notify(message);
+        // "No token"/preference rejection is a completed attempt for this dispatch event; retrying
+        // forever cannot make an old assignment current. Transport exceptions are returned too.
+        await rideRef.set({ dispatchEffects: { ...effectState, [key]: { at: Date.now(), ok: !!out?.ok, reason: out?.reason || null } } }, { merge: true });
+        effectState = { ...effectState, [key]: { at: Date.now(), ok: !!out?.ok, reason: out?.reason || null } };
+      };
+      await emitOnce('operatorAssigned', {
+        uid: effectiveOperator.id, kind: 'travel_assigned', title: 'Scheduled travel assigned',
+        body: `${r.dep || 'Pickup'} to ${r.dest || 'destination'}. Open to accept.`,
+        data: { screen: '/operator', rideId: rideRef.id, tripNo: r.tripNo || '' },
+      });
+      await emitOnce('travelerAssigned', {
+        uid: r.travelerUid, kind: 'operator_assigned', title: 'Your operator is on the way',
+        body: `${effectiveOperator.name || 'An operator'} is ${effectiveEtaMin} minutes from ${r.dep || 'your pickup'}.`,
+        data: { screen: '/ride', rideId: rideRef.id, tripNo: r.tripNo || '' },
+      });
 
-        const teenPickup = await provisionTeenPin({ rideRef, rideId: rideRef.id, party: r.party || null, now });
-        if (teenPickup.required && r.party?.teenUid) await notify({ uid:r.party.teenUid, kind:'teen_pickup_code', title:'Your pickup code', body:`Give ${teenPickup.pin} to your Operator after confirming the vehicle and Operator.`, data:{screen:'/ride',rideId:rideRef.id,tripNo:r.tripNo||''} });
-        if (teenPickup.required && r.party?.guardianUid && r.party.guardianUid !== r.party.teenUid) await notify({ uid:r.party.guardianUid, kind:'guardian_travel', title:'Teen Travel assigned', body:`${r.party.travelerName || 'Teen Traveler'}'s scheduled Travel has been assigned.`, data:{screen:'/ride',rideId:rideRef.id,tripNo:r.tripNo||''} });
-      }
+      const teenPickup = await provisionTeenPin({ rideRef, rideId: rideRef.id, party: r.party || null, now });
+      if (teenPickup.required && !teenPickup.ok) throw new Error(teenPickup.error || 'Teen pickup code unavailable');
+      if (teenPickup.required && r.party?.teenUid) await emitOnce('teenPickupCode', { uid:r.party.teenUid, kind:'teen_pickup_code', title:'Your pickup code', body:`Give ${teenPickup.pin} to your Operator after confirming the vehicle and Operator.`, data:{screen:'/ride',rideId:rideRef.id,tripNo:r.tripNo||''} });
+      if (teenPickup.required && r.party?.guardianUid && r.party.guardianUid !== r.party.teenUid) await emitOnce('guardianAssigned', { uid:r.party.guardianUid, kind:'guardian_travel', title:'Teen Travel assigned', body:`${r.party.travelerName || 'Teen Traveler'}'s scheduled Travel has been assigned.`, data:{screen:'/ride',rideId:rideRef.id,tripNo:r.tripNo||''} });
 
       await touch(db, id, {
         status: 'dispatched',

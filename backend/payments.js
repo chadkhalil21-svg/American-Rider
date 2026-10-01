@@ -1199,6 +1199,7 @@ async function inspectStripeCustomerOwnership(uid) {
       created: Number(c.created) || null,
       paymentMethods: (methods.data || []).map(m => ({ id:String(m.id), brand:m.card?.brand || null, last4:m.card?.last4 || null, expMonth:m.card?.exp_month || null, expYear:m.card?.exp_year || null })),
       paymentIntents: (intents.data || []).map(pi => ({ id:String(pi.id), status:pi.status, amount:Number(pi.amount)||0, created:Number(pi.created)||null, reservationId:pi.metadata?.reservationId || null, tripNo:pi.metadata?.tripNo || null })),
+      paymentIntentsHasMore: !!intents.has_more,
     });
   }
   return customers;

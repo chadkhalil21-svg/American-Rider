@@ -74,7 +74,7 @@ const NATIONAL_SOURCE_CATALOG=Object.freeze({
     coverage:'commissioned market-specific route/time panel',
     public:true,
     primaryEligible:true,
-    caveat:'No nonpublic competitor data, no competitor coordination, no automated access contrary to source terms. Sample multiple providers/routes/times; strip promotions, tips and pass-throughs; timestamp every observation; reject outliers; never let one provider or quote control production.',
+    caveat:'Human-controlled audit evidence by default. No automated access to competitor platforms unless written permission or an expressly authorized interface permits the intended competitive use. No nonpublic competitor data or coordination. Sample multiple providers/routes/times; strip promotions, tips and pass-throughs; timestamp every observation; reject outliers; never let one provider or quote control production.',
   }),
   'independent-controlled-audit':Object.freeze({
     type:SOURCE_TYPES.INDEPENDENT_AUDIT,

@@ -1109,6 +1109,7 @@ export default {
     lostReturnHuman: "Patron Support coordina la restituzione dopo che l’Operatore ha localizzato l’oggetto. Nessun Viaggio di restituzione, addebito o assegnazione viene mostrato finché non esiste realmente.",
     familyRevokeUnable: "Non è stato possibile revocare l’autorizzazione Family. Riprovi.",
     inviteShareFailed: "Non è stato possibile aprire l’invito per la condivisione. Riprovi.",
+    lostCaseNumber: "Caso di assistenza %{caseNo}",
   },
 
   legal: {

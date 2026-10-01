@@ -1111,6 +1111,7 @@ export default {
 
     msgNotSent: "Message non envoyé. Vérifiez votre connexion et réessayez.",
     lostOperatorInboxDelivered: "Remis à %{names} dans la boîte de réception de l’Opérateur.",
+    notifSaveFailed: "La préférence de notification n’a pas été enregistrée. Réessayez.",
   },
 
   legal: {

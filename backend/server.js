@@ -91,7 +91,7 @@ const { fetchRoute } = require('./routes');
 const { planTrip } = require('./assistant');
 const { resolveIssue, supportMessage, replySender, MAX_OUT_OF_POCKET_CENTS } = require('./support');
 const { resolveOperatorIssue } = require('./operatorsupport');
-const { fileTicket, updateTicketLocation, listTickets } = require('./tickets');
+const { fileTicket, updateTicketLocation, listTickets, resolveTicket } = require('./tickets');
 const { lostItemTicket, stampLostItemCase, notifyLostItemOperators, operatorLostItem, respondLostItem } = require('./lostitem');
 const { adminDb, adminStatus, accountDisabled } = require('./firebase-admin');
 const { closeOperationalAccount } = require('./accountclosure');
@@ -685,6 +685,17 @@ app.get('/support/cases', requireAuth, async (req, res) => {
   } catch (e) {
     return res.status(502).json({ error: 'Your cases could not be read', detail: String(e && e.message || e) });
   }
+});
+
+// Operations closes a human case only after the work is actually complete. The Traveler
+// sees this stored status through /support/cases; there is no client-side “resolved” switch.
+app.post('/ops/support/cases/:caseNo/resolve', requireOps, async (req, res) => {
+  const out = await resolveTicket({
+    caseNo: req.params.caseNo,
+    resolution: req.body?.resolution,
+    actor: req.opsUser || req.user?.email || 'operations',
+  });
+  return res.status(out.ok ? 200 : out.reason === 'not found' ? 404 : 400).json(out);
 });
 
 // Family / Teen Travel: guardian-created relationship, accepted by the teen account.

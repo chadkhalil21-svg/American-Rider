@@ -81,4 +81,10 @@ const dispatchRoute=server.slice(server.indexOf("app.post('/travel/dispatch'"),s
 assert.ok(dispatchRoute.includes('tx.create(ref, ride)') && dispatchRoute.includes("collection('account_operation_fences')") && dispatchRoute.includes("collection('account_closures')"), 'immediate Travel creation serializes with account closure');
 const onlineRoute=server.slice(server.indexOf("app.post('/operator/online'"),server.indexOf("app.post('/operator/offline'"));
 assert.ok(onlineRoute.includes('const onlineResult = await db.runTransaction') && onlineRoute.includes('tx.set(operatorRef') && onlineRoute.includes("collection('account_operation_fences')"), 'Operator availability commit serializes with account closure');
+const authContext = fs.readFileSync(path.join(__dirname,'..','src','state','AuthContext.tsx'),'utf8');
+const closeRoute=server.slice(server.indexOf("app.post('/account/close'"),server.indexOf('// --- Legal pages'));
+assert.ok(closeRoute.includes("collection('users').doc(String(req.uid)).delete()"), 'profile PII retirement is server-authoritative before Firebase identity deletion');
+assert.ok(!authContext.includes("deleteDoc(doc(db, 'users'"), 'client no longer owns irreversible profile deletion');
+assert.ok(authContext.indexOf('await deleteUser(u)') < authContext.indexOf('await clearAllStorage()'), 'remote identity deletion succeeds before irreversible local account wipe');
+assert.ok(authContext.includes("if (!u) await clearAccountStorage().catch(() => {})"), 'auth disappearance is a crash-recovery backstop for account-scoped device cleanup');
 console.log('✓ one money architecture: charge platform, transfer on completed Travel');

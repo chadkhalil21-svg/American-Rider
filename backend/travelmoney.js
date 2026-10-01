@@ -153,7 +153,12 @@ async function cancelTravel({ db, uid, rideId, deps, stripeConfigured = true, no
   const ARRIVAL_FEE_CENTS = 300;
   const arrivalFee = stage === 'arrived' ? ARRIVAL_FEE_CENTS : 0;
 
-  await rideRef.set({ status: 'cancelled', statusAt: now }, { merge: true });
+  const cancelPatch = { status: 'cancelled', statusAt: now };
+  if (ride.teenPickup) {
+    const { hash: _hash, sealedPin: _sealedPin, ...audit } = ride.teenPickup;
+    cancelPatch.teenPickup = { ...audit, credentialRetiredAt: ride.teenPickup.credentialRetiredAt || now };
+  }
+  await rideRef.set(cancelPatch, { merge: true });
 
   // THE PAYMENT IS THE TRAVEL'S OWN. Never the request's: see the header.
   const paymentIntentId = String(ride.paymentIntentId || '');

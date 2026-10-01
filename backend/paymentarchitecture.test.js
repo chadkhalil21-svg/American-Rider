@@ -21,9 +21,14 @@ assert.ok(p.includes('if (!alreadyExists) throw e'), 'registry permission/networ
 const server = fs.readFileSync(path.join(__dirname,'server.js'),'utf8');
 assert.ok(server.includes("require('./runtime-mode')"), 'HTTP readiness uses shared runtime-mode authority');
 assert.ok(p.includes('inspectStripeCustomerOwnership'), 'payment layer exposes read-only duplicate-Customer inventory');
+assert.ok(p.includes('assertNoFinancialIdentityHold'), 'Customer-dependent money activity has a server-owned reconciliation hold gate');
+assert.ok((p.match(/await assertNoFinancialIdentityHold\(uid\)/g)||[]).length >= 2, 'hold is rechecked at immediate and scheduled PaymentIntent creation boundaries');
 assert.ok(p.includes('paymentIntentsHasMore'), 'reconciliation inventory discloses when Stripe history is paginated rather than pretending completeness');
 const ops = fs.readFileSync(path.join(__dirname,'ops.js'),'utf8');
 assert.ok(ops.includes("app.get('/ops/stripe-customers'"), 'named Operations has an authenticated reconciliation evidence endpoint');
 assert.ok(ops.includes("action: 'stripe_customer_reconciliation_inspected'"), 'financial identity inspection is audit logged');
 assert.ok(ops.includes('mutationPerformed: false'), 'reconciliation endpoint is explicitly non-mutating');
+assert.ok(ops.includes("app.post('/ops/stripe-customers/hold'"), 'named Operations can place a financial identity hold before reconciliation');
+assert.ok(ops.includes("action:'financial_identity_hold_placed'"), 'financial identity hold placement is audit logged');
+assert.ok(!ops.includes("app.post('/ops/stripe-customers/release'"), 'no unsafe manual release exists before a complete reconciliation protocol');
 console.log('✓ one money architecture: charge platform, transfer on completed Travel');

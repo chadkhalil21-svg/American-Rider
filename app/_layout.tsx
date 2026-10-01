@@ -55,6 +55,10 @@ function AppGate() {
     if (Platform.OS === 'web' || !user || onboarding) return;
     let live = true;
     const open = (data: Record<string, unknown>) => {
+      const recipientUid = typeof data?.recipientUid === 'string' ? data.recipientUid : null;
+      // Fail closed for unbound/legacy notifications. An OS notification can outlive the
+      // account session that received it, especially on a shared handset.
+      if (!recipientUid || recipientUid !== auth.currentUser?.uid) return;
       const screen = typeof data?.screen === 'string' ? data.screen : null;
       // Notification payloads cross an external delivery boundary. Even though American Rider
       // creates them server-side, do not turn an arbitrary payload string into a router target.

@@ -432,6 +432,49 @@ app.get('/config', (req, res) => {
 // deliberately does not delete retained transport or payment records: their retention needs a
 // policy. It does cancel scheduled Travel and remove an Operator from service, so account
 // deletion cannot cause a later dispatch or charge under a login that no longer exists.
+// Push-token ownership is server-authoritative. The same physical Expo token may not remain
+// attached to two accounts when an old session failed to clean itself up offline.
+app.post('/push/register', requireAuth, async (req, res) => {
+  const token = String(req.body?.token || '').trim();
+  if (!token || token.length > 512) return res.status(400).json({ error: 'A valid push token is required' });
+  const uid = String(req.uid);
+  const db = adminDb();
+  const ownerRef = db.collection('push_token_owners').doc(require('node:crypto').createHash('sha256').update(token).digest('hex'));
+  await db.runTransaction(async (tx) => {
+    const ownerSnap = await tx.get(ownerRef);
+    const previousUid = ownerSnap.exists ? String(ownerSnap.data()?.uid || '') : '';
+    if (previousUid && previousUid !== uid) {
+      const previousRef = db.collection('users').doc(previousUid);
+      const previousSnap = await tx.get(previousRef);
+      if (previousSnap.exists && String(previousSnap.data()?.pushToken || '') === token) {
+        tx.set(previousRef, { pushToken: null, pushUpdatedAt: Date.now() }, { merge: true });
+      }
+    }
+    tx.set(db.collection('users').doc(uid), {
+      pushToken: token, pushPlatform: String(req.body?.platform || ''), pushUpdatedAt: Date.now(),
+      ...(req.body?.prefs && typeof req.body.prefs === 'object' ? { pushPrefs: req.body.prefs } : {}),
+    }, { merge: true });
+    tx.set(ownerRef, { uid, updatedAt: Date.now() }, { merge: true });
+  });
+  res.json({ ok: true });
+});
+
+app.post('/push/clear', requireAuth, async (req, res) => {
+  const uid = String(req.uid), db = adminDb(), userRef = db.collection('users').doc(uid);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(userRef);
+    if (!snap.exists) return;
+    const token = String(snap.data()?.pushToken || '');
+    tx.set(userRef, { pushToken: null, pushUpdatedAt: Date.now() }, { merge: true });
+    if (token) {
+      const ownerRef = db.collection('push_token_owners').doc(require('node:crypto').createHash('sha256').update(token).digest('hex'));
+      const owner = await tx.get(ownerRef);
+      if (owner.exists && String(owner.data()?.uid || '') === uid) tx.delete(ownerRef);
+    }
+  });
+  res.json({ ok: true });
+});
+
 app.post('/account/close', requireAuth, async (req, res) => {
   try {
     const out = await closeOperationalAccount({ db: adminDb(), uid: req.uid });

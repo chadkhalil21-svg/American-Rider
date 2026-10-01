@@ -44,7 +44,7 @@ assert.ok(read('src/components/operator.tsx').includes("'Communications'"));
 assert.ok(server.includes("app.post('/smart-quote', LIMITS.routeIp, requireOperationalReadiness"), 'Smart Travel quote must fail closed when production providers are incomplete');
 assert.ok(server.includes("app.post('/smart-revalidate', LIMITS.routeIp, requireOperationalReadiness"), 'Smart Travel continuation verification must fail closed when production providers are incomplete');
 assert.ok(server.indexOf("app.use(express.json())") < server.indexOf("app.post('/smart-revalidate'"), 'Smart Travel revalidation must be mounted after JSON body parsing');
-assert.ok(server.includes('const productionMode = productionModeFromRuntime()'), 'server consumes shared production posture');
+assert.ok(server.includes('productionMode: runtimeProductionMode') && server.includes('const productionMode = runtimeProductionMode()'), 'server consumes shared production posture');
 assert.ok(runtimeMode.includes("stripeKeyMode() === 'live'"), 'a live Stripe key must force production posture even if DEPLOYMENT_MODE is omitted');
 assert.ok(server.includes("if (keyMode !== 'test' || productionMode)"), 'local Stripe test helper must be disabled in production posture');
 

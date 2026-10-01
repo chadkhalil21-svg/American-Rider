@@ -899,9 +899,22 @@ app.get('/connect/done', (req, res) =>
 //
 // This is docs/OPEN-DECISIONS.md §4 answered for the payout case: operator identity is the
 // account, not the handset.
+async function accountAcceptsNewWork(db, uid) {
+  const id = String(uid || '');
+  if (!db || !id) return false;
+  const [fence, closed] = await Promise.all([
+    db.collection('account_operation_fences').doc(id).get(),
+    db.collection('account_closures').doc(id).get(),
+  ]);
+  if (fence.exists && fence.data()?.closing === true) return false;
+  if (closed.exists && closed.data()?.operationallyClosed === true) return false;
+  return true;
+}
+
 app.post('/operator/online', requireAuth, requireOperationalReadiness, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
+  if (!(await accountAcceptsNewWork(db, req.uid))) return res.status(409).json({ code:'account_closing', error:'This account cannot begin new operations.' });
 
   // A REFUSAL TAKES THE OPERATOR OUT OF DISPATCH NOW. This route is also the 90-second renewal,
   // and a refused renewal used to leave the fleet record `available` until presence went stale
@@ -2891,6 +2904,7 @@ function travelNumberFor(documentId, pickup) {
 app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, requireOperationalReadiness, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
+  if (!(await accountAcceptsNewWork(db, req.uid))) return res.status(409).json({ code:'account_closing', error:'This account cannot create new Travel.' });
 
   const b = req.body || {};
   const pickup = { lat: Number(b.pickup?.lat), lng: Number(b.pickup?.lng) };
@@ -3313,7 +3327,7 @@ app.post('/travel/progress', requireAuth, requireOperationalReadiness, async (re
 app.post('/travel/return-operator', requireAuth, LIMITS.dispatch, requireOperationalReadiness, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
-
+  if (!(await accountAcceptsNewWork(db, req.uid))) return res.status(409).json({ code:'account_closing', error:'This account cannot create new scheduled Travel.' });
   const b = req.body || {};
   const itemId = String(b.lostItemId || '');
   const destination = { lat: Number(b.destination?.lat), lng: Number(b.destination?.lng) };

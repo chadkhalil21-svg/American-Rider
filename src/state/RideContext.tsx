@@ -1,4 +1,5 @@
 import type { SmartPlan } from '../backend/smart';
+import { DEFAULT_DEPARTURE } from '../location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { FeeLine } from '../data';
 import React, {
@@ -472,7 +473,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     };
   }, [tripCoords]);
 
-  const [departure, setDeparture] = useState<DepPlace>(DEP_PLACES[0]);
+  const [departure, setDeparture] = useState<DepPlace>(DEFAULT_DEPARTURE);
   const [pickupWait, setPickupWait] = useState(3);
   const [demand, setDemand] = useState<Demand>('normal');
   const [status, setStatus] = useState(0);
@@ -664,7 +665,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       // departure coordinates, a traveler in Wynwood was collected from Brickell and priced
       // from Brickell. The stale-pin reset above is still right; the pickup is not stale
       // when the device just told us where it is.
-      setDeparture((prev) => (prev?.resolved ? prev : DEP_PLACES[0]));
+      setDeparture((prev) => (prev?.resolved ? prev : DEFAULT_DEPARTURE));
       setTripCoords(null);
       setTravelClass('standard');
       setQuotedFareCents(null);

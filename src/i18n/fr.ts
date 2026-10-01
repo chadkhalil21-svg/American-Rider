@@ -146,6 +146,7 @@ export default {
     insuranceDisclosure: 'Déclaration légale d’assurance',
     partRead: 'Lu',
     openAllParts: 'Ouvrez les %{n} parties pour continuer',
+
   },
 
   traveler: {
@@ -1093,6 +1094,9 @@ export default {
     familySendMessage: 'Envoyer le Message',
     familyMessageFailed: 'Le message n’a pas été envoyé.',
 
+    msgNotSent: "Message non envoyé. Vérifiez votre connexion et réessayez.",
+  },
+
   },
 
   legal: {
@@ -1115,6 +1119,5 @@ export default {
     lostRecording: "Enregistrement…",
     lostLocated: "Objet retrouvé",
     lostNotFound: "Objet non retrouvé",
-    msgNotSent: "Message non envoyé. Vérifiez votre connexion et réessayez.",
   },
 } as const;

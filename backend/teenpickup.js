@@ -3,25 +3,31 @@ const crypto=require('node:crypto');
 const {adminDb,adminStatus}=require('./firebase-admin');
 const digest=(rideId,pin)=>crypto.createHash('sha256').update(String(rideId)+':'+String(pin)).digest('hex');
 const makePin=()=>String(crypto.randomInt(0,10000)).padStart(4,'0');
-const sealKey=()=>{
- const raw=String(process.env.TEEN_PIN_SEAL_KEY||'');
+const sealKey=(version='current')=>{
+ const name=version==='previous'?'TEEN_PIN_SEAL_KEY_PREVIOUS':'TEEN_PIN_SEAL_KEY';
+ const raw=String(process.env[name]||'');
  if(!raw)return null;
  return crypto.createHash('sha256').update(raw).digest();
 };
 const seal=(rideId,pin)=>{
- const key=sealKey(); if(!key)return null;
+ const key=sealKey('current'); if(!key)return null;
  const iv=crypto.randomBytes(12), cipher=crypto.createCipheriv('aes-256-gcm',key,iv);
  cipher.setAAD(Buffer.from(String(rideId)));
  const ciphertext=Buffer.concat([cipher.update(String(pin),'utf8'),cipher.final()]);
- return {v:1,iv:iv.toString('base64'),tag:cipher.getAuthTag().toString('base64'),ciphertext:ciphertext.toString('base64')};
+ return {v:1,keyVersion:'current',iv:iv.toString('base64'),tag:cipher.getAuthTag().toString('base64'),ciphertext:ciphertext.toString('base64')};
 };
 const unseal=(rideId,box)=>{
- try{
-  const key=sealKey(); if(!key||box?.v!==1)return null;
+ if(box?.v!==1)return null;
+ // During key rotation, try the key named by the record first and then the other configured
+ // generation. Legacy v1 records without keyVersion are also recoverable during the window.
+ const versions=box.keyVersion==='previous'?['previous','current']:['current','previous'];
+ for(const version of versions)try{
+  const key=sealKey(version); if(!key)continue;
   const decipher=crypto.createDecipheriv('aes-256-gcm',key,Buffer.from(box.iv,'base64'));
   decipher.setAAD(Buffer.from(String(rideId))); decipher.setAuthTag(Buffer.from(box.tag,'base64'));
   return Buffer.concat([decipher.update(Buffer.from(box.ciphertext,'base64')),decipher.final()]).toString('utf8');
- }catch{return null;}
+ }catch{}
+ return null;
 };
 async function provisionTeenPin({rideRef,rideId,party,now=Date.now()}){
  if(party?.teen!==true)return {ok:true,required:false};

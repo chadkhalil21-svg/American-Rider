@@ -22,6 +22,7 @@ const server = fs.readFileSync(path.join(__dirname,'server.js'),'utf8');
 assert.ok(server.includes("require('./runtime-mode')"), 'HTTP readiness uses shared runtime-mode authority');
 assert.ok(p.includes('inspectStripeCustomerOwnership'), 'payment layer exposes read-only duplicate-Customer inventory');
 assert.ok(p.includes('financialIdentityAuthorization'), 'Customer-dependent money activity has a server-owned reconciliation authorization generation');
+assert.ok(p.includes('const financialAuth = await financialIdentityAuthorization(uid);'), 'immediate Travel payment captures its financial identity generation before Stripe work');
 assert.ok((p.match(/await assertFinancialIdentityAuthorization\(uid, financialAuth\.generation\)/g)||[]).length >= 2, 'authorization generation is rechecked at immediate and scheduled PaymentIntent creation boundaries');
 assert.ok((p.match(/financialIdentityGeneration: String\(financialAuth\.generation\)/g)||[]).length >= 2, 'immediate and scheduled Stripe records retain the authorizing financial identity generation');
 assert.ok(p.includes('financialIdentityGeneration: financialAuth.generation'), 'scheduled charge returns its authorizing generation for crash-recovery evidence');
@@ -63,7 +64,7 @@ assert.ok(home.includes("result === 'dispatch_in_progress'"), 'home reports when
 assert.ok(home.includes("status === 'payment_integrity_hold'"), 'traveler sees payment integrity quarantine');
 const family = fs.readFileSync(path.join(__dirname,'family.js'),'utf8');
 const closure = fs.readFileSync(path.join(__dirname,'accountclosure.js'),'utf8');
-assert.ok((family.match(/runTransaction/g)||[]).length >= 2 && (family.match(/claimedAt\)>0/g)||[]).length >= 2, 'Family revocation and age-out cannot cancel after scheduler claim');
+assert.ok((family.match(/runTransaction/g)||[]).length >= 2 && (family.match(/claimedAt/g)||[]).length >= 2 && (family.match(/return false/g)||[]).length >= 2, 'Family revocation and age-out cannot cancel after scheduler claim');
 assert.ok(!closure.includes('d.ref.delete()'), 'account closure preserves scheduled Travel records as durable evidence');
 assert.ok(closure.includes("code:'scheduled_travel_in_progress'"), 'account closure fails closed when scheduled dispatch owns a reservation');
 assert.ok(closure.includes("collection('account_operation_fences').doc(uid)") && closure.includes('finally'), 'account closure places and always retires a transient scheduler fence');

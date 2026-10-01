@@ -1043,8 +1043,10 @@ async function chargeScheduledTravel({ travelCostCents, uid, email, tripNo, rese
   const stripe = getStripe();
   const q = quote(travelCostCents, undefined, governmentFees, cardCountry, tollCents);
   try {
-    // The idempotency key plus the reservation's frozen Customer/PaymentMethod identity is the\n    // crash-recovery primitive. Do not depend on Stripe Search's secondary index here.\n    const financialAuth = await financialIdentityAuthorization(uid);
-  const customer = customerId ? { id: String(customerId) } : await customerForTraveler({ uid, email });
+    // The idempotency key plus the reservation's frozen Customer/PaymentMethod identity is the
+    // crash-recovery primitive. Do not depend on Stripe Search's secondary index here.
+    const financialAuth = await financialIdentityAuthorization(uid);
+    const customer = customerId ? { id: String(customerId) } : await customerForTraveler({ uid, email });
     const pm = paymentMethodId ? { id: String(paymentMethodId) } : await savedPaymentMethodFor(customer);
     if (!pm) {
       return { ok: false, code: 'no_saved_card', error: 'No card on file for this traveler' };

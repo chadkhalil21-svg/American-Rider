@@ -6,6 +6,8 @@ const { outsideMarket, outsideMarketMessage } = require('./market');
 const { governmentFeesFor, permitRequired, permitRequiredMessage } = require('./fees');
 const { resolveTollsCostAware } = require('./tolls');
 const { routeCar } = require('./streets');
+const { referenceForQuote } = require('./market-reference-authority');
+const { fareForMarketTarget } = require('./market-reference-fare');
 
 function priceRoute(body, selectedRoute = null) {
   const withClass = (cents) => applyTravelClass(cents, body?.travelClass || body?.cls);
@@ -70,10 +72,14 @@ async function authoritativeFare({ body, uid = null, email = null, db = null, ca
   const tollPromise = body?.pickup && body?.dest
     ? resolveTollsCostAware(body.pickup, body.dest, { route: selectedRoute, routeAttempted: true })
     : Promise.resolve({ status: 'unknown', tollCents: null, reason: 'coordinates_required' });
-  const [cardCountry, journey, toll] = await Promise.all([
+  const referencePromise = body?.pickup && body?.dest && route.miles && route.minutes
+    ? referenceForQuote({ pickup: body.pickup, dest: body.dest, serviceClass: body?.travelClass || body?.cls || 'standard', routedMiles: route.miles, routedMinutes: route.minutes })
+    : Promise.resolve({ ok: false, reason: 'route conditions unavailable' });
+  const [cardCountry, journey, toll, marketReference] = await Promise.all([
     uid && cardCountryFor ? cardCountryFor({ uid, email }) : null,
     journeyFor({ db, uid, journeyNo: requestedJourneyNo }),
     tollPromise,
+    referencePromise,
   ]);
   // A caller that names a Smart Travel first leg does not get ordinary single-Travel pricing
   // merely because the reference is invalid. That would let an unpaid/foreign/chained leg
@@ -88,14 +94,19 @@ async function authoritativeFare({ body, uid = null, email = null, db = null, ca
   route.tollCents = toll.tollCents;
   route.tollProvider = toll.provider || null;
   route.tollReason = toll.reason || null;
-  const breakdown = quote(
-    route.travelCostCents,
-    journey,
-    route.governmentFees,
-    cardCountry,
-    toll.status === 'unknown' ? 0 : toll.tollCents,
-  );
-  return { ...route, ...breakdown, journey, cardCountry: cardCountry || null };
+  const tollForQuote=toll.status === 'unknown' ? 0 : toll.tollCents;
+  let marketPricing={applied:false,reason:marketReference.reason||'reference unavailable'};
+  if(!journey&&marketReference.ok){
+    const solved=fareForMarketTarget({
+      floorFareCents:route.travelCostCents,
+      targetControlledTotalCents:marketReference.targetTotalCents,
+      quoteForFare:(fare)=>quote(fare,null,route.governmentFees,cardCountry,tollForQuote),
+    });
+    route.travelCostCents=solved.fareCents;
+    marketPricing={applied:solved.reason==='market reference',reason:solved.reason,regionId:marketReference.regionId,referenceAsOf:marketReference.referenceAsOf,referenceTotalCents:marketReference.referenceTotalCents,targetControlledTotalCents:marketReference.targetTotalCents,referenceCell:marketReference.key,sources:marketReference.sources};
+  } else if(journey) marketPricing={applied:false,reason:'smart-journey combined economics'};
+  const breakdown = quote(route.travelCostCents,journey,route.governmentFees,cardCountry,tollForQuote);
+  return { ...route, ...breakdown, marketPricing, journey, cardCountry: cardCountry || null };
 }
 
 module.exports = { priceRoute, authoritativeFare, journeyFor };

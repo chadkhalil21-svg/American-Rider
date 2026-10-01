@@ -141,6 +141,7 @@ export default {
     insuranceDisclosure: 'Gesetzliche Versicherungsauskunft',
     partRead: 'Gelesen',
     openAllParts: 'Öffnen Sie alle %{n} Teile, um fortzufahren',
+
   },
   traveler: {
     beginTravel: 'Fahrt Beginnen',
@@ -1087,6 +1088,8 @@ export default {
     familySendMessage: 'Nachricht Senden',
     familyMessageFailed: 'Die Nachricht wurde nicht gesendet.',
 
+    msgNotSent: "Nachricht nicht gesendet. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
+  },
   },
   legal: {
     termsTitle: 'Nutzungsbedingungen',
@@ -1108,6 +1111,5 @@ export default {
     lostRecording: "Wird gespeichert…",
     lostLocated: "Gegenstand gefunden",
     lostNotFound: "Gegenstand nicht gefunden",
-    msgNotSent: "Nachricht nicht gesendet. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
   },
 } as const;

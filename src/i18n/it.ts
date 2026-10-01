@@ -1105,7 +1105,7 @@ export default {
     msgNotSent: "Messaggio non inviato. Controlli la connessione e riprovi.",
     lostOperatorInboxDelivered: "Consegnato a %{names} nella casella dell’Operatore.",
   },
-  },
+
   legal: {
     termsTitle: 'Termini di Servizio',
     privacyTitle: 'Informativa sulla Privacy',

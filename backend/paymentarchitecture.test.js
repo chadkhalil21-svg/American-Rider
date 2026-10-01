@@ -7,5 +7,9 @@ assert.equal(/application_fee_amount\s*:/.test(p), false, 'Travel payment code m
 assert.ok(p.includes('stripe.transfers.create'), 'Operator settlement must use explicit transfer');
 assert.ok(p.includes('source_transaction: chargeId'), 'settlement transfer must be tied to the Travel charge');
 assert.ok(p.includes('idempotencyKey: `ar_customer_${String(uid)}`'), 'Stripe Customer creation is idempotent per immutable Firebase uid');
-assert.ok(p.indexOf('stripe.customers.search') < p.indexOf('ar_customer_${String(uid)}'), 'Customer search is only a lookup before deterministic creation, not the uniqueness primitive');
+assert.ok(p.includes("collection('stripe_customers').doc(accountUid)"), 'Firebase uid has a durable server-owned Stripe Customer mapping');
+assert.ok(p.includes("stripe.customers.retrieve(String(owned.data().customerId))"), 'mapped Customer is retrieved directly rather than rediscovered by search');
+assert.ok(p.includes("Stripe Customer ownership mismatch"), 'Customer metadata mismatch fails closed');
+assert.ok(p.includes("Multiple Stripe Customers exist for this account"), 'ambiguous legacy Customer ownership fails closed rather than silently adopting one');
+assert.ok(p.includes('await ownerRef.create'), 'first-use mapping is create-only so concurrent requests cannot overwrite ownership');
 console.log('✓ one money architecture: charge platform, transfer on completed Travel');

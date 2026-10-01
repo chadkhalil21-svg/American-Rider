@@ -1478,7 +1478,7 @@ app.post('/fare-quote', attachAuth, LIMITS.quoteIp, requireOperationalReadiness,
   if (!priced) {
     return res.status(400).json({ error: 'Need either pickup+dest coordinates or a known destination' });
   }
-  if (priced.pricedBy === 'distance' && priced.tollStatus === 'unknown') {
+  if (String(priced.pricedBy || '').endsWith('-distance') && priced.tollStatus === 'unknown') {
     return res.status(503).json({ error: 'Toll cost could not be verified for this route.', code: 'toll_unavailable' });
   }
   // WHICH FEE SCHEDULE, DECIDED HERE AND NOWHERE ELSE. The fee depends on the issuing country
@@ -1656,7 +1656,7 @@ app.post('/charge-ride', requireAuth, LIMITS.payments, requireOperationalReadine
   if (!priced) {
     return res.status(400).json({ error: 'Need either pickup+dest coordinates or a known destination' });
   }
-  if (priced.pricedBy === 'distance' && priced.tollStatus === 'unknown') {
+  if (String(priced.pricedBy || '').endsWith('-distance') && priced.tollStatus === 'unknown') {
     return res.status(503).json({ error: 'Toll cost could not be verified for this route.', code: 'toll_unavailable' });
   }
   try {

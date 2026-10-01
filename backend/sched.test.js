@@ -21,6 +21,12 @@ function makeDb(seed) {
       data[col][id] = opts?.merge ? { ...(data[col][id] || {}), ...fields } : { ...fields };
     },
     async update(fields) { Object.assign(data[col][id], fields); },
+    async create(fields) {
+      if (addShouldThrow) throw new Error('permission denied (simulated)');
+      data[col] = data[col] || {};
+      if (data[col][id]) throw new Error('already exists (simulated)');
+      data[col][id] = { ...fields };
+    },
   });
   const db = {
     collection: (col) => ({

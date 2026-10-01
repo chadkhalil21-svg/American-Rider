@@ -366,6 +366,13 @@ ${alarms.length
 </section>
 
 <section>
+  <h2>Payment integrity exceptions</h2>
+  ${paymentIntegrity.length
+    ? `<div class="rows">${paymentIntegrity.map((r) => `<div><span class="k"><strong>${esc(r.tripNo || r.id)}</strong><br><span style="color:${T.faint};font-size:13px;">${esc(r.dep || '—')} → ${esc(r.dest || '—')} · ${esc(r.paymentErrorCode || 'checkpoint mismatch')}</span></span><span class="amount">HOLD</span></div>`).join('')}</div><p style="color:${T.muted};font-size:13px;">Read-only quarantine. There is no generic retry or release control; Stripe evidence must be reconciled before this state may change.</p>`
+    : '<p>No payment integrity exceptions.</p>'}
+</section>
+
+<section>
   <h2>Reservations</h2>
   ${scheduled.length
     ? `<div class="rows">${scheduled

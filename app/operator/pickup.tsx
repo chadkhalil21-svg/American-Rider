@@ -2,7 +2,7 @@
 // drawn navigation map, the traveler card with Contact, the Travel Notes card
 // ("You retain final discretion"), Confirm Arrival → Commence Travel.
 import { useRouter } from 'expo-router';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../../src/components/AppText';
 import { OperatorMap } from '../../src/components/operator';
@@ -29,18 +29,17 @@ export default function OperatorPickup() {
   if (!active) return <Screen scroll={false}>{null}</Screen>;
 
   const arrived = op.arrived;
+  const [progressBusy, setProgressBusy] = useState(false);
+  const [progressFailed, setProgressFailed] = useState(false);
 
   return (
     <Screen>
       <Pressable
-        onPress={() => {
-          op.cancelOp();
-          router.dismissTo('/operator');
-        }}
+        onPress={() => router.dismissTo('/operator')}
         hitSlop={10}
         style={styles.back}
       >
-        <Text style={styles.backText}>{t('traveler.cancelChev')}</Text>
+        <Text style={styles.backText}>{t('common.back')}</Text>
       </Pressable>
 
       <View style={styles.headRow}>
@@ -152,17 +151,36 @@ export default function OperatorPickup() {
 
       <View style={{ flex: 1 }} />
       {!arrived ? (
-        <PrimaryButton label={t('operator.confirmArrival')} onPress={op.confirmArrival} style={{ marginTop: 24 }} />
+        <>
+          <PrimaryButton
+            label={progressBusy ? t('traveler.familyWorking') : t('operator.confirmArrival')}
+            disabled={progressBusy}
+            onPress={async () => {
+              if (progressBusy) return;
+              setProgressBusy(true); setProgressFailed(false);
+              const ok = await op.confirmArrival();
+              setProgressBusy(false); if (!ok) setProgressFailed(true);
+            }}
+            style={{ marginTop: 24 }}
+          />
+          {progressFailed ? <Text style={styles.progressError}>{t('traveler.errReachARRetry')}</Text> : null}
+        </>
       ) : (
         <PrimaryButton
           label={t('operator.commenceTravel')}
           color={colors.green}
+          disabled={progressBusy}
           onPress={async () => {
+            if (progressBusy) return;
+            setProgressBusy(true); setProgressFailed(false);
             // Navigate only after the authoritative Travel accepted the onboard transition.
-            if (await op.beginTrip()) router.replace('/operator/trip');
+            const ok = await op.beginTrip();
+            setProgressBusy(false);
+            if (ok) router.replace('/operator/trip'); else setProgressFailed(true);
           }}
           style={{ marginTop: 24 }}
         />
+        {progressFailed ? <Text style={styles.progressError}>{t('traveler.errReachARRetry')}</Text> : null}
       )}
     </Screen>
   );
@@ -171,6 +189,7 @@ export default function OperatorPickup() {
 const styles = StyleSheet.create({
   back: { alignSelf: 'flex-start', paddingVertical: 6 },
   backText: { fontSize: 15, fontWeight: '500', color: colors.ink },
+  progressError: { fontSize: 12.5, color: colors.ink2, marginTop: 10, textAlign: 'center' },
   headRow: { flexDirection: 'row', alignItems: 'flex-start', marginTop: 6, gap: 12 },
   title: { fontSize: 20, fontWeight: '600', letterSpacing: -0.44, color: colors.ink },
   sub: { fontSize: 14, color: colors.muted, marginTop: 8, lineHeight: 21 },

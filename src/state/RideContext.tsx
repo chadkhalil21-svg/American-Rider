@@ -268,7 +268,7 @@ export type RideStore = {
   /** What the dispatcher has done with it: still waiting, operator sent, or why not. */
   schedState: ScheduledRide | null;
   scheduleRide: (info: SchedInfo) => void;
-  cancelScheduled: () => void;
+  cancelScheduled: () => Promise<boolean>;
 
   // audio
   share: boolean;
@@ -1502,19 +1502,19 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     [arrival, departure, travelClass, tripCoords, travelParty],
   );
 
-  const cancelScheduled = useCallback(() => {
+  const cancelScheduled = useCallback(async () => {
+    const id = schedIdRef.current;
+    if (!id) return false;
+    // Keep the reservation visible unless the server atomically accepted cancellation.
+    if (!(await deleteScheduledRide(id))) return false;
     setScheduled(false);
     setSchedInfo(null);
     setSchedSaved(null);
     setSchedState(null);
     setSchedId(null);
-    // Nothing may re-load a reservation the traveler has just cancelled — without this the
-    // loader below could race the delete and put the card straight back on the home screen.
     schedLoadRef.current = 'done';
-    if (schedIdRef.current) {
-      deleteScheduledRide(schedIdRef.current);
-      schedIdRef.current = null;
-    }
+    schedIdRef.current = null;
+    return true;
   }, []);
 
   // Read the reservation back once the traveler's own travel has loaded — which is what

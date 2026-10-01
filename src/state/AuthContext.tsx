@@ -13,6 +13,7 @@ import { updateProfile,
 } from 'firebase/auth';
 import { deleteDoc, doc } from 'firebase/firestore';
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth, db } from '../firebase';
 import { t } from '../i18n';
 import { clearAccountStorage, clearAllStorage } from './accountStorage';
@@ -54,6 +55,7 @@ type AuthState = {
 };
 
 const Ctx = createContext<AuthState | null>(null);
+const ONBOARDING_KEY = 'ar:auth-onboarding';
 
 export function useAuth(): AuthState {
   const c = useContext(Ctx);
@@ -90,8 +92,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [diagnosticCode, setDiagnosticCode] = useState<string | null>(null);
 
   useEffect(() => {
-    return onAuthStateChanged(auth, (u) => {
+    return onAuthStateChanged(auth, async (u) => {
       setUser(u);
+      // Firebase survives process death. The post-signup gate must survive it too, otherwise
+      // killing the app between account creation and role selection restores an authenticated
+      // account underneath a freshly-false in-memory onboarding flag.
+      try {
+        const pending = u ? (await AsyncStorage.getItem(ONBOARDING_KEY)) === u.uid : false;
+        setOnboarding(pending);
+      } catch {
+        // Fail closed only for the current process's explicit onboarding state; storage
+        // failure must not strand established accounts at the front door.
+      }
       setInitializing(false);
     });
   }, []);
@@ -278,7 +290,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await fbSignOut(auth);
       }),
     onboarding,
-    setOnboarding,
+    setOnboarding: (b) => {
+      setOnboarding(b);
+      const uid = auth.currentUser?.uid;
+      if (b && uid) void AsyncStorage.setItem(ONBOARDING_KEY, uid);
+      else void AsyncStorage.removeItem(ONBOARDING_KEY);
+    },
     diagnosticCode,
   };
 

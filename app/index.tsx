@@ -101,6 +101,7 @@ export default function Home() {
   const ride = useRide();
   const { user, signOut } = useAuth();
   const operator = useOperator();
+  const [scheduledCancelNotice, setScheduledCancelNotice] = useState('');
 
   // A commissioned account that closed the app in Operator view reopens in it —
   // the role flag persists ('ar:role'), per the demo's role-switching pattern.
@@ -515,11 +516,19 @@ export default function Home() {
               <Pressable onPress={() => router.navigate('/ride')} hitSlop={8}>
                 <Text style={styles.upcomingOpen}>{t('traveler.view')} ›</Text>
               </Pressable>
-            ) : (
-              <Pressable onPress={ride.cancelScheduled} hitSlop={8}>
+            ) : (ride.schedState?.status ?? 'reserved') === 'reserved' ? (
+              <Pressable onPress={async () => {
+                setScheduledCancelNotice('');
+                const result = await ride.cancelScheduled();
+                if (result === 'dispatch_in_progress') {
+                  setScheduledCancelNotice('Dispatch has begun. Open the Travel to review its current status.');
+                } else if (result !== 'cancelled') {
+                  setScheduledCancelNotice('This scheduled Travel could not be cancelled. Its current status has been preserved.');
+                }
+              }} hitSlop={8}>
                 <Text style={styles.upcomingCancel}>{t('traveler.cancel2')}</Text>
               </Pressable>
-            )}
+            ) : null}
           </View>
 
           {ride.schedState?.status === 'unmatched' && (
@@ -531,6 +540,10 @@ export default function Home() {
             <Text style={styles.upcomingFail}>
               {ride.schedState.paymentError || t('traveler.cardDeclined')} {t('traveler.noOperatorSent')}
             </Text>
+          )}
+          {!!scheduledCancelNotice && <Text style={styles.upcomingFail}>{scheduledCancelNotice}</Text>}
+          {ride.schedState?.status === 'payment_integrity_hold' && (
+            <Text style={styles.upcomingFail}>Payment verification requires review. No additional charge will be attempted automatically.</Text>
           )}
           {ride.schedState?.status === 'needs_attention' && (
             <Text style={styles.upcomingFail}>

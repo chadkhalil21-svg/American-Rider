@@ -9,7 +9,9 @@ assert.equal(qualification({asOf:'2026-10-01T11:30:00Z',promotion:{status:'candi
 assert.equal(qualification({...promoted,promotion:{...promoted.promotion,holdoutPassed:false}},plan).ok,false);
 assert.equal(qualification(promoted,plan).ok,true);
 assert.equal(qualification(promoted,plan,cell,now).ok,true);
-assert.equal(qualification(promoted,plan,{...cell,evidenceFamilies:['government-trips']},now).ok,false);\nassert.equal(qualification(promoted,plan,{...cell,sources:['only-one']},now).ok,false);\nassert.equal(qualification(promoted,plan,{...cell,maxProviderShare:0.71},now).ok,false);
+assert.equal(qualification(promoted,plan,{...cell,evidenceFamilies:['government-trips']},now).ok,false);
+assert.equal(qualification(promoted,plan,{...cell,sources:['only-one']},now).ok,false);
+assert.equal(qualification(promoted,plan,{...cell,maxProviderShare:0.71},now).ok,false);
 assert.equal(qualification(promoted,plan,{...cell,latestObservedAt:'2026-01-01T00:00:00Z'},now).ok,false);
 assert.equal(referenceScopeForPickup({lat:25.7959,lng:-80.287}),'fl-miami-dade');
 assert.equal(referenceScopeForPickup({lat:26.0742,lng:-80.1506}),'fl-broward');

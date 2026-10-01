@@ -739,7 +739,7 @@ export default function TravelConfirmation() {
           <View style={styles.footer}>
             <Card style={styles.totalCard}>
               <Text style={styles.totalLabel}>{t('traveler.totalTravelCost')}</Text>
-              {!quoteReady || pricing ? (
+              {pricing || (!quoteReady && !priceFailed && !unavailable) ? (
                 <Text style={styles.totalState}>{t('traveler.calculating')}</Text>
               ) : priceFailed || unavailable ? (
                 <Text style={styles.totalState}>{t('traveler.unavailable')}</Text>

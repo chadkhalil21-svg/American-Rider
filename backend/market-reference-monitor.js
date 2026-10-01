@@ -25,6 +25,8 @@ const GUARDRAILS = Object.freeze({
   prohibitPersonalizedPricing: true,
   prohibitProtectedClassSignals: true,
   prohibitUnboundedMultiplier: true,
+  declaredEmergencyDisablesUpwardDynamicAdjustment: true,
+  emergencyBaselineDays: 30,
 });
 
 function ageMinutes(asOf, now=Date.now()) {

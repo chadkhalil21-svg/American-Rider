@@ -159,6 +159,9 @@ export default {
   },
 
   traveler: {
+    scheduledDispatchBegun: "El despacho ha comenzado. Abra el Viaje para revisar su estado actual.",
+    scheduledCancelFailed: "Este Viaje programado no pudo cancelarse. Se ha conservado su estado actual.",
+    scheduledPaymentReview: "La verificación del pago requiere revisión. No se intentará ningún cargo adicional automáticamente.",
     beginTravel: 'Iniciar Viaje',
     departure: 'Salida',
     destinationEntry: 'Seleccione su destino',

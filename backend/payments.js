@@ -242,7 +242,13 @@ async function customerForTraveler({ uid, email }) {
   if (!accountUid) throw new Error('Firebase uid is required for Stripe Customer ownership');
   const db = adminDb();
   if (!db) throw new Error('Stripe Customer ownership registry is unavailable');
-  const ownerRef = db ? db.collection('stripe_customers').doc(accountUid) : null;
+  const ownerRef = db.collection('stripe_customers').doc(accountUid);
+  const holdSnap = await db.collection('financial_identity_holds').doc(accountUid).get();
+  if (holdSnap.exists && holdSnap.data()?.active === true) {
+    const err = new Error('Financial identity reconciliation is in progress');
+    err.code = 'financial_identity_hold';
+    throw err;
+  }
 
   if (ownerRef) {
     const owned = await ownerRef.get();

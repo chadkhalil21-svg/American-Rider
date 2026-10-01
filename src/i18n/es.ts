@@ -1124,6 +1124,8 @@ export default {
     notifSaveFailed: "La preferencia de notificaciones no se guardó. Inténtelo de nuevo.",
     cancelFailed: "El Viaje no se canceló. Inténtelo de nuevo.",
     lostReturnHuman: "Patron Support coordina la devolución después de que el Operador localiza el objeto. No se muestra ningún Viaje de devolución, cargo ni asignación hasta que exista realmente.",
+    familyRevokeUnable: "No se pudo revocar la autorización familiar. Inténtelo de nuevo.",
+    inviteShareFailed: "No se pudo abrir la invitación para compartirla. Inténtelo de nuevo.",
   },
 
   legal: {

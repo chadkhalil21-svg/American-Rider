@@ -38,3 +38,11 @@ The platform never promises hourly competitor prices when the underlying source 
 ## Market expansion rule
 
 Adding a state or metro is not a code fork. It is a commissioning package: geography + law + insurance + tolls + evidence plan + reference + pricing record + tests. Missing any package component fails closed.
+
+## National zero-license-cost expansion template
+
+The default U.S. commissioning path is public-first and requires no licensed market-data subscription. A new service market begins with the current independent public national rate-card layer (presently covering 312 U.S. cities across all 50 states), then adds any usable government passenger-fare microdata, independent observed-trip aggregates where available, and a controlled contemporaneous public-price panel. At least two independent evidence families must qualify before automatic production promotion.
+
+This template is infrastructure, not permission to copy another city's price. Every market remains separately commissioned. Public national rate cards bootstrap discovery and sanity checking; they cannot alone become production authority. Government fare microdata receives the strongest evidentiary treatment where its schema is actually usable. Controlled public observations provide the direct contemporaneous layer where government fare data is absent. Licensed sources such as Gridwise remain optional gap-fill rather than a prerequisite.
+
+State expansion therefore does not require a new fare engine. It requires a commissioning package: service-market geography, jurisdiction/insurance/toll rules, source adapters and provenance, representative route/time cells, evidence diversity, pricing record, and the existing router/hold-out/economics/promotion gates. Missing evidence fails closed rather than inheriting a neighboring market.

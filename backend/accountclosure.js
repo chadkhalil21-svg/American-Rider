@@ -16,6 +16,11 @@ async function closeOperationalAccount({ db, uid, now = Date.now() }) {
   if (!db) return { ok: false, code: 'database_unavailable' };
   if (!uid) return { ok: false, code: 'account_required' };
 
+  const fenceRef = db.collection('account_operation_fences').doc(uid);
+  await fenceRef.set({ closing:true, startedAt:now }, { merge:true });
+  try {
+  // Fence first. Immediate and scheduled Travel creation transactionally read this document,
+  // so once it exists the active-Travel inventory cannot gain new work behind this check.
   const [travelerRides, operatorRides] = await Promise.all([
     recordsFor(db, 'rides', 'travelerUid', uid),
     recordsFor(db, 'rides', 'operatorId', uid),
@@ -25,9 +30,6 @@ async function closeOperationalAccount({ db, uid, now = Date.now() }) {
   );
   if (active.length) return { ok: false, code: 'active_travel' };
 
-  const fenceRef = db.collection('account_operation_fences').doc(uid);
-  await fenceRef.set({ closing:true, startedAt:now }, { merge:true });
-  try {
   const scheduled = await recordsFor(db, 'scheduled_rides', 'travelerUid', uid);
   let cancelledScheduled = 0;
   for (const d of scheduled) {

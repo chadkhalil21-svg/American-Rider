@@ -233,6 +233,10 @@ export type RideStore = {
   sendMsg: (text: string) => void;
   threadFor: (tripNo: string) => Msg[];
   sendMsgTo: (tripNo: string, text: string, lostItemId?: string | null) => void;
+  /** Add a message only after the server accepted it. */
+  appendSentMsg: (tripNo: string, text: string) => void;
+  /** Authoritative ride id currently watched, used for live-thread delivery. */
+  watchedRideId: string | null;
 
   // help / issues
   issue: string | null;
@@ -1337,6 +1341,12 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  const appendSentMsg = useCallback((tripNo: string, text: string) => {
+    const clean = text.trim();
+    if (!clean || !tripNo) return;
+    setThreads((m) => ({ ...m, [tripNo]: [...(m[tripNo] ?? []), { me: true, text: clean }] }));
+  }, []);
+
   const sendMsg = useCallback(
     (text: string) => sendMsgTo(lastTripRef.current.no, text),
     [sendMsgTo],
@@ -1634,6 +1644,8 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     sendMsg,
     threadFor,
     sendMsgTo,
+      appendSentMsg,
+      watchedRideId: watchedRideIdRef.current,
     issue,
     issueState,
     issueTripNo,

@@ -143,6 +143,9 @@ export default {
     openAllParts: 'Öffnen Sie alle %{n} Teile, um fortzufahren',
   },
   traveler: {
+    scheduledDispatchBegun: "Die Vermittlung hat begonnen. Öffnen Sie die Fahrt, um den aktuellen Status zu prüfen.",
+    scheduledCancelFailed: "Diese geplante Fahrt konnte nicht storniert werden. Ihr aktueller Status wurde beibehalten.",
+    scheduledPaymentReview: "Die Zahlungsprüfung erfordert eine Überprüfung. Es wird nicht automatisch versucht, eine weitere Belastung vorzunehmen.",
     beginTravel: 'Fahrt Beginnen',
     departure: 'Abfahrt',
     destinationEntry: 'Wählen Sie Ihr Ziel',

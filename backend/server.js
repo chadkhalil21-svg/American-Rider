@@ -26,7 +26,7 @@ const {
   transferToOperator, refundableFor, connectDashboardLink, pingStripe, probeNetwork,
   transferFixed, operatorPayoutAccount,
   listPaymentMethods, createSetupIntent, setDefaultPaymentMethod, detachPaymentMethod,
-  defaultCardCountry, chargeOperatorAccountFee,
+  defaultCardCountry, scheduledPaymentIdentity, chargeOperatorAccountFee,
 } = require('./payments');
 const { readKey } = require('./env');
 const { requireAuth, attachAuth, requireVerifiedEmail } = require('./auth');
@@ -3116,6 +3116,8 @@ app.post('/travel/schedule', requireAuth, LIMITS.dispatch, requireOperationalRea
   if (!partyResult.ok) return res.status(400).json({ error: partyResult.error, code: partyResult.code });
   const party = partyResult.party;
   try {
+    const paymentIdentity = await scheduledPaymentIdentity({ uid: req.uid, email: req.email || '' });
+    if (!paymentIdentity) return res.status(409).json({ error: 'A saved payment method is required for scheduled Travel.', code: 'scheduled_payment_method_required' });
     const ref = db.collection('scheduled_rides').doc();
     const tripNo = travelNumberFor(ref.id, pickup);
     const record = {
@@ -3131,6 +3133,7 @@ app.post('/travel/schedule', requireAuth, LIMITS.dispatch, requireOperationalRea
       miles: priced.miles, governmentFeeCents: priced.governmentFeeCents,
       tollCents: Math.max(0, Number(priced.tollCents) || 0),
       feeLines: priced.feeLines, cardCountry: priced.cardCountry, tripNo,
+      stripeCustomerId: paymentIdentity.customerId, stripePaymentMethodId: paymentIdentity.paymentMethodId,
       status: 'reserved', createdAt: Date.now(),
     };
     await ref.create(record);

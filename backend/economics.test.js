@@ -22,10 +22,10 @@ check('unknown cards are international-safe, never domestic by assumption',
 // Exact audited examples under the cost model. The $2 active-account cost is operator-side, not in this fee.
 const examples = [
   // fare, domestic fee, international/unknown fee
-  [500, 200, 200],
-  [1000, 200, 210],
-  [2000, 216, 250],
-  [3000, 240, 291],
+  [500, 250, 250],
+  [1000, 250, 250],
+  [2000, 250, 250],
+  [3000, 250, 291],
   [4000, 265, 332],
   [5000, 290, 373],
   [6100, 318, 418],
@@ -44,7 +44,7 @@ for (const [fare, us, intl] of examples) {
 
 // Exhaustive invariant: every cent from $3 to $500, both card classes.
 // The selected fee must meet the contribution target, and one cent less must fail unless the
-// selected fee is the absolute $2 floor.
+// selected fee is the absolute $2.50 floor.
 for (const country of ['US', 'GB', null]) {
   let invariant = true;
   let minimal = true;

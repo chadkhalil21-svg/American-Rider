@@ -914,8 +914,6 @@ async function accountAcceptsNewWork(db, uid) {
 app.post('/operator/online', requireAuth, requireOperationalReadiness, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
-  if (!(await accountAcceptsNewWork(db, req.uid))) return res.status(409).json({ code:'account_closing', error:'This account cannot begin new operations.' });
-
   // A REFUSAL TAKES THE OPERATOR OUT OF DISPATCH NOW. This route is also the 90-second renewal,
   // and a refused renewal used to leave the fleet record `available` until presence went stale
   // five minutes later. Dispatch reads only that record, so for those minutes an operator whose
@@ -934,6 +932,7 @@ app.post('/operator/online', requireAuth, requireOperationalReadiness, async (re
   };
 
   try {
+    if (!(await accountAcceptsNewWork(db, req.uid))) return refuse({ code:'account_closing', error:'This account cannot begin new operations.' });
     // A DISABLED ACCOUNT KEEPS A VALID SIGN-IN FOR UP TO AN HOUR (requireAuth checks the token
     // locally), so Firebase is asked directly. "Cannot tell" is not "enabled".
     if ((await accountDisabled(req.uid)) !== false) {

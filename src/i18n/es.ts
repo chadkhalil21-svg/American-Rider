@@ -156,6 +156,7 @@ export default {
     insuranceDisclosure: 'Divulgación Legal de Seguros',
     partRead: 'Leído',
     openAllParts: 'Abra las %{n} partes para continuar',
+
   },
 
   traveler: {
@@ -1103,6 +1104,9 @@ export default {
     familySendMessage: 'Enviar Mensaje',
     familyMessageFailed: 'El mensaje no se envió.',
 
+    msgNotSent: "Mensaje no enviado. Revise su conexión e inténtelo de nuevo.",
+  },
+
   },
 
   legal: {
@@ -1125,6 +1129,5 @@ export default {
     lostRecording: "Registrando…",
     lostLocated: "Objeto localizado",
     lostNotFound: "Objeto no encontrado",
-    msgNotSent: "Mensaje no enviado. Revise su conexión e inténtelo de nuevo.",
   },
 } as const;

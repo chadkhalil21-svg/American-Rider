@@ -3064,6 +3064,31 @@ app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, requireOperationalRea
   }
 });
 
+// Cancel scheduled Travel through the same authoritative document the scheduler claims.
+app.post('/travel/schedule/:id/cancel', requireAuth, async (req, res) => {
+  const db = adminDb();
+  if (!db) return res.status(503).json({ error: 'Service unavailable' });
+  const id = String(req.params?.id || '').trim();
+  if (!id) return res.status(400).json({ error: 'Reservation id is required' });
+  const ref = db.collection('scheduled_rides').doc(id);
+  try {
+    const result = await db.runTransaction(async tx => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) return { status:404, code:'scheduled_not_found' };
+      const r = snap.data() || {};
+      if (String(r.travelerUid || '') !== String(req.uid)) return { status:404, code:'scheduled_not_found' };
+      if (r.status !== 'reserved') return { status:409, code:'scheduled_not_cancellable' };
+      if (Number(r.claimedAt) > 0) return { status:409, code:'scheduled_dispatch_in_progress' };
+      tx.update(ref, { status:'cancelled', cancelledAt:Date.now(), claimedAt:null });
+      return { status:200, code:'cancelled' };
+    });
+    if (result.status !== 200) return res.status(result.status).json({ error: result.code, code: result.code });
+    return res.json({ ok:true, status:'cancelled' });
+  } catch (e) {
+    return res.status(500).json({ error:'Cancellation could not be completed', code:'scheduled_cancel_failed' });
+  }
+});
+
 // Create a scheduled reservation with the same server authority as immediate dispatch.
 // The time and labels are traveler inputs. Fare, distance, fees and Travel Number are not.
 app.post('/travel/schedule', requireAuth, LIMITS.dispatch, requireOperationalReadiness, async (req, res) => {

@@ -17,7 +17,7 @@ For every service market, commissioning must establish:
 
 Use the strongest evidence actually available in each market.
 
-Government/open trip records are preferred when they contain usable fare, time and geography fields. Known examples include Chicago TNP trip data and NYC TLC high-volume FHV trip records. California CPUC public TNC data is an eligible program but fields and availability must be verified for the relevant reporting period before fare use.
+Government/open trip records are preferred only when the public schema actually contains usable passenger-fare, time and geography fields. Chicago TNP trip data currently satisfies that standard. NYC TLC high-volume FHV public records and Massachusetts reports are valuable structural evidence but are not assumed to provide Chicago-equivalent passenger-fare microdata. California CPUC reporting is free public evidence, but passenger-fare eligibility remains disabled until the relevant public-period schema is verified.
 
 Where public data is absent or too stale/coarse, use an approved independent controlled audit and/or a commercially licensed national/metro dataset. Gridwise Analytics is identified as a candidate licensed source because it advertises national/metro customer-pricing and record-level rideshare data. A contract, permitted use, schema validation and credentials are required before its data may be treated as active.
 
@@ -38,3 +38,11 @@ The platform never promises hourly competitor prices when the underlying source 
 ## Market expansion rule
 
 Adding a state or metro is not a code fork. It is a commissioning package: geography + law + insurance + tolls + evidence plan + reference + pricing record + tests. Missing any package component fails closed.
+
+## National zero-license-cost expansion template
+
+The default U.S. commissioning path is public-first and requires no licensed market-data subscription. A new service market begins with the current independent public national rate-card layer (presently covering 312 U.S. cities across all 50 states), then adds any usable government passenger-fare microdata, independent observed-trip aggregates where available, and a controlled contemporaneous public-price panel. At least two independent evidence families must qualify before automatic production promotion.
+
+This template is infrastructure, not permission to copy another city's price. Every market remains separately commissioned. Public national rate cards bootstrap discovery and sanity checking; they cannot alone become production authority. Government fare microdata receives the strongest evidentiary treatment where its schema is actually usable. Controlled public observations provide the direct contemporaneous layer where government fare data is absent. Licensed sources such as Gridwise remain optional gap-fill rather than a prerequisite.
+
+State expansion therefore does not require a new fare engine. It requires a commissioning package: service-market geography, jurisdiction/insurance/toll rules, source adapters and provenance, representative route/time cells, evidence diversity, pricing record, and the existing router/hold-out/economics/promotion gates. Missing evidence fails closed rather than inheriting a neighboring market.

@@ -1,9 +1,11 @@
 const assert=require('node:assert/strict');
 const {normalizeObservation}=require('./market-evidence-ingest');
 const base={marketId:'il-chicago',sourceId:'chicago-tnp-open-data',sourceType:'government-trips',observedAt:'2026-09-23T12:00:00Z',serviceClass:'standard',routedMiles:7.2,routedMinutes:24,travelerTotalCents:2450};
-const o=normalizeObservation(base);
+const o=normalizeObservation({...base,providerKey:'provider-a',confidence:'high'});
 assert.equal(o.marketId,'il-chicago');
 assert.equal(o.travelerTotalCents,2450);
+assert.equal(o.providerKey,'provider-a');
+assert.equal(o.confidence,'high');
 assert.throws(()=>normalizeObservation({...base,userId:'traveler-1'}),/personalized/);
 assert.throws(()=>normalizeObservation({...base,travelerTotalCents:-1}),/travelerTotalCents/);
 assert.throws(()=>normalizeObservation({...base,sourceType:'competitor-secret'}),/unsupported/);

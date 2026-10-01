@@ -30,6 +30,8 @@ function qualification(snapshot,plan,cell=null,now=Date.now()){
   if(!cell)return {ok:true};
   const families=new Set(cell.evidenceFamilies||[]);
   if(families.size<(plan?.minimumIndependentFamilies||2))return {ok:false,reason:'condition-cell independent evidence insufficient'};
+  if((cell.sources||[]).length<2)return {ok:false,reason:'condition-cell source diversity insufficient'};
+  if(Number(cell.maxProviderShare)>0.70)return {ok:false,reason:'condition-cell provider concentration excessive'};
   const observed=Date.parse(cell.latestObservedAt||'');
   if(!Number.isFinite(observed))return {ok:false,reason:'condition-cell evidence timestamp missing'};
   const maxAgeDays=Number(plan?.maxObservationAgeDays||90);

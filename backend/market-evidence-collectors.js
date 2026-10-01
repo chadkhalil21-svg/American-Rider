@@ -35,6 +35,10 @@ async function collectChicago({marketId='il-chicago'}={}){
 }
 
 function configuredCollectors(){
+  // Deliberately no Uber/Lyft collector: direct competitor-platform automation is disabled
+  // absent documented permission/authorized competitive-use interface. Human audit observations
+  // enter only through the normalized ingestion boundary with provenance.
+
   const out={};
   // Public collectors are enabled only for a market whose evidence plan names the source.
   out['chicago-tnp-open-data']=collectChicago;

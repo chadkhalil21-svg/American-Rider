@@ -10,6 +10,7 @@ const REQUIREMENTS = Object.freeze({
   FL: Object.freeze({
     state: 'FL',
     stateName: 'Florida',
+    timeZone: 'America/New_York',
     statute: 'Fla. Stat. §627.748(7)',
     source: 'https://www.flsenate.gov/Laws/Statutes/2026/627.748',
     loggedOn: Object.freeze({ statute: 'Fla. Stat. §627.748(7)(b)', perPerson: 50000, perIncident: 100000, propertyDamage: 25000 }),

@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../../src/components/AppText';
 import { Card, LetterheadBar, PrimaryButton, Screen, SectionLabel, Title } from '../../src/components/UI';
 import { fetchOperatorLostItem, respondOperatorLostItem, type OperatorLostItem } from '../../src/backend/operatorLostItem';
@@ -44,7 +44,7 @@ export default function OperatorLostItemScreen() {
     {error ? <Text style={styles.error}>{error}</Text> : null}
     {item ? <>
       <SectionLabel style={styles.label}>{t('operator.lostItemLabel')}</SectionLabel>
-      <Card style={styles.card}><Text style={styles.body}>{item.description}</Text></Card>
+      <Card style={styles.card}><Text style={styles.body}>{item.description}</Text>{item.photoUrl ? <Image source={{ uri: item.photoUrl }} style={styles.photo} /> : null}</Card>
       {needsTrip ? <>
         <SectionLabel style={styles.label}>{t('operator.lostTravelLabel')}</SectionLabel>
         <Text style={styles.sub}>{t('operator.lostTravelInstruction')}</Text>
@@ -71,6 +71,7 @@ const styles=StyleSheet.create({
   label:{marginTop:24,marginBottom:10},
   card:{padding:18},
   body:{fontSize:14.5,color:colors.ink2,lineHeight:21},
+  photo:{width:'100%',height:220,borderRadius:12,marginTop:14},
   trip:{fontSize:13.5,color:colors.muted,marginTop:16},
   choice:{padding:16,marginBottom:8},
   selected:{borderColor:colors.ink},

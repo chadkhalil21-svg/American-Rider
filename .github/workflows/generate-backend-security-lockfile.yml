@@ -21,7 +21,7 @@ jobs:
           cache-dependency-path: backend/package-lock.json
       - name: Regenerate backend lockfile
         working-directory: backend
-        run: npm install --package-lock-only --ignore-scripts
+        run: npm update --package-lock-only --ignore-scripts
       - name: Production audit
         working-directory: backend
         run: npm audit --omit=dev --json > npm-audit-production.json || true

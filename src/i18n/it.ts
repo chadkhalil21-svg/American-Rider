@@ -1088,6 +1088,7 @@ export default {
     familyMessageFailed: 'Il messaggio non è stato inviato.',
 
     msgNotSent: "Messaggio non inviato. Controlli la connessione e riprovi.",
+    lostOperatorInboxDelivered: "Consegnato a %{names} nella casella dell’Operatore.",
   },
   },
   legal: {

@@ -125,6 +125,21 @@ export async function clearPushToken(): Promise<void> {
   }
 }
 
+/** Return the notification interaction that launched/restored the app, if any. */
+export async function getInitialNotificationData(): Promise<Record<string, unknown> | null> {
+  try {
+    const response = await Notifications.getLastNotificationResponseAsync();
+    return (response?.notification.request.content.data ?? null) as Record<string, unknown> | null;
+  } catch {
+    return null;
+  }
+}
+
+/** Clear the consumed launch response so a later ordinary app launch does not replay it. */
+export async function clearInitialNotificationResponse(): Promise<void> {
+  try { await Notifications.clearLastNotificationResponseAsync(); } catch { /* no response */ }
+}
+
 /** Run `onOpen` when the person taps a notification. Returns an unsubscribe. */
 export function onNotificationTap(onOpen: (data: Record<string, unknown>) => void): () => void {
   const sub = Notifications.addNotificationResponseReceivedListener((res) => {

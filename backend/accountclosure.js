@@ -27,6 +27,7 @@ async function closeOperationalAccount({ db, uid, now = Date.now() }) {
 
   const fenceRef = db.collection('account_operation_fences').doc(uid);
   await fenceRef.set({ closing:true, startedAt:now }, { merge:true });
+  try {
   const scheduled = await recordsFor(db, 'scheduled_rides', 'travelerUid', uid);
   let cancelledScheduled = 0;
   for (const d of scheduled) {
@@ -39,10 +40,7 @@ async function closeOperationalAccount({ db, uid, now = Date.now() }) {
       tx.update(d.ref, { status:'cancelled', cancelledAt:now, closedReason:'Account closed.', claimedAt:null });
       return 'cancelled';
     });
-    if (outcome === 'in_flight') {
-      await fenceRef.delete();
-      return { ok:false, code:'scheduled_travel_in_progress' };
-    }
+    if (outcome === 'in_flight') return { ok:false, code:'scheduled_travel_in_progress' };
     if (outcome === 'cancelled') cancelledScheduled++;
   }
   await db.collection('operators').doc(uid).set(
@@ -56,8 +54,10 @@ async function closeOperationalAccount({ db, uid, now = Date.now() }) {
     { operationallyClosed: true, closedAt: now, cancelledScheduled },
     { merge: true },
   );
-  await fenceRef.delete();
   return { ok: true, operationallyClosed: true, cancelledScheduled };
+  } finally {
+    await fenceRef.delete().catch(() => {});
+  }
 }
 
 module.exports = { ACTIVE_STATUSES, closeOperationalAccount };

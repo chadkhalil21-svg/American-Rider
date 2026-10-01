@@ -42,8 +42,8 @@ async function revokeFamilyLink({id,guardianUid,now=Date.now()}){
  const q=await db.collection('scheduled_rides').where('status','==','reserved').get();
  let cancelledScheduledTravels=0;
  for(const d of q.docs){const r=d.data()||{};if(r.party?.teen===true&&String(r.party?.familyLinkId)===String(id)){
-   await d.ref.set({status:'cancelled',cancelledAt:now,closedReason:'Family authorization revoked.'},{merge:true});
-   cancelledScheduledTravels++;
+   const cancelled=await db.runTransaction(async tx=>{const fresh=await tx.get(d.ref);const current=fresh.data()||{};if(!fresh.exists||current.status!=='reserved'||Number(current.claimedAt)>0)return false;tx.update(d.ref,{status:'cancelled',cancelledAt:now,closedReason:'Family authorization revoked.',claimedAt:null});return true;});
+   if(cancelled)cancelledScheduledTravels++;
  }}
  return {ok:true,cancelledScheduledTravels};
 }

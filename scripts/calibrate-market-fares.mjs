@@ -5,6 +5,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 const require=createRequire(import.meta.url);
 const { minimumPlatformFeeCents }=require('../backend/economics.js');
+const { MARKET_REFERENCE_TARGET_FRACTION }=require('../backend/pricing-policy.js');
 const input=process.argv[2];
 if(!input) throw new Error('usage: calibrate-market-fares <market-evidence.json>');
 const basket=JSON.parse(fs.readFileSync(path.resolve(input),'utf8'));
@@ -13,8 +14,11 @@ const rows=basket.observations.filter(r=>!r[5]);
 function solve3(A,b){const m=A.map((r,i)=>[...r,b[i]]);for(let c=0;c<3;c++){let p=c;for(let r=c+1;r<3;r++)if(Math.abs(m[r][c])>Math.abs(m[p][c]))p=r;[m[c],m[p]]=[m[p],m[c]];const d=m[c][c];if(Math.abs(d)<1e-12)throw new Error('singular calibration matrix');for(let j=c;j<4;j++)m[c][j]/=d;for(let r=0;r<3;r++)if(r!==c){const f=m[r][c];for(let j=c;j<4;j++)m[r][j]-=f*m[c][j];}}return m.map(r=>r[3]);}
 function ols(samples,y){const X=samples.map(r=>[1,r[1],r[2]]),xtx=Array.from({length:3},()=>Array(3).fill(0)),xty=Array(3).fill(0);for(let i=0;i<X.length;i++)for(let a=0;a<3;a++){xty[a]+=X[i][a]*y[i];for(let b=0;b<3;b++)xtx[a][b]+=X[i][a]*X[i][b];}return solve3(xtx,xty);}
 function fareForTargetTotal(totalCents){for(let fare=totalCents;fare>=0;fare--){const fee=minimumPlatformFeeCents({travelCostCents:fare,cardCountry:'US'});if(fare+fee<=totalCents)return{fare,fee,total:fare+fee};}throw new Error('no feasible fare');}
-const fraction=Number(basket.targetFraction);
-if(!(fraction>0&&fraction<=1)) throw new Error('targetFraction must be in (0,1]');
+const requestedFraction=basket.targetFraction==null?MARKET_REFERENCE_TARGET_FRACTION:Number(basket.targetFraction);
+if(!(requestedFraction>0&&requestedFraction<=1)) throw new Error('targetFraction must be in (0,1]');
+// Production planning uses the national policy. Evidence files may override only for explicit
+// diagnostic/scenario analysis; the output remains HOLD until promotion gates pass.
+const fraction=requestedFraction;
 const market=ols(rows,rows.map(r=>r[3]));
 const targetTotals=rows.map(r=>Math.round(r[3]*fraction*100));
 const reverse=targetTotals.map(fareForTargetTotal);

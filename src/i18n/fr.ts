@@ -1115,5 +1115,6 @@ export default {
     lostRecording: "Enregistrement…",
     lostLocated: "Objet retrouvé",
     lostNotFound: "Objet non retrouvé",
+    msgNotSent: "Message non envoyé. Vérifiez votre connexion et réessayez.",
   },
 } as const;

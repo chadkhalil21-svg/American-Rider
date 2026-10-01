@@ -56,7 +56,6 @@ type AuthState = {
 
 const Ctx = createContext<AuthState | null>(null);
 const ONBOARDING_KEY = 'ar:auth-onboarding';
-const DELETION_KEY = 'ar:account-deletion';
 
 export function useAuth(): AuthState {
   const c = useContext(Ctx);
@@ -269,9 +268,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // failed credential both throw, so no operational or destructive step can follow.
         await reauthenticate();
         if (auth.currentUser?.uid !== u.uid) throw new Error(t('traveler.errNoAccountDelete'));
-        // Crash-consistency marker: once destructive work starts, a relaunch must not treat a
-        // partially deleted account as ordinary. It is UID-bound and survives process death.
-        await AsyncStorage.setItem(DELETION_KEY, u.uid);
+
         // 2. Stop future work before removing the login. Fail closed: deleting the login
         // while a scheduled Travel or an on-duty Operator remains could dispatch or charge
         // an account that can no longer control that work.
@@ -287,13 +284,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // traveler can retry; deleting authentication while leaving profile PII behind would
         // make the remaining record harder for its owner to control.
         await deleteDoc(doc(db, 'users', u.uid));
-        // 4. Delete the login while the crash marker still exists. If the process dies here,
-        // a surviving Firebase identity sees that deletion was interrupted rather than being
-        // treated as an ordinary account on relaunch.
-        await deleteUser(u);
-        // 5. Only after Firebase confirms the identity is gone, remove everything this app kept
-        // on the phone — including the deletion marker itself.
+        // 4. Everything this app kept on the phone — role, operator qualification,
+        //    revenue, preferences, trusted contacts, the welcome flag.
         await clearAllStorage();
+        // 5. The login itself. After this the app returns to the front door.
+        await deleteUser(u);
       }),
     // THE DEVICE IS CLEARED BEFORE THE SESSION ENDS. Firebase sign-out alone left every
     // `ar:` value on the phone for the next person who signed in — see accountStorage.ts.

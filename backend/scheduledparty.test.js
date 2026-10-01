@@ -28,6 +28,8 @@ assert.ok(teenPickup.includes('TEEN_PIN_SEAL_KEY'), 'Teen PIN recovery requires 
 assert.ok(teenPickup.includes('TEEN_PIN_SEAL_KEY_PREVIOUS'), 'Teen PIN recovery survives controlled seal-key rotation');
 assert.ok(teenPickup.includes("['current','previous']"), 'PIN unsealing supports the current/previous key rotation window');
 assert.ok(teenPickup.includes('if(current?.sealedPin)'), 'Teen PIN provisioning recovers rather than rotates an existing code');
+assert.ok(teenPickup.includes('credentialRetiredAt'), 'successful Teen PIN verification retires credential material');
+assert.ok(teenPickup.includes('hash:_hash') && teenPickup.includes('sealedPin:_sealedPin'), 'verification removes both PIN hash and recoverable ciphertext');
 assert.ok(scheduled.includes('civilDate?: string') && scheduled.includes('civilTime?: string'), 'client contract carries the displayed civil appointment for server validation');
 assert.ok(scheduled.includes("party?: { mode: 'self' | 'other_adult'"), 'client scheduled contract supports another adult');
 assert.ok(scheduled.includes("mode: 'self' | 'other_adult' | 'teen'"), 'client scheduled contract supports authorized Teen Travel');

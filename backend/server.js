@@ -3134,6 +3134,7 @@ app.post('/travel/schedule', requireAuth, LIMITS.dispatch, requireOperationalRea
       tollCents: Math.max(0, Number(priced.tollCents) || 0),
       feeLines: priced.feeLines, cardCountry: priced.cardCountry, tripNo,
       stripeCustomerId: paymentIdentity.customerId, stripePaymentMethodId: paymentIdentity.paymentMethodId,
+      financialIdentityGeneration: paymentIdentity.financialIdentityGeneration,
       status: 'reserved', createdAt: Date.now(),
     };
     await ref.create(record);

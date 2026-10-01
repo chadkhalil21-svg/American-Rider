@@ -12,4 +12,8 @@ assert.ok(p.includes("stripe.customers.retrieve(String(owned.data().customerId))
 assert.ok(p.includes("Stripe Customer ownership mismatch"), 'Customer metadata mismatch fails closed');
 assert.ok(p.includes("Multiple Stripe Customers exist for this account"), 'ambiguous legacy Customer ownership fails closed rather than silently adopting one');
 assert.ok(p.includes('await ownerRef.create'), 'first-use mapping is create-only so concurrent requests cannot overwrite ownership');
+assert.ok(p.includes("if (!db && productionMode()) throw new Error('Stripe Customer ownership registry is unavailable')"), 'live money fails closed when durable Customer ownership registry is unavailable');
+const server = fs.readFileSync(path.join(__dirname,'server.js'),'utf8');
+assert.ok(server.includes("require('./runtime-mode')"), 'HTTP readiness uses shared runtime-mode authority');
+assert.ok(p.includes("require('./runtime-mode')"), 'payment identity uses the same runtime-mode authority');
 console.log('✓ one money architecture: charge platform, transfer on completed Travel');

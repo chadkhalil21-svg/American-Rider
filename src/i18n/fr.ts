@@ -1116,6 +1116,7 @@ export default {
     lostReturnHuman: "Patron Support coordonne le retour après que l’Opérateur a localisé l’objet. Aucun Voyage de retour, débit ou affectation n’est affiché avant d’exister réellement.",
     familyRevokeUnable: "L’autorisation familiale n’a pas pu être révoquée. Réessayez.",
     inviteShareFailed: "L’invitation n’a pas pu être ouverte pour le partage. Réessayez.",
+    lostCaseNumber: "Dossier d’assistance %{caseNo}",
   },
 
   legal: {

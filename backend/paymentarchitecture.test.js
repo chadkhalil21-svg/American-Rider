@@ -25,6 +25,8 @@ assert.ok(p.includes('financialIdentityAuthorization'), 'Customer-dependent mone
 assert.ok((p.match(/await assertFinancialIdentityAuthorization\(uid, financialAuth\.generation\)/g)||[]).length >= 2, 'authorization generation is rechecked at immediate and scheduled PaymentIntent creation boundaries');
 assert.ok((p.match(/financialIdentityGeneration: String\(financialAuth\.generation\)/g)||[]).length >= 2, 'immediate and scheduled Stripe records retain the authorizing financial identity generation');
 assert.ok(p.includes('financialIdentityGeneration: financialAuth.generation'), 'scheduled charge returns its authorizing generation for crash-recovery evidence');
+assert.ok(p.includes('verifyScheduledPaymentCheckpoint'), 'scheduled crash recovery re-verifies its checkpoint against Stripe');
+for (const code of ['payment_checkpoint_not_succeeded','payment_checkpoint_uid_mismatch','payment_checkpoint_reservation_mismatch','payment_checkpoint_amount_mismatch','payment_checkpoint_generation_mismatch']) assert.ok(p.includes(code), `checkpoint verification covers ${code}`);
 assert.ok(p.includes('paymentIntentsHasMore'), 'reconciliation inventory discloses when Stripe history is paginated rather than pretending completeness');
 const ops = fs.readFileSync(path.join(__dirname,'ops.js'),'utf8');
 assert.ok(ops.includes("app.get('/ops/stripe-customers'"), 'named Operations has an authenticated reconciliation evidence endpoint');
@@ -38,5 +40,9 @@ const scheduler = fs.readFileSync(path.join(__dirname,'scheduler.js'),'utf8');
 assert.ok(server.includes('financialIdentityGeneration: paymentIdentity.financialIdentityGeneration'), 'scheduled reservation freezes the financial identity generation with Customer and PaymentMethod');
 assert.ok(scheduler.includes('financialIdentityGeneration: r.financialIdentityGeneration'), 'scheduler passes the frozen generation to off-session charging');
 assert.ok(scheduler.includes('paymentCheckpointGeneration: paid.financialIdentityGeneration'), 'successful scheduled charge checkpoint retains generation evidence');
+assert.ok(scheduler.includes("status: 'payment_integrity_hold'"), 'checkpoint mismatch is quarantined rather than retried as a fresh charge');
 assert.ok(p.includes("code:'financial_identity_generation_required'"), 'legacy scheduled payment identity cannot be charged without generation evidence');
+const rules = fs.readFileSync(path.join(__dirname,'..','firestore.rules'),'utf8');
+const scheduledRules = rules.slice(rules.indexOf('match /scheduled_rides/'), rules.indexOf('// ---- support_tickets'));
+assert.ok(scheduledRules.includes('allow create: if false') && scheduledRules.includes('allow update: if false'), 'clients cannot forge scheduled payment checkpoints');
 console.log('✓ one money architecture: charge platform, transfer on completed Travel');

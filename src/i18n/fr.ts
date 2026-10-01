@@ -1114,6 +1114,8 @@ export default {
     notifSaveFailed: "La préférence de notification n’a pas été enregistrée. Réessayez.",
     cancelFailed: "Le Voyage n’a pas été annulé. Réessayez.",
     lostReturnHuman: "Patron Support coordonne le retour après que l’Opérateur a localisé l’objet. Aucun Voyage de retour, débit ou affectation n’est affiché avant d’exister réellement.",
+    familyRevokeUnable: "L’autorisation familiale n’a pas pu être révoquée. Réessayez.",
+    inviteShareFailed: "L’invitation n’a pas pu être ouverte pour le partage. Réessayez.",
   },
 
   legal: {

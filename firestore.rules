@@ -277,7 +277,7 @@ service cloud.firestore {
     function userFieldsAreOwn() {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
         'name', 'mobile', 'email',
-        'pushToken', 'pushPlatform', 'pushUpdatedAt', 'pushPrefs',
+        'pushPrefs',
         'cabinPreferences', 'savedPlaces', 'trustedContacts',
       ]);
     }

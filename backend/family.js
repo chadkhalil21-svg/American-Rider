@@ -89,7 +89,7 @@ async function sweepFamilyAgeOut({now=Date.now()}={}){
  for(const d of q.docs){const x=d.data()||{},age=ageOn(x.teenDob,now);if(age!==null&&age>=MIN_AGE&&age<=MAX_AGE)continue;
   await d.ref.set({status:'aged_out',agedOutAt:now,updatedAt:now},{merge:true});agedOut++;
   const reserved=await db.collection('scheduled_rides').where('status','==','reserved').get();
-  for(const r of reserved.docs){const v=r.data()||{};if(v.party?.teen===true&&String(v.party?.familyLinkId)===String(d.id)){await r.ref.set({status:'cancelled',cancelledAt:now,closedReason:'Teen Traveler is no longer age-eligible.'},{merge:true});cancelledScheduledTravels++;}}
+  for(const r of reserved.docs){const v=r.data()||{};if(v.party?.teen===true&&String(v.party?.familyLinkId)===String(d.id)){const cancelled=await db.runTransaction(async tx=>{const fresh=await tx.get(r.ref);const current=fresh.data()||{};if(!fresh.exists||current.status!=='reserved'||Number(current.claimedAt)>0)return false;tx.update(r.ref,{status:'cancelled',cancelledAt:now,closedReason:'Teen Traveler is no longer age-eligible.',claimedAt:null});return true;});if(cancelled)cancelledScheduledTravels++;}}
  }
  return {ok:true,agedOut,cancelledScheduledTravels};
 }

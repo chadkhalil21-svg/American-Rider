@@ -1106,7 +1106,7 @@ export default {
     msgNotSent: "Nachricht nicht gesendet. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
     lostOperatorInboxDelivered: "An %{names} im Operator-Postfach zugestellt.",
   },
-  },
+
   legal: {
     termsTitle: 'Nutzungsbedingungen',
     privacyTitle: 'Datenschutzerklärung',

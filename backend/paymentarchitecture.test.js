@@ -71,6 +71,10 @@ assert.ok(closure.includes("collection('account_operation_fences').doc(uid)") &&
 assert.ok(scheduler.includes("collection('account_operation_fences').doc(travelerUid)") && scheduler.includes("fence.data()?.closing === true"), 'scheduler claim honors account closure fence transactionally');
 assert.ok(server.includes('async function accountAcceptsNewWork(db, uid)'), 'new-work routes share one account closure gate');
 for (const route of ["/operator/online", "/travel/dispatch", "/travel/schedule"]) { const i=server.indexOf(`app.post('${route}'`); assert.ok(i>=0 && server.slice(i,i+1800).includes('accountAcceptsNewWork'), `${route} rejects closing or closed accounts`); }
+const dispatchRoute=server.slice(server.indexOf("app.post('/travel/dispatch'"),server.indexOf("app.post('/travel/schedule'"));
+assert.ok(dispatchRoute.includes('tx.create(ref, ride)') && dispatchRoute.includes("collection('account_operation_fences')") && dispatchRoute.includes("collection('account_closures')"), 'immediate Travel creation serializes with closure fence');
+const onlineRoute=server.slice(server.indexOf("app.post('/operator/online'"),server.indexOf("app.post('/operator/offline'"));
+assert.ok(onlineRoute.includes('const onlineResult = await db.runTransaction') && onlineRoute.includes('tx.set(operatorRef') && onlineRoute.includes("collection('account_operation_fences')"), 'Operator availability serializes with closure fence');
 const scheduleRoute=server.slice(server.indexOf("app.post('/travel/schedule'"),server.indexOf('// --- Who can bring a lost item back'));
 assert.ok(scheduleRoute.includes('tx.create(ref, record)') && scheduleRoute.includes("collection('account_operation_fences')") && scheduleRoute.includes("collection('account_closures')"), 'scheduled booking creation serializes with closure fence');
 console.log('✓ one money architecture: charge platform, transfer on completed Travel');

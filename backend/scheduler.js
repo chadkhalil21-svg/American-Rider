@@ -338,6 +338,18 @@ async function sweepScheduled({ now = Date.now() } = {}) {
       }
     }
 
+    if (!paid.ok && String(paid.code || '').startsWith('payment_checkpoint_')) {
+      await touch(db, id, {
+        status: 'payment_integrity_hold',
+        claimedAt: null,
+        lastSweepAt: now,
+        paymentError: 'Stored payment checkpoint could not be corroborated with Stripe.',
+        paymentErrorCode: paid.code,
+      });
+      report.failed.push({ id, reason: paid.code });
+      continue;
+    }
+
     if (!paid.ok) {
       // The card failed, or the bank wants the traveler present. Either way NOBODY IS SENT.
       // The reservation is released so a traveler who fixes their card in the next few

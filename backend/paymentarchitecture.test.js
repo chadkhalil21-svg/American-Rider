@@ -46,7 +46,10 @@ assert.ok(p.includes("code:'financial_identity_generation_required'"), 'legacy s
 const rules = fs.readFileSync(path.join(__dirname,'..','firestore.rules'),'utf8');
 const scheduledRules = rules.slice(rules.indexOf('match /scheduled_rides/'), rules.indexOf('// ---- support_tickets'));
 assert.ok(scheduledRules.includes('allow create: if false') && scheduledRules.includes('allow update: if false'), 'clients cannot forge scheduled payment checkpoints');
-assert.ok(scheduledRules.includes("allow delete: if ownsExisting() && resource.data.status == 'reserved'"), 'client cancellation cannot delete quarantined payment-integrity evidence');
+assert.ok(scheduledRules.includes('allow delete: if false'), 'scheduled cancellation cannot race scheduler claim through direct client deletion');
+assert.ok(server.includes("app.post('/travel/schedule/:id/cancel'"), 'scheduled cancellation is server-authoritative');
+assert.ok(server.includes("code:'scheduled_dispatch_in_progress'"), 'cancellation fails clearly after scheduler claim wins');
+assert.ok(server.includes("tx.update(ref, { status:'cancelled'"), 'successful cancellation is committed transactionally on the claimed document');
 assert.ok(ops.includes("where('status', '==', 'payment_integrity_hold')"), 'Operations explicitly queries payment integrity quarantine');
 assert.ok(ops.includes('Payment integrity exceptions'), 'Operations visibly surfaces quarantined scheduled payments');
 assert.ok(!ops.includes('/ops/scheduled/retry') && !ops.includes('/ops/scheduled/release'), 'no generic Operations retry or release bypass exists');

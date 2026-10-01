@@ -30,9 +30,14 @@ assert.strictEqual(providerResultError({ ok: false }).code, 'auth/invalid-creden
 const context = fs.readFileSync(require.resolve('../src/state/AuthContext.tsx'), 'utf8');
 const recent = context.indexOf('await reauthenticate();');
 const operational = context.indexOf('await closeOperationalAccount();');
-const profile = context.indexOf("await deleteDoc(doc(db, 'users', u.uid));");
 const login = context.indexOf('await deleteUser(u);');
-assert(recent >= 0 && recent < operational && operational < profile && profile < login);
+const localWipe = context.indexOf('await clearAllStorage();');
+assert(recent >= 0 && recent < operational && operational < login && login < localWipe);
+assert(!context.includes("deleteDoc(doc(db, 'users'"), 'client must not own irreversible profile PII deletion');
+const server = fs.readFileSync(require.resolve('./server'), 'utf8');
+const closeRoute = server.slice(server.indexOf("app.post('/account/close'"), server.indexOf('// --- Legal pages'));
+assert(closeRoute.indexOf("collection('users').doc(String(req.uid)).delete()") > closeRoute.indexOf('dropToken(String(req.uid), null, true)'), 'server retires device ownership before profile PII');
+assert(closeRoute.includes("collection('users').doc(String(req.uid)).delete()"), 'server owns profile PII retirement before Firebase identity deletion');
 
 const apple = fs.readFileSync(require.resolve('../src/state/appleSignIn.ts'), 'utf8');
 const google = fs.readFileSync(require.resolve('../src/state/googleSignIn.ts'), 'utf8');

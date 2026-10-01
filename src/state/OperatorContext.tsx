@@ -920,10 +920,12 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const cancelOp = useCallback(() => {
-    setOp(null);
-    setArrived(false);
+    // There is no authoritative “Operator cancelled an accepted Travel” transition yet.
+    // Never erase the local operation and pretend the Travel disappeared while the server
+    // still assigns it to this Operator. Going off duty may stop new offers, but the accepted
+    // Travel remains visible until an authoritative terminal/reassignment path exists.
     setOnlineState(false);
-    goOffline(); // leave the dispatchable fleet too, not just this screen's state
+    goOffline();
   }, []);
 
   opRef.current = op;

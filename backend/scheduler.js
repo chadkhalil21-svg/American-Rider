@@ -549,6 +549,10 @@ async function claim(db, id, now) {
       if (!snap.exists) return false;
       const r = snap.data();
       if (r.status !== 'reserved') return false;
+      const travelerUid = String(r.travelerUid || '');
+      if (!travelerUid) return false;
+      const fence = await tx.get(db.collection('account_operation_fences').doc(travelerUid));
+      if (fence.exists && fence.data()?.closing === true) return false;
       const held = Number(r.claimedAt) || 0;
       if (held && now - held < CLAIM_STALE_MS) return false; // somebody else has it
       tx.update(ref, { claimedAt: now });

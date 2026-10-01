@@ -68,4 +68,9 @@ assert.match(layout,/return unsubscribeToken/, 'push token listener must be remo
 assert.ok(pushServer.includes('recipientUid: String(uid)'), 'server push payload is bound to its intended account');
 assert.ok(layout.includes("recipientUid !== auth.currentUser?.uid"), 'native notification routing rejects a payload for another account');
 assert.ok(layout.includes('if (!recipientUid'), 'legacy/unbound notification payloads fail closed');
+assert.ok(server.includes("app.post('/push/register', requireAuth"), 'push token registration is authenticated server authority');
+assert.ok(server.includes("collection('push_token_owners')"), 'server maintains unique token-owner index');
+assert.ok(server.includes("previousUid !== uid"), 'registering a token to a new account evicts its previous account binding');
+assert.ok(pushClient.includes('/push/register') && pushClient.includes('/push/clear'), 'native client uses server token ownership endpoints');
+assert.ok(!rules.includes("'pushToken', 'pushPlatform', 'pushUpdatedAt', 'pushPrefs'"), 'clients cannot directly bypass server token ownership');
 console.log('PASS native permission, push and background-presence configuration invariants');

@@ -7,6 +7,10 @@ const presence = fs.readFileSync('src/backend/presence.ts','utf8');
 const authContext = fs.readFileSync('src/state/AuthContext.tsx','utf8');
 const layout = fs.readFileSync('app/_layout.tsx','utf8');
 const authScreen = fs.readFileSync('src/screens/AuthScreen.tsx','utf8');
+const pushServer = fs.readFileSync('backend/push.js','utf8');
+const server = fs.readFileSync('backend/server.js','utf8');
+const pushClient = push;
+const rules = fs.readFileSync('firestore.rules','utf8');
 
 assert.equal(app.ios.usesAppleSignIn, true);
 assert.ok(app.plugins.includes('expo-apple-authentication'));

@@ -41,8 +41,13 @@ assert.ok(server.includes('financialIdentityGeneration: paymentIdentity.financia
 assert.ok(scheduler.includes('financialIdentityGeneration: r.financialIdentityGeneration'), 'scheduler passes the frozen generation to off-session charging');
 assert.ok(scheduler.includes('paymentCheckpointGeneration: paid.financialIdentityGeneration'), 'successful scheduled charge checkpoint retains generation evidence');
 assert.ok(scheduler.includes("status: 'payment_integrity_hold'"), 'checkpoint mismatch is quarantined rather than retried as a fresh charge');
+assert.ok(scheduler.includes(".where('status', '==', 'reserved')"), 'scheduler considers only reserved reservations; integrity holds cannot be swept again');
 assert.ok(p.includes("code:'financial_identity_generation_required'"), 'legacy scheduled payment identity cannot be charged without generation evidence');
 const rules = fs.readFileSync(path.join(__dirname,'..','firestore.rules'),'utf8');
 const scheduledRules = rules.slice(rules.indexOf('match /scheduled_rides/'), rules.indexOf('// ---- support_tickets'));
 assert.ok(scheduledRules.includes('allow create: if false') && scheduledRules.includes('allow update: if false'), 'clients cannot forge scheduled payment checkpoints');
+assert.ok(scheduledRules.includes("allow delete: if ownsExisting() && resource.data.status == 'reserved'"), 'client cancellation cannot delete quarantined payment-integrity evidence');
+assert.ok(ops.includes("where('status', '==', 'payment_integrity_hold')"), 'Operations explicitly queries payment integrity quarantine');
+assert.ok(ops.includes('Payment integrity exceptions'), 'Operations visibly surfaces quarantined scheduled payments');
+assert.ok(!ops.includes('/ops/scheduled/retry') && !ops.includes('/ops/scheduled/release'), 'no generic Operations retry or release bypass exists');
 console.log('✓ one money architecture: charge platform, transfer on completed Travel');

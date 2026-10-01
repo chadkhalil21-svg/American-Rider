@@ -77,4 +77,8 @@ assert.ok(pushServer.includes('dropToken(uid, expectedToken = null)'), 'push ret
 assert.ok(pushServer.includes('if (expectedToken && token !== String(expectedToken)) return'), 'stale DeviceNotRegistered response cannot erase a newer token');
 assert.ok(pushServer.includes("tx.delete(ownerRef)"), 'provider invalidation retires the token-owner index');
 assert.ok(authContext.includes('await clearPushToken();') && authContext.indexOf('await clearPushToken();') < authContext.indexOf('await deleteDoc'), 'account deletion retires push ownership before deleting the user profile');
+assert.ok(server.includes('previousToken && previousToken !== token'), 'same-account push token rotation retires the previous owner index');
+assert.ok(server.includes('WRITE PHASE — no transaction reads below this point'), 'push registration separates Firestore transaction reads from writes');
+assert.ok(pushServer.includes('expectedToken = null, strict = false'), 'push retirement supports strict deletion cleanup without making ordinary sign-out blocking');
+assert.ok(server.includes('dropToken(String(req.uid), null, true)'), 'server account closure fails closed through strict push ownership retirement');
 console.log('PASS native permission, push and background-presence configuration invariants');

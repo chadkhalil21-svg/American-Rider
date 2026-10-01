@@ -48,6 +48,9 @@ assert.ok(scheduler.includes("recovered: true"), 'recovered Travel is explicitly
 assert.ok(scheduler.includes("!effectiveOperator.id || !existing.paymentIntentId"), 'recovery fails closed if committed Operator or payment identity is incomplete');
 assert.ok(scheduler.includes('chargedCents: paid.chargedCents'), 'fresh deterministic Travel persists the authoritative charged amount');
 assert.ok(scheduler.includes('chargedCents: Number(existing.chargedCents) || 0'), 'recovery reuses persisted charge fact rather than reconstructing money');
+assert.ok(scheduler.includes('paymentCheckpointAt'), 'successful scheduled payment is checkpointed before Travel creation');
+assert.ok(scheduler.includes('r.paymentIntentId && Number.isFinite(Number(r.chargedCents))'), 'retry recovers a checkpointed charge without requiring the saved card again');
+assert.ok(scheduler.indexOf('paymentCheckpointAt') < scheduler.indexOf('rideRef.create'), 'payment checkpoint is persisted before deterministic Travel creation');
 
 console.log('✓ scheduled Travel preserves Booker/Traveler party semantics');
 console.log('✓ scheduled Teen Travel uses Family authorization');

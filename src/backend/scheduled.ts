@@ -11,7 +11,6 @@
 // the traveler's screen say what has actually happened rather than what was hoped for.
 import {
   collection,
-  deleteDoc,
   doc,
   getDocs,
   onSnapshot,
@@ -28,6 +27,7 @@ export type SchedStatus =
   | 'unmatched' // nobody was available, and the hour has passed
   | 'payment_failed' // the card on file was declined
   | 'needs_attention' // charged, but the travel could not be created — for us, not them
+  | 'payment_integrity_hold' // stored payment evidence disagrees with Stripe; Operations review
   | 'cancelled'; // cancelled before dispatch, including revoked Family authorization
 
 export type ScheduledRide = {
@@ -136,7 +136,7 @@ export async function fetchScheduledRide(): Promise<ScheduledRide | null> {
         // A reservation that failed is kept in view for an hour, because the traveler has to
         // be told. Silently dropping it is how a 6:30 AM pickup that never came became
         // indistinguishable from one that was never made.
-        if (s === 'unmatched' || s === 'payment_failed' || s === 'needs_attention' || s === 'cancelled') {
+        if (s === 'unmatched' || s === 'payment_failed' || s === 'needs_attention' || s === 'payment_integrity_hold' || s === 'cancelled') {
           return r.atMs > Date.now() - 60 * 60 * 1000;
         }
         return r.atMs > Date.now();
@@ -177,13 +177,23 @@ export function watchScheduledRide(
   }
 }
 
-/** Cancel it. Returns whether the record is actually gone. */
-export async function deleteScheduledRide(id: string): Promise<boolean> {
-  if (!id) return false;
+export type ScheduledCancelResult = 'cancelled' | 'dispatch_in_progress' | 'not_cancellable' | 'failed';
+
+/** Cancel through server authority so cancellation and scheduler claim serialize on one record. */
+export async function cancelScheduledRide(id: string): Promise<ScheduledCancelResult> {
+  if (!id || !auth.currentUser) return 'failed';
   try {
-    await deleteDoc(doc(db, 'scheduled_rides', id));
-    return true;
+    const token = await auth.currentUser.getIdToken();
+    const res = await fetch(`${PAYMENT_SERVER_URL}/travel/schedule/${encodeURIComponent(id)}/cancel`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) return 'cancelled';
+    const body = await res.json().catch(() => ({}));
+    if (body?.code === 'scheduled_dispatch_in_progress') return 'dispatch_in_progress';
+    if (body?.code === 'scheduled_not_cancellable' || body?.code === 'scheduled_not_found') return 'not_cancellable';
+    return 'failed';
   } catch {
-    return false;
+    return 'failed';
   }
 }

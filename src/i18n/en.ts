@@ -154,6 +154,7 @@ export default {
     insuranceDisclosure: 'Statutory Insurance Disclosure',
     partRead: 'Read',
     openAllParts: 'Open all %{n} parts to continue',
+
   },
 
   // ---- TRAVELER -------------------------------------------------------------------------
@@ -1111,6 +1112,13 @@ export default {
     familySendMessage: 'Send Message',
     familyMessageFailed: 'The message was not sent.',
 
+    msgNotSent: "Message not sent. Check your connection and try again.",
+  },
+
+  // ---- LEGAL ----------------------------------------------------------------------------
+  // The documents themselves are served by the backend and translated there. This is the
+  // notice that appears above a translated one, and it is not boilerplate: it is what makes a
+  // convenience translation safe to offer at all.
   },
 
   // ---- LEGAL ----------------------------------------------------------------------------
@@ -1137,6 +1145,5 @@ export default {
     lostRecording: "Recording…",
     lostLocated: "Item Located",
     lostNotFound: "Item Not Found",
-    msgNotSent: "Message not sent. Check your connection and try again.",
   },
 } as const;

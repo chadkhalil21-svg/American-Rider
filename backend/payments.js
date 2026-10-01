@@ -951,6 +951,20 @@ async function chargeScheduledTravel({ travelCostCents, uid, email, tripNo, rese
   const stripe = getStripe();
   const q = quote(travelCostCents, undefined, governmentFees, cardCountry, tollCents);
   try {
+    // Recover the irreducible crash window: Stripe may have succeeded before Firestore could
+    // checkpoint the PaymentIntent. Search our own scheduled-payment metadata before requiring
+    // the card to still exist. The reservation id is server-generated and unique.
+    if (stripe.paymentIntents.search) {
+      const found = await stripe.paymentIntents.search({
+        query: `metadata['reservationId']:'${String(reservationId).replace(/'/g, "\\'")}' AND metadata['scheduled']:'true'`,
+        limit: 2,
+      });
+      const prior = Array.isArray(found?.data) ? found.data.find(x => x.status === 'succeeded' && String(x.metadata?.uid || '') === String(uid)) : null;
+      if (prior) {
+        if (Number(prior.amount) !== Number(q.travelerPays)) return { ok:false, code:'scheduled_payment_mismatch', error:'Recovered scheduled payment amount does not match the reservation' };
+        return { ok:true, paymentIntentId: prior.id, chargedCents: Number(prior.amount), breakdown:q, recovered:true };
+      }
+    }
     const customer = await customerForTraveler({ uid, email });
     const pm = await savedPaymentMethodFor(customer);
     if (!pm) {
@@ -981,6 +995,7 @@ async function chargeScheduledTravel({ travelCostCents, uid, email, tripNo, rese
           governmentFeeCents: String(q.governmentFeeCents),
           tollCents: String(q.tollCents),
           scheduled: 'true',
+          reservationId: String(reservationId),
         },
       },
       { idempotencyKey: `ar_sched_${reservationId}` },

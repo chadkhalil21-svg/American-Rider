@@ -81,4 +81,9 @@ assert.ok(server.includes('previousToken && previousToken !== token'), 'same-acc
 assert.ok(server.includes('WRITE PHASE — no transaction reads below this point'), 'push registration separates Firestore transaction reads from writes');
 assert.ok(pushServer.includes('expectedToken = null, strict = false'), 'push retirement supports strict deletion cleanup without making ordinary sign-out blocking');
 assert.ok(server.includes('dropToken(String(req.uid), null, true)'), 'server account closure fails closed through strict push ownership retirement');
+assert.ok(server.includes("push: perAccount({ name: 'push'"), 'push ownership mutations are rate limited per authenticated account');
+assert.ok(server.includes('ExponentPushToken|ExpoPushToken'), 'server rejects arbitrary strings as push ownership keys');
+assert.ok(server.includes("['ios','android'].includes(platform)"), 'push registration only accepts supported native platforms');
+assert.ok(server.includes("new Set(['enroute','arrived','complete'])"), 'push registration bounds preferences to the real notification schema');
+assert.ok(server.includes("app.post('/push/register', requireAuth, LIMITS.push"), 'push registration applies authenticated rate limiting');
 console.log('PASS native permission, push and background-presence configuration invariants');

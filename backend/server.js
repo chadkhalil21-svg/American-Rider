@@ -107,7 +107,7 @@ const { smartQuote, revalidateTransit } = require('./smart');
 const { transitHealth } = require('./transit');
 const { sweepScheduled, sweepSettlements } = require('./scheduler');
 const { sweepMonitor, sweepAssignments } = require('./monitor');
-const { notify } = require('./push');
+const { notify, dropToken } = require('./push');
 const { handleEvent, webhookReady } = require('./webhook');
 const { enqueueProviderEvent, processProviderEvent, sweepProviderEvents } = require('./providerqueue');
 const { acquireLease, renewLease, releaseLease, DEFAULT_LEASE_MS } = require('./schedulerlease');
@@ -460,18 +460,7 @@ app.post('/push/register', requireAuth, async (req, res) => {
 });
 
 app.post('/push/clear', requireAuth, async (req, res) => {
-  const uid = String(req.uid), db = adminDb(), userRef = db.collection('users').doc(uid);
-  await db.runTransaction(async (tx) => {
-    const snap = await tx.get(userRef);
-    if (!snap.exists) return;
-    const token = String(snap.data()?.pushToken || '');
-    tx.set(userRef, { pushToken: null, pushUpdatedAt: Date.now() }, { merge: true });
-    if (token) {
-      const ownerRef = db.collection('push_token_owners').doc(require('node:crypto').createHash('sha256').update(token).digest('hex'));
-      const owner = await tx.get(ownerRef);
-      if (owner.exists && String(owner.data()?.uid || '') === uid) tx.delete(ownerRef);
-    }
-  });
+  await dropToken(String(req.uid));
   res.json({ ok: true });
 });
 

@@ -290,7 +290,7 @@ async function sweepScheduled({ now = Date.now() } = {}) {
       continue;
     }
 
-    // ---- 2/3. Charge the card on file. ------------------------------------------------
+    // ---- 2/3. Charge the card on file, or recover a charge already checkpointed. --------
     const fareCents = Number(r.travelCostCents);
     if (!Number.isFinite(fareCents) || fareCents <= 0) {
       await close(db, id, 'unmatched', 'This reservation has no price on it and cannot be dispatched.');
@@ -298,20 +298,35 @@ async function sweepScheduled({ now = Date.now() } = {}) {
       continue;
     }
 
-    const paid = await chargeScheduledTravel({
-      travelCostCents: fareCents,
-      uid: r.travelerUid,
-      email: r.travelerEmail || '',
-      tripNo: r.tripNo || '',
-      reservationId: id,
-      dep: r.dep || '',
-      dest: r.dest || '',
-      // The traveler was quoted with the government fee for this pickup; the charge must be
-      // the quote. A reservation carries its pickup coordinates and only the NAME of its
-      // destination, so a drop-off fee — none exists today — would need destLat/destLng here.
-      governmentFees: Array.isArray(r.feeLines) ? r.feeLines : [],
-      cardCountry: r.cardCountry || null,
-    });
+    let paid;
+    if (r.paymentIntentId && Number.isFinite(Number(r.chargedCents)) && Number(r.chargedCents) > 0) {
+      // Stripe succeeded on an earlier sweep but the process died before Travel creation.
+      // The reservation checkpoint is authoritative recovery evidence; do not require the card
+      // still to be saved and do not initiate another charge.
+      paid = { ok: true, paymentIntentId: String(r.paymentIntentId), chargedCents: Number(r.chargedCents), recovered: true };
+    } else {
+      paid = await chargeScheduledTravel({
+        travelCostCents: fareCents,
+        uid: r.travelerUid,
+        email: r.travelerEmail || '',
+        tripNo: r.tripNo || '',
+        reservationId: id,
+        dep: r.dep || '',
+        dest: r.dest || '',
+        governmentFees: Array.isArray(r.feeLines) ? r.feeLines : [],
+        cardCountry: r.cardCountry || null,
+      });
+      if (paid.ok) {
+        // Minimize the Stripe→Firestore crash window. This checkpoint precedes Travel creation
+        // so the next sweep can recover payment even if the saved card later disappears.
+        await touch(db, id, {
+          paymentIntentId: paid.paymentIntentId,
+          chargedCents: paid.chargedCents,
+          paymentCheckpointAt: Date.now(),
+          paymentError: null,
+        });
+      }
+    }
 
     if (!paid.ok) {
       // The card failed, or the bank wants the traveler present. Either way NOBODY IS SENT.

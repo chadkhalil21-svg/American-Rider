@@ -166,7 +166,7 @@ function legalSentence(text: string, nodes: Record<string, React.ReactNode>) {
 
 export function AuthScreen() {
   const { t, language, setLanguage, languages } = useLanguage();
-  const { signUp, signIn, resetPassword, busy, error, diagnosticCode, setOnboarding } = useAuth();
+  const { user, onboarding, signUp, signIn, resetPassword, busy, error, diagnosticCode, setOnboarding } = useAuth();
   // AuthContext owns provider errors. The front door owns which flow they belong to.
   // A failure from Sign In must not be rendered as though Create Account just failed.
   // Chad's entry architecture. `appleReady` is the device's own answer, not an assumption;
@@ -235,6 +235,12 @@ export function AuthScreen() {
   }, []);
   const router = useRouter();
   const [step, setStep] = useState<Step>('welcome');
+
+  // If Firebase restored an account whose signup was interrupted after creation but before
+  // role selection, resume at that decision rather than presenting a second sign-in form.
+  useEffect(() => {
+    if (user && onboarding) setStep('select');
+  }, [user, onboarding]);
   const [name, setName] = useState('');
   const [mobile, setMobile] = useState('');
   const [email, setEmail] = useState('');

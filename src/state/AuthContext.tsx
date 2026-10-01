@@ -56,6 +56,7 @@ type AuthState = {
 
 const Ctx = createContext<AuthState | null>(null);
 const ONBOARDING_KEY = 'ar:auth-onboarding';
+const DELETION_KEY = 'ar:account-deletion';
 
 export function useAuth(): AuthState {
   const c = useContext(Ctx);
@@ -268,6 +269,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // failed credential both throw, so no operational or destructive step can follow.
         await reauthenticate();
         if (auth.currentUser?.uid !== u.uid) throw new Error(t('traveler.errNoAccountDelete'));
+        // Crash-consistency marker: once destructive work starts, a relaunch must not treat a
+        // partially deleted account as ordinary. It is UID-bound and survives process death.
+        await AsyncStorage.setItem(DELETION_KEY, u.uid);
         // 2. Stop future work before removing the login. Fail closed: deleting the login
         // while a scheduled Travel or an on-duty Operator remains could dispatch or charge
         // an account that can no longer control that work.
@@ -288,6 +292,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await clearAllStorage();
         // 5. The login itself. After this the app returns to the front door.
         await deleteUser(u);
+        await AsyncStorage.removeItem(DELETION_KEY).catch(() => undefined);
       }),
     // THE DEVICE IS CLEARED BEFORE THE SESSION ENDS. Firebase sign-out alone left every
     // `ar:` value on the phone for the next person who signed in — see accountStorage.ts.

@@ -6,4 +6,6 @@ assert.equal(/transfer_data\s*:/.test(p), false, 'Travel payment code must not c
 assert.equal(/application_fee_amount\s*:/.test(p), false, 'Travel payment code must not split funds at charge time');
 assert.ok(p.includes('stripe.transfers.create'), 'Operator settlement must use explicit transfer');
 assert.ok(p.includes('source_transaction: chargeId'), 'settlement transfer must be tied to the Travel charge');
+assert.ok(p.includes('idempotencyKey: `ar_customer_${String(uid)}`'), 'Stripe Customer creation is idempotent per immutable Firebase uid');
+assert.ok(p.indexOf('stripe.customers.search') < p.indexOf('ar_customer_${String(uid)}'), 'Customer search is only a lookup before deterministic creation, not the uniqueness primitive');
 console.log('✓ one money architecture: charge platform, transfer on completed Travel');

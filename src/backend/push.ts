@@ -80,6 +80,11 @@ export async function registerForPush(prefs?: PushPrefs): Promise<{
 
     const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId });
     if (!token) return { token: null, reason: t('traveler.errNoPushToken') };
+    // Permission/token acquisition crosses native async boundaries. The account may have
+    // changed while those sheets/APIs were pending; never attach this device to a stale UID.
+    if (auth.currentUser?.uid !== uid) {
+      return { token: null, reason: t('traveler.errNotSignedIn') };
+    }
 
     await setDoc(
       doc(db, 'users', uid),
@@ -112,6 +117,7 @@ export async function savePushPrefs(prefs: PushPrefs): Promise<boolean> {
   const uid = auth.currentUser?.uid;
   if (!uid) return false;
   try {
+    if (auth.currentUser?.uid !== uid) return false;
     await setDoc(doc(db, 'users', uid), { pushPrefs: prefs }, { merge: true });
     return true;
   } catch {

@@ -166,8 +166,9 @@ export default function OperatorPickup() {
           {progressFailed ? <Text style={styles.progressError}>{t('traveler.errReachARRetry')}</Text> : null}
         </>
       ) : (
+        <>
         <PrimaryButton
-          label={t('operator.commenceTravel')}
+          label={progressBusy ? t('traveler.familyWorking') : t('operator.commenceTravel')}
           color={colors.green}
           disabled={progressBusy}
           onPress={async () => {
@@ -181,6 +182,7 @@ export default function OperatorPickup() {
           style={{ marginTop: 24 }}
         />
         {progressFailed ? <Text style={styles.progressError}>{t('traveler.errReachARRetry')}</Text> : null}
+        </>
       )}
     </Screen>
   );

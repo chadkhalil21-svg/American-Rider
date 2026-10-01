@@ -582,4 +582,4 @@ function mount(app, express, deps = {}) {
   });
 }
 
-module.exports = { mount, signedIn, opsAccounts, tokenFor, opsAuthMode, sharedMode };
+module.exports = { mount, signedIn, opsAccounts, tokenFor, opsAuthMode, sharedMode, actorOf };

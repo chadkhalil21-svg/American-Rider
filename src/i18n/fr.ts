@@ -8,7 +8,6 @@ export default {
     continueWithApple: 'Continuer avec Apple',
     continueWithGoogle: 'Continuer avec Google',
     orDivider: 'ou',
-    emailOrMobileField: 'Adresse e-mail',
     continueLabel: 'Continuer',
     ssoNotConfigured: 'Cette connexion n’est pas encore configurée dans cette version.',
     appleUnavailable: 'Apple n’a pas pu terminer la connexion. Réessayez ou utilisez votre adresse e-mail.',

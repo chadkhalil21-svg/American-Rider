@@ -501,7 +501,7 @@ async function setSuspension({ db, uid, active, actor, note, now = Date.now() })
   });
 }
 
-module.exports = {
+module.exports = { localDateKey, expiredOn,
   REQUIRED_DOCS,
   FL_CARRYING_LIMIT_DOLLARS,
   FL_TNC_INSURANCE,

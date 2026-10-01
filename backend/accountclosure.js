@@ -33,7 +33,14 @@ async function closeOperationalAccount({ db, uid, now = Date.now() }) {
     { available: false, offlineAt: now, lat: null, lng: null },
     { merge: true },
   );
-  return { ok: true, cancelledScheduled: scheduled.length };
+  // Durable server-side closure state makes retries/crash recovery observable. Client-local
+  // markers can disappear on reinstall or storage cleanup; this record survives both and is
+  // written only after future operational work has been shut down.
+  await db.collection('account_closures').doc(uid).set(
+    { operationallyClosed: true, closedAt: now, cancelledScheduled: scheduled.length },
+    { merge: true },
+  );
+  return { ok: true, operationallyClosed: true, cancelledScheduled: scheduled.length };
 }
 
 module.exports = { ACTIVE_STATUSES, closeOperationalAccount };

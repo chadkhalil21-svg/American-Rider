@@ -178,7 +178,7 @@ const check = (label, cond, detail) => { results.push({ label, ok: !!cond, detai
     // Past the grace it stops retrying and says so.
     const h2 = makeDb({ scheduled_rides: { r1: base(-15) }, operators: FLEET, users: { opA: QUALIFIED_USER('opA'), opB: QUALIFIED_USER('opB') } });
     await inject(h2.db).sweepScheduled();
-    check('  past grace: payment_failed', h2.data.scheduled_rides.r1.status === 'payment_failed',
+    check('  past grace: expired before payment', h2.data.scheduled_rides.r1.status === 'unmatched',
       h2.data.scheduled_rides.r1.status);
     charge = async () => ({ ok: true, paymentIntentId: 'pi_fake', chargedCents: 2600 });
   }

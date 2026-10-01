@@ -39,6 +39,8 @@ assert.ok(scheduler.includes('out?.retryable'), 'transient push failure remains 
 assert.ok(scheduler.includes('dispatchEffects.${key}'), 'dispatch checkpoints update one nested effect instead of replacing siblings');
 assert.ok(pushSource.includes('retryable: true'), 'push transport exceptions are retryable');
 assert.ok(pushSource.includes("code === 'DeviceNotRegistered'"), 'invalid device token is terminal rather than endlessly retried');
+assert.ok(scheduler.includes('late && !recoverySnap.exists'), 'expired reservation cannot create a fresh Travel or charge after the dispatch window');
+assert.ok(scheduler.includes('dispatch window expired'), 'scheduler records explicit stale-dispatch failure rather than dispatching hours late');
 
 console.log('✓ scheduled Travel preserves Booker/Traveler party semantics');
 console.log('✓ scheduled Teen Travel uses Family authorization');

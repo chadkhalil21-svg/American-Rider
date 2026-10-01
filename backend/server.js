@@ -130,6 +130,8 @@ const { provisionTeenPin, verifyTeenPin } = require('./teenpickup');
 const { listPlatformMessages, markPlatformMessageRead } = require('./platforminbox');
 const { page } = require('./shell');
 const { screeningReady, screeningCurrent, sweepScreening } = require('./screening');
+const { runMarketReferenceSweep, firestoreReady: marketReferenceReady } = require('./market-reference-service');
+const { configuredCollectors: marketReferenceCollectors } = require('./market-evidence-collectors');
 
 const app = express();
 // One proxy in front (Render). Makes req.ip the caller rather than the proxy, which the
@@ -218,6 +220,7 @@ function productionReadiness() {
   if (!readKey('HERE_API_KEY')) missing.push('toll_provider');
   if (!readKey('SCHEDULER_TOKEN')) missing.push('scheduler_token');
   if (!adminStatus().ok) missing.push('firebase_admin');
+  if (!marketReferenceReady()) missing.push('market_reference_store');
   if (opsAuthMode() !== 'named') missing.push('ops_auth');
   return { ready: !productionMode || missing.length === 0, missing };
 }
@@ -367,6 +370,7 @@ app.get('/health', async (req, res) => {
     operationalMissing: readiness.missing,
     scheduler: readKey('SCHEDULER_TOKEN') ? 'authenticated' : 'off',
     tolls: readKey('HERE_API_KEY') ? 'on' : 'off',
+    marketReference: marketReferenceReady() ? 'scheduler-on' : 'off',
     receipts: mailReady() ? 'on' : 'off',
     // NO PROVIDER MEANS NOBODY CAN BE COMMISSIONED. Every operator sits at
     // `awaiting_provider`, which is deliberately not a pass and not dispatchable — so an
@@ -1691,7 +1695,7 @@ let lastSweep = { at: 0, report: null };
  * Promise.all.
  */
 async function runAllSweeps() {
-  const [scheduled, monitor, assignments, screening, settlements, providerEvents, operatorFees, familyAgeOut, insuranceMonitoring] = await Promise.allSettled([
+  const [scheduled, monitor, assignments, screening, settlements, providerEvents, operatorFees, familyAgeOut, insuranceMonitoring, marketReference] = await Promise.allSettled([
     sweepScheduled(),
     sweepMonitor(),
     sweepAssignments(),
@@ -1705,6 +1709,7 @@ async function runAllSweeps() {
     }),
     family.sweepFamilyAgeOut(),
     sweepInsuranceMonitoring({ db: adminDb(), requestConfirmation: issueInsuranceConfirmationRequest, notify }),
+    runMarketReferenceSweep({ collectors: marketReferenceCollectors() }),
   ]);
   const unwrap = (r) => (r.status === 'fulfilled' ? r.value : { ok: false, reason: String(r.reason) });
   return {
@@ -1717,6 +1722,7 @@ async function runAllSweeps() {
     operatorFees: unwrap(operatorFees),
     familyAgeOut: unwrap(familyAgeOut),
     insuranceMonitoring: unwrap(insuranceMonitoring),
+    marketReference: unwrap(marketReference),
   };
 }
 

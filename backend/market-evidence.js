@@ -21,6 +21,14 @@ const NATIONAL_SOURCE_CATALOG=Object.freeze({
     primaryEligible:true,
     caveat:'Requires commercial license/contract and field-level validation for intended pricing use.',
   }),
+  'nyc-tlc-hvfhv':Object.freeze({
+    type:SOURCE_TYPES.GOVERNMENT_TRIPS,
+    authority:'NYC Taxi & Limousine Commission',
+    coverage:'New York City, NY',
+    public:true,
+    primaryEligible:true,
+    caveat:'Published monthly, typically about two months delayed; use as structural/reference evidence, not a real-time quote feed.',
+  }),
   'chicago-tnp-open-data':Object.freeze({
     type:SOURCE_TYPES.GOVERNMENT_TRIPS,
     authority:'City of Chicago',
@@ -67,6 +75,18 @@ const NATIONAL_SOURCE_CATALOG=Object.freeze({
 });
 
 const MARKET_EVIDENCE_PLANS=Object.freeze({
+  'il-chicago':Object.freeze({
+    sources:Object.freeze(['chicago-tnp-open-data','independent-controlled-audit','gridwise-analytics']),
+    minimumIndependentFamilies:2,
+    liveCollectorRequiredForContinuousMonitoring:true,
+    bootstrapReference:null,
+  }),
+  'ny-nyc':Object.freeze({
+    sources:Object.freeze(['nyc-tlc-hvfhv','independent-controlled-audit','gridwise-analytics']),
+    minimumIndependentFamilies:2,
+    liveCollectorRequiredForContinuousMonitoring:true,
+    bootstrapReference:null,
+  }),
   'fl-southeast':Object.freeze({
     sources:Object.freeze(['independent-controlled-audit','american-rider-field-panel','gridwise-analytics']),
     minimumIndependentFamilies:2,

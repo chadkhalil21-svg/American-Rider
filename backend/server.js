@@ -91,8 +91,8 @@ const { fetchRoute } = require('./routes');
 const { planTrip } = require('./assistant');
 const { resolveIssue, supportMessage, replySender, MAX_OUT_OF_POCKET_CENTS } = require('./support');
 const { resolveOperatorIssue } = require('./operatorsupport');
-const { fileTicket, updateTicketLocation, listTickets } = require('./tickets');
-const { lostItemTicket, stampLostItemCase } = require('./lostitem');
+const { fileTicket, updateTicketLocation, listTickets, resolveTicket } = require('./tickets');
+const { lostItemTicket, stampLostItemCase, notifyLostItemOperators, operatorLostItem, respondLostItem } = require('./lostitem');
 const { adminDb, adminStatus, accountDisabled } = require('./firebase-admin');
 const { closeOperationalAccount } = require('./accountclosure');
 const { acceptOffer } = require('./eligibility');
@@ -115,7 +115,7 @@ const { sweepOperatorAccountFees } = require('./operatorfees');
 const crypto = require('node:crypto');
 const WORKER_ID = crypto.randomUUID();
 const { send, receiptEmail, emailReady: mailReady } = require('./email');
-const { mount: mountOps, opsAuthMode } = require('./ops');
+const { mount: mountOps, opsAuthMode, signedIn: opsSignedIn, actorOf: opsActorOf } = require('./ops');
 const { readDocument, documentsReady, READER_VERSION } = require('./documents');
 const { ready: r2Ready, uploadUrl: r2UploadUrl, readUrl: r2ReadUrl, owns: r2Owns } = require('./r2');
 const { assessOperator, assessAndRecord } = require('./qualification');
@@ -134,6 +134,16 @@ const { runMarketReferenceSweep, firestoreReady: marketReferenceReady } = requir
 const { configuredCollectors: marketReferenceCollectors } = require('./market-evidence-collectors');
 
 const app = express();
+
+// Reuse the same signed, named Operations session as the /ops console. This route changes
+// support-case state, so ordinary Firebase authentication is not sufficient authority.
+function requireOps(req, res, next) {
+  const name = opsSignedIn(req);
+  if (!name) return res.status(401).json({ error: 'Operations sign-in required' });
+  req.opsUser = name;
+  req.opsActor = opsActorOf(req);
+  return next();
+}
 // One proxy in front (Render). Makes req.ip the caller rather than the proxy, which the
 // per-address limits in ratelimit.js need.
 app.set('trust proxy', 1);
@@ -685,6 +695,17 @@ app.get('/support/cases', requireAuth, async (req, res) => {
   } catch (e) {
     return res.status(502).json({ error: 'Your cases could not be read', detail: String(e && e.message || e) });
   }
+});
+
+// Operations closes a human case only after the work is actually complete. The Traveler
+// sees this stored status through /support/cases; there is no client-side “resolved” switch.
+app.post('/ops/support/cases/:caseNo/resolve', requireOps, async (req, res) => {
+  const out = await resolveTicket({
+    caseNo: req.params.caseNo,
+    resolution: req.body?.resolution,
+    actor: req.opsUser || req.user?.email || 'operations',
+  });
+  return res.status(out.ok ? 200 : out.reason === 'not found' ? 404 : 400).json(out);
 });
 
 // Family / Teen Travel: guardian-created relationship, accepted by the teen account.
@@ -1286,7 +1307,40 @@ app.post('/lost-item', requireAuth, requireVerifiedEmail, LIMITS.lostItem, async
   if (filed.ok) {
     await stampLostItemCase({ itemId: (req.body || {}).itemId, uid: req.uid, caseNo: filed.caseNo });
   }
-  res.json({ ok: filed.ok, caseNo: filed.caseNo });
+  // A named Operator is not a notified Operator. Create a durable inbox message (with push
+  // as a delivery channel) and advance the status only after at least one message exists.
+  const operatorDelivery = await notifyLostItemOperators({
+    itemId: (req.body || {}).itemId,
+    uid: req.uid,
+  }).catch(() => ({ ok: false, delivered: 0 }));
+  res.json({
+    ok: filed.ok || operatorDelivery.ok,
+    caseNo: filed.caseNo,
+    operatorNotified: !!operatorDelivery.ok,
+    operatorDeliveryCount: Number(operatorDelivery.delivered || 0),
+  });
+});
+
+// --- Lost-item Operator recovery: a report is actionable, not merely named. ----------------
+app.get('/operator/lost-item/:id', requireAuth, async (req, res) => {
+  const out = await operatorLostItem({ itemId: req.params.id, operatorUid: req.uid });
+  if (!out.ok) return res.status(out.status || 500).json(out);
+  // Authorization above proves this authenticated Operator is named on this report. Only then
+  // mint a short-lived read URL for the Traveler's private lost-item photograph.
+  let photoUrl = null;
+  if (out.item?.photoObjectKey) {
+    try { photoUrl = await r2ReadUrl(out.item.photoObjectKey); } catch { photoUrl = null; }
+  }
+  return res.json({ ...out, item: { ...out.item, photoUrl } });
+});
+app.post('/operator/lost-item/:id/respond', requireAuth, async (req, res) => {
+  const out = await respondLostItem({
+    itemId: req.params.id,
+    operatorUid: req.uid,
+    outcome: req.body?.outcome,
+    tripNo: req.body?.tripNo || null,
+  });
+  return res.status(out.ok ? 200 : out.status || 500).json(out);
 });
 
 // --- Emergency: a traveler has opened the emergency screen. ------------------------------
@@ -3011,6 +3065,28 @@ app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, requireOperationalRea
   } catch (e) {
     res.status(502).json({ error: e.message });
   }
+});
+
+// Cancel a scheduled reservation only while it is still a reservation. The transaction closes
+// the race with the scheduler: once dispatch has advanced it, the Traveler must cancel the
+// resulting Travel through the normal Travel cancellation/refund lifecycle.
+app.delete('/travel/schedule/:id', requireAuth, async (req, res) => {
+  const db = adminDb();
+  if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
+  const ref = db.collection('scheduled_rides').doc(String(req.params.id || ''));
+  try {
+    const out = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) return { status: 404, body: { ok: false, code: 'not_found' } };
+      const row = snap.data() || {};
+      if (String(row.travelerUid || '') !== String(req.uid)) return { status: 403, body: { ok: false, code: 'forbidden' } };
+      const status = String(row.status || 'reserved');
+      if (status !== 'reserved') return { status: 409, body: { ok: false, code: 'already_advanced', status } };
+      tx.update(ref, { status: 'cancelled', closedReason: 'Cancelled by Traveler.', cancelledAt: Date.now() });
+      return { status: 200, body: { ok: true } };
+    });
+    return res.status(out.status).json(out.body);
+  } catch (e) { return res.status(502).json({ ok: false, error: e.message }); }
 });
 
 // Create a scheduled reservation with the same server authority as immediate dispatch.

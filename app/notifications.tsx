@@ -73,6 +73,8 @@ export default function Notifications() {
   // Why nothing can be delivered, when that is the case. Stated plainly on the screen: a set
   // of toggles above a permission the person has refused is the same lie in a smaller font.
   const [blocked, setBlocked] = useState<string | null>(null);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [saveFailed, setSaveFailed] = useState(false);
 
   useEffect(() => {
     if (Platform.OS === 'web') {
@@ -82,14 +84,22 @@ export default function Notifications() {
     registerForPush().then(({ token, reason }) => setBlocked(token ? null : reason));
   }, []);
 
-  const toggle = (id: string) => {
+  const toggle = async (id: string) => {
+    if (savingId) return;
     const next = { ...prefs, [id]: !prefs[id] };
+    setSavingId(id);
+    setSaveFailed(false);
+    // The server copy is authoritative because backend/push.js reads it before delivery.
+    // Do not show a preference as changed until that write has actually succeeded.
+    const stored = await savePushPrefs(next);
+    if (!stored) {
+      setSaveFailed(true);
+      setSavingId(null);
+      return;
+    }
     setPrefs(next);
-    AsyncStorage.setItem(prefsKey(), JSON.stringify(next)).catch(() => {});
-    // AND ON THE ACCOUNT. The device copy survives a restart; the account copy is the one the
-    // server reads before it sends, and without it the toggle governs nothing.
-    savePushPrefs(next);
-    // Turning something ON is the moment to ask, if we have not already.
+    await AsyncStorage.setItem(prefsKey(), JSON.stringify(next)).catch(() => {});
+    setSavingId(null);
     if (next[id] && blocked) {
       registerForPush(next).then(({ token, reason }) => setBlocked(token ? null : reason));
     }
@@ -108,11 +118,12 @@ export default function Notifications() {
               <Text style={styles.rowTitle}>{t(r.title)}</Text>
               <Text style={styles.rowSub}>{t(r.sub)}</Text>
             </View>
-            <Toggle label={t(r.title)} on={!!prefs[r.id]} onToggle={() => toggle(r.id)} />
+            <Toggle label={t(r.title)} on={!!prefs[r.id]} onToggle={() => { void toggle(r.id); }} />
           </View>
         ))}
       </Card>
 
+      {saveFailed ? <Text style={styles.blocked}>{t('traveler.notifSaveFailed')}</Text> : null}
       {/* WAS: "Nothing is sent to your phone yet." It was true, and it is not any more. */}
       {blocked ? (
         <Text style={styles.blocked}>{blocked}</Text>

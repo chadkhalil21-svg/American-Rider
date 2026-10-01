@@ -221,4 +221,25 @@ async function listTickets(uid, { limit = 20, database } = {}) {
     }));
 }
 
-module.exports = { fileTicket, newCaseNo, updateTicketLocation, listTickets };
+/**
+ * Resolve a support case. Server-side only: the account can read its status but cannot
+ * manufacture closure. A resolution is an operational fact, not an inbox convention.
+ */
+async function resolveTicket({ caseNo, resolution, actor = 'operations', now = Date.now() }, { database } = {}) {
+  const d = database || db();
+  if (!d || !caseNo || !String(resolution || '').trim()) return { ok: false, reason: 'case, database and resolution are required' };
+  const ref = d.collection('support_tickets').doc(String(caseNo));
+  const snap = await ref.get();
+  if (!snap.exists) return { ok: false, reason: 'not found' };
+  const ticket = snap.data() || {};
+  if (ticket.status === 'resolved') return { ok: true, alreadyResolved: true };
+  await ref.set({
+    status: 'resolved',
+    resolution: String(resolution).trim().slice(0, 4000),
+    resolvedAt: now,
+    resolvedBy: String(actor || 'operations').slice(0, 120),
+  }, { merge: true });
+  return { ok: true };
+}
+
+module.exports = { fileTicket, newCaseNo, updateTicketLocation, listTickets, resolveTicket };

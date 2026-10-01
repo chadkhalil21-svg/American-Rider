@@ -157,12 +157,9 @@ export default function OperatorPickup() {
         <PrimaryButton
           label={t('operator.commenceTravel')}
           color={colors.green}
-          onPress={() => {
-            // Report it before navigating. This screen used to only change its own route,
-            // so the traveler's phone had no way of knowing the journey had started and
-            // advanced on a timer instead.
-            op.beginTrip();
-            router.replace('/operator/trip');
+          onPress={async () => {
+            // Navigate only after the authoritative Travel accepted the onboard transition.
+            if (await op.beginTrip()) router.replace('/operator/trip');
           }}
           style={{ marginTop: 24 }}
         />

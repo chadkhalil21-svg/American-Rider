@@ -125,6 +125,8 @@ export default function Status() {
   const router = useRouter();
   const ride = useRide();
   const [cancelAsk, setCancelAsk] = useState(false);
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const [cancelFailed, setCancelFailed] = useState(false);
 
   // The live map's car eases into the pickup over a few seconds after the status flips to
   // "Operator Arrived" — hold the walk-to-your-car finder until it has visibly parked.
@@ -238,15 +240,22 @@ export default function Status() {
                 <Text style={styles.keepBtnText}>{t('traveler.keepTravel')}</Text>
               </Pressable>
               <Pressable
-                onPress={() => {
-                  ride.cancelRide();
-                  router.dismissTo('/');
+                disabled={cancelBusy}
+                onPress={async () => {
+                  if (cancelBusy) return;
+                  setCancelBusy(true);
+                  setCancelFailed(false);
+                  const ok = await ride.cancelRide();
+                  setCancelBusy(false);
+                  if (ok) router.dismissTo('/');
+                  else setCancelFailed(true);
                 }}
                 style={styles.yesCancelBtn}
               >
-                <Text style={styles.yesCancelText}>{t('traveler.yesCancel')}</Text>
+                <Text style={styles.yesCancelText}>{cancelBusy ? t('traveler.familyWorking') : t('traveler.yesCancel')}</Text>
               </Pressable>
             </View>
+            {cancelFailed ? <Text style={styles.cancelNote}>{t('traveler.cancelFailed')}</Text> : null}
           </View>
         ) : (
           <Pressable onPress={() => setCancelAsk(true)} hitSlop={10}>

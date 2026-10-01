@@ -209,7 +209,7 @@ export type RideStore = {
   rideActive: boolean;
   confirmRide: () => void;
   boardRide: () => void; // "I'm in the car" — resumes the trip from the arrival hold
-  cancelRide: () => void;
+  cancelRide: () => Promise<boolean>;
   matchedOp: MatchedOp | null; // the real operator matched from the live database
   dispatchState: DispatchState; // how the search for an operator is going
   retryDispatch: () => void; // try matching an operator again after none/error
@@ -232,7 +232,7 @@ export type RideStore = {
   msgs: Msg[]; // the current travel's thread
   sendMsg: (text: string) => void;
   threadFor: (tripNo: string) => Msg[];
-  sendMsgTo: (tripNo: string, text: string, lostItemId?: string | null) => void;
+  sendMsgTo: (tripNo: string, text: string, lostItemId?: string | null) => Promise<boolean>;
 
   // help / issues
   issue: string | null;
@@ -268,7 +268,7 @@ export type RideStore = {
   /** What the dispatcher has done with it: still waiting, operator sent, or why not. */
   schedState: ScheduledRide | null;
   scheduleRide: (info: SchedInfo) => void;
-  cancelScheduled: () => void;
+  cancelScheduled: () => Promise<boolean>;
 
   // audio
   share: boolean;
@@ -1267,50 +1267,42 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     return () => clearTimeout(t);
   }, [rideActive, status, boardRide, matchedOp]);
 
-  const cancelRide: () => void = useCallback(() => {
-    // A cancelled car leg ends the Smart Travel journey it belonged to; the traveler plans
-    // again from wherever they are.
+  const cancelRide: () => Promise<boolean> = useCallback(async () => {
+    const rideId = activeRideId.current;
+    if (!rideId) return false;
+    // Cancellation is authoritative and may include a refund. Do not dismantle the local
+    // journey until the server has accepted that state transition.
+    const result = await cancelTravel({ rideId });
+    if (!result.ok) return false;
     if (smartJourneyRef.current) {
       smartJourneyRef.current = null;
       setSmartJourney(null);
     }
-    // The lock screen is part of the travel. Cancelling ends it at once rather than leaving a
-    // card advertising a journey that is not happening.
     endTravelActivity(true);
     if (rideTimer.current) clearInterval(rideTimer.current);
     rideTimer.current = null;
     setRideActive(false);
     statusRef.current = 0;
     setStatus(0);
-    if (activeRideId.current) {
-      const cancelled = activeRideId.current;
-      // GIVE THE MONEY BACK. The traveler is charged at confirmation, before an operator has
-      // moved, and this used to write status 'cancelled' and stop — so cancelling left
-      // American Rider holding the whole fare for a journey nobody took, silently. The server
-      // refunds in full and records it against the travel.
-      // THE SERVER CANCELS, and only the server: it records 'cancelled' and refunds from the
-      // travel's own payment. The phone no longer writes 'cancelled' itself (firestore.rules),
-      // which would have bypassed the refund rules.
-      cancelTravel({ rideId: cancelled }).finally(() => refreshMyRides());
-      paidIntentRef.current = null;
-      settleRideRef.current = null;
-      activeRideId.current = null;
-      setWatchedRideId(null);
-    }
+    paidIntentRef.current = null;
+    settleRideRef.current = null;
+    activeRideId.current = null;
+    setWatchedRideId(null);
+    refreshMyRides();
+    return true;
   }, [refreshMyRides]);
 
   const threadFor = useCallback((tripNo: string) => threads[tripNo] ?? [], [threads]);
 
   const sendMsgTo = useCallback(
-    (tripNo: string, text: string, lostItemId?: string | null) => {
+    async (tripNo: string, text: string, lostItemId?: string | null) => {
       const t = text.trim();
-      if (!t || !tripNo) return;
-      setThreads((m) => ({ ...m, [tripNo]: [...(m[tripNo] ?? []), { me: true, text: t }] }));
+      if (!t || !tripNo) return false;
       // The message is written where the operator side reads it. Best-effort: the traveler's
       // words stay on screen either way, and no screen claims the operator has read them.
       // The operator on this travel, so the rule lets them read what was just written.
       const onTravel = myRidesRef.current?.find((r) => r.tripNo === tripNo);
-      sendTravelMessage({
+      const stored = await sendTravelMessage({
         // The ride record, which the security rule reads to confirm who is on this travel.
         rideId: onTravel?.id ?? (tripNo === lastTripRef.current.no ? watchedRideIdRef.current : null),
         tripNo,
@@ -1319,13 +1311,15 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
         operatorId: onTravel?.operatorId ?? matchedOpRef.current?.id ?? null,
         lostItemId,
       });
+      if (!stored) return false;
+      setThreads((m) => ({ ...m, [tripNo]: [...(m[tripNo] ?? []), { me: true, text: t }] }));
 
       // The scripted reply is the DEMO RIDE ONLY — it belongs to the simulated 2.6s-a-step
       // journey, where "Miguel" is a script. It must never fire on a lost item thread: an
       // invented "Got it — see you soon." over a bag nobody has looked for is precisely the
       // outcome-without-mechanism defect this build is removing.
       const isLiveDemoRide = rideActiveRef.current && tripNo === lastTripRef.current.no;
-      if (!isLiveDemoRide) return;
+      if (!isLiveDemoRide) return true;
       if (msgTimer.current) clearTimeout(msgTimer.current);
       msgTimer.current = setTimeout(() => {
         setThreads((m) => ({
@@ -1333,6 +1327,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
           [tripNo]: [...(m[tripNo] ?? []), { me: false, text: tr('traveler.opGotIt') }],
         }));
       }, 1600);
+      return true;
     },
     [],
   );
@@ -1507,19 +1502,19 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     [arrival, departure, travelClass, tripCoords, travelParty],
   );
 
-  const cancelScheduled = useCallback(() => {
+  const cancelScheduled = useCallback(async () => {
+    const id = schedIdRef.current;
+    if (!id) return false;
+    // Keep the reservation visible unless the server atomically accepted cancellation.
+    if (!(await deleteScheduledRide(id))) return false;
     setScheduled(false);
     setSchedInfo(null);
     setSchedSaved(null);
     setSchedState(null);
     setSchedId(null);
-    // Nothing may re-load a reservation the traveler has just cancelled — without this the
-    // loader below could race the delete and put the card straight back on the home screen.
     schedLoadRef.current = 'done';
-    if (schedIdRef.current) {
-      deleteScheduledRide(schedIdRef.current);
-      schedIdRef.current = null;
-    }
+    schedIdRef.current = null;
+    return true;
   }, []);
 
   // Read the reservation back once the traveler's own travel has loaded — which is what

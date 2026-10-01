@@ -6,10 +6,8 @@
 // reported "RESOLVED" over a bag nobody had looked for yet.
 //
 // THE RULE THIS FILE KEEPS: a status is written only once the thing it describes has
-// happened. `reported` means a record exists. `operator-notified` means named operators are
-// on the document. Nothing here can write `located` or `returned`, because only an operator
-// can know those — and the operator side is not built yet. So the screen shows a ladder with
-// the traveler standing on the rung they are actually on, and no higher.
+// happened. `reported` means a record exists; server-side Operator recovery owns later facts.
+// The Traveler client never promotes a report to located, returned, or return-arranged.
 import {
   addDoc,
   collection,
@@ -17,12 +15,11 @@ import {
   getDocs,
   onSnapshot,
   query,
-  updateDoc,
   where,
 } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { PAYMENT_SERVER_URL } from '../config';
-import { returnOperator, type RideRecord } from './dispatch';
+import { type RideRecord } from './dispatch';
 
 /**
  * The ladder, in order. `resolved` is deliberately not a value: an item is not resolved, it
@@ -60,6 +57,9 @@ export type LostItem = {
   candidateTripNos: string[];
   notifiedOperatorIds: string[];
   notifiedOperatorNames: string[];
+  /** Number of durable Operator inbox deliveries acknowledged by the server. */
+  operatorDeliveryCount?: number;
+  operatorDeliveryAt?: number | null;
   description: string;
   photoUrl: string | null;
   /** Private R2 object key; access is granted by the authenticated backend. */
@@ -144,10 +144,9 @@ export async function reportLostItem(args: {
     description: args.description.trim().slice(0, 2000),
     photoUrl,
     ...(photoObjectKey ? { photoObjectKey } : {}),
-    // The document naming the operators IS the notification, so the two are written in one
-    // step and the status can never run ahead of it. With no operator on the travel record
-    // there is nobody to notify and the report stops at `reported`.
-    status: operatorIds.length > 0 ? 'operator-notified' : 'reported',
+    // A database relation is not a notification. The server advances this only after it has
+    // created a durable Operator inbox message (push is an additional delivery channel).
+    status: 'reported',
     createdAt: now,
     statusAt: now,
     return: null,
@@ -249,80 +248,3 @@ export async function fetchMyLostItems(): Promise<LostItem[]> {
   }
 }
 
-export type ArrangeResult =
-  | { ok: true; ret: LostItemReturn }
-  | { ok: false; reason: 'no-operator' | 'write-failed' | 'signed-out' | 'travel-unknown' };
-
-/**
- * Arrange the return. THE PLATFORM CHOOSES; the traveler is never asked to negotiate.
- *
- * Path 1 — THE ORIGINAL OPERATOR, when they are still working. No cost: they have the item
- * already and their next travel can pass by. Tried first because it is the best outcome for
- * everyone.
- *
- * Path 2 — ANY OPERATOR, dispatched like a small delivery: whoever is nearest, paid the same
- * 99%. This is the answer when the original operator has finished for the day or left the
- * area, and it is the case worth getting right — the item is a passenger with no opinions,
- * and an operator who has finished their day is not penalised for having finished it.
- *
- * Either way it is a real dispatched travel, priced by the same server that prices every
- * other travel. When there are no coordinates to price from, `priced` comes back false and
- * the screen must show no amount rather than an invented one.
- */
-export async function arrangeReturn(args: {
-  item: LostItem;
-  /** Where the traveler wants the item brought. */
-  destination: { lat: number; lng: number } | null;
-}): Promise<ArrangeResult> {
-  const uid = auth.currentUser?.uid;
-  if (!uid) return { ok: false, reason: 'signed-out' };
-
-  // AN "I'M NOT SURE WHICH" REPORT HAS NO ORIGINAL OPERATOR YET.
-  //
-  // This took `notifiedOperatorIds[0]` — the first of however many operators the report was
-  // fanned out to, ordered by nothing meaningful — and, if that person happened to be free,
-  // told the traveler "the operator who drove your travel" is bringing it back. We have no
-  // reason to believe they drove it, and a return dispatched to the wrong car is the same
-  // defect as a status nobody set. A fanned-out report has to wait for an operator to say
-  // they have the item; that answer is what names the travel.
-  if (!args.item.tripNo) return { ok: false, reason: 'travel-unknown' };
-
-  // ONE QUESTION, ANSWERED ON THE SERVER. This was two calls that each pulled the whole fleet
-  // to the phone. The server tries the operator who drove the travel first and falls back to
-  // the nearest, holding both to the same gates as any dispatch.
-  if (!args.destination) return { ok: false, reason: 'no-operator' };
-  const found = await returnOperator({ lostItemId: args.item.id, destination: args.destination });
-  if (!found) return { ok: false, reason: 'no-operator' };
-
-  let ret: LostItemReturn;
-  if (found.path === 'original-operator') {
-    ret = {
-      path: 'original-operator',
-      operatorId: found.op.id,
-      operatorName: found.op.name,
-      costCents: 0,
-      priced: true,
-      arrangedAt: Date.now(),
-    };
-  } else {
-    ret = {
-      path: 'any-operator',
-      operatorId: found.op.id,
-      operatorName: found.op.name,
-      costCents: found.costCents,
-      priced: true,
-      arrangedAt: Date.now(),
-    };
-  }
-
-  try {
-    await updateDoc(doc(db, 'lost_items', args.item.id), {
-      return: ret,
-      status: 'return-arranged' as LostItemStatus,
-      statusAt: Date.now(),
-    });
-    return { ok: true, ret };
-  } catch {
-    return { ok: false, reason: 'write-failed' };
-  }
-}

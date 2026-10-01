@@ -1,7 +1,7 @@
 // The case a lost item report becomes: what a specialist reads, what is refused, and the
 // caps that keep a hostile body from writing a novel into the ticket.
 const assert = require('node:assert');
-const { lostItemTicket, stampLostItemCase, LOST_ITEM_REASON } = require('./lostitem');
+const { lostItemTicket, stampLostItemCase, notifyLostItemOperators, operatorLostItem, respondLostItem, LOST_ITEM_REASON } = require('./lostitem');
 
 const results = [];
 const check = (label, ok, detail) => results.push({ label, ok: !!ok, detail });
@@ -22,7 +22,7 @@ const one = lostItemTicket({
   trip: { no: 'AR-2117-MIA', dep: 'Miami Financial District', arr: 'Miami International Airport', totalCents: 1797 },
 });
 check('no error', !one.error);
-check('the reason says a person carries it', one.reason === LOST_ITEM_REASON && /person carries/.test(one.reason));
+check('the reason describes operator recovery with human fallback', one.reason === LOST_ITEM_REASON && /Operator recovery workflow/.test(one.reason));
 check('the trip passes through as the record has it', one.trip.dep === 'Miami Financial District' && one.trip.totalCents === 1797);
 check("the traveler's words are trimmed and quoted", /In the traveler's words:\nBlack bag, back seat\n/.test(one.description));
 check('the travel is named', /\nTravel: AR-2117-MIA\n/.test(one.description));
@@ -89,6 +89,58 @@ const fakeDb = {
   const broken = { collection: () => ({ doc: () => ({ get: async () => { throw new Error('offline'); } }) }) };
   const thrown = await stampLostItemCase({ itemId: 'abc123', uid: 'u1', caseNo: 'AR-C-000005' }, { database: broken });
   check('a Firestore error is ok:false, never a throw', !thrown.ok);
+
+
+  // ---- authoritative Operator recovery ----
+  const lost = {
+    li1: {
+      travelerUid: 'traveler1', tripNo: 'AR-2117-MIA', candidateTripNos: ['AR-2117-MIA'],
+      notifiedOperatorIds: ['op1'], description: 'Black bag', status: 'reported', operatorResponses: {},
+    },
+    li2: {
+      travelerUid: 'traveler1', tripNo: null, candidateTripNos: ['AR-A','AR-B'],
+      notifiedOperatorIds: ['op1','op2'], description: 'Keys', status: 'reported', operatorResponses: {},
+    },
+  };
+  const rides = {
+    'AR-A': { operatorId: 'op1' },
+    'AR-B': { operatorId: 'op2' },
+  };
+  const recoveryDb = {
+    collection: (name) => ({
+      doc: (id) => ({
+        get: async () => ({ exists: name === 'lost_items' && !!lost[id], data: () => lost[id] }),
+        set: async (patch) => { if (name === 'lost_items') Object.assign(lost[id], patch); },
+      }),
+      where: (field, op, value) => ({
+        limit: () => ({
+          get: async () => ({
+            docs: name === 'rides' && rides[value]
+              ? [{ data: () => rides[value] }]
+              : [],
+          }),
+        }),
+      }),
+    }),
+  };
+  const sent = [];
+  const delivery = await notifyLostItemOperators(
+    { itemId: 'li1', uid: 'traveler1' },
+    { database: recoveryDb, postMessage: async (m) => { sent.push(m); return { ok: true }; } },
+  );
+  check('operator-notified is earned by a durable inbox delivery', delivery.ok && delivery.delivered === 1 && lost.li1.status === 'operator-notified');
+  check('the Operator message opens the exact report', /itemId=li1/.test(sent[0]?.action?.screen || ''));
+  const denied = await operatorLostItem({ itemId: 'li1', operatorUid: 'op2' }, { database: recoveryDb });
+  check('an unrelated Operator cannot read the report', !denied.ok && denied.status === 403);
+  const ownReport = await operatorLostItem({ itemId: 'li1', operatorUid: 'op1' }, { database: recoveryDb });
+  check('a named Operator can read the minimum recovery record', ownReport.ok && ownReport.item.description === 'Black bag');
+
+  const wrongTrip = await respondLostItem({ itemId: 'li2', operatorUid: 'op1', outcome: 'located', tripNo: 'AR-B' }, { database: recoveryDb });
+  check('an Operator cannot claim another candidate Operator’s Travel', !wrongTrip.ok && wrongTrip.status === 403);
+  const firstNo = await respondLostItem({ itemId: 'li2', operatorUid: 'op1', outcome: 'not-found' }, { database: recoveryDb });
+  check('one not-found response does not close a multi-Operator search', firstNo.ok && firstNo.status === 'operator-notified');
+  const secondNo = await respondLostItem({ itemId: 'li2', operatorUid: 'op2', outcome: 'not-found' }, { database: recoveryDb });
+  check('not-found becomes final only after every candidate Operator answers', secondNo.ok && secondNo.status === 'not-found');
 
   for (const r of results) console.log(`${r.ok ? 'PASS' : 'FAIL'}  ${r.label}${r.detail ? ` — ${r.detail}` : ''}`);
   const failed = results.filter((r) => !r.ok);

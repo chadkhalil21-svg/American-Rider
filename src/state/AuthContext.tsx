@@ -45,7 +45,7 @@ type AuthState = {
    * afterwards — so an account created without one was stuck showing the local part of its
    * owner's email address wherever a name belonged, including to every traveler they drove.
    */
-  setDisplayName: (name: string) => Promise<void>;
+  setDisplayName: (name: string) => Promise<boolean>;
   resendEmailVerification: () => Promise<boolean>;
   requestEmailChange: (newEmail: string, reauthenticate: () => Promise<void>) => Promise<boolean>;
   deleteAccount: (reauthenticate: () => Promise<void>) => Promise<void>;
@@ -192,8 +192,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setBusy(false);
       }
     },
-    setDisplayName: (name) =>
-      run(async () => {
+    setDisplayName: async (name) => {
+      setBusy(true);
+      setError(null);
+      setDiagnosticCode(null);
+      try {
         const u = auth.currentUser;
         if (!u) throw new Error(t('traveler.errNoAccount'));
         const clean = name.trim().slice(0, 40);
@@ -205,7 +208,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // React does not re-render on a Firebase profile change — the user object is the
         // same instance — so the new name is published deliberately.
         setUser({ ...u, displayName: clean } as User);
-      }),
+        return true;
+      } catch (e: any) {
+        const code = typeof e?.code === 'string' ? e.code : 'auth/unknown';
+        setDiagnosticCode(code);
+        setError(friendly(code));
+        return false;
+      } finally {
+        setBusy(false);
+      }
+    },
     resendEmailVerification: async () => {
       const u = auth.currentUser;
       if (!u || !u.email || u.emailVerified) return !!u?.emailVerified;

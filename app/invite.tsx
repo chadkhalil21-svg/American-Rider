@@ -8,7 +8,7 @@
 // explain. What remains is real — a share sheet carrying the sentence shown on the screen, so
 // the traveler sees exactly what the recipient receives. An invitation that grants access and
 // is recorded against the inviter is a feature with a cost, and can be named once it exists.
-import React from 'react';
+import React, { useState } from 'react';
 import { Share, StyleSheet } from 'react-native';
 import { Text } from '../src/components/AppText';
 import { useGoBack } from '../src/components/nav';
@@ -20,16 +20,18 @@ import { colors } from '../src/theme';
 export default function Invitations() {
   const { t } = useLanguage();
   const goBack = useGoBack();
+  const [shareFailed, setShareFailed] = useState(false);
 
   // The sentence the recipient receives, in the traveler's language, with the site named the
   // way people say it.
   const message = t('traveler.inviteShareText', { site: LEGAL_URL.replace(/^https?:\/\//, '') });
 
   const sendInvitation = async () => {
+    setShareFailed(false);
     try {
       await Share.share({ message });
     } catch {
-      // cancelled — fine
+      setShareFailed(true);
     }
   };
 
@@ -46,6 +48,7 @@ export default function Invitations() {
         <Text style={styles.message}>{message}</Text>
       </Card>
 
+      {shareFailed ? <Text style={styles.error}>{t('traveler.inviteShareFailed')}</Text> : null}
       <PrimaryButton label={t('traveler.sendInvitation')} onPress={sendInvitation} style={{ marginTop: 16 }} />
     </Screen>
   );
@@ -55,4 +58,5 @@ const styles = StyleSheet.create({
   lbl: { marginTop: 22, marginBottom: 10 },
   card: { paddingVertical: 16, paddingHorizontal: 18 },
   message: { fontSize: 14.5, color: colors.ink, lineHeight: 22 },
+  error: { fontSize: 12.5, color: colors.red, lineHeight: 18, marginTop: 12 },
 });

@@ -247,7 +247,7 @@ type OperatorState = {
   /** The countdown ran out. Leaves the travel assigned; does NOT record a refusal. */
   lapseRequest: (r: SimRequest) => void;
   /** The traveler has boarded — reported so their screen can follow. */
-  beginTrip: () => void;
+  beginTrip: () => Promise<boolean>;
   /** Why going on duty was refused — shown on the operator home, never swallowed. */
   onlineError: string | null;
   /** The server's machine-readable reason, so a screen can point at the fix. */
@@ -279,9 +279,9 @@ type OperatorState = {
   respondToCheckIn: (text: string) => Promise<boolean>;
   /** Resolves true only once the server has accepted the travel for this operator. */
   acceptRequest: (r: SimRequest) => Promise<boolean>;
-  confirmArrival: () => void;
+  confirmArrival: () => Promise<boolean>;
   cancelOp: () => void;
-  completeOp: () => void;
+  completeOp: () => Promise<boolean>;
   lastCompleted: CompletedOp | null;
   msgs: OpMsg[];
   sendMsg: (text: string) => void;
@@ -903,17 +903,20 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
   // timer regardless of where the operator was; it now follows these writes.
   const confirmArrival = useCallback(async () => {
     const rideId = opRef.current?.rideId;
-    if (!rideId) return;
-    if (!(await markArrived(rideId))) return;
+    if (!rideId) return false;
+    if (!(await markArrived(rideId))) return false;
     setArrived(true);
     // The traveler may not be looking at their phone. Being outside is the one moment where
     // that matters most, and it is the notification every rideshare has and we did not.
     announceTravel(rideId, 'arrived');
+    return true;
   }, []);
 
   /** The traveler is in the car and the journey proper has begun. */
-  const beginTrip = useCallback(() => {
-    if (opRef.current?.rideId) markOnboard(opRef.current.rideId);
+  const beginTrip = useCallback(async () => {
+    const rideId = opRef.current?.rideId;
+    if (!rideId) return false;
+    return await markOnboard(rideId);
   }, []);
 
   const cancelOp = useCallback(() => {
@@ -926,9 +929,9 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
   opRef.current = op;
 
   const completeOp = useCallback(async () => {
-    if (!op) return;
+    if (!op) return false;
     if (op.rideId) {
-      if (!(await markCompleted(op.rideId))) return;
+      if (!(await markCompleted(op.rideId))) return false;
       announceTravel(op.rideId, 'completed');
     }
     const record: CompletedOp = {
@@ -945,6 +948,7 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
     commitRevenue({ ...revRef.current, ops: [record, ...revRef.current.ops] });
     setOp(null);
     setArrived(false);
+    return true;
   }, [op, commitRevenue]);
 
   // Keep the Operator's conversation on the same Travel-scoped record the Traveler sees.

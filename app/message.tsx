@@ -20,6 +20,8 @@ export default function Message() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ trip?: string; lost?: string }>();
   const [input, setInput] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
   // WHICH TRAVEL THIS THREAD IS ABOUT. Without it the operator has to guess which journey a
@@ -67,8 +69,17 @@ export default function Message() {
     scrollRef.current?.scrollToEnd({ animated: true });
   }, [msgs.length]);
 
-  const send = () => {
-    ride.sendMsgTo(tripNo, input, lostItemId);
+  const send = async () => {
+    const text = input.trim();
+    if (!text || sending) return;
+    setSending(true);
+    setSendError(null);
+    const storedOk = await ride.sendMsgTo(tripNo, text, lostItemId);
+    setSending(false);
+    if (!storedOk) {
+      setSendError(t('traveler.msgNotSent'));
+      return;
+    }
     setInput('');
   };
 
@@ -110,6 +121,7 @@ export default function Message() {
           showsVerticalScrollIndicator={false}
         >
           {threadError && <Text style={styles.emptyThread}>{threadError}</Text>}
+          {sendError && <Text style={styles.sendError}>{sendError}</Text>}
           {msgs.length === 0 && !threadError && (
             <Text style={styles.emptyThread}>
               {lostItemId
@@ -144,6 +156,7 @@ export default function Message() {
           />
           <Pressable
             onPress={send}
+            disabled={sending || !input.trim()}
             style={({ pressed }) => [styles.sendBtn, pressed && { backgroundColor: colors.ink2 }]}
           >
             <Text style={styles.sendText}>{t('traveler.send')}</Text>
@@ -159,6 +172,7 @@ const styles = StyleSheet.create({
   driverName: { fontSize: 18, fontWeight: '600', color: colors.ink },
   driverNote: { fontSize: 12, color: colors.muted, marginTop: 2 },
   emptyThread: { fontSize: 13.5, color: colors.muted, lineHeight: 20, paddingVertical: 8 },
+  sendError: { fontSize: 12.5, color: colors.red, lineHeight: 18, paddingVertical: 4 },
   bubble: {
     maxWidth: '78%',
     paddingVertical: 12,

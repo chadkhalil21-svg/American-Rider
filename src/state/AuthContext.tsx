@@ -17,6 +17,7 @@ import { auth, db } from '../firebase';
 import { t } from '../i18n';
 import { clearAccountStorage, clearAllStorage } from './accountStorage';
 import { closeOperationalAccount } from '../backend/account';
+import { clearPushToken } from '../backend/push';
 
 type AuthState = {
   user: User | null;
@@ -261,6 +262,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // `ar:` value on the phone for the next person who signed in — see accountStorage.ts.
     signOut: () =>
       run(async () => {
+        // Remove this device from the departing account before ending Firebase auth. Otherwise the
+        // same Expo/APNs token can remain attached to the old account after another person
+        // signs into this handset, leaking required Travel/safety notifications across accounts.
+        // Best-effort by design: clearPushToken never throws, so a transient Firestore failure
+        // cannot trap somebody inside an account they are trying to leave.
+        await clearPushToken();
         await clearAccountStorage();
         await fbSignOut(auth);
       }),

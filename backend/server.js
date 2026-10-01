@@ -130,7 +130,7 @@ const { provisionTeenPin, verifyTeenPin } = require('./teenpickup');
 const { listPlatformMessages, markPlatformMessageRead } = require('./platforminbox');
 const { page } = require('./shell');
 const { screeningReady, screeningCurrent, sweepScreening } = require('./screening');
-const { runMarketReferenceSweep } = require('./market-reference-service');
+const { runMarketReferenceSweep, firestoreReady: marketReferenceReady } = require('./market-reference-service');
 const { configuredCollectors: marketReferenceCollectors } = require('./market-evidence-collectors');
 
 const app = express();
@@ -220,6 +220,7 @@ function productionReadiness() {
   if (!readKey('HERE_API_KEY')) missing.push('toll_provider');
   if (!readKey('SCHEDULER_TOKEN')) missing.push('scheduler_token');
   if (!adminStatus().ok) missing.push('firebase_admin');
+  if (!marketReferenceReady()) missing.push('market_reference_store');
   if (opsAuthMode() !== 'named') missing.push('ops_auth');
   return { ready: !productionMode || missing.length === 0, missing };
 }
@@ -369,6 +370,7 @@ app.get('/health', async (req, res) => {
     operationalMissing: readiness.missing,
     scheduler: readKey('SCHEDULER_TOKEN') ? 'authenticated' : 'off',
     tolls: readKey('HERE_API_KEY') ? 'on' : 'off',
+    marketReference: marketReferenceReady() ? 'scheduler-on' : 'off',
     receipts: mailReady() ? 'on' : 'off',
     // NO PROVIDER MEANS NOBODY CAN BE COMMISSIONED. Every operator sits at
     // `awaiting_provider`, which is deliberately not a pass and not dispatchable — so an

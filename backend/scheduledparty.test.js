@@ -15,6 +15,9 @@ assert.ok(server.includes('civilDate !== serverDate || civilTime !== serverTime'
 assert.ok(server.includes('const partyResult = await normalizeParty(b'), 'scheduled route normalizes party through authoritative Family-aware policy');
 assert.ok(server.includes('party,'), 'scheduled record persists party');
 assert.ok(scheduler.includes('party: r.party || null'), 'scheduler carries party into live Travel');
+assert.ok(scheduler.includes("doc(`scheduled_${id}`)"), 'scheduled Travel identity is deterministic across crash/replay');
+assert.ok(scheduler.includes('if (existingRide.exists)'), 'scheduler recovers an already-created Travel after a crash');
+assert.ok(scheduler.includes('effectiveOperator = {'), 'replay preserves the Operator already committed to the Travel');
 assert.ok(scheduled.includes('civilDate?: string') && scheduled.includes('civilTime?: string'), 'client contract carries the displayed civil appointment for server validation');
 assert.ok(scheduled.includes("party?: { mode: 'self' | 'other_adult'"), 'client scheduled contract supports another adult');
 assert.ok(scheduled.includes("mode: 'self' | 'other_adult' | 'teen'"), 'client scheduled contract supports authorized Teen Travel');

@@ -417,6 +417,9 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       (arrival.lat != null && arrival.lng != null ? { lat: arrival.lat, lng: arrival.lng } : null);
     if (!dest) return;
     const seq = ++repriceSeq.current;
+    // The old pickup's quote ceases to be true the instant the pickup changes.
+    setQuotedFareCents(null);
+    setQuotedFeeLines([]);
     setRepricing(true);
     fetchQuote({ pickup: pickupPin, dest, destination: arrival.short, travelClass })
       .then((q) => {

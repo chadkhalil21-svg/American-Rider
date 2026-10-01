@@ -591,7 +591,7 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
       dest: t.dest,
       // THE FARE, NOT THE ALL-IN PRICE. costCents is what the TRAVELER paid — the fare plus
       // the platform fee — and earnOf takes 1% off whatever it is given.
-      fare: fareFromTotal(t.costCents / 100),
+      fare: t.travelCostCents > 0 ? t.travelCostCents / 100 : fareFromTotal(t.costCents / 100),
     });
   }, []);
 
@@ -770,7 +770,7 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
             ACTIVE_RESTORE_MAX_MS,
       );
       if (underway && !opRef.current) {
-        const fare = fareFromTotal(underway.costCents / 100);
+        const fare = underway.travelCostCents > 0 ? underway.travelCostCents / 100 : fareFromTotal(underway.costCents / 100);
         setOp({
           rideId: underway.rideId,
           tripNo: underway.tripNo,

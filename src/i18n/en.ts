@@ -1129,6 +1129,7 @@ export default {
 
     msgNotSent: "Message not sent. Check your connection and try again.",
     lostOperatorInboxDelivered: "Delivered to %{names} in the Operator inbox.",
+    notifSaveFailed: "Notification preference was not saved. Try again.",
   },
 
   // ---- LEGAL ----------------------------------------------------------------------------

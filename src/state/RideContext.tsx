@@ -209,7 +209,7 @@ export type RideStore = {
   rideActive: boolean;
   confirmRide: () => void;
   boardRide: () => void; // "I'm in the car" — resumes the trip from the arrival hold
-  cancelRide: () => void;
+  cancelRide: () => Promise<boolean>;
   matchedOp: MatchedOp | null; // the real operator matched from the live database
   dispatchState: DispatchState; // how the search for an operator is going
   retryDispatch: () => void; // try matching an operator again after none/error
@@ -1267,36 +1267,29 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     return () => clearTimeout(t);
   }, [rideActive, status, boardRide, matchedOp]);
 
-  const cancelRide: () => void = useCallback(() => {
-    // A cancelled car leg ends the Smart Travel journey it belonged to; the traveler plans
-    // again from wherever they are.
+  const cancelRide: () => Promise<boolean> = useCallback(async () => {
+    const rideId = activeRideId.current;
+    if (!rideId) return false;
+    // Cancellation is authoritative and may include a refund. Do not dismantle the local
+    // journey until the server has accepted that state transition.
+    const result = await cancelTravel({ rideId });
+    if (!result.ok) return false;
     if (smartJourneyRef.current) {
       smartJourneyRef.current = null;
       setSmartJourney(null);
     }
-    // The lock screen is part of the travel. Cancelling ends it at once rather than leaving a
-    // card advertising a journey that is not happening.
     endTravelActivity(true);
     if (rideTimer.current) clearInterval(rideTimer.current);
     rideTimer.current = null;
     setRideActive(false);
     statusRef.current = 0;
     setStatus(0);
-    if (activeRideId.current) {
-      const cancelled = activeRideId.current;
-      // GIVE THE MONEY BACK. The traveler is charged at confirmation, before an operator has
-      // moved, and this used to write status 'cancelled' and stop — so cancelling left
-      // American Rider holding the whole fare for a journey nobody took, silently. The server
-      // refunds in full and records it against the travel.
-      // THE SERVER CANCELS, and only the server: it records 'cancelled' and refunds from the
-      // travel's own payment. The phone no longer writes 'cancelled' itself (firestore.rules),
-      // which would have bypassed the refund rules.
-      cancelTravel({ rideId: cancelled }).finally(() => refreshMyRides());
-      paidIntentRef.current = null;
-      settleRideRef.current = null;
-      activeRideId.current = null;
-      setWatchedRideId(null);
-    }
+    paidIntentRef.current = null;
+    settleRideRef.current = null;
+    activeRideId.current = null;
+    setWatchedRideId(null);
+    refreshMyRides();
+    return true;
   }, [refreshMyRides]);
 
   const threadFor = useCallback((tripNo: string) => threads[tripNo] ?? [], [threads]);

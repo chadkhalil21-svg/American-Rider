@@ -8,7 +8,7 @@ import { Text } from '../src/components/AppText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useGoBack } from '../src/components/nav';
 import { useLanguage } from '../src/state/LanguageContext';
-import { sendTravelMessage, watchTravelThread, type TravelMessage } from '../src/backend/messages';
+import { watchTravelThread, type TravelMessage } from '../src/backend/messages';
 import { LetterheadBar, Mono } from '../src/components/UI';
 import { useRide } from '../src/state/RideContext';
 import { colors } from '../src/theme';
@@ -74,24 +74,12 @@ export default function Message() {
     if (!text || sending) return;
     setSending(true);
     setSendError(null);
-    const onTravel = ride.myRides.find((r) => r.tripNo === tripNo);
-    const rideId = onTravel?.id ?? (isCurrentTravel ? ride.watchedRideId : null);
-    const storedOk = await sendTravelMessage({
-      rideId,
-      tripNo,
-      text,
-      from: 'traveler',
-      operatorId: onTravel?.operatorId ?? ride.matchedOp?.id ?? null,
-      lostItemId,
-    });
+    const storedOk = await ride.sendMsgTo(tripNo, text, lostItemId);
     setSending(false);
     if (!storedOk) {
       setSendError(t('traveler.msgNotSent'));
       return;
     }
-    // Add to the local thread only after the server has accepted it. The Firestore listener
-    // will reconcile it with the authoritative record; no failed message is rendered as sent.
-    ride.appendSentMsg(tripNo, text);
     setInput('');
   };
 

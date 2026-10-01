@@ -14,6 +14,7 @@
 const Stripe = require('stripe');
 const { readKey, hasInvalidHeaderChars, describeInvalidChars } = require('./env');
 const { adminDb } = require('./firebase-admin');
+const { productionMode } = require('./runtime-mode');
 const {
   MIN_PLATFORM_FEE_CENTS,
   isDomesticCard,
@@ -241,6 +242,7 @@ async function customerForTraveler({ uid, email }) {
   const accountUid = String(uid || '');
   if (!accountUid) throw new Error('Firebase uid is required for Stripe Customer ownership');
   const db = adminDb();
+  if (!db && productionMode()) throw new Error('Stripe Customer ownership registry is unavailable');
   const ownerRef = db ? db.collection('stripe_customers').doc(accountUid) : null;
 
   if (ownerRef) {

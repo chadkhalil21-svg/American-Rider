@@ -232,11 +232,7 @@ export type RideStore = {
   msgs: Msg[]; // the current travel's thread
   sendMsg: (text: string) => void;
   threadFor: (tripNo: string) => Msg[];
-  sendMsgTo: (tripNo: string, text: string, lostItemId?: string | null) => void;
-  /** Add a message only after the server accepted it. */
-  appendSentMsg: (tripNo: string, text: string) => void;
-  /** Authoritative ride id currently watched, used for live-thread delivery. */
-  watchedRideId: string | null;
+  sendMsgTo: (tripNo: string, text: string, lostItemId?: string | null) => Promise<boolean>;
 
   // help / issues
   issue: string | null;
@@ -1306,15 +1302,14 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   const threadFor = useCallback((tripNo: string) => threads[tripNo] ?? [], [threads]);
 
   const sendMsgTo = useCallback(
-    (tripNo: string, text: string, lostItemId?: string | null) => {
+    async (tripNo: string, text: string, lostItemId?: string | null) => {
       const t = text.trim();
-      if (!t || !tripNo) return;
-      setThreads((m) => ({ ...m, [tripNo]: [...(m[tripNo] ?? []), { me: true, text: t }] }));
+      if (!t || !tripNo) return false;
       // The message is written where the operator side reads it. Best-effort: the traveler's
       // words stay on screen either way, and no screen claims the operator has read them.
       // The operator on this travel, so the rule lets them read what was just written.
       const onTravel = myRidesRef.current?.find((r) => r.tripNo === tripNo);
-      sendTravelMessage({
+      const stored = await sendTravelMessage({
         // The ride record, which the security rule reads to confirm who is on this travel.
         rideId: onTravel?.id ?? (tripNo === lastTripRef.current.no ? watchedRideIdRef.current : null),
         tripNo,
@@ -1323,13 +1318,15 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
         operatorId: onTravel?.operatorId ?? matchedOpRef.current?.id ?? null,
         lostItemId,
       });
+      if (!stored) return false;
+      setThreads((m) => ({ ...m, [tripNo]: [...(m[tripNo] ?? []), { me: true, text: t }] }));
 
       // The scripted reply is the DEMO RIDE ONLY — it belongs to the simulated 2.6s-a-step
       // journey, where "Miguel" is a script. It must never fire on a lost item thread: an
       // invented "Got it — see you soon." over a bag nobody has looked for is precisely the
       // outcome-without-mechanism defect this build is removing.
       const isLiveDemoRide = rideActiveRef.current && tripNo === lastTripRef.current.no;
-      if (!isLiveDemoRide) return;
+      if (!isLiveDemoRide) return true;
       if (msgTimer.current) clearTimeout(msgTimer.current);
       msgTimer.current = setTimeout(() => {
         setThreads((m) => ({
@@ -1337,15 +1334,10 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
           [tripNo]: [...(m[tripNo] ?? []), { me: false, text: tr('traveler.opGotIt') }],
         }));
       }, 1600);
+      return true;
     },
     [],
   );
-
-  const appendSentMsg = useCallback((tripNo: string, text: string) => {
-    const clean = text.trim();
-    if (!clean || !tripNo) return;
-    setThreads((m) => ({ ...m, [tripNo]: [...(m[tripNo] ?? []), { me: true, text: clean }] }));
-  }, []);
 
   const sendMsg = useCallback(
     (text: string) => sendMsgTo(lastTripRef.current.no, text),
@@ -1644,8 +1636,6 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     sendMsg,
     threadFor,
     sendMsgTo,
-      appendSentMsg,
-      watchedRideId: watchedRideIdRef.current,
     issue,
     issueState,
     issueTripNo,

@@ -236,16 +236,29 @@ function quote(travelCostCents, journey, governmentFees, cardCountry, tollCents)
  * Keyed on the Firebase uid in metadata rather than on email: an email can change hands, a
  * uid cannot, and this is the record a refund's ownership check ultimately rests on.
  */
-async function assertNoFinancialIdentityHold(uid) {
+async function financialIdentityAuthorization(uid) {
   const db = adminDb();
   if (!db) throw new Error('Stripe Customer ownership registry is unavailable');
   const snap = await db.collection('financial_identity_holds').doc(String(uid || '')).get();
-  if (snap.exists && snap.data()?.active === true) {
+  const state = snap.exists ? (snap.data() || {}) : {};
+  if (state.active === true) {
     const err = new Error('Financial identity reconciliation is in progress');
     err.code = 'financial_identity_hold';
     throw err;
   }
+  return { generation: Math.max(0, Number(state.generation) || 0) };
 }
+
+async function assertFinancialIdentityAuthorization(uid, expectedGeneration) {
+  const current = await financialIdentityAuthorization(uid);
+  if (Number.isFinite(Number(expectedGeneration)) && current.generation !== Number(expectedGeneration)) {
+    const err = new Error('Financial identity authorization changed during payment preparation');
+    err.code = 'financial_identity_generation_changed';
+    throw err;
+  }
+  return current;
+}
+
 
 async function customerForTraveler({ uid, email }) {
   const stripe = getStripe();
@@ -254,7 +267,7 @@ async function customerForTraveler({ uid, email }) {
   const db = adminDb();
   if (!db) throw new Error('Stripe Customer ownership registry is unavailable');
   const ownerRef = db.collection('stripe_customers').doc(accountUid);
-  await assertNoFinancialIdentityHold(accountUid);
+  await financialIdentityAuthorization(accountUid);
 
   if (ownerRef) {
     const owned = await ownerRef.get();
@@ -400,6 +413,7 @@ async function savedPaymentMethodFor(customer) {
 }
 
 async function scheduledPaymentIdentity({ uid, email }) {
+  const financialAuth = await financialIdentityAuthorization(uid);
   const customer = await customerForTraveler({ uid, email });
   const pm = await savedPaymentMethodFor(customer);
   return pm ? { customerId: String(customer.id), paymentMethodId: String(pm.id) } : null;
@@ -533,6 +547,7 @@ async function createPaymentIntent({ travelCostCents, uid, email, tripNo, rideId
       // Leg 2 of a Smart Travel journey records leg 1's Travel Number: the reason its fee
       // is not the standard one is then readable on Stripe's own record.
       journeyNo: journey?.journeyNo || '',
+      financialIdentityGeneration: String(financialAuth.generation),
     },
   };
   // NO `transfer_data` HERE — deliberately. See transferToOperator below for why the split
@@ -552,7 +567,7 @@ async function createPaymentIntent({ travelCostCents, uid, email, tripNo, rideId
   // No tripNo, no key. A Travel Number is what makes the key specific to one travel; keying on
   // uid and amount alone would make two genuinely different travels at the same fare collide,
   // and the second traveler would be handed the first one's intent.
-  await assertNoFinancialIdentityHold(uid);
+  await assertFinancialIdentityAuthorization(uid, financialAuth.generation);
   const pi = await stripe.paymentIntents.create(
     params,
     idempotencyForTravel('travel', uid, tripNo, params.amount),
@@ -1028,12 +1043,13 @@ async function chargeScheduledTravel({ travelCostCents, uid, email, tripNo, rese
   const stripe = getStripe();
   const q = quote(travelCostCents, undefined, governmentFees, cardCountry, tollCents);
   try {
-    // The idempotency key plus the reservation's frozen Customer/PaymentMethod identity is the\n    // crash-recovery primitive. Do not depend on Stripe Search's secondary index here.\n    const customer = customerId ? { id: String(customerId) } : await customerForTraveler({ uid, email });
+    // The idempotency key plus the reservation's frozen Customer/PaymentMethod identity is the\n    // crash-recovery primitive. Do not depend on Stripe Search's secondary index here.\n    const financialAuth = await financialIdentityAuthorization(uid);
+  const customer = customerId ? { id: String(customerId) } : await customerForTraveler({ uid, email });
     const pm = paymentMethodId ? { id: String(paymentMethodId) } : await savedPaymentMethodFor(customer);
     if (!pm) {
       return { ok: false, code: 'no_saved_card', error: 'No card on file for this traveler' };
     }
-    await assertNoFinancialIdentityHold(uid);
+    await assertFinancialIdentityAuthorization(uid, financialAuth.generation);
     const pi = await stripe.paymentIntents.create(
       {
         amount: q.travelerPays,
@@ -1060,6 +1076,7 @@ async function chargeScheduledTravel({ travelCostCents, uid, email, tripNo, rese
           tollCents: String(q.tollCents),
           scheduled: 'true',
           reservationId: String(reservationId),
+          financialIdentityGeneration: String(financialAuth.generation),
         },
       },
       { idempotencyKey: `ar_sched_${reservationId}` },

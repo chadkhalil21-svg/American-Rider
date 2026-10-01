@@ -9,6 +9,7 @@ const scheduled=read('src/backend/scheduled.ts');
 const party=read('backend/travelparty.js');
 const teenPickup=read('backend/teenpickup.js');
 const pushSource=read('backend/push.js');
+const payments=read('backend/payments.js');
 
 assert.ok(server.includes("app.post('/travel/schedule'"), 'scheduled route exists');
 assert.ok(server.includes('pickupRegion.timezone'), 'scheduled epoch is interpreted in the pickup market timezone');
@@ -51,6 +52,9 @@ assert.ok(scheduler.includes('chargedCents: Number(existing.chargedCents) || 0')
 assert.ok(scheduler.includes('paymentCheckpointAt'), 'successful scheduled payment is checkpointed before Travel creation');
 assert.ok(scheduler.includes('r.paymentIntentId && Number.isFinite(Number(r.chargedCents))'), 'retry recovers a checkpointed charge without requiring the saved card again');
 assert.ok(scheduler.indexOf('paymentCheckpointAt') < scheduler.indexOf('rideRef.create'), 'payment checkpoint is persisted before deterministic Travel creation');
+assert.ok(payments.includes("reservationId: String(reservationId)"), 'Stripe scheduled payment carries deterministic reservation identity');
+assert.ok(payments.includes('stripe.paymentIntents.search'), 'scheduled charge helper searches Stripe for success from a pre-checkpoint crash');
+assert.ok(payments.includes("scheduled_payment_mismatch"), 'recovered Stripe payment fails closed if its amount differs from the reservation');
 
 console.log('✓ scheduled Travel preserves Booker/Traveler party semantics');
 console.log('✓ scheduled Teen Travel uses Family authorization');

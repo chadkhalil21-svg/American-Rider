@@ -1108,5 +1108,6 @@ export default {
     lostRecording: "Wird gespeichert…",
     lostLocated: "Gegenstand gefunden",
     lostNotFound: "Gegenstand nicht gefunden",
+    msgNotSent: "Nachricht nicht gesendet. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
   },
 } as const;

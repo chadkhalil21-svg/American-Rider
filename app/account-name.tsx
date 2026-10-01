@@ -35,7 +35,7 @@ export default function AccountName() {
             returnKeyType="done"
             onSubmitEditing={() => {
               if (!changed || busy) return;
-              setDisplayName(clean).then(goBack);
+              setDisplayName(clean).then((ok) => { if (ok) goBack(); });
             }}
             style={styles.field}
           />
@@ -46,7 +46,7 @@ export default function AccountName() {
       <PrimaryButton
         label={busy ? t('traveler.busySaving') : t('traveler.save')}
         disabled={!changed || busy}
-        onPress={() => setDisplayName(clean).then(goBack)}
+        onPress={() => { void setDisplayName(clean).then((ok) => { if (ok) goBack(); }); }}
         style={{ paddingVertical: 16 }}
       />
     </Screen>

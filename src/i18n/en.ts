@@ -1137,5 +1137,6 @@ export default {
     lostRecording: "Recording…",
     lostLocated: "Item Located",
     lostNotFound: "Item Not Found",
+    msgNotSent: "Message not sent. Check your connection and try again.",
   },
 } as const;

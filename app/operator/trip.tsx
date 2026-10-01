@@ -2,7 +2,7 @@
 // the Route Suggestion card ("your call"), the traveler card, and the Your Revenue
 // card carrying the 99% line.
 import { useRouter } from 'expo-router';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../../src/components/AppText';
 import { OperatorMap } from '../../src/components/operator';
@@ -17,6 +17,8 @@ export default function OperatorTrip() {
   const router = useRouter();
   const op = useOperator();
   const active = op.op;
+  const [completeBusy, setCompleteBusy] = useState(false);
+  const [completeFailed, setCompleteFailed] = useState(false);
 
   // Cold-open guard only: once this screen has carried an operation, completing it
   // clears `op` while the Complete screen takes over — don't race that navigation.
@@ -140,18 +142,25 @@ export default function OperatorTrip() {
 
       <View style={{ flex: 1 }} />
       <PrimaryButton
-        label={t('operator.completeOperation')}
+        label={completeBusy ? t('traveler.familyWorking') : t('operator.completeOperation')}
+        disabled={completeBusy}
         onPress={async () => {
+          if (completeBusy) return;
+          setCompleteBusy(true); setCompleteFailed(false);
           // Completion drives settlement and revenue. Never show the completion receipt first.
-          if (await op.completeOp()) router.replace('/operator/complete');
+          const ok = await op.completeOp();
+          setCompleteBusy(false);
+          if (ok) router.replace('/operator/complete'); else setCompleteFailed(true);
         }}
         style={{ marginTop: 24 }}
       />
+      {completeFailed ? <Text style={styles.progressError}>{t('traveler.errReachARRetry')}</Text> : null}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  progressError: { fontSize: 12.5, color: colors.ink2, marginTop: 10, textAlign: 'center' },
   headRow: { flexDirection: 'row', alignItems: 'flex-start', marginTop: 6, gap: 12 },
   title: { fontSize: 22, fontWeight: '600', letterSpacing: -0.44, color: colors.ink },
   sub: { fontSize: 14, color: colors.muted, marginTop: 8, lineHeight: 21 },

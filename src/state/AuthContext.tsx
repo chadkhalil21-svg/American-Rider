@@ -17,6 +17,7 @@ import { auth, db } from '../firebase';
 import { t } from '../i18n';
 import { clearAccountStorage, clearAllStorage } from './accountStorage';
 import { closeOperationalAccount } from '../backend/account';
+import { clearPushToken } from '../backend/push';
 
 type AuthState = {
   user: User | null;
@@ -244,6 +245,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // while a scheduled Travel or an on-duty Operator remains could dispatch or charge
         // an account that can no longer control that work.
         await closeOperationalAccount();
+        // Detach this device while the departing Firebase identity can still authorize the write.
+        await clearPushToken();
         // 3. Their profile document (name, mobile, email). Transport, payment, safety and
         // qualification records are not deleted from the phone; their retention needs a
         // separate policy and privileged server handling.
@@ -261,6 +264,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // `ar:` value on the phone for the next person who signed in — see accountStorage.ts.
     signOut: () =>
       run(async () => {
+        // Retire this device's push destination before ending the Firebase session.
+        await clearPushToken();
         await clearAccountStorage();
         await fbSignOut(auth);
       }),

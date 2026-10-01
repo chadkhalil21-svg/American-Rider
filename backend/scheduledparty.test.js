@@ -8,6 +8,7 @@ const scheduler=read('backend/scheduler.js');
 const scheduled=read('src/backend/scheduled.ts');
 const party=read('backend/travelparty.js');
 const teenPickup=read('backend/teenpickup.js');
+const pushSource=read('backend/push.js');
 
 assert.ok(server.includes("app.post('/travel/schedule'"), 'scheduled route exists');
 assert.ok(server.includes('pickupRegion.timezone'), 'scheduled epoch is interpreted in the pickup market timezone');
@@ -34,6 +35,10 @@ assert.ok(scheduled.includes('civilDate?: string') && scheduled.includes('civilT
 assert.ok(scheduled.includes("party?: { mode: 'self' | 'other_adult'"), 'client scheduled contract supports another adult');
 assert.ok(scheduled.includes("mode: 'self' | 'other_adult' | 'teen'"), 'client scheduled contract supports authorized Teen Travel');
 assert.ok(party.includes('normalizeTeenParty'), 'server delegates scheduled Teen Travel to Family authorization');
+assert.ok(scheduler.includes('out?.retryable'), 'transient push failure remains eligible for scheduler recovery');
+assert.ok(scheduler.includes('dispatchEffects.${key}'), 'dispatch checkpoints update one nested effect instead of replacing siblings');
+assert.ok(pushSource.includes('retryable: true'), 'push transport exceptions are retryable');
+assert.ok(pushSource.includes("code === 'DeviceNotRegistered'"), 'invalid device token is terminal rather than endlessly retried');
 
 console.log('✓ scheduled Travel preserves Booker/Traveler party semantics');
 console.log('✓ scheduled Teen Travel uses Family authorization');

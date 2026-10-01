@@ -1,0 +1,27 @@
+name: Live Firebase Auth Commissioning
+
+on:
+  pull_request:
+    branches: [release/current]
+    paths:
+      - 'src/firebase.ts'
+      - 'src/state/AuthContext.tsx'
+      - 'src/screens/AuthScreen.tsx'
+      - 'scripts/commission-live-firebase-auth.cjs'
+      - '.github/workflows/live-firebase-auth-commissioning.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live-firebase-auth:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Exercise production Firebase account and session boundary
+        run: node scripts/commission-live-firebase-auth.cjs

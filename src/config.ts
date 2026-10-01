@@ -18,7 +18,7 @@
 // (On a real phone "localhost" means the phone itself, so that override only ever works on
 // the simulator or on web.)
 export const PAYMENT_SERVER_URL =
-  process.env.EXPO_PUBLIC_API_URL || 'https://american-rider-server.onrender.com';
+  process.env.EXPO_PUBLIC_API_URL || 'https://american-rider-server-3d7x.onrender.com';
 
 // WHICH COMMIT THIS BUILD IS. Stamped at build time — scripts/build-simulator.sh for the
 // simulator, scripts/eas-build-pre-install.sh for EAS/TestFlight — so a build can prove what

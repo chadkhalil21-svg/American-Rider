@@ -282,7 +282,7 @@ export function AuthScreen() {
       }
       setStep('select');
     } else {
-      signIn(email, password);
+      await signIn(email, password);
     }
   };
 

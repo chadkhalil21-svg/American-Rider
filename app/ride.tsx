@@ -8,7 +8,7 @@
 // payment state.
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Platform, Pressable, Share, StyleSheet, View } from 'react-native';
 import { Text } from '../src/components/AppText';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
 import { useNative } from '../src/components/anim';
@@ -29,6 +29,7 @@ import { prettyPlace, STATUS_ETAS, STATUS_LABELS, VENUE_NOTES } from '../src/dat
 import { useRide } from '../src/state/RideContext';
 import { useLanguage } from '../src/state/LanguageContext';
 import { colors, fmt, radii } from '../src/theme';
+import { followLink } from '../src/backend/follow';
 
 // Called during render and handed the screen's own `t`, so the line changes with the
 // language instead of freezing at whatever locale was current when this module loaded.
@@ -256,6 +257,24 @@ export default function Status() {
     );
   }
 
+  const shareBookedTravel = async () => {
+    if (ride.travelParty.mode !== 'other_adult' || !ride.matchedOp?.rideId) return;
+    const link = await followLink(ride.matchedOp.rideId);
+    const op = ride.matchedOp;
+    const message = [
+      t('traveler.safetyShareIntro', { place: ride.lastTrip.arr }),
+      t('traveler.safetyOperatorLine', { name: op.name, car: op.car, plate: op.plate }),
+      t('traveler.safetyArrivingIn', { n: op.etaMin }),
+      t('traveler.safetyTravelNumber', { no: ride.lastTrip.no }),
+      link && t('traveler.safetyFollowHere', { link }),
+    ].filter(Boolean).join(' ');
+    try {
+      await Share.share({ message });
+    } catch {
+      // The Booker dismissed the native share sheet.
+    }
+  };
+
   return (
     <Screen>
       <LetterheadBar onMenu={() => router.navigate('/account')} />
@@ -453,6 +472,19 @@ export default function Status() {
         <Text style={styles.tripNoLabel}>{t('traveler.travelNumber')}</Text>
         <Mono size={13}>{ride.lastTrip.no}</Mono>
       </Card>
+
+      {/* Booking for another adult stays intentionally lightweight: name at booking, then one
+          native share action once a real Travel exists. The guest needs no American Rider
+          account and receives no authority over the Booker's payment or account. The shared
+          bearer link is the same short-lived, Travel-scoped capability used by Safe Travels. */}
+      {ride.travelParty.mode === 'other_adult' && ride.matchedOp?.rideId && (
+        <Pressable onPress={shareBookedTravel} accessibilityRole="button">
+          <Card style={styles.guestShareCard}>
+            <Text style={styles.guestShareTitle}>{t('traveler.shareTravelBtn')}</Text>
+            <Text style={styles.guestShareChev}>›</Text>
+          </Card>
+        </Pressable>
+      )}
 
       {ride.payment.status !== 'idle' && (
         <Card style={styles.payCard}>
@@ -671,6 +703,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tripNoLabel: { fontSize: 13.5, color: colors.ink2 },
+  guestShareCard: { marginTop: 10, paddingVertical: 14, paddingHorizontal: 18, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  guestShareTitle: { fontSize: 14.5, fontWeight: '600', color: colors.ink },
+  guestShareChev: { fontSize: 18, color: colors.muted },
   payCard: {
     marginTop: 12,
     paddingVertical: 15,

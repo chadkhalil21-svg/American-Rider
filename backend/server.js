@@ -29,6 +29,7 @@ const {
   defaultCardCountry, scheduledPaymentIdentity, chargeOperatorAccountFee,
 } = require('./payments');
 const { readKey } = require('./env');
+const { stripeKeyMode, deploymentMode, productionMode: runtimeProductionMode } = require('./runtime-mode');
 const { requireAuth, attachAuth, requireVerifiedEmail } = require('./auth');
 const { perAccount, countOnly, perIp } = require('./ratelimit');
 const { marketFor, servesPoint, listMarkets, markets: allMarkets } = require('./markets');
@@ -188,12 +189,11 @@ app.use(express.json()); // parse JSON request bodies — everything BELOW the w
 // version of this line checked only `sk_live_`, so a restricted live key would have run real
 // money while /health reported "test" and the app told travelers nothing was being charged.
 const KEY = readKey('STRIPE_SECRET_KEY');
-const keyMode = /^(sk|rk)_live_/.test(KEY) ? 'live' : /^(sk|rk)_test_/.test(KEY) ? 'test' : 'no-key';
-const DEPLOYMENT_MODE = String(readKey('DEPLOYMENT_MODE') || 'development').toLowerCase();
-const declaredProduction = DEPLOYMENT_MODE === 'production';
+const keyMode = stripeKeyMode();
+const DEPLOYMENT_MODE = deploymentMode();
 // A live Stripe credential is itself a production posture. This prevents an omitted or mistyped
 // DEPLOYMENT_MODE from allowing real-money operation around the full readiness gate.
-const productionMode = declaredProduction || keyMode === 'live';
+const productionMode = runtimeProductionMode();
 const operationalMode = productionMode;
 
 // Native apps do not depend on browser CORS. Browser clients do, so production permits only

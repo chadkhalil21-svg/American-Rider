@@ -26,9 +26,20 @@ async function closeOperationalAccount({ db, uid, now = Date.now() }) {
   if (active.length) return { ok: false, code: 'active_travel' };
 
   const scheduled = await recordsFor(db, 'scheduled_rides', 'travelerUid', uid);
-  // Do not use one Firestore batch: an account can accumulate more than the 500-operation
-  // batch limit over time. If any delete fails, the endpoint fails and the login remains.
-  await Promise.all(scheduled.map((d) => d.ref.delete()));
+  let cancelledScheduled = 0;
+  for (const d of scheduled) {
+    const outcome = await db.runTransaction(async (tx) => {
+      const fresh = await tx.get(d.ref);
+      if (!fresh.exists) return 'gone';
+      const r = fresh.data() || {};
+      if (r.status === 'cancelled') return 'already_cancelled';
+      if (r.status !== 'reserved' || Number(r.claimedAt) > 0) return 'in_flight';
+      tx.update(d.ref, { status:'cancelled', cancelledAt:now, closedReason:'Account closed.', claimedAt:null });
+      return 'cancelled';
+    });
+    if (outcome === 'in_flight') return { ok:false, code:'scheduled_travel_in_progress' };
+    if (outcome === 'cancelled') cancelledScheduled++;
+  }
   await db.collection('operators').doc(uid).set(
     { available: false, offlineAt: now, lat: null, lng: null },
     { merge: true },
@@ -37,10 +48,10 @@ async function closeOperationalAccount({ db, uid, now = Date.now() }) {
   // markers can disappear on reinstall or storage cleanup; this record survives both and is
   // written only after future operational work has been shut down.
   await db.collection('account_closures').doc(uid).set(
-    { operationallyClosed: true, closedAt: now, cancelledScheduled: scheduled.length },
+    { operationallyClosed: true, closedAt: now, cancelledScheduled },
     { merge: true },
   );
-  return { ok: true, operationallyClosed: true, cancelledScheduled: scheduled.length };
+  return { ok: true, operationallyClosed: true, cancelledScheduled };
 }
 
 module.exports = { ACTIVE_STATUSES, closeOperationalAccount };

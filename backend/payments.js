@@ -489,6 +489,7 @@ function idempotencyForTravel(kind, uid, tripNo, amountCents) {
 async function createPaymentIntent({ travelCostCents, uid, email, tripNo, rideId, dep, dest, journey, governmentFees, cardCountry, tollCents = 0 }) {
   const stripe = getStripe();
   const q = quote(travelCostCents, journey, governmentFees, cardCountry, tollCents);
+  const financialAuth = await financialIdentityAuthorization(uid);
 
   // The PaymentSheet needs all three: a customer, a short-lived key that lets the phone read
   // that customer's saved cards, and the intent itself.

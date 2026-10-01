@@ -438,7 +438,7 @@ export const INSURERS: {
   },
 ];
 
-export const APP_FEE = 2.0;
+export const APP_FEE = 2.5;
 
 // Internal economics constants. The server remains authoritative; these mirror
 // backend/economics.js so local display fallbacks cannot quote a different amount.

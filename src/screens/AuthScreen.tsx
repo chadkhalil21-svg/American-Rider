@@ -17,7 +17,7 @@ import Svg, { Path } from 'react-native-svg';
 
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { appleSignInAvailable, signInWithApple } from '../state/appleSignIn';
-import { googleSignInConfigured, useGoogleSignIn } from '../state/googleSignIn';
+import { googleSignInConfigured, signInWithGoogleWeb, useGoogleSignIn } from '../state/googleSignIn';
 
 // DESIGN PREVIEW ONLY, AND OFF UNLESS A BUILD ASKS FOR IT. Chad asked (13 Sept 2026) to see
 // the Apple and Google controls rendered before the Firebase client ids exist, so that the
@@ -67,7 +67,7 @@ function InkButton({
 // cannot be called conditionally and my guard sat inside the press handler instead. The hook
 // lives in this component, and the parent mounts the component only when the ids exist, so
 // the unconfigured case never reaches it. Found by running the build, not by reading it.
-function GoogleEntry({ label, onFailed, onStart }: { label: string; onFailed: () => void; onStart: () => void }) {
+function GoogleNativeEntry({ label, onFailed, onStart }: { label: string; onFailed: () => void; onStart: () => void }) {
   const google = useGoogleSignIn();
   if (!google.ready) return null;
   return (
@@ -77,6 +77,20 @@ function GoogleEntry({ label, onFailed, onStart }: { label: string; onFailed: ()
       onPress={async () => {
         onStart();
         const r = await google.signIn();
+        if (!r.ok && !r.cancelled) onFailed();
+      }}
+    />
+  );
+}
+
+function GoogleWebEntry({ label, onFailed, onStart }: { label: string; onFailed: () => void; onStart: () => void }) {
+  return (
+    <SsoButton
+      label={label}
+      glyph="google"
+      onPress={async () => {
+        onStart();
+        const r = await signInWithGoogleWeb();
         if (!r.ok && !r.cancelled) onFailed();
       }}
     />
@@ -379,7 +393,7 @@ export function AuthScreen() {
             <TextInput
               value={entry}
               onChangeText={setEntry}
-              placeholder={t('auth.emailOrMobileField')}
+              placeholder={t('auth.emailLabel')}
               placeholderTextColor={colors.faint}
               keyboardType="email-address"
               autoCapitalize="none"
@@ -423,11 +437,19 @@ export function AuthScreen() {
           {(googleSignInConfigured || SSO_PREVIEW) && (
             <>
               {googleSignInConfigured ? (
-                <GoogleEntry
+                <>{Platform.OS === 'web' ? (
+                <GoogleWebEntry
                   label={t('auth.continueWithGoogle')}
                   onFailed={() => setSsoError(t('auth.googleUnavailable'))}
                   onStart={() => setSsoError('')}
                 />
+              ) : (
+                <GoogleNativeEntry
+                  label={t('auth.continueWithGoogle')}
+                  onFailed={() => setSsoError(t('auth.googleUnavailable'))}
+                  onStart={() => setSsoError('')}
+                />
+              )}</>
               ) : (
                 <SsoButton
                   label={t('auth.continueWithGoogle')}

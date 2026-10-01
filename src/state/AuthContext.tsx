@@ -287,12 +287,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // traveler can retry; deleting authentication while leaving profile PII behind would
         // make the remaining record harder for its owner to control.
         await deleteDoc(doc(db, 'users', u.uid));
-        // 4. Everything this app kept on the phone — role, operator qualification,
-        //    revenue, preferences, trusted contacts, the welcome flag.
-        await clearAllStorage();
-        // 5. The login itself. After this the app returns to the front door.
+        // 4. Delete the login while the crash marker still exists. If the process dies here,
+        // a surviving Firebase identity sees that deletion was interrupted rather than being
+        // treated as an ordinary account on relaunch.
         await deleteUser(u);
-        await AsyncStorage.removeItem(DELETION_KEY).catch(() => undefined);
+        // 5. Only after Firebase confirms the identity is gone, remove everything this app kept
+        // on the phone — including the deletion marker itself.
+        await clearAllStorage();
       }),
     // THE DEVICE IS CLEARED BEFORE THE SESSION ENDS. Firebase sign-out alone left every
     // `ar:` value on the phone for the next person who signed in — see accountStorage.ts.

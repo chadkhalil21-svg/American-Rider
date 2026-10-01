@@ -26,9 +26,9 @@ async function collectChicago({marketId='il-chicago'}={}){
     return normalizeObservation({
       marketId,sourceId:'chicago-tnp-open-data',sourceType:'government-trips',observedAt,
       serviceClass:'standard',routedMiles:Number(r.trip_miles),routedMinutes:Number(r.trip_seconds)/60,
-      travelerTotalCents:Math.round(Number(r.trip_total)*100),daypart:chicagoDaypart(observedAt),
+      travelerTotalCents:Math.round((Number(r.fare)+Number(r.additional_charges||0))*100),daypart:chicagoDaypart(observedAt),
       weekdayWeekend:chicagoWeekend(observedAt),calendarClass:'ordinary',regulatedLocationClass:'ordinary',
-      provenance:'City of Chicago Transportation Network Providers - Trips (2025-), dataset 6dvr-xwnh',
+      provenance:'City of Chicago TNP Trips 2025+, dataset 6dvr-xwnh; comparable passenger charge = fare + additional_charges, excludes voluntary tip; fare rounded by publisher',
     });
   });
 }

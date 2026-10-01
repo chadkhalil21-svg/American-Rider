@@ -160,6 +160,9 @@ export default {
   // Traveler surfaces speak human. Same restraint, plainer words — and the same refusal to
   // reassure: the price is stated, never defended.
   traveler: {
+    scheduledDispatchBegun: "Dispatch has begun. Open the Travel to review its current status.",
+    scheduledCancelFailed: "This scheduled Travel could not be cancelled. Its current status has been preserved.",
+    scheduledPaymentReview: "Payment verification requires review. No additional charge will be attempted automatically.",
     beginTravel: 'Begin Travel',
     departure: 'Departure',
     destinationEntry: 'Select your destination',

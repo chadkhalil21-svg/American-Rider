@@ -21,6 +21,14 @@ const NATIONAL_SOURCE_CATALOG=Object.freeze({
     primaryEligible:true,
     caveat:'Requires commercial license/contract and field-level validation for intended pricing use.',
   }),
+  'nyc-tlc-hvfhv':Object.freeze({
+    type:SOURCE_TYPES.GOVERNMENT_TRIPS,
+    authority:'NYC Taxi & Limousine Commission',
+    coverage:'New York City, NY',
+    public:true,
+    primaryEligible:true,
+    caveat:'Published monthly, typically about two months delayed; use as structural/reference evidence, not a real-time quote feed.',
+  }),
   'chicago-tnp-open-data':Object.freeze({
     type:SOURCE_TYPES.GOVERNMENT_TRIPS,
     authority:'City of Chicago',

@@ -7,6 +7,7 @@ const server=read('backend/server.js');
 const scheduler=read('backend/scheduler.js');
 const scheduled=read('src/backend/scheduled.ts');
 const party=read('backend/travelparty.js');
+const teenPickup=read('backend/teenpickup.js');
 
 assert.ok(server.includes("app.post('/travel/schedule'"), 'scheduled route exists');
 assert.ok(server.includes('pickupRegion.timezone'), 'scheduled epoch is interpreted in the pickup market timezone');
@@ -22,6 +23,9 @@ assert.ok(scheduler.includes("emitOnce('operatorAssigned'"), 'operator assignmen
 assert.ok(scheduler.includes("emitOnce('travelerAssigned'"), 'traveler assignment has independent durable completion');
 assert.ok(scheduler.includes("emitOnce('teenPickupCode'"), 'Teen PIN delivery has independent durable completion');
 assert.ok(scheduler.includes('provisionTeenPin'), 'replay can recover the existing Teen PIN before resuming missing effects');
+assert.ok(teenPickup.includes("createCipheriv('aes-256-gcm'"), 'Teen PIN recovery material is authenticated-encrypted, not plaintext');
+assert.ok(teenPickup.includes('TEEN_PIN_SEAL_KEY'), 'Teen PIN recovery requires server-held key material');
+assert.ok(teenPickup.includes('if(current?.sealedPin)'), 'Teen PIN provisioning recovers rather than rotates an existing code');
 assert.ok(scheduled.includes('civilDate?: string') && scheduled.includes('civilTime?: string'), 'client contract carries the displayed civil appointment for server validation');
 assert.ok(scheduled.includes("party?: { mode: 'self' | 'other_adult'"), 'client scheduled contract supports another adult');
 assert.ok(scheduled.includes("mode: 'self' | 'other_adult' | 'teen'"), 'client scheduled contract supports authorized Teen Travel');

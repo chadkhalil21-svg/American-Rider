@@ -277,6 +277,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // account still owns the session; otherwise deletion can leave iOS/Android waking the
         // app for background location even though the server correctly refuses the renewal.
         await stopBackgroundPresence();
+        // Retire the device-token ownership while authentication still exists. Otherwise
+        // deleting users/{uid} can orphan the server's token-owner index.
+        await clearPushToken();
         // 3. Their profile document (name, mobile, email). Transport, payment, safety and
         // qualification records are not deleted from the phone; their retention needs a
         // separate policy and privileged server handling.

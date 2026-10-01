@@ -138,6 +138,12 @@ export default function TravelConfirmation() {
   const chooseDestination = React.useCallback(
     async (place: Place, opts?: { keepSearchOpen?: boolean }) => {
       const req = ++priceReq.current;
+      // A destination change invalidates every quote-derived fact immediately. Keeping the
+      // previous quote (or falling back to place.cost === 0) while the new server quote is in
+      // flight makes the platform-fee floor look like a complete Travel price.
+      ride.setQuotedFareCents(null);
+      ride.setQuotedFeeLines([]);
+      ride.setTripCoords(null);
       ride.setArrival(place);
       if (!opts?.keepSearchOpen) {
         setSearching(false);
@@ -271,11 +277,16 @@ export default function TravelConfirmation() {
   // THE SAME SUM THE SERVER CHARGES, per class: the class fare, the platform fee on it, and
   // any government fee fenced for this trip. The chosen class's figure is ride.travelerTotal,
   // the one derivation every money screen reads; these rows use the same three lines.
-  const baseCents = ride.quotedFareCents ?? Math.round(ride.arrival.cost * 100);
+  const authoritativePriceReady = ride.quotedFareCents != null && !pricing && !ride.repricing && !priceFailed && !unavailable;
   const governmentFee = ride.quotedFeeLines.reduce((sum, l) => sum + l.cents, 0) / 100;
   const allIn = (key: string) => {
-    const fare = applyClassCents(baseCents, key) / 100;
+    if (!authoritativePriceReady || ride.quotedFareCents == null) return null;
+    const fare = applyClassCents(ride.quotedFareCents, key) / 100;
     return +(fare + platformFee(fare) + governmentFee).toFixed(2);
+  };
+  const displayClassPrice = (key: string) => {
+    const amount = allIn(key);
+    return amount == null ? '—' : fmt(amount);
   };
 
   // `meta` carries the server's measured distance as "18.7 mi" once a quote has landed; a
@@ -594,7 +605,7 @@ export default function TravelConfirmation() {
                           key={cls.key}
                           accessibilityRole="radio"
                           accessibilityState={{ checked: on }}
-                          accessibilityLabel={`${t(classNameKey(cls.key))}, ${fmt(allIn(cls.key))}`}
+                          accessibilityLabel={`${t(classNameKey(cls.key))}, ${displayClassPrice(cls.key)}`}
                           onPress={() => ride.setTravelClass(cls.key)}
                         >
                           <View style={[styles.row, i > 0 && styles.hair]}>
@@ -611,7 +622,7 @@ export default function TravelConfirmation() {
                               <Text style={styles.rowSub}>{t(cls.sub)}</Text>
                             </View>
                             <Num size={15} weight="600">
-                              {fmt(allIn(cls.key))}
+                              {displayClassPrice(cls.key)}
                             </Num>
                           </View>
                         </Pressable>

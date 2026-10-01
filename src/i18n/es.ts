@@ -1123,8 +1123,6 @@ export default {
     lostOperatorInboxDelivered: "Entregado a %{names} en la bandeja del Operador.",
   },
 
-  },
-
   legal: {
     termsTitle: 'Términos del Servicio',
     privacyTitle: 'Política de Privacidad',

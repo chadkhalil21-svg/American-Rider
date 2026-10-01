@@ -19,7 +19,6 @@ import * as Crypto from 'expo-crypto';
 import {
   OAuthProvider,
   reauthenticateWithCredential,
-  revokeAccessToken,
   signInWithCredential,
   updateProfile,
 } from 'firebase/auth';
@@ -120,44 +119,6 @@ export async function reauthenticateWithApple(): Promise<AppleResult> {
   if (!authResult.ok) return authResult;
   try {
     await reauthenticateWithCredential(user, authResult.credential);
-    return { ok: true };
-  } catch (e: unknown) {
-    return { ok: false, cancelled: false, reason: safeAuthReason(e) };
-  }
-}
-
-
-/**
- * Reauthenticate an Apple account and revoke its Apple authorization before account deletion.
- * Firebase requires a fresh Apple authorization code for native iOS revocation. The Firebase
- * JS SDK exposes revokeAccessToken(accessToken), not the native iOS authorization-code API;
- * therefore this helper exchanges the short-lived Apple authorization code for an access token
- * at the server boundary before revocation. Never place the Apple client secret in the app.
- */
-export async function reauthenticateAndRevokeAppleForDeletion(): Promise<AppleResult> {
-  const user = auth.currentUser;
-  if (!user) return { ok: false, cancelled: false, reason: 'no_current_user' };
-  const authResult = await appleCredential();
-  if (!authResult.ok) return authResult;
-  try {
-    await reauthenticateWithCredential(user, authResult.credential);
-    const authorizationCode = authResult.apple.authorizationCode;
-    if (!authorizationCode) return { ok: false, cancelled: false, reason: 'no_authorization_code' };
-
-    const apiBase = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '');
-    if (!apiBase) return { ok: false, cancelled: false, reason: 'apple_revocation_unavailable' };
-    const idToken = await user.getIdToken();
-    const response = await fetch(\`\${apiBase}/auth/apple/revoke\`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: \`Bearer \${idToken}\` },
-      body: JSON.stringify({ authorizationCode }),
-    });
-    if (!response.ok) return { ok: false, cancelled: false, reason: 'apple_revocation_failed' };
-    const payload = (await response.json()) as { accessToken?: unknown };
-    if (typeof payload.accessToken !== 'string' || !payload.accessToken) {
-      return { ok: false, cancelled: false, reason: 'apple_revocation_failed' };
-    }
-    await revokeAccessToken(auth, payload.accessToken);
     return { ok: true };
   } catch (e: unknown) {
     return { ok: false, cancelled: false, reason: safeAuthReason(e) };

@@ -521,9 +521,9 @@ export default function Home() {
                 setScheduledCancelNotice('');
                 const result = await ride.cancelScheduled();
                 if (result === 'dispatch_in_progress') {
-                  setScheduledCancelNotice('Dispatch has begun. Open the Travel to review its current status.');
+                  setScheduledCancelNotice(t('traveler.scheduledDispatchBegun'));
                 } else if (result !== 'cancelled') {
-                  setScheduledCancelNotice('This scheduled Travel could not be cancelled. Its current status has been preserved.');
+                  setScheduledCancelNotice(t('traveler.scheduledCancelFailed'));
                 }
               }} hitSlop={8}>
                 <Text style={styles.upcomingCancel}>{t('traveler.cancel2')}</Text>
@@ -543,7 +543,7 @@ export default function Home() {
           )}
           {!!scheduledCancelNotice && <Text style={styles.upcomingFail}>{scheduledCancelNotice}</Text>}
           {ride.schedState?.status === 'payment_integrity_hold' && (
-            <Text style={styles.upcomingFail}>Payment verification requires review. No additional charge will be attempted automatically.</Text>
+            <Text style={styles.upcomingFail}>{t('traveler.scheduledPaymentReview')}</Text>
           )}
           {ride.schedState?.status === 'needs_attention' && (
             <Text style={styles.upcomingFail}>

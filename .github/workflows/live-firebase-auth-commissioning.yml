@@ -9,6 +9,8 @@ on:
       - 'src/screens/AuthScreen.tsx'
       - 'scripts/commission-live-firebase-auth.cjs'
       - '.github/workflows/live-firebase-auth-commissioning.yml'
+  push:
+    branches: [release/current]
   workflow_dispatch:
 
 permissions:

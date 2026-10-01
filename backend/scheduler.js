@@ -269,11 +269,22 @@ async function sweepScheduled({ now = Date.now() } = {}) {
       // never create a second one after the claim lease expires.
       const rideRef = db.collection('rides').doc(`scheduled_${id}`);
       const existingRide = await rideRef.get();
+      let effectiveOperator = match.operator;
+      let effectiveEtaMin = match.etaMin;
       if (existingRide.exists) {
         const existing = existingRide.data() || {};
         if (String(existing.reservationId || '') !== id || String(existing.travelerUid || '') !== String(r.travelerUid)) {
           throw new Error('scheduled Travel identity collision');
         }
+        // Recovery must honor the Operator already committed by the first attempt. A later
+        // fleet match is irrelevant once a Travel exists.
+        effectiveOperator = {
+          id: existing.operatorId,
+          name: existing.operatorName || '',
+          car: existing.operatorCar || '',
+          plate: existing.operatorPlate || '',
+        };
+        effectiveEtaMin = Number(existing.operatorEtaMin) || match.etaMin;
       } else await rideRef.create({
         travelerUid: r.travelerUid,
         travelerName: r.travelerName || '',
@@ -304,13 +315,13 @@ async function sweepScheduled({ now = Date.now() } = {}) {
         paymentIntentId: paid.paymentIntentId,
       });
 
-      taken.add(match.operator.id);
+      taken.add(effectiveOperator.id);
 
       // TELL BOTH OF THEM. A scheduled travel is dispatched while nobody is looking at a
       // phone — that is the entire point of it — so a reservation that becomes a travel in
       // silence is a car arriving at a door nobody is behind.
       await notify({
-        uid: match.operator.id,
+        uid: effectiveOperator.id,
         kind: 'travel_assigned',
         title: 'Scheduled travel assigned',
         body: `${r.dep || 'Pickup'} to ${r.dest || 'destination'}. Open to accept.`,
@@ -321,7 +332,7 @@ async function sweepScheduled({ now = Date.now() } = {}) {
         kind: 'operator_assigned',
         title: 'Your operator is on the way',
         body:
-          `${match.operator.name || 'An operator'} is ${match.etaMin} minutes from ` +
+          `${effectiveOperator.name || 'An operator'} is ${effectiveEtaMin} minutes from ` +
           `${r.dep || 'your pickup'}.`,
         data: { screen: '/ride', rideId: rideRef.id, tripNo: r.tripNo || '' },
       });
@@ -334,9 +345,9 @@ async function sweepScheduled({ now = Date.now() } = {}) {
         status: 'dispatched',
         claimedAt: null,
         rideId: rideRef.id,
-        operatorId: match.operator.id,
-        operatorName: match.operator.name || '',
-        etaMin: match.etaMin,
+        operatorId: effectiveOperator.id,
+        operatorName: effectiveOperator.name || '',
+        etaMin: effectiveEtaMin,
         paymentIntentId: paid.paymentIntentId,
         chargedCents: paid.chargedCents,
         dispatchedAt: now,
@@ -346,8 +357,8 @@ async function sweepScheduled({ now = Date.now() } = {}) {
         id,
         rideId: rideRef.id,
         tripNo: r.tripNo || '',
-        operator: match.operator.name,
-        etaMin: match.etaMin,
+        operator: effectiveOperator.name,
+        etaMin: effectiveEtaMin,
       });
     } catch (e) {
       // MONEY HAS ALREADY LEFT THE TRAVELER'S CARD. This is the one branch that must never be

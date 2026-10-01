@@ -500,11 +500,22 @@ app.post('/account/close', requireAuth, async (req, res) => {
     }
     // Permanent account deletion depends on this endpoint. Retire device ownership here,
     // under server authority, so a client/network failure after this response cannot orphan it.
-    await dropToken(String(req.uid), null, true);
+    const db = adminDb();
+    const closureRef = db.collection('account_closures').doc(String(req.uid));
+    const closureSnap = await closureRef.get();
+    const cleanup = closureSnap.exists ? (closureSnap.data() || {}) : {};
+    if (cleanup.pushRetired !== true) {
+      await dropToken(String(req.uid), null, true);
+      await closureRef.set({ pushRetired:true, pushRetiredAt:Date.now() }, { merge:true });
+    }
     // Profile PII retirement is server-owned so permanent identity deletion remains resumable.
     // Durable Travel/payment/safety/qualification records are intentionally retained elsewhere.
-    await adminDb().collection('users').doc(String(req.uid)).delete();
-    return res.json(out);
+    if (cleanup.profileRetired !== true) {
+      await db.collection('users').doc(String(req.uid)).delete();
+      await closureRef.set({ profileRetired:true, profileRetiredAt:Date.now() }, { merge:true });
+    }
+    await closureRef.set({ serverCleanupComplete:true, serverCleanupCompletedAt:Date.now() }, { merge:true });
+    return res.json({ ...out, serverCleanupComplete:true });
   } catch (e) {
     console.error('[account] close failed:', e.message);
     return res.status(503).json({ code: 'account_close_failed', error: 'Account closure is not available at this time.' });

@@ -6,6 +6,7 @@ export type OperatorLostItem = {
   tripNo: string | null;
   candidateTripNos: string[];
   description: string;
+  photoUrl?: string | null;
   status: string;
   response?: { outcome: 'located' | 'not-found'; tripNo?: string | null; at: number } | null;
   createdAt: number;

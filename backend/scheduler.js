@@ -264,7 +264,17 @@ async function sweepScheduled({ now = Date.now() } = {}) {
     // Field for field the document dispatchRide() writes, so the operator app, the traveler's
     // live screen, settlement and the receipt all read it without knowing it was scheduled.
     try {
-      const rideRef = await db.collection('rides').add({
+      // Deterministic identity closes the crash window between a successful Stripe charge
+      // and reservation bookkeeping. Replaying this reservation must recover the SAME Travel,
+      // never create a second one after the claim lease expires.
+      const rideRef = db.collection('rides').doc(`scheduled_${id}`);
+      const existingRide = await rideRef.get();
+      if (existingRide.exists) {
+        const existing = existingRide.data() || {};
+        if (String(existing.reservationId || '') !== id || String(existing.travelerUid || '') !== String(r.travelerUid)) {
+          throw new Error('scheduled Travel identity collision');
+        }
+      } else await rideRef.create({
         travelerUid: r.travelerUid,
         travelerName: r.travelerName || '',
         party: r.party || null,

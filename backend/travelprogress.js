@@ -63,7 +63,13 @@ async function progressTravel({ db, uid, rideId, status, now = Date.now() }) {
     }
 
     const patch = { status: next, statusAt: now, [STAMP[next]]: now };
-    if (next === 'completed') patch.needsPayout = true;
+    if (next === 'completed') {
+      patch.needsPayout = true;
+      if (ride.teenPickup) {
+        const { hash: _hash, sealedPin: _sealedPin, ...audit } = ride.teenPickup;
+        patch.teenPickup = { ...audit, credentialRetiredAt: ride.teenPickup.credentialRetiredAt || now };
+      }
+    }
     tx.update(ref, patch);
     return { status: 200, body: { ok: true, status: next } };
   });

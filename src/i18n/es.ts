@@ -1123,6 +1123,7 @@ export default {
     lostOperatorInboxDelivered: "Entregado a %{names} en la bandeja del Operador.",
     notifSaveFailed: "La preferencia de notificaciones no se guardó. Inténtelo de nuevo.",
     cancelFailed: "El Viaje no se canceló. Inténtelo de nuevo.",
+    lostReturnHuman: "Patron Support coordina la devolución después de que el Operador localiza el objeto. No se muestra ningún Viaje de devolución, cargo ni asignación hasta que exista realmente.",
   },
 
   legal: {

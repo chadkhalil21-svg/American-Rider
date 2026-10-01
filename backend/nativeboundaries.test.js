@@ -64,4 +64,8 @@ assert.match(layout,/Platform\.OS === 'web' \|\| !user \|\| onboarding/, 'notifi
 assert.match(layout,/const unsubscribeToken = onPushTokenChange\(\)/, 'authenticated app lifecycle must subscribe to push token rotation');
 assert.match(layout,/return unsubscribeToken/, 'push token listener must be removed when account scope changes');
 
+
+assert.ok(pushServer.includes('recipientUid: String(uid)'), 'server push payload is bound to its intended account');
+assert.ok(layout.includes("recipientUid !== auth.currentUser?.uid"), 'native notification routing rejects a payload for another account');
+assert.ok(layout.includes('if (!recipientUid'), 'legacy/unbound notification payloads fail closed');
 console.log('PASS native permission, push and background-presence configuration invariants');

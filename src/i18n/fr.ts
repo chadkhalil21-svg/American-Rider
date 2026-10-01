@@ -149,6 +149,9 @@ export default {
   },
 
   traveler: {
+    scheduledDispatchBegun: "La répartition a commencé. Ouvrez le Voyage pour consulter son état actuel.",
+    scheduledCancelFailed: "Ce Voyage programmé n’a pas pu être annulé. Son état actuel a été conservé.",
+    scheduledPaymentReview: "La vérification du paiement nécessite un examen. Aucun débit supplémentaire ne sera tenté automatiquement.",
     beginTravel: 'Commencer le Trajet',
     departure: 'Départ',
     destinationEntry: 'Sélectionnez votre destination',

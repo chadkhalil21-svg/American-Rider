@@ -98,6 +98,16 @@ export async function registerForPush(prefs?: PushPrefs): Promise<{
 }
 
 /** Store which notifications this account wants. The server reads this before it sends. */
+/** Keep the server-side device association current if Expo rotates the token at runtime. */
+export function onPushTokenChange(): () => void {
+  const sub = Notifications.addPushTokenListener(() => {
+    // Re-register through Expo rather than persisting the native token delivered to this
+    // listener: the server sends through Expo and therefore stores an Expo push token.
+    void registerForPush();
+  });
+  return () => sub.remove();
+}
+
 export async function savePushPrefs(prefs: PushPrefs): Promise<boolean> {
   const uid = auth.currentUser?.uid;
   if (!uid) return false;

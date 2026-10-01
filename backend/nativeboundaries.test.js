@@ -45,6 +45,8 @@ assert.ok(deleteBody.indexOf('await stopBackgroundPresence()') < deleteBody.inde
 assert.match(push,/getLastNotificationResponseAsync\(\)/, 'cold-start notification response must be recoverable');
 assert.match(push,/clearLastNotificationResponseAsync\(\)/, 'consumed cold-start response must be cleared');
 assert.match(layout,/getInitialNotificationData\(\)/, 'root navigation must inspect the notification that launched a terminated app');
+assert.match(layout,/new Set\(\['\/ride', '\/receipt', '\/operator', '\/operator\/insurance', '\/family'\]\)/, 'notification navigation must be restricted to server-emitted destinations');
+assert.match(layout,/allowed\.has\(screen\)/, 'notification payload must not be used as an unrestricted router target');
 assert.match(layout,/Platform\.OS === 'web' \|\| !user \|\| onboarding/, 'notification routing must wait for authenticated account restoration');
 assert.match(layout,/const unsubscribeToken = onPushTokenChange\(\)/, 'authenticated app lifecycle must subscribe to push token rotation');
 assert.match(layout,/return unsubscribeToken/, 'push token listener must be removed when account scope changes');

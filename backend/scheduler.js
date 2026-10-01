@@ -303,7 +303,7 @@ async function sweepScheduled({ now = Date.now() } = {}) {
       // Stripe succeeded on an earlier sweep but the process died before Travel creation.
       // The reservation checkpoint is authoritative recovery evidence; do not require the card
       // still to be saved and do not initiate another charge.
-      paid = { ok: true, paymentIntentId: String(r.paymentIntentId), chargedCents: Number(r.chargedCents), recovered: true };
+      paid = { ok: true, paymentIntentId: String(r.paymentIntentId), chargedCents: Number(r.chargedCents), financialIdentityGeneration: r.paymentCheckpointGeneration, recovered: true };
     } else {
       paid = await chargeScheduledTravel({
         travelCostCents: fareCents,
@@ -325,6 +325,7 @@ async function sweepScheduled({ now = Date.now() } = {}) {
         await touch(db, id, {
           paymentIntentId: paid.paymentIntentId,
           chargedCents: paid.chargedCents,
+          paymentCheckpointGeneration: paid.financialIdentityGeneration,
           paymentCheckpointAt: Date.now(),
           paymentError: null,
         });

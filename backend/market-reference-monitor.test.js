@@ -7,6 +7,8 @@ assert.equal(M.CADENCE.productionPromotionMinutes,1440);
 assert.equal(M.CADENCE.ownMarketplaceMaxAgeMinutes,5);
 assert.equal(M.GUARDRAILS.targetFraction,0.90);
 assert.equal(M.GUARDRAILS.prohibitPersonalizedPricing,true);
+assert.equal(M.GUARDRAILS.prohibitNonpublicCompetitorData,true);
+assert.equal(M.GUARDRAILS.prohibitSharedCompetitorPricingRecommendations,true);
 assert.equal(M.GUARDRAILS.declaredEmergencyDisablesUpwardDynamicAdjustment,true);
 assert.equal(M.GUARDRAILS.emergencyBaselineDays,30);
 assert.equal(M.freshness({kind:'traffic',asOf:'2026-10-01T11:57:00Z'},now).ok,true);

@@ -1113,8 +1113,6 @@ export default {
     lostOperatorInboxDelivered: "Remis à %{names} dans la boîte de réception de l’Opérateur.",
   },
 
-  },
-
   legal: {
     termsTitle: 'Conditions d’Utilisation',
     privacyTitle: 'Politique de Confidentialité',

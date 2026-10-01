@@ -2,6 +2,7 @@
 // Candidate snapshots do not automatically become prices. A quote may consume a reference only
 // when the market's evidence-diversity requirement is met and the requested condition cell exists.
 const {regionForTrip}=require('./regions');
+const {marketFor}=require('./markets');
 const {planForRegion}=require('./market-evidence');
 const {currentReference,distanceBand,durationBand}=require('./market-reference-service');
 
@@ -24,12 +25,13 @@ function qualification(snapshot,plan){
 }
 async function referenceForQuote({pickup,dest,serviceClass,routedMiles,routedMinutes,now=new Date()}){
   const region=regionForTrip(pickup,dest);if(!region)return {ok:false,reason:'region unavailable'};
-  const plan=planForRegion(region.id);if(!plan)return {ok:false,reason:'evidence plan unavailable',regionId:region.id};
-  const snapshot=await currentReference(region.id),q=qualification(snapshot,plan);
-  if(!q.ok)return {...q,regionId:region.id};
+  const market=marketFor(pickup);if(!market||market.status!=='active')return {ok:false,reason:'service market unavailable',regionId:region.id};
+  const plan=planForRegion(market.id);if(!plan)return {ok:false,reason:'evidence plan unavailable',regionId:region.id,marketId:market.id};
+  const snapshot=await currentReference(market.id),q=qualification(snapshot,plan);
+  if(!q.ok)return {...q,regionId:region.id,marketId:market.id};
   const key=keyForQuote({serviceClass,routedMiles,routedMinutes,region,now});
   const cell=snapshot.cells[key];
-  if(!cell||!Number.isInteger(cell.targetTotalCents))return {ok:false,reason:'condition-matched reference unavailable',regionId:region.id,key};
-  return {ok:true,regionId:region.id,key,referenceTotalCents:cell.referenceTotalCents,targetTotalCents:cell.targetTotalCents,referenceAsOf:snapshot.latestObservedAt,sources:cell.sources||[]};
+  if(!cell||!Number.isInteger(cell.targetTotalCents))return {ok:false,reason:'condition-matched reference unavailable',regionId:region.id,marketId:market.id,key};
+  return {ok:true,regionId:region.id,marketId:market.id,key,referenceTotalCents:cell.referenceTotalCents,targetTotalCents:cell.targetTotalCents,referenceAsOf:snapshot.latestObservedAt,sources:cell.sources||[]};
 }
 module.exports={localConditions,keyForQuote,qualification,referenceForQuote};

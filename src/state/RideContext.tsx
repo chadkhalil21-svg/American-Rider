@@ -63,7 +63,7 @@ export type Demand = 'quiet' | 'normal' | 'busy';
 // `describing` is the rung that used to be missing: the traveler says what happened in their
 // own words before anything is decided. The old flow went straight from a tapped category to
 // a canned resolution, which is how the app came to answer complaints it had never read.
-export type IssueState = null | 'describing' | 'resolving' | 'resolved';
+export type IssueState = null | 'describing' | 'resolving' | 'failed' | 'resolved';
 export type Msg = { me: boolean; text: string };
 export type SchedDate = 'today' | 'tomorrow' | 'pick';
 export type SchedInfo = {
@@ -1441,6 +1441,11 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
         if (gen !== issueGen.current) return; // this case was abandoned
         setIssueResult(outcome);
         setIssueState('resolved');
+      }).catch(() => {
+        if (gen !== issueGen.current) return;
+        // A rejected support request is not an endless "Assessing" state. Keep the words the
+        // traveler wrote and return control so the same request can be retried explicitly.
+        setIssueState('failed');
       });
     },
     [issue, issueTripNo, completedTrips],

@@ -14,7 +14,7 @@
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
-import { GoogleAuthProvider, reauthenticateWithCredential, signInWithCredential } from 'firebase/auth';
+import { GoogleAuthProvider, reauthenticateWithCredential, reauthenticateWithPopup, signInWithCredential, signInWithPopup } from 'firebase/auth';
 
 import { auth } from '../firebase';
 
@@ -100,6 +100,22 @@ export function useGoogleSignIn() {
   };
 
   const signIn = async (): Promise<GoogleResult> => {
+    // On web, let Firebase own the Google OAuth transaction. This uses the Firebase
+    // project's configured Google provider/handler instead of Expo AuthSession's web
+    // redirect URI, which must be separately allow-listed in Google Cloud and produced
+    // redirect_uri_mismatch on the deployed platform.
+    if (Platform.OS === 'web') {
+      try {
+        await signInWithPopup(auth, new GoogleAuthProvider());
+        return { ok: true };
+      } catch (e: unknown) {
+        const code = safeAuthReason(e);
+        if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+          return { ok: false, cancelled: true };
+        }
+        return { ok: false, cancelled: false, reason: code };
+      }
+    }
     const result = await googleCredential();
     if (!result.ok) return result;
     try {
@@ -113,6 +129,18 @@ export function useGoogleSignIn() {
   const reauthenticate = async (): Promise<GoogleResult> => {
     const user = auth.currentUser;
     if (!user) return { ok: false, cancelled: false, reason: 'no_current_user' };
+    if (Platform.OS === 'web') {
+      try {
+        await reauthenticateWithPopup(user, new GoogleAuthProvider());
+        return { ok: true };
+      } catch (e: unknown) {
+        const code = safeAuthReason(e);
+        if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+          return { ok: false, cancelled: true };
+        }
+        return { ok: false, cancelled: false, reason: code };
+      }
+    }
     const result = await googleCredential();
     if (!result.ok) return result;
     try {

@@ -148,6 +148,8 @@ export default function Home() {
   // whose receipt the row opens. A traveler with three different destinations still sees
   // three rows, so nothing is hidden — only the repetition goes.
   const [menuOpen, setMenuOpen] = useState(false);
+  const [cancellingScheduled, setCancellingScheduled] = useState(false);
+  const [scheduledCancelError, setScheduledCancelError] = useState<string | null>(null);
   const { note, showNote } = useNote();
 
   // The drawer head speaks for the signed-in account — named and initialed by the
@@ -527,6 +529,7 @@ export default function Home() {
               {ride.schedState.closedReason || t('traveler.noOperatorAvailable')} {t('traveler.noChargeMade')}
             </Text>
           )}
+          {scheduledCancelError ? <Text style={styles.schedError}>{scheduledCancelError}</Text> : null}
           {ride.schedState?.status === 'payment_failed' && (
             <Text style={styles.upcomingFail}>
               {ride.schedState.paymentError || t('traveler.cardDeclined')} {t('traveler.noOperatorSent')}
@@ -870,6 +873,7 @@ const styles = StyleSheet.create({
   // INK (Chad, 19 Sept 2026). Cancelling a reservation that has not been dispatched is an
   // ordinary correction, not a destructive act, and it sits on the home screen.
   upcomingCancel: { fontSize: 13, fontWeight: '600', color: colors.ink },
+  schedError: { fontSize: 13, color: colors.red, marginTop: 8 },
   upcomingOpen: { fontSize: 13, fontWeight: '600', color: colors.blue },
   upcomingNo: { fontSize: 11.5, color: colors.muted, marginTop: 6, letterSpacing: 0.6 },
   upcomingFail: { fontSize: 13, color: colors.ink2, marginTop: 11, lineHeight: 18.5 },

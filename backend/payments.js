@@ -416,7 +416,7 @@ async function scheduledPaymentIdentity({ uid, email }) {
   const financialAuth = await financialIdentityAuthorization(uid);
   const customer = await customerForTraveler({ uid, email });
   const pm = await savedPaymentMethodFor(customer);
-  return pm ? { customerId: String(customer.id), paymentMethodId: String(pm.id) } : null;
+  return pm ? { customerId: String(customer.id), paymentMethodId: String(pm.id), financialIdentityGeneration: financialAuth.generation } : null;
 }
 
 async function listPaymentMethods({ uid, email }) {
@@ -1039,13 +1039,16 @@ async function probeNetwork() {
  * `travelCostCents` and `uid` back off Stripe's own record hours later, and a scheduled
  * travel must settle through the same path as any other.
  */
-async function chargeScheduledTravel({ travelCostCents, uid, email, tripNo, reservationId, dep, dest, governmentFees, cardCountry, tollCents = 0, customerId = null, paymentMethodId = null }) {
+async function chargeScheduledTravel({ travelCostCents, uid, email, tripNo, reservationId, dep, dest, governmentFees, cardCountry, tollCents = 0, customerId = null, paymentMethodId = null, financialIdentityGeneration = null }) {
   const stripe = getStripe();
   const q = quote(travelCostCents, undefined, governmentFees, cardCountry, tollCents);
   try {
     // The idempotency key plus the reservation's frozen Customer/PaymentMethod identity is the
     // crash-recovery primitive. Do not depend on Stripe Search's secondary index here.
-    const financialAuth = await financialIdentityAuthorization(uid);
+    if (!Number.isFinite(Number(financialIdentityGeneration))) {
+      return { ok:false, code:'financial_identity_generation_required', error:'Scheduled Travel payment identity must be reauthorized.' };
+    }
+    const financialAuth = await assertFinancialIdentityAuthorization(uid, Number(financialIdentityGeneration));
     const customer = customerId ? { id: String(customerId) } : await customerForTraveler({ uid, email });
     const pm = paymentMethodId ? { id: String(paymentMethodId) } : await savedPaymentMethodFor(customer);
     if (!pm) {

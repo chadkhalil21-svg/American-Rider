@@ -280,10 +280,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // account still owns the session; otherwise deletion can leave iOS/Android waking the
         // app for background location even though the server correctly refuses the renewal.
         await stopBackgroundPresence();
-        // Retire the device-token ownership while authentication still exists. Otherwise
-        // deleting users/{uid} can orphan the server's token-owner index.
-        await clearPushToken();
-        // 3. The server has already retired profile PII and future operational work.
+        // Push-token ownership is retired strictly by /account/close before profile PII is
+        // deleted. Do not repeat that server mutation here after durable closure succeeds.
+        // 3. The server has already retired profile PII, push ownership and future operational work.
         // Delete the Firebase identity while the freshly reauthenticated credential is still
         // available. If this fails, the login survives and the user can retry against the
         // durable, idempotent server closure record instead of being left half-deleted locally.

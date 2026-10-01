@@ -115,7 +115,7 @@ const { sweepOperatorAccountFees } = require('./operatorfees');
 const crypto = require('node:crypto');
 const WORKER_ID = crypto.randomUUID();
 const { send, receiptEmail, emailReady: mailReady } = require('./email');
-const { mount: mountOps, opsAuthMode } = require('./ops');
+const { mount: mountOps, opsAuthMode, signedIn: opsSignedIn, actorOf: opsActorOf } = require('./ops');
 const { readDocument, documentsReady, READER_VERSION } = require('./documents');
 const { ready: r2Ready, uploadUrl: r2UploadUrl, readUrl: r2ReadUrl, owns: r2Owns } = require('./r2');
 const { assessOperator, assessAndRecord } = require('./qualification');
@@ -134,6 +134,16 @@ const { runMarketReferenceSweep, firestoreReady: marketReferenceReady } = requir
 const { configuredCollectors: marketReferenceCollectors } = require('./market-evidence-collectors');
 
 const app = express();
+
+// Reuse the same signed, named Operations session as the /ops console. This route changes
+// support-case state, so ordinary Firebase authentication is not sufficient authority.
+function requireOps(req, res, next) {
+  const name = opsSignedIn(req);
+  if (!name) return res.status(401).json({ error: 'Operations sign-in required' });
+  req.opsUser = name;
+  req.opsActor = opsActorOf(req);
+  return next();
+}
 // One proxy in front (Render). Makes req.ip the caller rather than the proxy, which the
 // per-address limits in ratelimit.js need.
 app.set('trust proxy', 1);

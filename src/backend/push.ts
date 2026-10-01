@@ -18,6 +18,7 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { doc, setDoc } from 'firebase/firestore';
+import { PAYMENT_SERVER_URL } from '../config';
 import { auth, db } from '../firebase';
 import { t } from '../i18n';
 
@@ -86,16 +87,14 @@ export async function registerForPush(prefs?: PushPrefs): Promise<{
       return { token: null, reason: t('traveler.errNotSignedIn') };
     }
 
-    await setDoc(
-      doc(db, 'users', uid),
-      {
-        pushToken: token,
-        pushPlatform: Platform.OS,
-        pushUpdatedAt: Date.now(),
-        ...(prefs ? { pushPrefs: prefs } : {}),
-      },
-      { merge: true },
-    );
+    const idToken = await auth.currentUser?.getIdToken();
+    if (!idToken || auth.currentUser?.uid !== uid) return { token: null, reason: t('traveler.errNotSignedIn') };
+    const registered = await fetch(`${PAYMENT_SERVER_URL}/push/register`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, platform: Platform.OS, ...(prefs ? { prefs } : {}) }),
+    });
+    if (!registered.ok) throw new Error('push_registration_failed');
     return { token, reason: null };
   } catch (e) {
     return { token: null, reason: e instanceof Error ? e.message : t('traveler.errCouldNotRegister') };
@@ -135,7 +134,12 @@ export async function clearPushToken(): Promise<void> {
   const uid = auth.currentUser?.uid;
   if (!uid) return;
   try {
-    await setDoc(doc(db, 'users', uid), { pushToken: null, pushUpdatedAt: Date.now() }, { merge: true });
+    const idToken = await auth.currentUser?.getIdToken();
+    if (!idToken || auth.currentUser?.uid !== uid) return;
+    await fetch(`${PAYMENT_SERVER_URL}/push/clear`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+    });
   } catch {
     /* nothing to do about it, and nothing depends on it succeeding */
   }

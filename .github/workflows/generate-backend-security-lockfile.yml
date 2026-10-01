@@ -7,13 +7,15 @@ on:
       - '.github/workflows/generate-backend-security-lockfile.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   generate-lockfile:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -28,6 +30,14 @@ jobs:
       - name: Verify clean production audit
         working-directory: backend
         run: node -e "const a=require('./npm-audit-production.json'); if ((a.metadata?.vulnerabilities?.total ?? 0) !== 0) { console.error(JSON.stringify(a.metadata?.vulnerabilities)); process.exit(1) }"
+      - name: Commit generated lockfile
+        working-directory: backend
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add package-lock.json
+          git diff --cached --quiet || git commit -m "Regenerate backend lockfile after security upgrades"
+          git push origin HEAD:${{ github.head_ref }}
       - name: Upload generated lockfile and audit
         if: always()
         uses: actions/upload-artifact@v4

@@ -242,7 +242,13 @@ async function customerForTraveler({ uid, email }) {
     limit: 1,
   });
   if (found.data[0]) return found.data[0];
-  return stripe.customers.create({ email: email || undefined, metadata: { uid: String(uid) } });
+  // Stripe Search is only a fast lookup, not our uniqueness primitive. Its index can lag and
+  // concurrent first-use requests can both observe "not found". Deterministic Customer creation
+  // makes those races converge on the same Stripe Customer for this immutable Firebase uid.
+  return stripe.customers.create(
+    { email: email || undefined, metadata: { uid: String(uid) } },
+    { idempotencyKey: `ar_customer_${String(uid)}` },
+  );
 }
 
 // ——— THE TRAVELER'S SAVED PAYMENT METHODS ———————————————————————————————————————————

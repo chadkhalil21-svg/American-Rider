@@ -18,7 +18,6 @@ export default {
     continueWithApple: 'Continuar con Apple',
     continueWithGoogle: 'Continuar con Google',
     orDivider: 'o',
-    emailOrMobileField: 'Correo electrónico',
     continueLabel: 'Continuar',
     ssoNotConfigured: 'Este inicio de sesión aún no está configurado en esta versión.',
     appleUnavailable: 'Apple no pudo completar el inicio de sesión. Inténtelo de nuevo o use su correo electrónico.',

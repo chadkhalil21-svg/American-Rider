@@ -10,11 +10,12 @@ assert.equal(/\bchargeTip\b|\btipTravel\b|tipCents/.test(
 ),false);
 
 const server=read('backend/server.js');
+const runtimeMode=read('backend/runtime-mode.js');
 assert.ok(server.indexOf('await enqueueProviderEvent') < server.indexOf("res.json({ received: true"), 'durable receipt precedes webhook ACK');
 assert.ok(server.includes("const name = 'operations_sweep'") && server.includes('await acquireLease(name,'),'sweeps have a single-leader lease');
 assert.ok(server.includes("scheduler: readKey('SCHEDULER_TOKEN') ? 'authenticated' : 'off'"), 'health exposes scheduler authorization readiness');
 assert.ok(server.includes("tolls: readKey('HERE_API_KEY') ? 'on' : 'off'"), 'health exposes toll authority readiness');
-assert.ok(server.includes("const declaredProduction = DEPLOYMENT_MODE === 'production'") && server.includes("const productionMode = declaredProduction || keyMode === 'live'"), 'server has explicit production posture and live money implies it');
+assert.ok(runtimeMode.includes("deploymentMode() === 'production'") && runtimeMode.includes("stripeKeyMode() === 'live'"), 'shared runtime mode has explicit production posture and live money implies it');
 assert.ok(server.includes("if (!fleet.length && !operationalMode)"), 'demonstration fleet is impossible in production posture');
 assert.ok(server.includes('function productionReadiness()'), 'production readiness is centralized');
 assert.ok(server.includes("code: 'production_not_ready'"), 'production operations fail closed when dependencies are incomplete');
@@ -43,7 +44,8 @@ assert.ok(read('src/components/operator.tsx').includes("'Communications'"));
 assert.ok(server.includes("app.post('/smart-quote', LIMITS.routeIp, requireOperationalReadiness"), 'Smart Travel quote must fail closed when production providers are incomplete');
 assert.ok(server.includes("app.post('/smart-revalidate', LIMITS.routeIp, requireOperationalReadiness"), 'Smart Travel continuation verification must fail closed when production providers are incomplete');
 assert.ok(server.indexOf("app.use(express.json())") < server.indexOf("app.post('/smart-revalidate'"), 'Smart Travel revalidation must be mounted after JSON body parsing');
-assert.ok(server.includes("const productionMode = declaredProduction || keyMode === 'live'"), 'a live Stripe key must force production posture even if DEPLOYMENT_MODE is omitted');
+assert.ok(server.includes('const productionMode = productionModeFromRuntime()'), 'server consumes shared production posture');
+assert.ok(runtimeMode.includes("stripeKeyMode() === 'live'"), 'a live Stripe key must force production posture even if DEPLOYMENT_MODE is omitted');
 assert.ok(server.includes("if (keyMode !== 'test' || productionMode)"), 'local Stripe test helper must be disabled in production posture');
 
 console.log('✓ production money path has one transfer architecture');

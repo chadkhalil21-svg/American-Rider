@@ -1,0 +1,20 @@
+const fs = require('node:fs');
+const assert = require('node:assert/strict');
+
+const push = fs.readFileSync('src/backend/push.ts', 'utf8');
+const layout = fs.readFileSync('app/_layout.tsx', 'utf8');
+const auth = fs.readFileSync('src/state/AuthContext.tsx', 'utf8');
+const serverPush = fs.readFileSync('backend/push.js', 'utf8');
+
+assert.match(push, /Notifications\.IosAuthorizationStatus\.PROVISIONAL/);
+assert.match(push, /Notifications\.IosAuthorizationStatus\.EPHEMERAL/);
+assert.doesNotMatch(push, /ios\?\.status\s*===\s*3/);
+assert.match(serverPush, /recipientUid: String\(uid\)/);
+assert.match(layout, /recipientUid !== user\.uid/);
+assert.match(layout, /new Set\(\['\/ride', '\/receipt', '\/operator', '\/operator\/insurance', '\/family'\]\)/);
+assert.match(layout, /allowed\.has\(screen\)/);
+assert.match(auth, /await clearPushToken\(\);/);
+const signOut = auth.slice(auth.indexOf('signOut: () =>'), auth.indexOf('onboarding,', auth.indexOf('signOut: () =>')));
+assert.ok(signOut.indexOf('await clearPushToken()') >= 0);
+assert.ok(signOut.indexOf('await clearPushToken()') < signOut.indexOf('await fbSignOut(auth)'));
+console.log('PASS final native push boundary invariants');

@@ -1039,6 +1039,19 @@ async function probeNetwork() {
  * `travelCostCents` and `uid` back off Stripe's own record hours later, and a scheduled
  * travel must settle through the same path as any other.
  */
+async function verifyScheduledPaymentCheckpoint({ paymentIntentId, uid, reservationId, chargedCents, financialIdentityGeneration }) {
+  const stripe = getStripe();
+  const pi = await stripe.paymentIntents.retrieve(String(paymentIntentId || ''));
+  if (!pi || pi.status !== 'succeeded') return { ok:false, code:'payment_checkpoint_not_succeeded' };
+  if (String(pi.metadata?.uid || '') !== String(uid || '')) return { ok:false, code:'payment_checkpoint_uid_mismatch' };
+  if (String(pi.metadata?.reservationId || '') !== String(reservationId || '')) return { ok:false, code:'payment_checkpoint_reservation_mismatch' };
+  if (Number(pi.amount) !== Number(chargedCents)) return { ok:false, code:'payment_checkpoint_amount_mismatch' };
+  if (String(pi.metadata?.financialIdentityGeneration || '') !== String(financialIdentityGeneration ?? '')) {
+    return { ok:false, code:'payment_checkpoint_generation_mismatch' };
+  }
+  return { ok:true, paymentIntentId:String(pi.id), chargedCents:Number(pi.amount), financialIdentityGeneration:Number(financialIdentityGeneration), recovered:true };
+}
+
 async function chargeScheduledTravel({ travelCostCents, uid, email, tripNo, reservationId, dep, dest, governmentFees, cardCountry, tollCents = 0, customerId = null, paymentMethodId = null, financialIdentityGeneration = null }) {
   const stripe = getStripe();
   const q = quote(travelCostCents, undefined, governmentFees, cardCountry, tollCents);
@@ -1247,7 +1260,7 @@ module.exports = {
   MIN_PLATFORM_FEE_CENTS,
   customerForTraveler, scheduledPaymentIdentity, inspectStripeCustomerOwnership, connectAccountFor, connectOnboardingLink, connectAccountStatus,
   transferToOperator, paidWithFromIntent, refundableFor, connectDashboardLink, pingStripe, probeNetwork,
-  transferFixed, chargeScheduledTravel, createScreeningIntent, chargeOperatorAccountFee,
+  transferFixed, chargeScheduledTravel, verifyScheduledPaymentCheckpoint, createScreeningIntent, chargeOperatorAccountFee,
   describePaymentMethod, listPaymentMethods, createSetupIntent, setDefaultPaymentMethod, detachPaymentMethod,
   // Exported under an underscored name for idempotency.test.js only. It is an internal detail
   // of how a charge is keyed, not part of the module's interface.

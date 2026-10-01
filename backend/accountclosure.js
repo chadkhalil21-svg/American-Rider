@@ -16,6 +16,19 @@ async function closeOperationalAccount({ db, uid, now = Date.now() }) {
   if (!db) return { ok: false, code: 'database_unavailable' };
   if (!uid) return { ok: false, code: 'account_required' };
 
+  const closureRef = db.collection('account_closures').doc(uid);
+  const existingClosure = await closureRef.get();
+  if (existingClosure.exists && existingClosure.data()?.operationallyClosed === true) {
+    const prior = existingClosure.data() || {};
+    return {
+      ok: true,
+      operationallyClosed: true,
+      cancelledScheduled: Math.max(0, Number(prior.cancelledScheduled) || 0),
+      closedAt: Number(prior.closedAt) || null,
+      alreadyClosed: true,
+    };
+  }
+
   const fenceRef = db.collection('account_operation_fences').doc(uid);
   await fenceRef.set({ closing:true, startedAt:now }, { merge:true });
   try {
@@ -52,7 +65,7 @@ async function closeOperationalAccount({ db, uid, now = Date.now() }) {
   // Durable server-side closure state makes retries/crash recovery observable. Client-local
   // markers can disappear on reinstall or storage cleanup; this record survives both and is
   // written only after future operational work has been shut down.
-  await db.collection('account_closures').doc(uid).set(
+  await closureRef.set(
     { operationallyClosed: true, closedAt: now, cancelledScheduled },
     { merge: true },
   );

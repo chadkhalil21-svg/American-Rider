@@ -55,7 +55,7 @@ const NATIONAL_SOURCE_CATALOG=Object.freeze({
   'ridewise-public-rate-cards':Object.freeze({
     type:SOURCE_TYPES.PLATFORM_PUBLICATION,
     authority:'RideWise public rate-card analysis',
-    coverage:'300+ U.S. cities as published',
+    coverage:'312 U.S. cities across all 50 states as published and periodically reverified',
     public:true,
     primaryEligible:false,
     caveat:'Free independent publication and cross-check only. Preserve publication date/methodology; never treat one published rate card as a condition-matched live fare.',
@@ -97,6 +97,14 @@ const NATIONAL_SOURCE_CATALOG=Object.freeze({
     public:false,
     primaryEligible:false,
   }),
+});
+
+const NATIONAL_PUBLIC_FIRST_TEMPLATE=Object.freeze({
+  requiredFamilies:2,
+  sources:Object.freeze(['government-fare-microdata-when-available','controlled-public-price-panel','ridewise-public-rate-cards','taxifare-public-observed']),
+  licensedGapFill:'optional-only',
+  commissioningRule:'Every new service market gets its own evidence plan and condition cells. Never inherit another market pricing record. Public rate cards bootstrap discovery but cannot alone promote production pricing.',
+  expansionRule:'A market may be added without new pricing code: register geography, law/insurance/tolls, public evidence adapters, condition cells, pricing record, then pass promotion gates.',
 });
 
 const FLORIDA_PUBLIC_EVIDENCE=Object.freeze({
@@ -174,4 +182,4 @@ function planProblems(regionId){
   return out;
 }
 
-module.exports={SOURCE_TYPES,NATIONAL_SOURCE_CATALOG,FLORIDA_PUBLIC_EVIDENCE,MARKET_EVIDENCE_PLANS,source,planForRegion,planProblems};
+module.exports={SOURCE_TYPES,NATIONAL_SOURCE_CATALOG,NATIONAL_PUBLIC_FIRST_TEMPLATE,FLORIDA_PUBLIC_EVIDENCE,MARKET_EVIDENCE_PLANS,source,planForRegion,planProblems};

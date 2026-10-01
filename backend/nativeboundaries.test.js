@@ -19,6 +19,7 @@ assert.match(push,/Notifications\.IosAuthorizationStatus\.PROVISIONAL/);
 assert.match(push,/Notifications\.IosAuthorizationStatus\.EPHEMERAL/);
 assert.doesNotMatch(push,/ios\?\.status\s*===\s*3/);
 assert.match(push,/getExpoPushTokenAsync\(\{ projectId \}\)/);
+assert.match(push,/auth\.currentUser\?\.uid !== uid/, 'push registration must reject an account switch while native token acquisition is pending');
 assert.match(push,/pushToken: token/);
 assert.match(push,/Notifications\.addPushTokenListener/, 'runtime token rotation must be observed');
 assert.match(push,/void registerForPush\(\)/, 'a rotated native token must refresh the Expo token stored for this account');
@@ -52,6 +53,8 @@ assert.ok(deleteBody.indexOf('await stopBackgroundPresence()') < deleteBody.inde
 assert.match(push,/getLastNotificationResponseAsync\(\)/, 'cold-start notification response must be recoverable');
 assert.match(push,/clearLastNotificationResponseAsync\(\)/, 'consumed cold-start response must be cleared');
 assert.match(layout,/getInitialNotificationData\(\)/, 'root navigation must inspect the notification that launched a terminated app');
+assert.match(layout,/const notificationUid = user\.uid/, 'cold-start response must bind to the account that installed the effect');
+assert.match(layout,/auth\.currentUser\?\.uid !== notificationUid/, 'cold-start response must be dropped after an account switch');
 assert.match(layout,/new Set\(\['\/ride', '\/receipt', '\/operator', '\/operator\/insurance', '\/family'\]\)/, 'notification navigation must be restricted to server-emitted destinations');
 assert.match(layout,/allowed\.has\(screen\)/, 'notification payload must not be used as an unrestricted router target');
 assert.match(layout,/Platform\.OS === 'web' \|\| !user \|\| onboarding/, 'notification routing must wait for authenticated account restoration');

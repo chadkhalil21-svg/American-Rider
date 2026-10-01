@@ -167,6 +167,8 @@ function legalSentence(text: string, nodes: Record<string, React.ReactNode>) {
 export function AuthScreen() {
   const { t, language, setLanguage, languages } = useLanguage();
   const { signUp, signIn, resetPassword, busy, error, diagnosticCode, setOnboarding } = useAuth();
+  // AuthContext owns provider errors. The front door owns which flow they belong to.
+  // A failure from Sign In must not be rendered as though Create Account just failed.
   // Chad's entry architecture. `appleReady` is the device's own answer, not an assumption;
   // `google.ready` is true only when this build carries the client ids Google needs.
   const [entry, setEntry] = useState('');
@@ -207,7 +209,7 @@ export function AuthScreen() {
     }
     setSsoError('');
     setEmail(clean);
-    setStep('signin');
+    changeCredentialStep('signin');
   };
 
   // null while the answer is unknown, then true or false — never assumed either way.
@@ -238,6 +240,17 @@ export function AuthScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [resetNotice, setResetNotice] = useState('');
+  const [authAttemptStep, setAuthAttemptStep] = useState<'signin' | 'signup' | null>(null);
+  const visibleAuthError = authAttemptStep === step ? error : null;
+  const visibleDiagnosticCode = authAttemptStep === step ? diagnosticCode : null;
+
+  const changeCredentialStep = (next: 'welcome' | 'signin' | 'signup') => {
+    setResetNotice('');
+    setSsoError('');
+    setAuthAttemptStep(null);
+    setPassword('');
+    setStep(next);
+  };
 
   const firstName = name.trim().split(/\s+/)[0] || 'Traveler';
   const digits = mobile.replace(/\D/g, '');
@@ -259,6 +272,7 @@ export function AuthScreen() {
 
   const submit = async () => {
     if (!canSubmit) return;
+    setAuthAttemptStep(step === 'signup' ? 'signup' : 'signin');
     if (step === 'signup') {
       setOnboarding(true); // keep the front door up through code → role → ready
       const created = await signUp(email, password, name, mobile);
@@ -519,7 +533,7 @@ export function AuthScreen() {
   return (
     <Screen scroll={false}>
       <View style={{ flex: 1 }}>
-        <Pressable onPress={() => setStep('welcome')} hitSlop={10}>
+        <Pressable onPress={() => changeCredentialStep('welcome')} hitSlop={10}>
           <Text style={s.back}>{t('auth.back')}</Text>
         </Pressable>
 
@@ -608,9 +622,9 @@ export function AuthScreen() {
             {resetNotice ? <Text style={s.resetNotice}>{resetNotice}</Text> : null}
           </>
         )}
-        {error ? <Text style={s.error}>{error}</Text> : null}
-        {Platform.OS === 'web' && process.env.EXPO_PUBLIC_AUTH_PREVIEW_BYPASS === '1' && diagnosticCode ? (
-          <Text style={s.previewDiagnostic}>Preview diagnostic: {diagnosticCode}</Text>
+        {visibleAuthError ? <Text style={s.error}>{visibleAuthError}</Text> : null}
+        {Platform.OS === 'web' && process.env.EXPO_PUBLIC_AUTH_PREVIEW_BYPASS === '1' && visibleDiagnosticCode ? (
+          <Text style={s.previewDiagnostic}>Preview diagnostic: {visibleDiagnosticCode}</Text>
         ) : null}
 
         <View style={{ flex: 1 }} />
@@ -647,7 +661,7 @@ export function AuthScreen() {
         />
 
         <Pressable
-          onPress={() => setStep(isSignup ? 'signin' : 'signup')}
+          onPress={() => changeCredentialStep(isSignup ? 'signin' : 'signup')}
           style={{ marginTop: isSignup ? 18 : 15, marginBottom: 6 }}
           hitSlop={8}
         >

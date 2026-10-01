@@ -323,12 +323,21 @@ async function sweepScheduled({ now = Date.now() } = {}) {
       // opposite failure: permanently skipping everything after a mid-sequence crash.
       let effectState = existingRide.exists ? (existingRide.data()?.dispatchEffects || {}) : {};
       const emitOnce = async (key, message) => {
-        if (effectState[key]) return;
+        if (effectState[key]?.completed === true) return;
         const out = await notify(message);
-        // "No token"/preference rejection is a completed attempt for this dispatch event; retrying
-        // forever cannot make an old assignment current. Transport exceptions are returned too.
-        await rideRef.set({ dispatchEffects: { ...effectState, [key]: { at: Date.now(), ok: !!out?.ok, reason: out?.reason || null } } }, { merge: true });
-        effectState = { ...effectState, [key]: { at: Date.now(), ok: !!out?.ok, reason: out?.reason || null } };
+        const nowEffect = Date.now();
+        const attempts = Number(effectState[key]?.attempts || 0) + 1;
+        if (out?.retryable) {
+          // Transient network/provider failure remains eligible for a later recovery pass.
+          const marker = { attempts, lastAttemptAt: nowEffect, completed: false, ok: false, reason: out?.reason || null };
+          await rideRef.update({ [`dispatchEffects.${key}`]: marker });
+          effectState = { ...effectState, [key]: marker };
+          return;
+        }
+        const marker = { attempts, at: nowEffect, completed: true, ok: !!out?.ok, reason: out?.reason || null };
+        // Update one nested key; do not replace sibling markers written by another recovery worker.
+        await rideRef.update({ [`dispatchEffects.${key}`]: marker });
+        effectState = { ...effectState, [key]: marker };
       };
       await emitOnce('operatorAssigned', {
         uid: effectiveOperator.id, kind: 'travel_assigned', title: 'Scheduled travel assigned',

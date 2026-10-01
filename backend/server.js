@@ -1324,7 +1324,14 @@ app.post('/lost-item', requireAuth, requireVerifiedEmail, LIMITS.lostItem, async
 // --- Lost-item Operator recovery: a report is actionable, not merely named. ----------------
 app.get('/operator/lost-item/:id', requireAuth, async (req, res) => {
   const out = await operatorLostItem({ itemId: req.params.id, operatorUid: req.uid });
-  return res.status(out.ok ? 200 : out.status || 500).json(out);
+  if (!out.ok) return res.status(out.status || 500).json(out);
+  // Authorization above proves this authenticated Operator is named on this report. Only then
+  // mint a short-lived read URL for the Traveler's private lost-item photograph.
+  let photoUrl = null;
+  if (out.item?.photoObjectKey) {
+    try { photoUrl = await r2ReadUrl(out.item.photoObjectKey); } catch { photoUrl = null; }
+  }
+  return res.json({ ...out, item: { ...out.item, photoUrl } });
 });
 app.post('/operator/lost-item/:id/respond', requireAuth, async (req, res) => {
   const out = await respondLostItem({

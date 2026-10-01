@@ -957,21 +957,7 @@ async function chargeScheduledTravel({ travelCostCents, uid, email, tripNo, rese
   const stripe = getStripe();
   const q = quote(travelCostCents, undefined, governmentFees, cardCountry, tollCents);
   try {
-    // Recover the irreducible crash window: Stripe may have succeeded before Firestore could
-    // checkpoint the PaymentIntent. Search our own scheduled-payment metadata before requiring
-    // the card to still exist. The reservation id is server-generated and unique.
-    if (stripe.paymentIntents.search) {
-      const found = await stripe.paymentIntents.search({
-        query: `metadata['reservationId']:'${String(reservationId).replace(/'/g, "\\'")}' AND metadata['scheduled']:'true'`,
-        limit: 2,
-      });
-      const prior = Array.isArray(found?.data) ? found.data.find(x => x.status === 'succeeded' && String(x.metadata?.uid || '') === String(uid)) : null;
-      if (prior) {
-        if (Number(prior.amount) !== Number(q.travelerPays)) return { ok:false, code:'scheduled_payment_mismatch', error:'Recovered scheduled payment amount does not match the reservation' };
-        return { ok:true, paymentIntentId: prior.id, chargedCents: Number(prior.amount), breakdown:q, recovered:true };
-      }
-    }
-    const customer = customerId ? { id: String(customerId) } : await customerForTraveler({ uid, email });
+    // The idempotency key plus the reservation's frozen Customer/PaymentMethod identity is the\n    // crash-recovery primitive. Do not depend on Stripe Search's secondary index here.\n    const customer = customerId ? { id: String(customerId) } : await customerForTraveler({ uid, email });
     const pm = paymentMethodId ? { id: String(paymentMethodId) } : await savedPaymentMethodFor(customer);
     if (!pm) {
       return { ok: false, code: 'no_saved_card', error: 'No card on file for this traveler' };

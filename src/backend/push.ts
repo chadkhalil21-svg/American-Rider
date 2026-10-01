@@ -158,7 +158,13 @@ export async function clearInitialNotificationResponse(): Promise<void> {
 
 /** Run `onOpen` when the person taps a notification. Returns an unsubscribe. */
 export function onNotificationTap(onOpen: (data: Record<string, unknown>) => void): () => void {
+  let lastResponseId: string | null = null;
   const sub = Notifications.addNotificationResponseReceivedListener((res) => {
+    // Native delivery can replay a response across lifecycle transitions. A single tap must
+    // never cause duplicate navigation/actions within this listener lifetime.
+    const responseId = res.notification.request.identifier;
+    if (responseId && responseId === lastResponseId) return;
+    lastResponseId = responseId || null;
     onOpen((res.notification.request.content.data ?? {}) as Record<string, unknown>);
   });
   return () => sub.remove();

@@ -55,7 +55,11 @@ function AppGate() {
     let live = true;
     const open = (data: Record<string, unknown>) => {
       const screen = typeof data?.screen === 'string' ? data.screen : null;
-      if (screen) router.navigate(screen as never);
+      // Notification payloads cross an external delivery boundary. Even though American Rider
+      // creates them server-side, do not turn an arbitrary payload string into a router target.
+      // Only destinations the server intentionally emits are navigable from a notification.
+      const allowed = new Set(['/ride', '/receipt', '/operator', '/operator/insurance', '/family']);
+      if (screen && allowed.has(screen)) router.navigate(screen as never);
     };
 
     // A listener is sufficient while JS is alive, but not for the notification response that

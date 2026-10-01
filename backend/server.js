@@ -1072,7 +1072,14 @@ app.post('/operator/online', requireAuth, requireOperationalReadiness, async (re
     if (b.plate !== undefined) identity.plate = String(b.plate).slice(0, 16);
     if (Array.isArray(b.classes) && b.classes.length) identity.classes = b.classes.slice(0, 6);
 
-    await db.collection('operators').doc(String(req.uid)).set(
+    const operatorRef = db.collection('operators').doc(String(req.uid));
+    const onlineResult = await db.runTransaction(async (tx) => {
+      const fenceRef = db.collection('account_operation_fences').doc(String(req.uid));
+      const closedRef = db.collection('account_closures').doc(String(req.uid));
+      const [fence, closed] = await Promise.all([tx.get(fenceRef), tx.get(closedRef)]);
+      if ((fence.exists && fence.data()?.closing === true) ||
+          (closed.exists && closed.data()?.operationallyClosed === true)) return false;
+      tx.set(operatorRef,
       {
         uid: String(req.uid),
         ...identity,
@@ -1105,7 +1112,10 @@ app.post('/operator/online', requireAuth, requireOperationalReadiness, async (re
         onlineAt: Date.now(),
       },
       { merge: true },
-    );
+      );
+      return true;
+    });
+    if (!onlineResult) return refuse({ code:'account_closing', error:'This account cannot begin new operations.' });
     res.json({ ok: true, operatorId: String(req.uid), available: b.available !== false });
   } catch (e) {
     res.status(502).json({ error: e.message });

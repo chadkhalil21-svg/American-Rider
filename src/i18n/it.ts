@@ -142,6 +142,9 @@ export default {
     openAllParts: 'Apra le %{n} parti per continuare',
   },
   traveler: {
+    scheduledDispatchBegun: "L’assegnazione è iniziata. Apra il Viaggio per verificarne lo stato attuale.",
+    scheduledCancelFailed: "Questo Viaggio programmato non ha potuto essere annullato. Il suo stato attuale è stato conservato.",
+    scheduledPaymentReview: "La verifica del pagamento richiede una revisione. Non verrà tentato automaticamente alcun addebito aggiuntivo.",
     beginTravel: 'Iniziare il Viaggio',
     departure: 'Partenza',
     destinationEntry: 'Selezioni la sua destinazione',

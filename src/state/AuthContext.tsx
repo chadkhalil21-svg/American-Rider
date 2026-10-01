@@ -150,6 +150,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setDiagnosticCode(null);
       try {
         const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+        // The account now has a stable UID. Persist the post-signup gate before any later
+        // best-effort profile/email work so process death cannot skip role selection.
+        await AsyncStorage.setItem(ONBOARDING_KEY, cred.user.uid);
+        setOnboarding(true);
         if (name) await updateProfile(cred.user, { displayName: name.trim() });
         // THE VERIFICATION EMAIL WAS NEVER SENT, so `emailVerified` was false on every
         // email-and-password account that has ever existed — and the server, which carries the

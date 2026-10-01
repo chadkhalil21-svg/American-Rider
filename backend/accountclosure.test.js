@@ -28,11 +28,12 @@ function fakeDb({ traveler = [], operator = [], scheduled = [] } = {}) {
   assert.deepStrictEqual(blocked.operations, [], 'an active Travel must leave scheduled and fleet state unchanged');
 
   const db = fakeDb({ traveler: ['completed:T-1'], operator: ['cancelled:T-2'], scheduled: ['future:S-1', 'future:S-2'] });
-  assert.deepStrictEqual(await closeOperationalAccount({ db, uid: 'u', now: 123 }), { ok: true, cancelledScheduled: 2 });
+  assert.deepStrictEqual(await closeOperationalAccount({ db, uid: 'u', now: 123 }), { ok: true, operationallyClosed: true, cancelledScheduled: 2 });
   assert.deepStrictEqual(db.operations, [
     ['delete', 'future:S-1'],
     ['delete', 'future:S-2'],
     ['set', 'operators/u', { available: false, offlineAt: 123, lat: null, lng: null }, { merge: true }],
+    ['set', 'account_closures/u', { operationallyClosed: true, closedAt: 123, cancelledScheduled: 2 }, { merge: true }],
   ]);
   const server = fs.readFileSync(require.resolve('./server'), 'utf8');
   assert.match(server, /app\.post\('\/account\/close', requireAuth,/);
@@ -41,4 +42,5 @@ function fakeDb({ traveler = [], operator = [], scheduled = [] } = {}) {
   console.log('PASS  account closure blocks during active Travel');
   console.log('PASS  account closure cancels scheduled Travel and removes the Operator from service');
   console.log('PASS  account closure requires a Firebase identity at both ends');
+  console.log('PASS  account closure leaves durable server-side crash-recovery evidence');
 })().catch((e) => { console.error(e); process.exit(1); });

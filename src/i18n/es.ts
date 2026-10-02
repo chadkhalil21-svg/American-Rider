@@ -567,6 +567,7 @@ export default {
     gateCoverageExpired: 'Su cobertura comercial ha vencido. No se pueden asignar viajes hasta que se renueve y la nueva fecha esté registrada.',
     gateLocation: 'Los viajes se asignan por distancia, por lo que American Rider necesita la ubicación de este dispositivo para ponerle en servicio.',
     couldNotEnterService: 'No se pudo entrar en servicio.',
+    travelIdentityUnavailable: 'La identidad del Travel no está disponible. Esta solicitud no se puede aceptar.',
     errEmailInUse: 'Ese correo ya tiene una cuenta: inicie sesión.',
     errWeakPassword: 'La contraseña debe tener al menos 15 caracteres.',
     errBadCredentials: 'No fue posible iniciar sesión. Compruebe su correo y contraseña, o use ¿Olvidó su contraseña?',

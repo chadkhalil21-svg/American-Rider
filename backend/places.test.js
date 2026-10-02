@@ -81,3 +81,17 @@ for (const r of results) console.log(`${r.ok ? '✓' : '✗'} ${r.label}${r.ok |
 const failed = results.filter((r) => !r.ok);
 console.log(failed.length ? `\n${failed.length} FAILED of ${results.length}` : `\nall ${results.length} passed`);
 process.exit(failed.length ? 1 : 0);
+
+
+const dataSource = fs.readFileSync('src/data.ts','utf8');
+const locationSource = fs.readFileSync('src/location.ts','utf8');
+assert.equal(
+  /name:\s*['"]Current location\s+—\s+Brickell['"]/.test(dataSource),
+  false,
+  'Static pickup collections must never contain a fabricated Current location',
+);
+assert.match(locationSource, /accuracy:\s*Location\.Accuracy\.High/,
+  'device pickup must request high accuracy appropriate to curbside pickup');
+assert.match(locationSource, /if \(!label\) return null/,
+  'coordinates without a human-readable pickup must remain unresolved');
+console.log('PASS current pickup can only originate from resolved device location');

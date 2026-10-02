@@ -402,7 +402,9 @@ export default function Home() {
           label: t('traveler.aboutAmericanRider'),
           onPress: () => {
             setMenuOpen(false);
-            Linking.openURL(`${LEGAL_URL}/about`);
+            Linking.openURL(`${LEGAL_URL}/about`).catch(() => {
+              router.navigate('/settings');
+            });
           },
         },
       ],

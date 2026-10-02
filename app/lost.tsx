@@ -228,7 +228,7 @@ export default function LostItemScreen() {
                 .join(' · ');
               const when = travelDateTime(r.createdAt, language);
               return (
-                <Pressable
+                <Pressable accessibilityRole="button"
                   key={r.id}
                   onPress={() => pickTravel(r)}
                   accessibilityRole="button"
@@ -258,7 +258,7 @@ export default function LostItemScreen() {
         {/* Nobody leaves this screen with nowhere to go. With no travel to report against
             there is nothing for an operator to search, so the case belongs with a person. */}
         {travels.length === 0 && (
-          <Pressable
+          <Pressable accessibilityRole="button"
             onPress={() => {
               ride.openHelp(ride.lastTrip.no);
               router.replace({ pathname: '/issues', params: { from: 'lost' } });
@@ -340,7 +340,7 @@ export default function LostItemScreen() {
           {photoUri ? (
             <View style={styles.photoRow}>
               <Image source={{ uri: photoUri }} style={styles.thumb} />
-              <Pressable
+              <Pressable accessibilityRole="button"
                 onPress={() => setPhotoUri(null)}
                 style={styles.linkPress}
                 accessibilityRole="button"

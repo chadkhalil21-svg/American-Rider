@@ -13,8 +13,8 @@ import { type DepPlace } from './data';
 
 /** Unresolved means exactly that: no invented neighbourhood and no coordinates. */
 export const DEFAULT_DEPARTURE: DepPlace = {
-  name: 'Current location',
-  short: 'Current location',
+  name: 'traveler.currentLocation',
+  short: 'traveler.currentLocation',
 };
 
 /**

@@ -313,12 +313,16 @@ export default function TravelConfirmation() {
   }, [depLat, depLng]);
 
   const [placeSuggestions, setPlaceSuggestions] = useState<PlaceSuggestion[]>([]);
+  const [placeSearchBusy, setPlaceSearchBusy] = useState(false);
   useEffect(() => {
-    if (!searching || query.trim().length < 2) { setPlaceSuggestions([]); return undefined; }
+    if (!searching || query.trim().length < 2) { setPlaceSuggestions([]); setPlaceSearchBusy(false); return undefined; }
+    setPlaceSearchBusy(true);
     const controller = new AbortController();
     const anchor = ride.pickupPin ?? (depLat != null && depLng != null ? { lat: depLat, lng: depLng } : null);
     const timer = setTimeout(() => {
-      searchPlaces(query, anchor, controller.signal).then(setPlaceSuggestions);
+      searchPlaces(query, anchor, controller.signal).then((results) => {
+        if (!controller.signal.aborted) { setPlaceSuggestions(results); setPlaceSearchBusy(false); }
+      });
     }, 180);
     return () => { clearTimeout(timer); controller.abort(); };
   }, [query, searching, depLat, depLng, ride.pickupPin]);
@@ -343,12 +347,16 @@ export default function TravelConfirmation() {
   const typedDisplay = query.trim().replace(/\b\w/g, (c) => c.toUpperCase());
   const qd = queryDep.trim().toLowerCase();
   const [depSuggestions, setDepSuggestions] = useState<PlaceSuggestion[]>([]);
+  const [depSearchBusy, setDepSearchBusy] = useState(false);
   useEffect(() => {
-    if (!searchingDep || qd.length < 2) { setDepSuggestions([]); return undefined; }
+    if (!searchingDep || qd.length < 2) { setDepSuggestions([]); setDepSearchBusy(false); return undefined; }
+    setDepSearchBusy(true);
     const controller = new AbortController();
     const anchor = ride.pickupPin ?? (depLat != null && depLng != null ? { lat: depLat, lng: depLng } : null);
     const timer = setTimeout(() => {
-      searchPlaces(queryDep, anchor, controller.signal).then(setDepSuggestions);
+      searchPlaces(queryDep, anchor, controller.signal).then((results) => {
+        if (!controller.signal.aborted) { setDepSuggestions(results); setDepSearchBusy(false); }
+      });
     }, 180);
     return () => { clearTimeout(timer); controller.abort(); };
   }, [queryDep, searchingDep, qd, depLat, depLng, ride.pickupPin]);
@@ -596,7 +604,7 @@ export default function TravelConfirmation() {
                   </View>
                 </Pressable>
               ))}
-              {qd !== '' && depMatched.length === 0 && (
+              {qd.length >= 2 && !depSearchBusy && depMatched.length === 0 && (
                 <Text style={styles.noResults}>{t('traveler.noPlacesFound')}</Text>
               )}
               {Platform.OS === 'ios' && (

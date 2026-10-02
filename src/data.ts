@@ -64,42 +64,6 @@ export type Trip = {
   emailed?: string;
 };
 
-// Demo destinations, priced from Brickell. These are a FIXED LIST — the app has no real
-// address search yet, so anywhere not in here shows "No places found". Replacing this with
-// Apple MapKit search + distance-based pricing is the next big piece of work.
-//
-// ⚠️ Every `short` here must also exist in ../backend/fares.js, which is what the SERVER
-// prices from. A destination missing there cannot be paid for.
-export const PLACES: Place[] = [
-  { name: 'Miami International Airport', short: 'Miami International Airport', cost: 10.2, meta: '20 min', lat: 25.7953, lng: -80.2789, permitRequired: true },
-  { name: 'Wynwood', short: 'Wynwood', cost: 4.94, meta: '10 min', lat: 25.801, lng: -80.1994 },
-  { name: 'South Beach', short: 'South Beach', cost: 7.44, meta: '15 min', lat: 25.7826, lng: -80.1341 },
-  { name: 'Coral Gables', short: 'Coral Gables', cost: 10.32, meta: '20 min', lat: 25.7215, lng: -80.2684 },
-  { name: 'PortMiami · Cruise Terminal', short: 'PortMiami', cost: 4.01, meta: '8 min', lat: 25.7785, lng: -80.1687, permitRequired: true },
-  { name: 'Kaseya Center', short: 'Kaseya Center', cost: 3.5, meta: '5 min', lat: 25.7814, lng: -80.187 },
-  { name: 'Kendall', short: 'Kendall', cost: 16.5, meta: '31 min', lat: 25.6793, lng: -80.3173 },
-  { name: 'Doral', short: 'Doral', cost: 17.62, meta: '32 min', lat: 25.8195, lng: -80.3553 },
-  { name: 'Coconut Grove', short: 'Coconut Grove', cost: 7.99, meta: '16 min', lat: 25.7282, lng: -80.2431 },
-  { name: 'Key Biscayne', short: 'Key Biscayne', cost: 10.08, meta: '20 min', lat: 25.6937, lng: -80.1626 },
-  { name: 'Little Havana', short: 'Little Havana', cost: 4.01, meta: '8 min', lat: 25.7743, lng: -80.2199 },
-  { name: 'Design District', short: 'Design District', cost: 6.24, meta: '13 min', lat: 25.8131, lng: -80.1935 },
-  { name: 'Midtown Miami', short: 'Midtown Miami', cost: 5.45, meta: '11 min', lat: 25.806, lng: -80.193 },
-  { name: 'Bayside Marketplace', short: 'Bayside', cost: 3.5, meta: '4 min', lat: 25.7784, lng: -80.1866 },
-  { name: 'University of Miami', short: 'University of Miami', cost: 11.16, meta: '22 min', lat: 25.7215, lng: -80.2793 },
-  { name: 'Virginia Key', short: 'Virginia Key', cost: 6.31, meta: '13 min', lat: 25.7362, lng: -80.1596 },
-  { name: 'Miami Beach Convention Center', short: 'Convention Center', cost: 7.91, meta: '16 min', lat: 25.795, lng: -80.134 },
-  { name: 'Hialeah', short: 'Hialeah', cost: 13.86, meta: '26 min', lat: 25.8576, lng: -80.2781 },
-  { name: 'Bal Harbour', short: 'Bal Harbour', cost: 15.88, meta: '30 min', lat: 25.8917, lng: -80.1264 },
-  { name: 'North Miami Beach', short: 'North Miami Beach', cost: 18.87, meta: '34 min', lat: 25.9331, lng: -80.1625 },
-  { name: 'Sunny Isles Beach', short: 'Sunny Isles', cost: 21.32, meta: '38 min', lat: 25.949, lng: -80.1226 },
-  { name: 'Aventura Mall', short: 'Aventura', cost: 21.67, meta: '39 min', lat: 25.9581, lng: -80.1428 },
-  { name: 'Hard Rock Stadium', short: 'Hard Rock Stadium', cost: 21.55, meta: '39 min', lat: 25.958, lng: -80.2389 },
-  { name: 'Homestead', short: 'Homestead', cost: 41.42, meta: '69 min', lat: 25.4687, lng: -80.4776 },
-  { name: 'Fort Lauderdale Airport', short: 'Fort Lauderdale Airport', cost: 32.86, meta: '56 min', lat: 26.0742, lng: -80.1506, permitRequired: true },
-];
-
-export const HOME_PLACE: Place = { name: 'Home — Brickell City Centre', short: 'Home', cost: 3.5, meta: '1 min', lat: 25.7689, lng: -80.1935 };
-
 // Destination names that shipped before 15 Aug 2026, mapped to what they are called now.
 //
 // Renaming a place does NOT rewrite history: a trip in Firestore keeps the arrival name it
@@ -211,22 +175,6 @@ export const VENUE_NOTES: Record<string, string> = {
     'traveler.venuePortMiami',
   'Convention Center':
     'traveler.venueConvention',
-};
-
-export const DRIVER = {
-  name: 'Miguel',
-  fullName: 'Miguel D.',
-  initials: 'MD',
-  car: 'Gray Toyota Camry',
-  plate: 'KTR 4821',
-  rating: 4.98,
-};
-
-export const RIDER = {
-  name: 'J. Reyes',
-  initials: 'JR',
-  since: 2026,
-  rating: 4.92,
 };
 
 // Fare model (ONE all-in price for the traveler): the operator keeps 99% of the fare

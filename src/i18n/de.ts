@@ -689,6 +689,7 @@ export default {
     add: 'Hinzufügen',
     onStripesSchedule: 'Nach dem Zeitplan von Stripe',
     save: 'Speichern',
+    saved: 'Gespeichert.',
     edit: 'Bearbeiten',
     iNeedHelp: 'Ich brauche Hilfe',
     safetyRow: '911 · Fahrt teilen · Betreiber überprüfen',

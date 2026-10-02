@@ -403,6 +403,7 @@ export default {
     chooseFile: 'Datei auswählen',
     notSubmitted: 'Nicht eingereicht',
     notChecked: 'Nicht geprüft',
+    beingChecked: 'Wird geprüft',
     validThrough: 'Gültig bis %{date}',
     notAccepted: 'Nicht akzeptiert.',
     submit: 'Einreichen',

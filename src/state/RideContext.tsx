@@ -710,12 +710,12 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
             pay: (() => {
               const p = live.paidWith;
               if (!p) return '';
-              if (p.wallet === 'apple_pay') return p.last4 ? `Apple Pay ····${p.last4}` : 'Apple Pay';
-              if (p.wallet === 'google_pay') return p.last4 ? `Google Pay ····${p.last4}` : 'Google Pay';
-              if (p.type === 'us_bank_account') return p.last4 ? `${p.bank || 'Bank Account'} · ACH ····${p.last4}` : (p.bank || 'Bank Account');
+              if (p.wallet === 'apple_pay') return p.last4 ? tr('traveler.cardEnding', { brand: 'Apple Pay', last4: p.last4 }) : 'Apple Pay';
+              if (p.wallet === 'google_pay') return p.last4 ? tr('traveler.cardEnding', { brand: 'Google Pay', last4: p.last4 }) : 'Google Pay';
+              if (p.type === 'us_bank_account') return p.last4 ? tr('traveler.bankEnding', { last4: p.last4 }) : tr('traveler.bankAccount');
               if (p.last4) {
                 const brand = p.brand ? p.brand[0].toUpperCase() + p.brand.slice(1) : 'Card';
-                return `${brand} ····${p.last4}`;
+                return tr('traveler.cardEnding', { brand, last4: p.last4 });
               }
               return p.type || '';
             })(),

@@ -558,11 +558,9 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     settleTravel({ rideId, paymentIntentId });
   }, []);
   const [viewTrip, setViewTrip] = useState<(Trip & { sub?: string }) | null>(null);
-  const [stats, setStats] = useState({ trips: 23, spent: 612.85 });
+  const [stats, setStats] = useState({ trips: 0, spent: 0 });
   // Threads keyed by Travel Number. The seed is the demo's opening line on the first trip.
-  const [threads, setThreads] = useState<Record<string, Msg[]>>({
-    [INITIAL_TRIP.no]: [{ me: false, text: tr('traveler.opOnMyWay') }],
-  });
+  const [threads, setThreads] = useState<Record<string, Msg[]>>({});
   const [issue, setIssue] = useState<string | null>(null);
   const [issueState, setIssueState] = useState<IssueState>(null);
   const [issueResult, setIssueResult] = useState<SupportOutcome | null>(null);
@@ -611,7 +609,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   // cannot render over a later one.
   const issueGen = useRef(0);
   const msgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastTotalRef = useRef(26.25);
+  const lastTotalRef = useRef(0);
   const lastTripRef = useRef<Trip>(INITIAL_TRIP);
   // The live payment, readable from a callback without re-creating it whenever it changes.
   const paymentRef = useRef<PaymentState>({ status: 'idle' });
@@ -678,6 +676,8 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     try {
       const rides = await fetchMyRides();
       setMyRides(rides);
+      const completed = rides.filter((r) => r.status === 'completed');
+      setStats({ trips: completed.length, spent: completed.reduce((sum, r) => sum + r.totalCents, 0) / 100 });
       // Continue this traveler's trip numbers past the rides they already have, so a
       // fresh launch doesn't hand out AR-2048 again on every first booking.
       setTripSeq((s) => Math.max(s, 2047 + rides.length));
@@ -1062,7 +1062,9 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       rideTimer.current = null;
     }
     setRideActive(false);
-    setStats((st) => ({ trips: st.trips + 1, spent: st.spent + lastTotalRef.current }));
+    // Account statistics are reconstructed from authoritative completed Travel records by
+    // refreshMyRides(). Do not optimistically increment them here: completion snapshots may
+    // replay after foreground/reconnect and would double-count the same Travel.
     // Boarding to completion, for the receipt. Unknown when nobody recorded boarding.
     const minutes = onboardAtRef.current
       ? Math.max(1, Math.round((Date.now() - onboardAtRef.current) / 60000))

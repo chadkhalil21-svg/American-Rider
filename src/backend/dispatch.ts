@@ -336,7 +336,7 @@ export async function fetchMyRides(): Promise<RideRecord[]> {
       return {
         id: d.id,
         tripNo: x.tripNo ?? '',
-        dep: x.dep ?? 'Brickell',
+        dep: typeof x.dep === 'string' ? x.dep : '',
         arr: x.dest ?? '',
         operatorName: x.operatorName ?? '',
         operatorId: x.operatorId ?? '',

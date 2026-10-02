@@ -265,7 +265,7 @@ export type RideStore = {
   schedSaved: boolean | null;
   /** What the dispatcher has done with it: still waiting, operator sent, or why not. */
   schedState: ScheduledRide | null;
-  scheduleRide: (info: SchedInfo) => void;
+  scheduleRide: (info: SchedInfo) => Promise<boolean>;
   cancelScheduled: () => Promise<boolean>;
 
   // audio
@@ -1474,12 +1474,10 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   // It shows immediately either way — losing the write must not lose what they chose — but
   // `schedSaved` records whether it will still be there tomorrow, and the screen says so.
   const scheduleRide = useCallback(
-    (info: SchedInfo) => {
-      setScheduled(true);
-      setSchedInfo(info);
-      setCustomTime('');
+    async (info: SchedInfo): Promise<boolean> => {
+      // A reservation is a server fact. Do not display "Scheduled" before the server has
+      // accepted the exact journey; a failed or stale write must never become local truth.
       setSchedSaved(null);
-      setSchedState(null);
 
       // THE WHOLE JOURNEY GOES ON THE RESERVATION, not just the appointment.
       //
@@ -1487,7 +1485,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       // derives and stores the authoritative fare and Travel Number; local quote state is
       // presentation only and cannot become reservation authority.
 
-      saveScheduledRide({
+      const saved = await saveScheduledRide({
         when: info.when,
         time: info.time,
         period: info.period === 'AM' ? 'AM' : 'PM',
@@ -1502,11 +1500,22 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
         destinationLng: tripCoords?.dest?.lng ?? arrival.lng,
         travelClass: operatorClassFor(travelClass),
         party: travelParty,
-      }).then((saved) => {
-        schedIdRef.current = saved?.id ?? null;
-        setSchedId(saved?.id ?? null);
-        setSchedSaved(!!saved);
       });
+      if (!saved) {
+        setSchedSaved(false);
+        return false;
+      }
+      schedIdRef.current = saved.id;
+      setSchedId(saved.id);
+      setSchedInfo({
+        ...info,
+        cost: saved.cost,
+      });
+      setCustomTime('');
+      setSchedState(saved);
+      setSchedSaved(true);
+      setScheduled(true);
+      return true;
     },
     [arrival, departure, travelClass, tripCoords, travelParty],
   );

@@ -420,7 +420,6 @@ export default {
     typeAddressThenTap: 'Geben Sie die Adresse Ihres Kontos ein und tippen Sie erneut auf Passwort vergessen.',
     paymentUnavailable: 'Die Zahlung ist derzeit nicht verfügbar. Es können keine Fahrten reserviert werden.',
     paymentsSimulated: 'Zahlungen werden während des Testprogramms simuliert. Es erfolgt keine Belastung.',
-    opOnMyWay: 'Bin unterwegs — in wenigen Minuten da.',
     paymentServerUnreachable: 'Der Zahlungsserver war nicht erreichbar',
     opGotIt: 'Verstanden — bis gleich.',
     notifArrived: 'Ankunftshinweise',

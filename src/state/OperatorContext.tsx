@@ -181,7 +181,7 @@ const K_ROLE = 'ar:role';
 const K_VERIFICATION = 'ar:operator-verification';
 const K_COMMISSIONED = 'ar:operator-commissioned'; // ISO date when commissioned
 const K_DOCS = 'ar:operator-docs';
-const K_BGCHECK = 'ar:operator-bgcheck'; // ISO date of the simulated screening pass
+const K_BGCHECK = 'ar:operator-bgcheck'; // ISO date of the verified screening record
 const K_REVENUE = 'ar:operator-revenue';
 
 // How often an on-duty phone re-states that it is there. Comfortably inside the server's
@@ -202,7 +202,7 @@ const K_VEHICLE = 'ar:operator-vehicle'; // the car a traveler will be looking f
 const K_COVERAGE = 'ar:operator-coverage'; // the date the commercial policy runs out
 
 type RevenueBlob = { ops: CompletedOp[]; withdrawn: number; seq: number };
-const EMPTY_REVENUE: RevenueBlob = { ops: [], withdrawn: 0, seq: 2047 };
+const EMPTY_REVENUE: RevenueBlob = { ops: [], withdrawn: 0, seq: 0 };
 
 type OperatorState = {
   ready: boolean;
@@ -686,7 +686,11 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
       // and a label describing something the value is not. `tripNo` arrives on every
       // dispatched request (see SimRequest); rideId stays the fallback only for a record old
       // enough to predate it, and the scripted number for the test program.
-      setOp({ ...r, no: r.tripNo || r.rideId || `AR-${seq}-MIA`, earn: earnOf(r.fare) });
+      if (!r.tripNo && !r.rideId) {
+        setOnlineError(tr('traveler.travelIdentityUnavailable'));
+        return false;
+      }
+      setOp({ ...r, no: r.tripNo || r.rideId!, earn: earnOf(r.fare) });
       setArrived(false);
       setMsgs([]);
       return true;

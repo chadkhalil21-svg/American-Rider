@@ -63,6 +63,7 @@ export default function Schedule() {
   const [calOffset, setCalOffset] = useState(0); // months ahead of the current month
   // Once scheduled, the demo shows its Travel Scheduled splash before returning home.
   const [doneInfo, setDoneInfo] = useState<SchedInfo | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const now = new Date();
   const nowMin = now.getHours() * 60 + now.getMinutes();
@@ -437,8 +438,8 @@ export default function Schedule() {
 
       <PrimaryButton
         label={t('traveler.scheduleTravel')}
-        disabled={schedInvalid}
-        onPress={() => {
+        disabled={schedInvalid || saving}
+        onPress={async () => {
           const info: SchedInfo = {
             when: whenLabels[ride.schedDate],
             time: chosenTime,
@@ -447,8 +448,10 @@ export default function Schedule() {
             cost: ride.travelerTotal, // the same price the traveler was shown — see travelerTotal
             atMs: scheduledAt(),
           };
-          ride.scheduleRide(info);
-          setDoneInfo(info); // the demo's splash, then Done → home
+          setSaving(true);
+          const saved = await ride.scheduleRide(info);
+          setSaving(false);
+          if (saved) setDoneInfo({ ...info, cost: ride.schedState?.cost ?? info.cost });
         }}
         style={{ marginTop: 'auto' }}
       />

@@ -28,8 +28,6 @@ import {
 } from '../src/components/UI';
 import {
   canonicalPlaceName,
-  HOME_PLACE,
-  PLACES,
   prettyPlace,
   STATUS_LABELS,
   type Place,
@@ -231,17 +229,9 @@ export default function Home() {
       }
     }
     if (!best) return null;
-    // Resolve through canonicalPlaceName first: a trip booked before a destination was
-    // renamed still carries the old label, and matching raw would silently empty this
-    // section for exactly the loyal travelers it exists to serve.
-    const arrived = canonicalPlaceName(best.arr);
-    const place: Place | undefined = [HOME_PLACE, ...PLACES].find(
-      (p) => p.name === arrived || p.short === arrived,
-    );
-    if (!place) return null; // only suggest what one tap can actually book
-    // Deliberately no price here. What this travel last cost is not what it costs now, and
-    // a figure carried in this object is a figure something will eventually render.
-    return { place };
+    // A past destination is a historical label, not a current geocoded destination.
+    // Re-enter it through live place search so the server resolves and re-quotes it now.
+    return { query: canonicalPlaceName(best.arr) };
   }, [ride.myRides]);
 
   // WHAT THIS TRAVEL COSTS NOW, not what it cost last time.
@@ -260,7 +250,7 @@ export default function Home() {
   // still fills to three from what remains.
   const recentDistinct = useMemo(() => {
     const seen = new Set<string>();
-    if (suggestion) seen.add(canonicalPlaceName(suggestion.place.name));
+    if (suggestion) seen.add(canonicalPlaceName(suggestion.query.name));
     const out: typeof ride.myRides = [];
     for (const r of ride.myRides) {
       const key = canonicalPlaceName(r.arr);
@@ -292,7 +282,7 @@ export default function Home() {
     setSuggestedMinutes(null);
     if (!suggestion) return;
     const dep = ride.departure;
-    const place = suggestion.place;
+    const place = suggestion.query;
     const pickup = dep?.lat != null && dep?.lng != null ? { lat: dep.lat, lng: dep.lng } : null;
     const dest = place.lat != null && place.lng != null ? { lat: place.lat, lng: place.lng } : null;
     setSuggestedQuote(null);
@@ -634,7 +624,7 @@ export default function Home() {
               // charged here. Where the quote has not arrived — offline, or a suggestion we
               // cannot serve — the old path still runs, so the price is never invented to
               // save a step.
-              ride.startBooking(suggestion.place);
+              ride.startBooking(suggestion.query);
               if (suggestedQuote) {
                 ride.setQuotedFareCents(suggestedQuote.travelCostCents);
                 ride.setQuotedFeeLines(suggestedQuote.feeLines);
@@ -651,7 +641,7 @@ export default function Home() {
           >
             <View style={styles.itemCard}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.itemName}>{prettyPlace(suggestion.place.name)}</Text>
+                <Text style={styles.itemName}>{prettyPlace(suggestion.query.name)}</Text>
                 {/* The number has to say what it measures. The demo prints a bare "24 min"
                     and we printed "24 min away", and neither tells a traveler whether it is
                     how long the journey takes or how far off their operator is. Chad, 15 Aug:

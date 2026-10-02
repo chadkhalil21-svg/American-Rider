@@ -437,7 +437,6 @@ export default {
     typeAddressThenTap: 'Type the address on your account, then tap Forgot password again.',
     paymentUnavailable: 'Payment is unavailable right now. Travel cannot be reserved.',
     paymentsSimulated: 'Payments are simulated during the test program. No charge is made.',
-    opOnMyWay: 'On my way — a few minutes out.',
     paymentServerUnreachable: 'Could not reach the payment server',
     opGotIt: 'Got it — see you soon.',
     notifArrived: 'Arrival & Stationing Alerts',

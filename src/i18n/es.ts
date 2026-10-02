@@ -175,6 +175,7 @@ export default {
   },
 
   traveler: {
+    pleaseWait: 'Espere',
     beginTravel: 'Iniciar Viaje',
     departure: 'Salida',
     destinationEntry: 'Seleccione su destino',

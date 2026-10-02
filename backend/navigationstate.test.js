@@ -46,3 +46,15 @@ assert.equal(operatorVehicle.includes("showNote('Saved.')"), false, 'Operator ve
 assert.equal(operatorVehicle.includes(": 'Save'"), false, 'Operator vehicle save action must be localized');
 console.log('✓ Pickup ETA remains unknown until authoritative evidence exists');
 console.log('✓ Operator vehicle save states are localized');
+
+
+assert.ok(reserve.includes("if (!controller.signal.aborted) { setPlaceSuggestions(results);"), 'Destination search must reject stale aborted responses');
+assert.ok(reserve.includes("if (!controller.signal.aborted) { setDepSuggestions(results);"), 'Pickup search must reject stale aborted responses');
+assert.ok(reserve.includes("!depSearchBusy && depMatched.length === 0"), 'Pickup search must not claim no results while lookup is pending');
+assert.ok(reserve.includes("ride.arrival.name.trim()) chooseDestination"), 'Reserve must not request a quote for an empty destination');
+const savedPlaces = fs.readFileSync(path.join(__dirname, '..', 'src', 'savedPlaces.ts'), 'utf8');
+assert.ok(savedPlaces.includes("if (!localSaved && !remoteSaved) throw"), 'Saved Places must not report success when no durable store accepted the mutation');
+const savedPlaceScreen = fs.readFileSync(path.join(__dirname, '..', 'app', 'saved-place.tsx'), 'utf8');
+assert.ok(savedPlaceScreen.includes("setError(t('traveler.couldNotSaveConn'))"), 'Saved Place mutation failures must remain on-screen with an actionable error');
+console.log('✓ Place search fences stale responses and truthful pending/empty states');
+console.log('✓ Saved Places fail closed when persistence fails');

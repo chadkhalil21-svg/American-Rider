@@ -34,11 +34,7 @@ export type DepPlace = {
   /**
    * True only when these coordinates came from the device's own position.
    *
-   * DEP_PLACES[0] is ALSO called "Current location" and carries fixed Brickell
-   * coordinates, so the name cannot be used to tell a real position from the placeholder —
-   * which is precisely how a resolved location got silently replaced by Brickell at the
-   * start of every booking. Anything that resets a pickup must preserve a resolved one.
-   */
+    */
   resolved?: boolean;
 };
 
@@ -175,12 +171,10 @@ export function prettyPlace(recorded: string): string {
   return s;
 }
 
-// Named pickups carry their own coordinates. NEVER geocode these labels: phrases like
-// "Current location — Brickell" are not addresses, and Apple's geocoder only sometimes
-// guesses them — when it failed, the whole trip silently lost its coordinates (no pins,
-// no route, no car on the map). Real coords make that failure impossible.
+// Named saved/example pickups carry their own coordinates. Device “Current location” is
+// deliberately absent from this static collection: it may only come from src/location.ts
+// after the device establishes a real position and a human-readable pickup place.
 export const DEP_PLACES: DepPlace[] = [
-  { name: 'Current location — Brickell', short: 'Brickell', lat: 25.767, lng: -80.1919 },
   { name: 'Home — Brickell City Centre', short: 'Brickell', lat: 25.7689, lng: -80.1935 },
   { name: 'Work — Coral Gables', short: 'Coral Gables', lat: 25.7215, lng: -80.2684 },
   { name: 'Wynwood', short: 'Wynwood', lat: 25.801, lng: -80.1994 },

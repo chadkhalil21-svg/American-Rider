@@ -220,7 +220,7 @@ export default function TravelConfirmation() {
     pricedOnOpen.current = true;
     // keepSearchOpen: this is background pricing, not a pick — if the traveler arrived
     // through the search card, their search box must stay open.
-    if (!ride.tripCoords) chooseDestination(ride.arrival, { keepSearchOpen: true });
+    if (!ride.tripCoords && ride.arrival.name.trim()) chooseDestination(ride.arrival, { keepSearchOpen: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

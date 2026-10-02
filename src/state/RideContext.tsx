@@ -550,9 +550,13 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   const trySettle = useCallback(() => {
     const rideId = settleRideRef.current;
     const paymentIntentId = paidIntentRef.current;
-    if (!rideId || !paymentIntentId || settledRides.current.has(rideId)) return;
-    settledRides.current.add(rideId);
-    settleTravel({ rideId, paymentIntentId });
+    if (!rideId || !paymentIntentId || settledRides.current.has(rideId) || settlementInFlightRef.current === rideId) return;
+    settlementInFlightRef.current = rideId;
+    settleTravel({ rideId, paymentIntentId }).then((result) => {
+      if (result.ok || result.owed) settledRides.current.add(rideId);
+    }).finally(() => {
+      if (settlementInFlightRef.current === rideId) settlementInFlightRef.current = null;
+    });
   }, []);
   const [viewTrip, setViewTrip] = useState<(Trip & { sub?: string }) | null>(null);
   const [stats, setStats] = useState({ trips: 0, spent: 0 });

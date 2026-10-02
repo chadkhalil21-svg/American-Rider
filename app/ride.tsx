@@ -144,7 +144,8 @@ export default function Status() {
   const arrivalFact = (() => {
     if (st === 1 && ride.matchedOp && ride.matchedOp.etaMin > 0) return t('traveler.durMin', { n: ride.matchedOp.etaMin });
     if (st === 2) return t('traveler.rideStepOutside');
-    if (ride.route && st >= 3 && st < 5) return t('traveler.durMin', { n: Math.max(1, Math.ceil((ride.route.durationSec * (5 - st)) / 3 / 60)) });
+    // Total route duration is not remaining duration. Without live progress telemetry there is
+    // no defensible countdown after boarding, so display no invented arrival estimate.
     return null;
   })();
   const subs = STATUS_SUBS(t);

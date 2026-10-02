@@ -544,9 +544,7 @@ export default function TravelConfirmation() {
                     <View style={[styles.pin, { backgroundColor: colors.ink }]} />
                     <View style={{ flex: 1 }}>
                       <View style={{ flex: 1 }}>
-                      <Text style={styles.resultName}>{p.title}</Text>
-                      {!!p.subtitle && <Text style={styles.resultMeta}>{p.subtitle}</Text>}
-                    </View>
+                      <Text style={styles.resultName}>{p.name}</Text>
                       {/* The time from WHERE THIS TRAVELER IS, computed by the server against
                           their own coordinates, not a figure measured from Brickell and shown
                           to everybody. */}
@@ -581,7 +579,7 @@ export default function TravelConfirmation() {
             <Card style={styles.resultsCard}>
               {depMatched.map((p, i) => (
                 <Pressable
-                  key={p.name}
+                  key={p.id}
                   accessibilityRole="button"
                   onPress={() => {
                     ride.setDeparture({ name: p.title, short: p.title, lat: p.lat, lng: p.lng });

@@ -685,7 +685,6 @@ export default {
     floridaLicence: 'Permis de Floride',
     finishedCheckAgain: 'J’ai terminé — vérifiez à nouveau',
     backLabel: 'Retour',
-    cancelChev: '‹ Annuler',
     notNowChev: '‹ Pas maintenant',
     operatorCaps: 'OPÉRATEUR',
     add: 'Ajouter',

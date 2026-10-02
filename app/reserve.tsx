@@ -339,7 +339,7 @@ export default function TravelConfirmation() {
   // Anything the traveler types that isn't one of our shortcuts is still a real place —
   // offer to look it up rather than dead-ending with "no places found".
   const typedPlace: Place | null =
-    q !== '' && matched.length === 0 && liveMatched.length === 0
+    q !== '' && !placeSearchBusy && matched.length === 0 && liveMatched.length === 0
       ? { name: query.trim(), short: query.trim(), cost: 0, meta: 'Looking up…' }
       : null;
   // The demo capitalizes the typed place for display; the booked name stays as typed

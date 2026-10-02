@@ -1071,6 +1071,9 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   // outcome — the record, the settlement, the Travel Log — has to be reachable from both.
   const finishTravelRef = useRef<() => void>(() => {});
   const finishTravel = useCallback(() => {
+    const terminalRideId = activeRideId.current;
+    if (terminalRideId && finishedRideIdsRef.current.has(terminalRideId)) return;
+    if (terminalRideId) finishedRideIdsRef.current.add(terminalRideId);
     if (rideTimer.current) {
       clearInterval(rideTimer.current);
       rideTimer.current = null;

@@ -358,7 +358,7 @@ export default function TravelConfirmation() {
   // that cannot be charged, or that American Rider does not make, is not one to confirm.
   const busy = pricing || ride.repricing;
   const partyReady = ride.travelParty.mode === 'self' || (ride.travelParty.mode === 'other_adult' && ride.travelParty.travelerName.trim().length > 0);
-  const canReserve = payConfig.canTakePayment && partyReady && !busy && !priceFailed && !unavailable;
+  const canReserve = payConfig.canTakePayment && partyReady && authoritativePriceReady && !!ride.tripCoords && !busy && !priceFailed && !unavailable;
   const confirm = () => {
     if (!canReserve) return;
     ride.confirmRide();

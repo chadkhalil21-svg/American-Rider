@@ -709,6 +709,7 @@ export default {
     add: 'Add',
     onStripesSchedule: 'On Stripe\'s schedule',
     save: 'Save',
+    saved: 'Saved.',
     edit: 'Edit',
     iNeedHelp: 'I need help',
     safetyRow: '911 · Share your travel · Verify your operator',

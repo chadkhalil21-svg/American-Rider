@@ -165,6 +165,7 @@ export default {
   },
 
   traveler: {
+    pleaseWait: 'Veuillez patienter',
     beginTravel: 'Commencer le Trajet',
     departure: 'Départ',
     destinationEntry: 'Sélectionnez votre destination',

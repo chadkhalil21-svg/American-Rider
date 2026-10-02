@@ -58,3 +58,14 @@ const savedPlaceScreen = fs.readFileSync(path.join(__dirname, '..', 'app', 'save
 assert.ok(savedPlaceScreen.includes("setError(t('traveler.couldNotSaveConn'))"), 'Saved Place mutation failures must remain on-screen with an actionable error');
 console.log('✓ Place search fences stale responses and truthful pending/empty states');
 console.log('✓ Saved Places fail closed when persistence fails');
+
+
+const qualify = fs.readFileSync(path.join(__dirname, '..', 'app', 'operator', 'qualify.tsx'), 'utf8');
+assert.ok(qualify.includes('if (areaBusy) return;'), 'Operating-area mutation must reject duplicate taps');
+assert.ok(qualify.includes("setAreaError(t('traveler.couldNotSaveConn'))"), 'Operating-area mutation failures must remain visible');
+const settings = fs.readFileSync(path.join(__dirname, '..', 'app', 'settings.tsx'), 'utf8');
+assert.equal(/<Pressable onPress=/.test(settings), false, 'Settings interactive rows must expose accessibility semantics');
+const review = fs.readFileSync(path.join(__dirname, '..', 'app', 'operator', 'review.tsx'), 'utf8');
+assert.equal(/<Pressable onPress=/.test(review), false, 'Operator review secondary action must expose accessibility semantics');
+console.log('✓ Operator market mutation is fenced and failure-visible');
+console.log('✓ Settings and Operator review controls expose accessibility roles');

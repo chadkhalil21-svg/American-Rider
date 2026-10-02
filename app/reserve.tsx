@@ -57,6 +57,7 @@ import { useCabinPrefs } from '../src/state/cabinPrefs';
 import { useRide } from '../src/state/RideContext';
 import { paymentModeNote, usePaymentConfig } from '../src/state/PaymentConfigContext';
 import { useLanguage } from '../src/state/LanguageContext';
+import { useAuth } from '../src/state/AuthContext';
 import { colors, fmt } from '../src/theme';
 import { fetchFamily, type FamilyLink } from '../src/backend/family';
 
@@ -94,6 +95,7 @@ export default function TravelConfirmation() {
   const router = useRouter();
   const goBack = useGoBack();
   const ride = useRide();
+  const { user } = useAuth();
   const payConfig = usePaymentConfig();
   const cabin = useCabinPrefs();
   const params = useLocalSearchParams<{ search?: string; q?: string }>();
@@ -402,7 +404,7 @@ export default function TravelConfirmation() {
                     <View style={{ flex: 1 }}>
                       <Text style={styles.slotLabel}>{t('traveler.whoIsTraveling')}</Text>
                       <Text style={styles.slotValue}>
-                        {ride.travelParty.mode === 'self' ? t('traveler.me') : ride.travelParty.travelerName || t('traveler.anotherAdult')}
+                        {ride.travelParty.mode === 'self' ? (user?.displayName?.trim() || t('traveler.me')) : ride.travelParty.travelerName || t('traveler.anotherAdult')}
                       </Text>
                     </View>
                     <Chev />

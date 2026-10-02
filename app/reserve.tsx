@@ -355,7 +355,7 @@ export default function TravelConfirmation() {
   const depMatched = depSuggestions.slice(0, 6);
 
   // One factual line, whatever the demand: what the operator's arrival is estimated at.
-  const waitNote = t('traveler.approxMinToPickup', { n: ride.pickupWait });
+  const waitNote = ride.pickupWait > 0 ? t('traveler.approxMinToPickup', { n: ride.pickupWait }) : null;
   // Reads the server's real key mode instead of a hardcoded "nothing is charged yet", which
   // would become a lie on the sheet a traveler reads before money moves. Null once the server
   // holds a live key; the Terms promise the app says which mode it is in at payment.
@@ -626,7 +626,7 @@ export default function TravelConfirmation() {
                 <Text style={styles.routeDistance}>{t('traveler.routeDistance', { miles: routeMiles })}</Text>
               )}
 
-              <Text style={styles.waitNote}>{waitNote}</Text>
+              {waitNote ? <Text style={styles.waitNote}>{waitNote}</Text> : null}
 
               {/* THE VEHICLE CLASS, ON THE SHEET (Chad, 13 Sept 2026: "Merge vehicle class
                   selection directly into the destination summary screen"). Each row states

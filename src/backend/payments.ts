@@ -183,6 +183,10 @@ export async function payForRide(opts: {
   if (!intent.clientSecret) return { ok: false, error: t('traveler.errPaymentNotStarted') };
 
   // ---- 2. Stripe's own sheet, on the phone ----
+  // Wallet environment must follow the same authoritative server mode as Stripe. A test
+  // backend must never initialize Google Pay as production, and a live backend must never
+  // silently remain in Google's test environment.
+  const walletTestEnv = (await fetchPaymentConfig()).mode !== 'live';
   const init = await initPaymentSheet({
     merchantDisplayName: 'American Rider',
     paymentIntentClientSecret: intent.clientSecret,
@@ -194,7 +198,7 @@ export async function payForRide(opts: {
     ...(Platform.OS === 'ios'
       ? { applePay: { merchantCountryCode: 'US' } }
       : Platform.OS === 'android'
-        ? { googlePay: { merchantCountryCode: 'US', testEnv: false } }
+        ? { googlePay: { merchantCountryCode: 'US', testEnv: walletTestEnv } }
         : {}),
     returnURL: 'americanrider://stripe-redirect',
   });
@@ -327,6 +331,7 @@ export async function addPaymentMethod(): Promise<{ ok: boolean; canceled?: bool
     return { ok: false, error: t('traveler.paymentServerUnreachable') };
   }
   if (!setup.clientSecret) return { ok: false, error: t('traveler.couldNotAddMethod') };
+  const walletTestEnv = (await fetchPaymentConfig()).mode !== 'live';
   const init = await initPaymentSheet({
     merchantDisplayName: 'American Rider',
     setupIntentClientSecret: setup.clientSecret,

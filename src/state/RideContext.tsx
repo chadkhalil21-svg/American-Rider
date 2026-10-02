@@ -470,7 +470,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   }, [tripCoords]);
 
   const [departure, setDeparture] = useState<DepPlace>(DEFAULT_DEPARTURE);
-  const [pickupWait, setPickupWait] = useState(3);
+  const [pickupWait, setPickupWait] = useState(UNKNOWN_PICKUP_WAIT);
   const [demand, setDemand] = useState<Demand>('normal');
   const [status, setStatus] = useState(0);
   const [rideActive, setRideActive] = useState(false);

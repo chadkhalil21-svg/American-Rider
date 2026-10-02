@@ -393,11 +393,12 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   // Friendly and the rest are multipliers on top of it, exactly as options.tsx, review.tsx
   // and the booking path all do. Same three lines, one place.
   const travelerTotal = useMemo(() => {
+    if (quotedFareCents == null) return 0;
     const baseCents = quotedFareCents;
     const fare = applyClassCents(baseCents, travelClass) / 100;
     return +(fare + feeFor(fare, smartJourney) + governmentFee(quotedFeeLines)).toFixed(2);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quotedFareCents, arrival.cost, travelClass, smartJourney, quotedFeeLines]);
+  }, [quotedFareCents, travelClass, smartJourney, quotedFeeLines]);
   const [tripCoords, setTripCoords] = useState<{ pickup: Coords; dest: Coords } | null>(null);
   const tripCoordsRef = useRef<{ pickup: Coords; dest: Coords } | null>(null);
   tripCoordsRef.current = tripCoords;

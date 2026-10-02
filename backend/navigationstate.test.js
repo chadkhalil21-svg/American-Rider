@@ -1,0 +1,23 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const issues = fs.readFileSync(path.join(__dirname, '..', 'app', 'issues.tsx'), 'utf8');
+
+// Patron Support is a stateful hierarchy inside one route. Back from a category/detail must
+// return to the category list before the router stack is allowed to leave /issues.
+assert.ok(
+  /const supportBack = \(\) => \{[\s\S]*ride\.issueState !== null[\s\S]*resetIssue\(\)[\s\S]*goBack\(\)/.test(issues),
+  'Patron Support Back must unwind in-route issue state before route navigation',
+);
+assert.ok(
+  issues.includes('<LetterheadBar onBack={supportBack} />'),
+  'Patron Support header must use the hierarchical back handler',
+);
+assert.equal(
+  /<LetterheadBar onBack=\{goBack\} \/>/.test(issues),
+  false,
+  'Patron Support must not bypass its in-route hierarchy with raw route Back',
+);
+
+console.log('✓ Patron Support Back retraces issue detail → categories → route parent');

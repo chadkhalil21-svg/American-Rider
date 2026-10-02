@@ -35,13 +35,15 @@ export async function resolveCurrentDeparture(): Promise<DepPlace | null> {
     if (status !== 'granted') return null;
 
     const pos = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.Balanced, // street-level is enough to price a pickup
+      accuracy: Location.Accuracy.High, // pickup/dispatch needs curb-scale precision, not ~100 m
     });
     const { latitude: lat, longitude: lng } = pos.coords;
 
-    // Turn coordinates into something a person recognises. If this fails we still have a
-    // usable pickup — the coordinates are what actually price and dispatch the trip.
-    let label = 'Current location';
+    // Coordinates alone are not a complete pickup contract. The Traveler and Operator need a
+    // human-readable place to verify where pickup occurs. If reverse geocoding cannot establish
+    // one, keep pickup unresolved rather than presenting a bare “Current location” as though it
+    // were operationally sufficient.
+    let label = '';
     try {
       const [place] = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
       if (place) {
@@ -72,12 +74,15 @@ export async function resolveCurrentDeparture(): Promise<DepPlace | null> {
         if (area) label = `Current location — ${area}`;
       }
     } catch {
-      // Keep the bare label; coordinates still do the real work.
+      // Fall through to unresolved below. Coordinates are retained nowhere until a place the
+      // Traveler can recognize has also been established.
     }
+
+    if (!label) return null;
 
     return {
       name: label,
-      short: label.replace(/^Current location — /, '') || 'Current location',
+      short: label.replace(/^Current location — /, ''),
       lat,
       lng,
       resolved: true,

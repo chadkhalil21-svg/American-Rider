@@ -16,10 +16,8 @@ import {
   platformFee,
   DEP_PLACES,
   DepPlace,
-  HOME_PLACE,
   ISSUES,
   PAY_FRIENDLY,
-  PLACES,
   Place,
   Trip,
   coordinationFee,
@@ -93,9 +91,9 @@ export type DispatchState = 'idle' | 'searching' | 'matched' | 'none' | 'error';
 
 const DEFAULT_PREFS: Prefs = { quiet: true, charging: false, luggage: false, pet: false };
 
-const INITIAL_TRIP: Trip = {
-  arr: 'Miami International Airport', dep: 'Brickell', cost: 24.5, proc: 0, total: 26.0, opRev: 24.26,
-  pay: PAY_FRIENDLY.ach, no: 'AR-2047-MIA', date: 'July 6, 2:43 PM', subPrefix: 'July 6',
+const EMPTY_TRIP: Trip = {
+  arr: '', dep: '', cost: 0, proc: 0, total: 0, opRev: 0,
+  pay: '', no: '', date: '', subPrefix: '',
 };
 
 const nowLabel = () => {
@@ -368,7 +366,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   quotedFeeLinesRef.current = quotedFeeLines;
   const governmentFee = (lines: FeeLine[]) => lines.reduce((sum, l) => sum + l.cents, 0) / 100;
 
-  const [arrival, setArrival] = useState<Place>(PLACES[0]);
+  const [arrival, setArrival] = useState<Place>({ name: '', short: '', cost: 0, meta: '' });
 
   // ---- THE PRICE. ONE DERIVATION, USED BY EVERY SCREEN THAT SHOWS MONEY. ------------------
   //
@@ -499,9 +497,9 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   const [myRides, setMyRides] = useState<RideRecord[]>([]);
   const [payment, setPayment] = useState<PaymentState>({ status: 'idle' });
   const [tripSeq, setTripSeq] = useState(2047);
-  const [lastTrip, setLastTrip] = useState<Trip>(INITIAL_TRIP);
+  const [lastTrip, setLastTrip] = useState<Trip>(EMPTY_TRIP);
   // Every completed ride, newest first — keeps old receipts reachable.
-  // STARTS EMPTY. This began as [INITIAL_TRIP] — a fabricated $26.00 journey to Miami
+  // STARTS EMPTY. This began as [EMPTY_TRIP] — a fabricated $26.00 journey to Miami
   // International on July 6, travel number AR-2047-MIA — which every account carried as its
   // own completed travel, and which a receipt could be opened against.
   const [completedTrips, setCompletedTrips] = useState<Trip[]>([]);
@@ -570,7 +568,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   const [issue, setIssue] = useState<string | null>(null);
   const [issueState, setIssueState] = useState<IssueState>(null);
   const [issueResult, setIssueResult] = useState<SupportOutcome | null>(null);
-  // NO TRAVEL UNTIL THERE IS ONE. This was seeded with INITIAL_TRIP's number, so Patron
+  // NO TRAVEL UNTIL THERE IS ONE. This was seeded with EMPTY_TRIP's number, so Patron
   // Support opened showing "Travel AR-2047-MIA" to a traveler who had never taken a journey —
   // the seeded demonstration one, printed as though it were theirs.
   //
@@ -616,7 +614,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   const issueGen = useRef(0);
   const msgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTotalRef = useRef(0);
-  const lastTripRef = useRef<Trip>(INITIAL_TRIP);
+  const lastTripRef = useRef<Trip>(EMPTY_TRIP);
   // The live payment, readable from a callback without re-creating it whenever it changes.
   const paymentRef = useRef<PaymentState>({ status: 'idle' });
   // Mirrors `status` so the ride tick keeps side effects out of state updaters
@@ -1409,9 +1407,9 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       //
       // NEVER THE SEEDED TRAVEL. Until 15 Sept 2026 a traveler with no live travel who opened
       // support from Safety or the travel screen had their case filed against AR-2047-MIA — a
-      // journey nobody took — because lastTrip still held INITIAL_TRIP.
+      // journey nobody took — because lastTrip still held EMPTY_TRIP.
       const chosen = tripNo ?? (rideActiveRef.current ? lastTrip.no : '');
-      setIssueTripNo(chosen === INITIAL_TRIP.no ? '' : chosen);
+      setIssueTripNo(chosen === EMPTY_TRIP.no ? '' : chosen);
     },
     [lastTrip.no, resetIssue],
   );
@@ -1436,11 +1434,11 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       const gen = ++issueGen.current;
       // THE TRAVEL THE CASE CONCERNS, from a record the app actually holds: this session's
       // travels first, then the account's stored records. Never a fallback to lastTrip — that
-      // sent the seeded INITIAL_TRIP's figures ($26.00 to the airport, July 6) to the server
+      // sent the seeded EMPTY_TRIP's figures ($26.00 to the airport, July 6) to the server
       // as "the real recorded figures" of a travel that never happened. With no matching
       // record the case goes without a travel, and the server reasons from the words alone.
       const sessionTrip = [lastTripRef.current, ...completedTrips].find(
-        (t) => t.no === issueTripNo && t.no !== INITIAL_TRIP.no,
+        (t) => t.no === issueTripNo && t.no !== EMPTY_TRIP.no,
       );
       const record = myRidesRef.current.find((r) => r.tripNo === issueTripNo);
       const paymentFor = (no: string) =>
@@ -1732,4 +1730,3 @@ export function useRide(): RideStore {
 }
 
 // Home place used by "ride again" when destination was Home.
-export { HOME_PLACE };

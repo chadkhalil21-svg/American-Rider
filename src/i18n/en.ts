@@ -423,6 +423,7 @@ export default {
     chooseFile: 'Choose a file',
     notSubmitted: 'Not submitted',
     notChecked: 'Not checked',
+    beingChecked: 'Being checked',
     validThrough: 'Valid through %{date}',
     notAccepted: 'Not accepted.',
     submit: 'Submit',

@@ -551,6 +551,7 @@ export default {
     gateCoverageExpired: 'Ihr gewerblicher Versicherungsschutz ist abgelaufen. Es können keine Fahrten zugewiesen werden, bis er verlängert und das neue Datum hinterlegt ist.',
     gateLocation: 'Fahrten werden nach Entfernung zugewiesen, daher benötigt American Rider den Standort dieses Geräts, um Sie in den Dienst zu nehmen.',
     couldNotEnterService: 'Dienstantritt nicht möglich.',
+    travelIdentityUnavailable: 'Die Travel-Identität ist nicht verfügbar. Diese Anfrage kann nicht angenommen werden.',
     errEmailInUse: 'Für diese E-Mail besteht bereits ein Konto — melden Sie sich an.',
     errWeakPassword: 'Das Passwort sollte mindestens 15 Zeichen lang sein.',
     errBadCredentials: 'E-Mail-Adresse oder Passwort ist falsch.',

@@ -409,6 +409,7 @@ export default {
     chooseFile: 'Choisir un fichier',
     notSubmitted: 'Non soumis',
     notChecked: 'Non vérifié',
+    beingChecked: 'En cours de vérification',
     validThrough: 'Valable jusqu’au %{date}',
     notAccepted: 'Non accepté.',
     submit: 'Soumettre',

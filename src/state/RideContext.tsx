@@ -533,6 +533,10 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   // The completed travel waiting to be settled, and the ones already settled.
   const settleRideRef = useRef<string | null>(null);
   const settledRides = useRef<Set<string>>(new Set());
+  // Prevent duplicate settlement while the same authoritative request is in flight.
+  const settlementInFlightRef = useRef<string | null>(null);
+  // Completion snapshots can replay after reconnect/foreground. Side effects run once per ride.
+  const finishedRideIdsRef = useRef<Set<string>>(new Set());
 
   /**
    * Release the operator's 99% — but only once BOTH halves exist.
@@ -703,7 +707,18 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
             proc: 0,
             total,
             opRev: fare - coordinationFee(fare),
-            pay: live.paidWith?.label ?? '',
+            pay: (() => {
+              const p = live.paidWith;
+              if (!p) return '';
+              if (p.wallet === 'apple_pay') return p.last4 ? `Apple Pay ····${p.last4}` : 'Apple Pay';
+              if (p.wallet === 'google_pay') return p.last4 ? `Google Pay ····${p.last4}` : 'Google Pay';
+              if (p.type === 'us_bank_account') return p.last4 ? `${p.bank || 'Bank Account'} · ACH ····${p.last4}` : (p.bank || 'Bank Account');
+              if (p.last4) {
+                const brand = p.brand ? p.brand[0].toUpperCase() + p.brand.slice(1) : 'Card';
+                return `${brand} ····${p.last4}`;
+              }
+              return p.type || '';
+            })(),
             no: live.tripNo || live.id,
             date: Number.isFinite(when.getTime()) ? when.toLocaleString() : '',
             subPrefix: Number.isFinite(when.getTime()) ? when.toLocaleDateString() : '',

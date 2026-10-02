@@ -595,7 +595,7 @@ export default {
     messageNotDelivered: 'Ese mensaje no se entregó. Envíelo de nuevo.',
     disclosureRecorded: 'Registrado en su cuenta junto con el texto que aceptó. Si esta declaración cambia, se le pedirá que lea la nueva.',
     expiryFromDocuments: 'Las fechas de vencimiento se toman de los propios documentos. American Rider todavía no envía un aviso antes de que uno caduque: compruébelas usted mismo.',
-    certificateHolder: 'Pida a su agente que designe a American Rider como titular del certificado. Si la póliza vence o no se renueva, su aseguradora nos avisa y se dejan de asignar viajes en lugar de seguir sin seguro.',
+    certificateHolder: 'Pida a su agente o corredor que envíe un comprobante de cobertura vigente de American Rider a insurance@americanrider.app. Para una verificación vinculada a su cuenta, introduzca el correo de la aseguradora, agente o corredor en Estado del seguro y seleccione Solicitar Confirmación del Estado. La designación como titular del certificado no garantiza por sí sola un aviso de cancelación; si la póliza ofrece aviso de cancelación o no renovación mediante endoso, pida que se incluya. Una cobertura vencida o insuficiente detiene la asignación de Travels.',
     notAdditionalInsured: 'Solo titular del certificado. No pida que se añada a American Rider como asegurado adicional: eso le otorgaría cobertura bajo su póliza, le costaría más y no es para lo que sirve esto.',
     noCommissionOnPremium: 'American Rider no recibe ninguna comisión ni se queda con parte de su prima.',
     declarationsPage: 'La página de condiciones particulares, que muestra los límites y el tipo de uso, no la tarjeta de bolsillo.',

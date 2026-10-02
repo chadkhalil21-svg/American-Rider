@@ -543,7 +543,6 @@ export default function TravelConfirmation() {
                   <View style={[styles.resultRow, i > 0 && styles.hair]}>
                     <View style={[styles.pin, { backgroundColor: colors.ink }]} />
                     <View style={{ flex: 1 }}>
-                      <View style={{ flex: 1 }}>
                       <Text style={styles.resultName}>{p.name}</Text>
                       {/* The time from WHERE THIS TRAVELER IS, computed by the server against
                           their own coordinates, not a figure measured from Brickell and shown

@@ -402,6 +402,7 @@ export default {
     chooseFile: 'Scegliere un file',
     notSubmitted: 'Non inviato',
     notChecked: 'Non verificato',
+    beingChecked: 'In verifica',
     validThrough: 'Valido fino al %{date}',
     notAccepted: 'Non accettato.',
     submit: 'Inviare',

@@ -31,7 +31,6 @@ import {
   HOME_PLACE,
   PLACES,
   prettyPlace,
-  STATUS_ETAS,
   STATUS_LABELS,
   type Place,
   type FeeLine,
@@ -132,7 +131,6 @@ export default function Home() {
     return () => { live = false; };
   }, [depLat, depLng]);
 
-  const etas = STATUS_ETAS(ride.pickupWait);
   // The most recent travel this traveler ACTUALLY took, for Patron Support to open against.
   // This read pastTrips[0], which — until the fabricated journeys were removed — was a
   // seeded trip nobody had been on, and is now simply absent for a new account.
@@ -446,9 +444,7 @@ export default function Home() {
                 <Text style={styles.ongoingSub}>{t('traveler.tapToSeeRide')}</Text>
               </View>
             </View>
-            <Num size={13} weight="600" color={colors.blueSoft}>
-              {etas[ride.status]}
-            </Num>
+            {/* No ETA is rendered until dispatch supplies authoritative timing. */}
           </View>
         </Pressable>
       )}

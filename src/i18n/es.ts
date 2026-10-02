@@ -419,6 +419,7 @@ export default {
     chooseFile: 'Elegir un archivo',
     notSubmitted: 'No enviado',
     notChecked: 'No verificado',
+    beingChecked: 'En revisión',
     validThrough: 'Válido hasta %{date}',
     notAccepted: 'No aceptado.',
     submit: 'Enviar',

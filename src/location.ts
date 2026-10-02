@@ -13,8 +13,9 @@ import { type DepPlace } from './data';
 
 /** Unresolved means exactly that: no invented neighbourhood and no coordinates. */
 export const DEFAULT_DEPARTURE: DepPlace = {
-  name: 'traveler.currentLocation',
-  short: 'traveler.currentLocation',
+  // Empty is an internal unresolved sentinel. UI owns the localized status text.
+  name: '',
+  short: '',
 };
 
 /**

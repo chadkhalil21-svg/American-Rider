@@ -47,7 +47,6 @@ import {
   applyClassCents,
   classNameKey,
   BOOKABLE_CLASSES,
-  DEP_PLACES,
   Place,
   PLACES,
   platformFee,
@@ -343,9 +342,17 @@ export default function TravelConfirmation() {
   // so the geocoder sees exactly what the traveler wrote.
   const typedDisplay = query.trim().replace(/\b\w/g, (c) => c.toUpperCase());
   const qd = queryDep.trim().toLowerCase();
-  const depMatched = DEP_PLACES.filter(
-    (p) => qd === '' || p.name.toLowerCase().includes(qd),
-  ).slice(0, 4);
+  const [depSuggestions, setDepSuggestions] = useState<PlaceSuggestion[]>([]);
+  useEffect(() => {
+    if (!searchingDep || qd.length < 2) { setDepSuggestions([]); return undefined; }
+    const controller = new AbortController();
+    const anchor = ride.pickupPin ?? (depLat != null && depLng != null ? { lat: depLat, lng: depLng } : null);
+    const timer = setTimeout(() => {
+      searchPlaces(queryDep, anchor, controller.signal).then(setDepSuggestions);
+    }, 180);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [queryDep, searchingDep, qd, depLat, depLng, ride.pickupPin]);
+  const depMatched = depSuggestions.slice(0, 6);
 
   // One factual line, whatever the demand: what the operator's arrival is estimated at.
   const waitNote = t('traveler.approxMinToPickup', { n: ride.pickupWait });
@@ -536,7 +543,10 @@ export default function TravelConfirmation() {
                   <View style={[styles.resultRow, i > 0 && styles.hair]}>
                     <View style={[styles.pin, { backgroundColor: colors.ink }]} />
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.resultName}>{p.name}</Text>
+                      <View style={{ flex: 1 }}>
+                      <Text style={styles.resultName}>{p.title}</Text>
+                      {!!p.subtitle && <Text style={styles.resultMeta}>{p.subtitle}</Text>}
+                    </View>
                       {/* The time from WHERE THIS TRAVELER IS, computed by the server against
                           their own coordinates, not a figure measured from Brickell and shown
                           to everybody. */}
@@ -574,7 +584,7 @@ export default function TravelConfirmation() {
                   key={p.name}
                   accessibilityRole="button"
                   onPress={() => {
-                    ride.setDeparture(p);
+                    ride.setDeparture({ name: p.title, short: p.title, lat: p.lat, lng: p.lng });
                     ride.setPickupPin(null); // a named pickup replaces any dropped pin
                     setSearchingDep(false);
                     setQueryDep('');
@@ -582,7 +592,10 @@ export default function TravelConfirmation() {
                 >
                   <View style={[styles.resultRow, i > 0 && styles.hair]}>
                     <View style={[styles.pin, { backgroundColor: colors.ink }]} />
-                    <Text style={styles.resultName}>{p.name}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.resultName}>{p.title}</Text>
+                      {!!p.subtitle && <Text style={styles.resultMeta}>{p.subtitle}</Text>}
+                    </View>
                   </View>
                 </Pressable>
               ))}

@@ -557,6 +557,7 @@ export default {
     gateCoverageExpired: 'Votre couverture commerciale a expiré. Aucune course ne peut être attribuée tant qu’elle n’est pas renouvelée et la nouvelle date enregistrée.',
     gateLocation: 'Les courses sont attribuées selon la distance : American Rider a besoin de la position de cet appareil pour vous mettre en service.',
     couldNotEnterService: 'Impossible d’entrer en service.',
+    travelIdentityUnavailable: 'L’identité du Travel est indisponible. Cette demande ne peut pas être acceptée.',
     errEmailInUse: 'Cette adresse a déjà un compte — connectez-vous.',
     errWeakPassword: 'Le mot de passe doit comporter au moins 15 caractères.',
     errBadCredentials: 'L’adresse e-mail ou le mot de passe est incorrect.',

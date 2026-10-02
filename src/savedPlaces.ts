@@ -75,19 +75,24 @@ export async function loadSavedPlaces(): Promise<SavedPlaces> {
 }
 
 async function persist(next: SavedPlaces): Promise<SavedPlaces> {
+  let localSaved = false;
+  let remoteSaved = false;
   try {
     await AsyncStorage.setItem(storageKey(), JSON.stringify(next));
+    localSaved = true;
   } catch {
-    /* a device that cannot store it still returns the value for this session */
+    // Continue to the account store. Success is reported only if at least one durable store accepts it.
   }
   const uid = auth.currentUser?.uid;
   if (uid) {
     try {
       await setDoc(doc(db, 'users', uid), { savedPlaces: next }, { merge: true });
+      remoteSaved = true;
     } catch {
-      // The local account cache remains usable offline; the next load can retry migration.
+      // Offline is acceptable when the account-scoped device cache was written successfully.
     }
   }
+  if (!localSaved && !remoteSaved) throw new Error('saved-place-persist-failed');
   return next;
 }
 

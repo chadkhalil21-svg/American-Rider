@@ -689,7 +689,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       // Never over a session already in progress, and never for a travel this phone just
       // finished: only when the store is empty and the record says the travel is assigned.
       if (!rideActiveRef.current && !activeRideId.current) {
-        const live = rides.find((r) => r.status === 'assigned');
+        const live = rides.find((r) => ['assigned', 'accepted', 'arrived', 'onboard'].includes(r.status));
         if (live) {
           const total = live.totalCents / 100;
           const fare = fareFromTotal(+(total - (live.governmentFeeCents ?? 0) / 100).toFixed(2));
@@ -702,10 +702,10 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
             proc: 0,
             total,
             opRev: fare - coordinationFee(fare),
-            pay: PAY_FRIENDLY[payRef.current] ?? 'Bank account',
+            pay: live.paidWith?.label ?? '',
             no: live.tripNo || live.id,
-            date: `Today, ${nowLabel()}`,
-            subPrefix: 'Today',
+            date: Number.isFinite(when.getTime()) ? when.toLocaleString() : '',
+            subPrefix: Number.isFinite(when.getTime()) ? when.toLocaleDateString() : '',
             operator: live.operatorName || undefined,
             miles: live.miles,
             feeLines: live.feeLines,
@@ -714,7 +714,11 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
           setLastTrip(trip);
           // The operator's card is rebuilt from what dispatch recorded. A travel dispatched
           // before those fields existed restores without them rather than inventing a car.
-          if (live.operatorId && live.operatorCar && live.operatorPlate) {
+          if (
+            live.status !== 'assigned' &&
+            live.operatorId && live.operatorCar && live.operatorPlate &&
+            typeof live.operatorLat === 'number' && typeof live.operatorLng === 'number'
+          ) {
             setMatchedOp({
               id: live.operatorId,
               demo: live.operatorDemo ?? false,
@@ -724,14 +728,15 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
               etaMin: live.operatorEtaMin ?? 0,
               miles: live.operatorMiles ?? 0,
               rideId: live.id,
-              lat: live.operatorLat ?? 0,
-              lng: live.operatorLng ?? 0,
+              lat: live.operatorLat,
+              lng: live.operatorLng,
             });
+          } else {
+            setMatchedOp(null);
           }
-          // Onboard is the one step the operator's app stamps, so it is the only one that
-          // can be known here; anything earlier is reported as the operator being on the way.
-          statusRef.current = live.onboardAt ? 3 : 1;
-          setStatus(live.onboardAt ? 3 : 1);
+          const restoredStep = OPERATOR_STEP[live.status] ?? 0;
+          statusRef.current = restoredStep;
+          setStatus(restoredStep);
           setRideActive(true);
           activeRideId.current = live.id;
           settleRideRef.current = live.id;

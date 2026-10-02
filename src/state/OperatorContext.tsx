@@ -1157,8 +1157,10 @@ tr('traveler.blockCoverage'),
     return out;
   }, [user?.displayName, vehicle, insuranceExpiry, coverageDaysLeft]);
 
+  const dutyAttemptRef = useRef(0);
   const setOnline = useCallback(
     (want: boolean) => {
+      const attempt = ++dutyAttemptRef.current;
       setOnlineError(null);
       setOnlineErrorCode(null);
       if (!want) {
@@ -1202,6 +1204,7 @@ tr('traveler.gateCoverageExpired'),
       setOnlineBusy(true);
       (async () => {
         const here = await resolveCurrentDeparture();
+        if (attempt !== dutyAttemptRef.current) return;
         // Coordinates are optional on a DepPlace (a named pickup has none), and dispatch
         // matches purely by distance — so a position we cannot use is the same as no position.
         if (!here || !Number.isFinite(here.lat) || !Number.isFinite(here.lng)) {
@@ -1221,6 +1224,13 @@ tr('traveler.gateLocation'),
           classes: ['Standard'],
           insuranceExpiry: coverageRef.current ?? '',
         });
+        if (attempt !== dutyAttemptRef.current) {
+          // A newer duty choice superseded this request. If this stale request reached the
+          // server successfully, explicitly withdraw that presence rather than resurrecting
+          // an Operator who has since gone off duty.
+          if (r.ok) goOffline();
+          return;
+        }
         setOnlineBusy(false);
         if (!r.ok) {
           setOnlineState(false);

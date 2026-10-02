@@ -679,7 +679,6 @@ export default {
     floridaLicence: 'Führerschein aus Florida',
     finishedCheckAgain: 'Ich bin fertig — erneut prüfen',
     backLabel: 'Zurück',
-    cancelChev: '‹ Abbrechen',
     notNowChev: '‹ Nicht jetzt',
     operatorCaps: 'BETREIBER',
     add: 'Hinzufügen',

@@ -426,7 +426,6 @@ export default {
     typeAddressThenTap: 'Saisissez l’adresse de votre compte, puis touchez à nouveau Mot de passe oublié.',
     paymentUnavailable: 'Le paiement est indisponible pour le moment. Aucune réservation n’est possible.',
     paymentsSimulated: 'Les paiements sont simulés pendant le programme de test. Aucun débit n’est effectué.',
-    opOnMyWay: 'En route — j’arrive dans quelques minutes.',
     paymentServerUnreachable: 'Impossible de joindre le serveur de paiement',
     opGotIt: 'Bien reçu — à tout de suite.',
     notifArrived: 'Avis d’Arrivée',

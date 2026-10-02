@@ -451,7 +451,7 @@ export default function Schedule() {
           setSaving(true);
           const saved = await ride.scheduleRide(info);
           setSaving(false);
-          if (saved) setDoneInfo({ ...info, cost: ride.schedState?.cost ?? info.cost });
+          if (saved) setDoneInfo(info);
         }}
         style={{ marginTop: 'auto' }}
       />

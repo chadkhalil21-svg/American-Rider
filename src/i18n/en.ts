@@ -571,6 +571,7 @@ export default {
     gateCoverageExpired: 'Your commercial coverage has expired. Travel cannot be assigned until it is renewed and the new date is on file.',
     gateLocation: 'Travel is assigned by distance, so American Rider needs this device’s location to put you in service.',
     couldNotEnterService: 'Could not enter service.',
+    travelIdentityUnavailable: 'Travel identity is unavailable. This request cannot be accepted.',
     errEmailInUse: 'That email already has an account — try signing in.',
     errWeakPassword: 'Password should be at least 15 characters.',
     errBadCredentials: 'We could not sign you in. Check your email address and password, or use Forgot password.',

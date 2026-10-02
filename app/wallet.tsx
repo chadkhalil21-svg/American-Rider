@@ -17,7 +17,7 @@
 // for instruments the record does not hold.
 import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../src/components/AppText';
 import {
   addPaymentMethod,
@@ -52,6 +52,7 @@ export default function PaymentAndSettlement() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingRemove, setPendingRemove] = useState<SavedMethod | null>(null);
 
   const load = useCallback(async () => {
     const r = await fetchPaymentMethods();
@@ -150,7 +151,7 @@ export default function PaymentAndSettlement() {
                     <Pressable accessibilityRole="button" disabled={busy} onPress={() => makeDefault(m.id)} hitSlop={8}>
                       <Text style={styles.action}>{t('traveler.setAsDefault')}</Text>
                     </Pressable>
-                    <Pressable accessibilityRole="button" disabled={busy} onPress={() => remove(m.id)} hitSlop={8}>
+                    <Pressable accessibilityRole="button" disabled={busy} onPress={() => setPendingRemove(m)} hitSlop={8}>
                       <Text style={styles.removeAction}>{t('traveler.remove')}</Text>
                     </Pressable>
                   </View>
@@ -182,6 +183,22 @@ export default function PaymentAndSettlement() {
       {modeNote && <Text style={styles.modeNote}>{modeNote}</Text>}
 
 
+      <Modal visible={!!pendingRemove} animationType="fade" transparent onRequestClose={() => setPendingRemove(null)}>
+        <Pressable style={styles.confirmScrim} onPress={() => setPendingRemove(null)}>
+          <Pressable style={styles.confirmCard} onPress={() => {}}>
+            <Text style={styles.confirmTitle}>{t('traveler.paymentMethod')}</Text>
+            {pendingRemove ? <Text style={styles.confirmBody}>{methodTitle(pendingRemove)}</Text> : null}
+            <View style={styles.confirmActions}>
+              <Pressable onPress={() => setPendingRemove(null)} style={styles.confirmButton} accessibilityRole="button">
+                <Text style={styles.confirmButtonText}>{t('traveler.cancel2')}</Text>
+              </Pressable>
+              <Pressable onPress={() => { const id = pendingRemove?.id; setPendingRemove(null); if (id) void remove(id); }} style={styles.confirmButton} accessibilityRole="button">
+                <Text style={styles.confirmButtonText}>{t('traveler.remove')}</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </Screen>
   );
 }
@@ -206,4 +223,11 @@ const styles = StyleSheet.create({
   errorNote: { fontSize: 13, color: colors.ink, marginTop: 10 },
   modeNote: { fontSize: 12, color: colors.muted, marginTop: 10, lineHeight: 17.5 },
 
+  confirmScrim: { flex: 1, backgroundColor: 'rgba(20,23,31,0.42)', justifyContent: 'center', paddingHorizontal: 24 },
+  confirmCard: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.hairline, borderRadius: 16, padding: 20 },
+  confirmTitle: { fontSize: 17, fontWeight: '600', color: colors.ink },
+  confirmBody: { fontSize: 14, color: colors.ink2, marginTop: 8 },
+  confirmActions: { flexDirection: 'row', gap: 10, marginTop: 18 },
+  confirmButton: { flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: 13, padding: 14, alignItems: 'center' },
+  confirmButtonText: { fontSize: 15, fontWeight: '600', color: colors.ink },
 });

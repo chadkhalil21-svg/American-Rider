@@ -94,7 +94,7 @@ export default function Profile() {
 
       <SectionLabel style={{ marginTop: 22 }}>{t('traveler.account')}</SectionLabel>
       <Card style={styles.card}>
-        <Pressable onPress={() => router.navigate('/account-name')} accessibilityRole="button">
+        <Pressable accessibilityRole="button" onPress={() => router.navigate('/account-name')} accessibilityRole="button">
           <View style={styles.row}>
             <Text style={styles.rowTitle}>{t('traveler.nameLabel')}</Text>
             <View style={styles.valueNav}>
@@ -106,7 +106,7 @@ export default function Profile() {
           </View>
         </Pressable>
 
-        <Pressable onPress={() => router.navigate('/account-email')} accessibilityRole="button">
+        <Pressable accessibilityRole="button" onPress={() => router.navigate('/account-email')} accessibilityRole="button">
           <View style={[styles.row, styles.hair]}>
             <Text style={styles.rowTitle}>{t('traveler.emailLabel')}</Text>
             <View style={styles.valueNav}>
@@ -125,7 +125,7 @@ export default function Profile() {
           </View>
         </Pressable>
 
-        <Pressable onPress={() => router.navigate('/account-mobile')} accessibilityRole="button">
+        <Pressable accessibilityRole="button" onPress={() => router.navigate('/account-mobile')} accessibilityRole="button">
           <View style={[styles.row, styles.hair]}>
             <Text style={styles.rowTitle}>{t('traveler.mobileNumber')}</Text>
             <View style={styles.valueNav}>

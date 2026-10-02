@@ -419,7 +419,6 @@ export default {
     typeAddressThenTap: 'Digiti l’indirizzo del suo account, poi tocchi di nuovo Password dimenticata.',
     paymentUnavailable: 'Il pagamento non è disponibile in questo momento. Non è possibile prenotare viaggi.',
     paymentsSimulated: 'I pagamenti sono simulati durante il programma di prova. Non viene effettuato alcun addebito.',
-    opOnMyWay: 'Sto arrivando: qualche minuto.',
     paymentServerUnreachable: 'Non è stato possibile raggiungere il server dei pagamenti',
     opGotIt: 'Ricevuto: a tra poco.',
     notifArrived: 'Avvisi di Arrivo',

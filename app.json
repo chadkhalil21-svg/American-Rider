@@ -100,7 +100,7 @@
         "@stripe/stripe-react-native",
         {
           "merchantIdentifier": "merchant.com.americanrider.app",
-          "enableGooglePay": false
+          "enableGooglePay": true
         }
       ],
       [

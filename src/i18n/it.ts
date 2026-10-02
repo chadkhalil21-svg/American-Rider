@@ -678,7 +678,6 @@ export default {
     floridaLicence: 'Patente della Florida',
     finishedCheckAgain: 'Ho terminato — verifichi di nuovo',
     backLabel: 'Indietro',
-    cancelChev: '‹ Annullare',
     notNowChev: '‹ Non ora',
     operatorCaps: 'OPERATORE',
     add: 'Aggiungere',

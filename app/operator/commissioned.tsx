@@ -49,15 +49,15 @@ export default function OperatorCommissioned() {
           <Text style={styles.readinessBody}>
             {t('operator.operationalReadinessBody')}
           </Text>
-          <Pressable onPress={() => router.navigate('/operator/vehicle')} style={styles.readinessRow}>
+          <Pressable accessibilityRole="button" onPress={() => router.navigate('/operator/vehicle')} style={styles.readinessRow}>
             <Text style={styles.readinessLabel}>{t('operator.nameAndVehicle')}</Text>
             <Text style={styles.chev}>›</Text>
           </Pressable>
-          <Pressable onPress={() => router.navigate('/operator/payouts')} style={styles.readinessRow}>
+          <Pressable accessibilityRole="button" onPress={() => router.navigate('/operator/payouts')} style={styles.readinessRow}>
             <Text style={styles.readinessLabel}>{t('operator.payoutAccount')}</Text>
             <Text style={styles.chev}>›</Text>
           </Pressable>
-          <Pressable onPress={() => router.navigate('/operator/disclosure')} style={styles.readinessRow}>
+          <Pressable accessibilityRole="button" onPress={() => router.navigate('/operator/disclosure')} style={styles.readinessRow}>
             <Text style={styles.readinessLabel}>{t('operator.insuranceDisclosure')}</Text>
             <Text style={styles.chev}>›</Text>
           </Pressable>

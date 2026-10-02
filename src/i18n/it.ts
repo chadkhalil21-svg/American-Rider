@@ -158,6 +158,7 @@ export default {
     lostNotFound: "Oggetto non trovato",
   },
   traveler: {
+    pleaseWait: 'Attenda',
     beginTravel: 'Iniziare il Viaggio',
     departure: 'Partenza',
     destinationEntry: 'Selezioni la sua destinazione',

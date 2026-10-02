@@ -1236,13 +1236,14 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   // "I'm in the car" — the trip proper begins.
   const boardRide = useCallback(() => {
     if (!rideActive || statusRef.current !== 2) return;
+    // Traveler input is not operational authority. For a real Travel, only the Operator's
+    // server-backed onboard transition may advance status. The button can only advance an
+    // explicit demo stand-in, where no real Operator exists to attest boarding.
+    if (matchedOpRef.current?.demo !== true) return;
     statusRef.current = 3;
     setStatus(3);
     onboardAtRef.current = Date.now();
-    // Only a stand-in's journey runs itself to the destination. On a real travel the operator
-    // reports arrival; restarting the clock here would complete the journey — and release the
-    // 99% — while the car was still pulling away from the kerb.
-    if (matchedOpRef.current?.demo !== false) startTicker();
+    startTicker();
   }, [rideActive, startTicker]);
 
   // Never let a DEMO ride stall forever at the curb: if the traveler doesn't tap

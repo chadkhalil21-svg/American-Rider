@@ -176,6 +176,7 @@ export default {
   // Traveler surfaces speak human. Same restraint, plainer words — and the same refusal to
   // reassure: the price is stated, never defended.
   traveler: {
+    pleaseWait: 'Please wait',
     beginTravel: 'Begin Travel',
     departure: 'Departure',
     destinationEntry: 'Select your destination',

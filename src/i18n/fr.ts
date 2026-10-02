@@ -695,6 +695,7 @@ export default {
     add: 'Ajouter',
     onStripesSchedule: 'Selon le calendrier de Stripe',
     save: 'Enregistrer',
+    saved: 'Enregistré.',
     edit: 'Modifier',
     iNeedHelp: 'J’ai besoin d’aide',
     safetyRow: '911 · Partager votre trajet · Vérifier votre opérateur',

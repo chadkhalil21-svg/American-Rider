@@ -28,5 +28,18 @@ assert.equal(
   false,
   'Wallet must not use the whole-platform payment gate',
 );
+const appPayments = fs.readFileSync(path.join(__dirname,'..','src','backend','payments.ts'),'utf8');
+assert.equal(
+  (appPayments.match(/testEnv: walletTestEnv/g) || []).length,
+  2,
+  'Both Android PaymentSheet paths must derive Google Pay test/live mode from server configuration',
+);
+assert.equal(
+  /googlePay:\s*\{[^}]*testEnv:\s*false/.test(appPayments),
+  false,
+  'Google Pay environment must not be hard-coded to production',
+);
+
 console.log('✓ one money architecture: charge platform, transfer on completed Travel');
 console.log('✓ Wallet setup capability is independent; Travel charging remains fail-closed');
+console.log('✓ Google Pay test/live environment follows authoritative server payment mode');

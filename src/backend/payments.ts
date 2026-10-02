@@ -11,6 +11,7 @@
 //   2. hand the client secret to Stripe's PaymentSheet, which collects the card ON THE PHONE
 //   3. report what actually happened — including the traveler simply cancelling the sheet
 import { initPaymentSheet, presentPaymentSheet, retrievePaymentIntent, isPlatformPaySupported } from '@stripe/stripe-react-native';
+import { Platform } from 'react-native';
 import { PAYMENT_SERVER_URL } from '../config';
 import { auth } from '../firebase';
 import { t } from '../i18n';
@@ -190,7 +191,11 @@ export async function payForRide(opts: {
     // Remember the card for the next travel.
     allowsDelayedPaymentMethods: true,
     // Apple Pay is offered inside the sheet where the device and the merchant record allow it.
-    applePay: { merchantCountryCode: 'US' },
+    ...(Platform.OS === 'ios'
+      ? { applePay: { merchantCountryCode: 'US' } }
+      : Platform.OS === 'android'
+        ? { googlePay: { merchantCountryCode: 'US', testEnv: false } }
+        : {}),
     returnURL: 'americanrider://stripe-redirect',
   });
   if (init.error) return { ok: false, error: travelerFacing(init.error.message) };
@@ -327,7 +332,11 @@ export async function addPaymentMethod(): Promise<{ ok: boolean; canceled?: bool
     setupIntentClientSecret: setup.clientSecret,
     customerId: setup.customerId,
     customerEphemeralKeySecret: setup.ephemeralKeySecret,
-    applePay: { merchantCountryCode: 'US' },
+    ...(Platform.OS === 'ios'
+      ? { applePay: { merchantCountryCode: 'US' } }
+      : Platform.OS === 'android'
+        ? { googlePay: { merchantCountryCode: 'US', testEnv: false } }
+        : {}),
     returnURL: 'americanrider://stripe-redirect',
   });
   if (init.error) return { ok: false, error: travelerFacing(init.error.message) };

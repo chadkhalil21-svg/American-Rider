@@ -44,7 +44,7 @@ export default function OperatorVehicle() {
     try {
       if (name.trim() !== (user?.displayName ?? '')) await setDisplayName(name);
       op.setVehicle(car, plate);
-      showNote('Saved.');
+      showNote(t('traveler.saved'));
       router.back();
     } catch {
       showNote(t('traveler.couldNotSaveConn'));
@@ -104,7 +104,7 @@ export default function OperatorVehicle() {
 
       <View style={{ marginTop: 'auto' }}>
         <PrimaryButton
-          label={saving ? t('traveler.busySaving') : 'Save'}
+          label={saving ? t('traveler.busySaving') : t('traveler.save')}
           onPress={save}
           disabled={!ready || saving}
           style={{ marginTop: 24 }}

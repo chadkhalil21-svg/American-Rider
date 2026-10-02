@@ -695,7 +695,6 @@ export default {
     floridaLicence: 'Licencia de Florida',
     finishedCheckAgain: 'He terminado — compruebe de nuevo',
     backLabel: 'Atrás',
-    cancelChev: '‹ Cancelar',
     notNowChev: '‹ Ahora no',
     operatorCaps: 'OPERADOR',
     add: 'Añadir',

@@ -45,27 +45,27 @@ export default function OperatorCommissioned() {
         </Text>
 
         <Card style={styles.readiness}>
-          <Text style={styles.readinessTitle}>Before commencing operations</Text>
+          <Text style={styles.readinessTitle}>{t('operator.beforeCommencingOperations')}</Text>
           <Text style={styles.readinessBody}>
-            Your qualification is approved. Complete the operational items below before accepting Travel.
+            {t('operator.operationalReadinessBody')}
           </Text>
           <Pressable onPress={() => router.navigate('/operator/vehicle')} style={styles.readinessRow}>
-            <Text style={styles.readinessLabel}>Name and vehicle</Text>
+            <Text style={styles.readinessLabel}>{t('operator.nameAndVehicle')}</Text>
             <Text style={styles.chev}>›</Text>
           </Pressable>
           <Pressable onPress={() => router.navigate('/operator/payouts')} style={styles.readinessRow}>
-            <Text style={styles.readinessLabel}>Payout account</Text>
+            <Text style={styles.readinessLabel}>{t('operator.payoutAccount')}</Text>
             <Text style={styles.chev}>›</Text>
           </Pressable>
           <Pressable onPress={() => router.navigate('/operator/disclosure')} style={styles.readinessRow}>
-            <Text style={styles.readinessLabel}>Insurance disclosure</Text>
+            <Text style={styles.readinessLabel}>{t('operator.insuranceDisclosure')}</Text>
             <Text style={styles.chev}>›</Text>
           </Pressable>
         </Card>
         <View style={{ flex: 1 }} />
         <View style={{ alignSelf: 'stretch' }}>
           <PrimaryButton
-            label="Continue to operational readiness"
+            label={t('operator.continueOperationalReadiness')}
             color={colors.green}
             onPress={() => {
               op.setRole('operator');

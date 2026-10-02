@@ -66,7 +66,7 @@ export default function OperatorInsurance() {
     setStatusBusy(true);
     const s = await attestInsuranceUnchanged();
     setStatusBusy(false);
-    if (!s) return Alert.alert('Not recorded', t('traveler.errReachAR'));
+    if (!s) return Alert.alert(t('traveler.notRecorded'), t('traveler.errReachAR'));
     setLiveStatus(s);
     Alert.alert(t('traveler.insStatusTitle'), t('traveler.insAttestationSent'));
   };
@@ -79,7 +79,7 @@ export default function OperatorInsurance() {
     setStatusBusy(true);
     const out = await requestInsuranceConfirmation({ email, type: 'broker' });
     setStatusBusy(false);
-    if (!out.ok) return Alert.alert('Not sent', out.error || t('traveler.errReachAR'));
+    if (!out.ok) return Alert.alert(t('traveler.notSent'), out.error || t('traveler.errReachAR'));
     const s = await insuranceStatus();
     if (s) setLiveStatus(s);
     Alert.alert(t('traveler.insStatusTitle'), t('traveler.insRequestSent'));
@@ -97,13 +97,13 @@ export default function OperatorInsurance() {
     if (!uri) return;
     const out = await op.reviewDoc('insurance', uri);
     if (!out) {
-      Alert.alert('Not submitted', t('traveler.docUploadFailed'));
+      Alert.alert(t('traveler.notSubmitted'), t('traveler.docUploadFailed'));
     } else if ('error' in out) {
-      Alert.alert('Not checked', out.error);
+      Alert.alert(t('traveler.notChecked'), out.error);
     } else if (out.verdict === 'refuse') {
-      Alert.alert('Not accepted', out.reasons.join('\n\n'));
+      Alert.alert(t('traveler.notAccepted'), out.reasons.join('\n\n'));
     } else if (out.verdict === 'review') {
-      Alert.alert('Being checked', t('traveler.insUnderPersonReview'));
+      Alert.alert(t('traveler.beingChecked'), t('traveler.insUnderPersonReview'));
     } else {
       goBack();
     }
@@ -485,9 +485,9 @@ export default function OperatorInsurance() {
             label={st === 'checking' ? t('traveler.busyReading') : t('traveler.submitMyPolicy')}
             disabled={st === 'checking' || !config}
             onPress={() =>
-              Alert.alert('Commercial Insurance', t('traveler.insWhereDecPage'), [
-                { text: 'Take a photograph', onPress: () => submitPolicy(true) },
-                { text: 'Choose a file', onPress: () => submitPolicy(false) },
+              Alert.alert(t('operator.commercialInsurance'), t('traveler.insWhereDecPage'), [
+                { text: t('traveler.takePhotograph'), onPress: () => submitPolicy(true) },
+                { text: t('traveler.chooseFile'), onPress: () => submitPolicy(false) },
                 { text: 'Cancel', style: 'cancel' },
               ])
             }

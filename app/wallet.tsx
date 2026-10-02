@@ -38,7 +38,13 @@ export default function PaymentAndSettlement() {
   const { t } = useLanguage();
   const goBack = useGoBack();
   const payConfig = usePaymentConfig();
-  const modeNote = paymentModeNote(payConfig);
+  // Wallet has a narrower capability than booking. Unrelated operational dependencies
+  // must not disable Stripe setup, but Stripe itself must still be configured.
+  const modeNote = !payConfig.canManagePaymentMethods
+    ? t('traveler.paymentUnavailable')
+    : payConfig.mode === 'test'
+      ? t('traveler.paymentsSimulated')
+      : null;
 
   const [methods, setMethods] = useState<SavedMethod[]>([]);
   const [state, setState] = useState<'loading' | 'ready' | 'unreadable'>('loading');
@@ -154,7 +160,7 @@ export default function PaymentAndSettlement() {
           })}
         {/* The device's own wallet: whether Apple Pay (or Google Pay) can be presented here. It
             is offered inside Stripe's sheet, so this row states availability, not a choice. */}
-        {walletReady !== null && (
+        {walletReady !== null && payConfig.canManagePaymentMethods && (
           <View style={[styles.row, styles.hair]}>
             <Text style={styles.rowTitle}>{Platform.OS === 'ios' ? 'Apple Pay' : 'Google Pay'}</Text>
             <Text style={walletReady ? styles.defaultTag : styles.muted}>
@@ -168,7 +174,7 @@ export default function PaymentAndSettlement() {
           does nothing. */}
       <PrimaryButton
         label={adding ? t('traveler.busyChecking') : t('traveler.addPaymentMethod')}
-        disabled={adding || !payConfig.canTakePayment}
+        disabled={adding || !payConfig.canManagePaymentMethods}
         onPress={add}
         style={{ marginTop: 14 }}
       />

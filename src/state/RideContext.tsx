@@ -393,7 +393,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   // Friendly and the rest are multipliers on top of it, exactly as options.tsx, review.tsx
   // and the booking path all do. Same three lines, one place.
   const travelerTotal = useMemo(() => {
-    const baseCents = quotedFareCents ?? Math.round(arrival.cost * 100);
+    const baseCents = quotedFareCents;
     const fare = applyClassCents(baseCents, travelClass) / 100;
     return +(fare + feeFor(fare, smartJourney) + governmentFee(quotedFeeLines)).toFixed(2);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -747,6 +747,9 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   // "Free to cancel". At launch the fleet is empty until operators join, so that was not an
   // edge case; it was every booking. Nothing is charged now until somebody is actually coming.
   const pendingChargeRef = useRef<null | (() => void)>(null);
+  // One booking intent may have retries, but only its newest dispatch response may mutate UI.
+  const dispatchGenerationRef = useRef(0);
+  const confirmInFlightRef = useRef(false);
 
   // Operators who have already declined THIS travel. Cleared when a new booking starts.
   const declinedByRef = useRef<string[]>([]);
@@ -767,6 +770,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   // Tracks a real state so the live screen can show progress, a "none available" message,
   // or an error with a retry — instead of the old silent, endless "Finding your operator…".
   const runDispatch = useCallback(() => {
+    const generation = ++dispatchGenerationRef.current;
     const trip = lastTripRef.current;
     // WHERE THE TRAVELER ACTUALLY IS, in the order we can trust it: the pin they dropped on
     // the map, then this travel's geocoded pickup, then the departure's own coordinates.
@@ -813,6 +817,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       },
     })
       .then((res) => {
+        if (generation !== dispatchGenerationRef.current) return null;
         if (res) {
           if (res.tripNo) {
             const authoritativeTrip = { ...lastTripRef.current, no: res.tripNo };
@@ -831,6 +836,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
           activeRideId.current = res.rideId; // handle for writing the outcome back
           setWatchedRideId(res.rideId);
           setDispatchState('matched');
+          confirmInFlightRef.current = false;
           refreshMyRides();
           // TELL THE OPERATOR. The travel was written to Firestore from this phone, so the
           // server does not learn of it until its next sweep — and an operator whose app is
@@ -847,11 +853,14 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
           // No available operator nearby (or signed out) — surface it, don't hang. Nothing
           // has been charged, and the screen must not imply otherwise.
           setDispatchState('none');
+          confirmInFlightRef.current = false;
         }
         return res;
       })
       .catch(() => {
+        if (generation !== dispatchGenerationRef.current) return null;
         setDispatchState('error');
+        confirmInFlightRef.current = false;
         return null;
       });
   }, [arrival, departure, refreshMyRides]);
@@ -926,6 +935,11 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const confirmRide = useCallback(() => {
+    // Authority belongs at the action boundary, not merely in a disabled button. A second
+    // tap, stale screen, or alternate caller cannot create another Travel or use a placeholder
+    // fare. Exact coordinates and the current authoritative quote are prerequisites.
+    if (confirmInFlightRef.current || quotedFareCents == null || !tripCoordsRef.current) return;
+    confirmInFlightRef.current = true;
     // Clear AND null: the match-effect below only starts a timer when the ref is empty,
     // so a stale (already-cleared) id left in the ref would silently freeze the next ride.
     if (rideTimer.current) clearInterval(rideTimer.current);
@@ -974,7 +988,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       smartJourneyRef.current = stamped;
       setSmartJourney(stamped);
     }
-    setThreads((t) => ({ ...t, [trip.no]: [{ me: false, text: tr('traveler.opOnMyWay') }] }));
+    // No seeded message: an operator message exists only after the server records one.
     // Real payment: the server prices the travel and creates the intent, then Stripe's own
     // PaymentSheet collects the card on the phone. The card never reaches our server, and the
     // app never sends an amount.

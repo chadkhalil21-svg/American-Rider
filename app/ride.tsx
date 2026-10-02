@@ -154,7 +154,7 @@ export default function Status() {
   const searching = !ride.matchedOp && ride.dispatchState === 'searching';
   const noOperator = !ride.matchedOp && (ride.dispatchState === 'none' || ride.dispatchState === 'error');
   const stepIdx = st <= 1 ? 0 : st === 2 ? 1 : st <= 4 ? 2 : 3;
-  const steps = ['En Route', 'Arrived', 'Onboard', 'Arrival'];
+  const steps = [t('traveler.phaseEnRoute'), t('traveler.phaseArrived'), t('traveler.phaseOnboard'), t('traveler.arrival')];
 
   useEffect(() => {
     if (!canCancel && cancelAsk) setCancelAsk(false);
@@ -208,14 +208,6 @@ export default function Status() {
               <Pressable onPress={() => router.replace('/reserve')} hitSlop={8}>
                 <Text style={styles.retryLink}>{t('traveler.changeTravel')}</Text>
               </Pressable>
-            </>
-          )}
-          {searching && (
-            <>
-              <SectionLabel style={{ marginTop: 22 }}>{t('traveler.estimatedSearchTime')}</SectionLabel>
-              <Mono size={20} style={{ marginTop: 6 }}>
-                ~ 00:12
-              </Mono>
             </>
           )}
         </View>

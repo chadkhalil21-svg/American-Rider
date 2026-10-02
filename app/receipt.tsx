@@ -17,7 +17,7 @@ import {
   Sub,
   Title,
 } from '../src/components/UI';
-import { canonicalPlaceName, HOME_PLACE, PLACES, prettyPlace } from '../src/data';
+import { canonicalPlaceName, prettyPlace } from '../src/data';
 import { useRide } from '../src/state/RideContext';
 import { useLanguage } from '../src/state/LanguageContext';
 import { colors, fmt } from '../src/theme';
@@ -76,10 +76,9 @@ export default function Receipt() {
   // "Miami Airport" resolve to the place's current name first.
   const rideAgain = () => {
     const arr = canonicalPlaceName(view.arr);
-    const dest = arr === 'Home' ? HOME_PLACE : PLACES.find((p) => p.short === arr || p.name === arr);
-    ride.startBooking(dest);
-    router.dismissTo('/'); // viewTrip is released by the unmount cleanup above
-    router.navigate(dest ? '/reserve' : { pathname: '/reserve', params: { search: '1', q: arr } });
+    ride.startBooking();
+    router.dismissTo('/');
+    router.navigate({ pathname: '/reserve', params: { search: '1', q: arr } });
   };
 
   return (

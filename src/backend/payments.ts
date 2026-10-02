@@ -88,6 +88,9 @@ function travelerFacing(msg?: string | null): string {
 export type PaymentConfig = {
   stripePublishableKey: string | null;
   mode: 'live' | 'test' | 'no-key';
+  /** Stripe is configured enough to list/add/default/remove saved methods. */
+  canManagePaymentMethods: boolean;
+  /** The platform is operationally ready to create a Travel payment. */
   canTakePayment: boolean;
 };
 
@@ -106,10 +109,11 @@ export async function fetchPaymentConfig(): Promise<PaymentConfig> {
     return {
       stripePublishableKey: d?.stripePublishableKey ?? null,
       mode: d?.mode === 'live' ? 'live' : d?.mode === 'test' ? 'test' : 'no-key',
+      canManagePaymentMethods: d?.canManagePaymentMethods === true,
       canTakePayment: d?.canTakePayment === true,
     };
   } catch {
-    return { stripePublishableKey: null, mode: 'no-key', canTakePayment: false };
+    return { stripePublishableKey: null, mode: 'no-key', canManagePaymentMethods: false, canTakePayment: false };
   }
 }
 

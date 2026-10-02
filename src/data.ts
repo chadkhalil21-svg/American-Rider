@@ -622,14 +622,6 @@ export const STATUS_LABELS = [
   'Travel Complete',
 ];
 
-export const STATUS_ETAS = (pickupWait: number) => [
-  'Confirmed',
-  pickupWait + ' min',
-  'Here',
-  '18 min',
-  '4 min',
-  'Arriving',
-];
 
 // PAST_TRIPS_SEED and PRE_CREDITED are deleted, not left unused. Three fabricated journeys
 // — June 28, June 21 and June 14, with amounts, travel numbers and a "$1.15 credit" on one

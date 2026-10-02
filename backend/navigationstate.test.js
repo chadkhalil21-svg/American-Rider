@@ -69,3 +69,13 @@ const review = fs.readFileSync(path.join(__dirname, '..', 'app', 'operator', 're
 assert.equal(/<Pressable onPress=/.test(review), false, 'Operator review secondary action must expose accessibility semantics');
 console.log('✓ Operator market mutation is fenced and failure-visible');
 console.log('✓ Settings and Operator review controls expose accessibility roles');
+
+
+const emergency = fs.readFileSync(path.join(__dirname, '..', 'app', 'emergency.tsx'), 'utf8');
+assert.ok(emergency.includes('if (callBusy) return;'), 'Emergency call action must reject duplicate taps while opening the dialer');
+for (const rel of ['app/delete-account.tsx','app/family.tsx','app/language.tsx','app/lost.tsx','app/message.tsx','app/prefs.tsx','app/profile.tsx','app/operator/background.tsx','app/operator/commissioned.tsx','app/operator/documents.tsx','app/operator/insurance.tsx']) {
+  const source = fs.readFileSync(path.join(__dirname, '..', rel), 'utf8');
+  assert.equal(/<Pressable(?![^>]*accessibilityRole=)/s.test(source), false, rel + ' Pressables must expose an accessibility role');
+}
+console.log('✓ Emergency call action is duplicate-tap fenced');
+console.log('✓ Audited Traveler and Operator controls expose accessibility roles');

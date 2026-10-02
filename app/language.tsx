@@ -19,7 +19,7 @@ export default function LanguageScreen() {
         {languages.map((item, i) => {
           const selected = item.code === language;
           return (
-            <Pressable
+            <Pressable accessibilityRole="button"
               key={item.code}
               onPress={() => setLanguage(item.code)}
               accessibilityRole="radio"

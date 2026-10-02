@@ -438,7 +438,12 @@ app.get('/config', (req, res) => {
   res.json({
     stripePublishableKey: readKey('STRIPE_PUBLISHABLE_KEY') || null,
     mode: keyMode,
-    // false means the app must not offer to charge anybody.
+    // Managing a saved method is a Stripe capability, not a whole-platform capability.
+    // Screening, HERE, scheduler, market-reference and Ops readiness must never disable Wallet.
+    // A Travel charge remains stricter: create-payment-intent is still protected by
+    // requireOperationalReadiness below.
+    canManagePaymentMethods: keyMode !== 'no-key' && !!readKey('STRIPE_PUBLISHABLE_KEY'),
+    // Charging/reserving remains fail-closed on the complete operational gate.
     canTakePayment: readiness.ready && keyMode !== 'no-key' && !!readKey('STRIPE_PUBLISHABLE_KEY'),
     operationalReady: readiness.ready,
   });

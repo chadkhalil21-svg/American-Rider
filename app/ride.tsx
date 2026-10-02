@@ -25,7 +25,7 @@ import {
   Screen,
   SectionLabel,
 } from '../src/components/UI';
-import { prettyPlace, STATUS_ETAS, STATUS_LABELS, VENUE_NOTES } from '../src/data';
+import { prettyPlace, STATUS_LABELS, VENUE_NOTES } from '../src/data';
 import { useRide } from '../src/state/RideContext';
 import { useLanguage } from '../src/state/LanguageContext';
 import { colors, fmt, radii } from '../src/theme';
@@ -141,7 +141,12 @@ export default function Status() {
   }, [ride.status]);
 
   const st = ride.status;
-  const etas = STATUS_ETAS(ride.pickupWait);
+  const arrivalFact = (() => {
+    if (st === 1 && ride.matchedOp && ride.matchedOp.etaMin > 0) return t('traveler.durMin', { n: ride.matchedOp.etaMin });
+    if (st === 2) return t('traveler.rideStepOutside');
+    if (ride.route && st >= 3 && st < 5) return t('traveler.durMin', { n: Math.max(1, Math.ceil((ride.route.durationSec * (5 - st)) / 3 / 60)) });
+    return null;
+  })();
   const subs = STATUS_SUBS(t);
   const complete = st >= 5;
   const canCancel = st <= 2;
@@ -298,9 +303,7 @@ export default function Status() {
           <Num size={18} weight="600" style={{ marginTop: 3 }}>
             {/* While riding, show time left from the ACTUAL route rather than the canned
                 demo text — the real drive time scaled by how much trip remains. */}
-            {ride.route && st >= 3 && st < 5
-              ? t('traveler.durMin', { n: Math.max(1, Math.ceil((ride.route.durationSec * (5 - st)) / 3 / 60)) })
-              : etas[st]}
+            {arrivalFact ?? '—'}
           </Num>
         </View>
       </View>

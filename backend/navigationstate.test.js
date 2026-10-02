@@ -28,3 +28,12 @@ assert.ok(
 
 console.log('✓ Patron Support Back retraces issue detail → categories → route parent');
 console.log('✓ Travel Confirmation uses the authenticated Traveler display name when available');
+
+
+const operatorContext = fs.readFileSync(path.join(__dirname, '..', 'src', 'state', 'OperatorContext.tsx'), 'utf8');
+assert.equal(/r\.tripNo \|\| r\.rideId \|\|/.test(operatorContext), false, 'Operator acceptance must never fabricate a Travel Number');
+assert.ok(operatorContext.includes("if (!r.tripNo && !r.rideId)"), 'Operator acceptance must fail closed without authoritative Travel identity');
+const insurance = fs.readFileSync(path.join(__dirname, '..', 'app', 'operator', 'insurance.tsx'), 'utf8');
+for (const literal of ["'Not recorded'", "'Not sent'", "'Not submitted'", "'Not checked'", "'Not accepted'", "'Being checked'", "'Take a photograph'", "'Choose a file'"]) assert.equal(insurance.includes(literal), false, 'Insurance workflow must localize user-visible literal: ' + literal);
+console.log('✓ Operator acceptance fails closed on missing authoritative Travel identity');
+console.log('✓ Insurance action and failure states are localized');

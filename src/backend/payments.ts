@@ -340,7 +340,7 @@ export async function addPaymentMethod(): Promise<{ ok: boolean; canceled?: bool
     ...(Platform.OS === 'ios'
       ? { applePay: { merchantCountryCode: 'US' } }
       : Platform.OS === 'android'
-        ? { googlePay: { merchantCountryCode: 'US', testEnv: false } }
+        ? { googlePay: { merchantCountryCode: 'US', testEnv: walletTestEnv } }
         : {}),
     returnURL: 'americanrider://stripe-redirect',
   });

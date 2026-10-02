@@ -106,12 +106,9 @@ const nowLabel = () => {
   return `${h}:${String(d.getMinutes()).padStart(2, '0')} ${ampm}`;
 };
 
-const rollWait = (): { pickupWait: number; demand: Demand } => {
-  const roll = Math.random();
-  if (roll < 0.25) return { pickupWait: 2, demand: 'quiet' };
-  if (roll < 0.75) return { pickupWait: 3 + Math.floor(Math.random() * 2), demand: 'normal' };
-  return { pickupWait: 6 + Math.floor(Math.random() * 3), demand: 'busy' };
-};
+// Pickup ETA and demand are facts, not decoration. Until authoritative dispatch evidence
+// exists, the traveler sees no invented wait time and demand remains neutral.
+const UNKNOWN_PICKUP_WAIT = 0;
 
 export type SmartStatus = 'idle' | 'checking' | 'ok' | 'none' | 'unavailable';
 
@@ -647,9 +644,8 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       // src/state/cabinPrefs.ts is the saved set; this travel starts as a copy of it.
       const saved = getCabinPrefs();
       setTripPrefs({ ...defaultPrefs, quiet: saved.quiet, charging: saved.charging, luggage: saved.luggage });
-      const q = rollWait();
-      setPickupWait(q.pickupWait);
-      setDemand(q.demand);
+      setPickupWait(UNKNOWN_PICKUP_WAIT);
+      setDemand('normal');
       if (dest) setArrival(dest);
       setViewTrip(null);
       // Each booking starts with a clean slate. Without this, a pin dropped for LAST week's

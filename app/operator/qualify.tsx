@@ -42,6 +42,8 @@ export default function OperatorQualification() {
   // an operator whose county is active. Placed from the phone's last known position when there
   // is one and nothing is declared yet; otherwise the operator chooses.
   const [area, setArea] = useState<MarketState | null>(null);
+  const [areaBusy, setAreaBusy] = useState(false);
+  const [areaError, setAreaError] = useState<string | null>(null);
   useEffect(() => {
     let live = true;
     (async () => {
@@ -65,7 +67,7 @@ export default function OperatorQualification() {
 
   return (
     <Screen>
-      <Pressable onPress={goBack} hitSlop={10} style={styles.back}>
+      <Pressable onPress={goBack} accessibilityRole="button" hitSlop={10} style={styles.back}>
         <Text style={styles.backText}>{t('traveler.notNowChev')}</Text>
       </Pressable>
 
@@ -94,7 +96,9 @@ export default function OperatorQualification() {
       </View>
 
       {area && (
-        <Card style={styles.listCard}>
+        {areaError ? <Text style={styles.footnote}>{areaError}</Text> : null}
+
+      <Card style={styles.listCard}>
           <View style={styles.row}>
             <View style={{ flex: 1 }}>
               <Text style={styles.rowTitle}>{t('operator.operatingArea')}</Text>
@@ -111,7 +115,23 @@ export default function OperatorQualification() {
                     <Pressable
                       key={m.id}
                       hitSlop={6}
-                      onPress={async () => setArea(await setOperatingMarket({ marketId: m.id }))}
+                      disabled={areaBusy}
+                      accessibilityRole="button"
+                      accessibilityState={{ disabled: areaBusy }}
+                      onPress={async () => {
+                        if (areaBusy) return;
+                        setAreaBusy(true);
+                        setAreaError(null);
+                        try {
+                          const next = await setOperatingMarket({ marketId: m.id });
+                          setArea(next);
+                          if (next.market?.id !== m.id) setAreaError(t('traveler.couldNotSaveConn'));
+                        } catch {
+                          setAreaError(t('traveler.couldNotSaveConn'));
+                        } finally {
+                          setAreaBusy(false);
+                        }
+                      }}
                       style={{ marginRight: 14, marginTop: 4 }}
                     >
                       <Text style={styles.rowTitle}>{m.name} ›</Text>
@@ -130,6 +150,7 @@ export default function OperatorQualification() {
           const st = op.docs[d.key];
           return (
             <Pressable
+              accessibilityRole="button"
               key={d.key}
               onPress={() => {
                 // THE FOUR DOCUMENT STEPS GO TO THE SCREEN THAT CAN READ ONE. They used to call

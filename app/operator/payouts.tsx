@@ -138,7 +138,7 @@ export default function OperatorPayouts() {
           />
         )}
         {started && !payable && (
-          <Pressable onPress={refresh} hitSlop={10}>
+          <Pressable accessibilityRole="button" onPress={refresh} hitSlop={10}>
             <Text style={styles.recheck}>{t('traveler.finishedCheckAgain')}</Text>
           </Pressable>
         )}
@@ -151,7 +151,7 @@ export default function OperatorPayouts() {
         </Text>
       </Card>
 
-      <Pressable onPress={goBack} hitSlop={10}>
+      <Pressable accessibilityRole="button" onPress={goBack} hitSlop={10}>
         <Text style={styles.back}>{t('traveler.backLabel')}</Text>
       </Pressable>
 

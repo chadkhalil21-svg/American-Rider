@@ -63,11 +63,13 @@ const LIMITS = {
   waitlist: perAccount({ name: 'waitlist', limit: 5, windowMs: 24 * 60 * 60 * 1000 }),
   quoteIp: perIp({ name: 'quote', limit: 300, windowMs: 60 * 60 * 1000 }),
   routeIp: perIp({ name: 'route', limit: 300, windowMs: 60 * 60 * 1000 }),
+  placeSearchIp: perIp({ name: 'place-search', limit: 600, windowMs: 60 * 60 * 1000 }),
 };
 const { authoritativeFare } = require('./fareauthority');
 const { outsideMarket, outsideMarketMessage } = require('./market');
 const { permitRequired, permitRequiredMessage } = require('./fees');
 const { destinationsNear } = require('./places');
+const { searchPlaces } = require('./place-search');
 const { ready: voiceReady, reason: voiceReason, accessToken: voiceToken, connectTwiml } = require('./voice');
 const { REGIONS, defaultRegion } = require('./regions');
 const { presenceStale, coverageLapsed, matchOperator, etaMinutes } = require('./matching');
@@ -436,7 +438,12 @@ app.get('/config', (req, res) => {
   res.json({
     stripePublishableKey: readKey('STRIPE_PUBLISHABLE_KEY') || null,
     mode: keyMode,
-    // false means the app must not offer to charge anybody.
+    // Managing a saved method is a Stripe capability, not a whole-platform capability.
+    // Screening, HERE, scheduler, market-reference and Ops readiness must never disable Wallet.
+    // A Travel charge remains stricter: create-payment-intent is still protected by
+    // requireOperationalReadiness below.
+    canManagePaymentMethods: keyMode !== 'no-key' && !!readKey('STRIPE_PUBLISHABLE_KEY'),
+    // Charging/reserving remains fail-closed on the complete operational gate.
     canTakePayment: readiness.ready && keyMode !== 'no-key' && !!readKey('STRIPE_PUBLISHABLE_KEY'),
     operationalReady: readiness.ready,
   });
@@ -1505,6 +1512,17 @@ app.get('/destinations', LIMITS.quoteIp, (req, res) => {
     return res.status(400).json({ error: 'lat and lng are required' });
   }
   res.json(destinationsNear({ lat, lng }, limit));
+});
+
+// --- National place discovery. Search is NOT a market gate. ------------------------------
+app.get('/place-search', LIMITS.placeSearchIp, async (req, res) => {
+  const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+  if (q.length < 2) return res.json({ suggestions: [] });
+  const lat = Number(req.query.lat); const lng = Number(req.query.lng);
+  const near = Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+  const limit = Math.min(8, Math.max(1, Number(req.query.limit) || 6));
+  const suggestions = await searchPlaces(q, near, limit);
+  res.json({ suggestions });
 });
 
 // --- What does THIS trip cost? The app asks; the server decides. --------------------------

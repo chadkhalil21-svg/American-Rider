@@ -28,10 +28,7 @@ import {
 } from '../src/components/UI';
 import {
   canonicalPlaceName,
-  HOME_PLACE,
-  PLACES,
   prettyPlace,
-  STATUS_ETAS,
   STATUS_LABELS,
   type Place,
   type FeeLine,
@@ -132,7 +129,6 @@ export default function Home() {
     return () => { live = false; };
   }, [depLat, depLng]);
 
-  const etas = STATUS_ETAS(ride.pickupWait);
   // The most recent travel this traveler ACTUALLY took, for Patron Support to open against.
   // This read pastTrips[0], which — until the fabricated journeys were removed — was a
   // seeded trip nobody had been on, and is now simply absent for a new account.
@@ -148,6 +144,8 @@ export default function Home() {
   // whose receipt the row opens. A traveler with three different destinations still sees
   // three rows, so nothing is hidden — only the repetition goes.
   const [menuOpen, setMenuOpen] = useState(false);
+  const [cancellingScheduled, setCancellingScheduled] = useState(false);
+  const [scheduledCancelError, setScheduledCancelError] = useState<string | null>(null);
   const { note, showNote } = useNote();
 
   // The drawer head speaks for the signed-in account — named and initialed by the
@@ -231,17 +229,9 @@ export default function Home() {
       }
     }
     if (!best) return null;
-    // Resolve through canonicalPlaceName first: a trip booked before a destination was
-    // renamed still carries the old label, and matching raw would silently empty this
-    // section for exactly the loyal travelers it exists to serve.
-    const arrived = canonicalPlaceName(best.arr);
-    const place: Place | undefined = [HOME_PLACE, ...PLACES].find(
-      (p) => p.name === arrived || p.short === arrived,
-    );
-    if (!place) return null; // only suggest what one tap can actually book
-    // Deliberately no price here. What this travel last cost is not what it costs now, and
-    // a figure carried in this object is a figure something will eventually render.
-    return { place };
+    // A past destination is a historical label, not a current geocoded destination.
+    // Re-enter it through live place search so the server resolves and re-quotes it now.
+    return { query: canonicalPlaceName(best.arr) };
   }, [ride.myRides]);
 
   // WHAT THIS TRAVEL COSTS NOW, not what it cost last time.
@@ -260,7 +250,7 @@ export default function Home() {
   // still fills to three from what remains.
   const recentDistinct = useMemo(() => {
     const seen = new Set<string>();
-    if (suggestion) seen.add(canonicalPlaceName(suggestion.place.name));
+    if (suggestion) seen.add(canonicalPlaceName(suggestion.query));
     const out: typeof ride.myRides = [];
     for (const r of ride.myRides) {
       const key = canonicalPlaceName(r.arr);
@@ -271,53 +261,6 @@ export default function Home() {
     }
     return out;
   }, [ride.myRides, suggestion]);
-
-  const [suggestedCents, setSuggestedCents] = useState<number | null>(null);
-  // THE JOURNEY TIME FOR THIS TRAVELER, not the one baked into the destination list. That one
-  // was measured from Brickell and printed to whoever was reading it — a P2 on the known list
-  // since 16 September, seen with the simulator sitting in San Francisco. The quote below is
-  // already being fetched for the price; the time comes back with it and costs nothing.
-  const [suggestedMinutes, setSuggestedMinutes] = useState<number | null>(null);
-  // The whole quote, not just the price on the card: tapping the card goes straight to
-  // Travel Confirmation, which has to show the SAME total, and would otherwise re-derive it.
-  const [suggestedQuote, setSuggestedQuote] = useState<{
-    travelCostCents: number;
-    feeLines: FeeLine[];
-    pickup: { lat: number; lng: number } | null;
-    dest: { lat: number; lng: number } | null;
-  } | null>(null);
-  useEffect(() => {
-    let live = true;
-    setSuggestedCents(null);
-    setSuggestedMinutes(null);
-    if (!suggestion) return;
-    const dep = ride.departure;
-    const place = suggestion.place;
-    const pickup = dep?.lat != null && dep?.lng != null ? { lat: dep.lat, lng: dep.lng } : null;
-    const dest = place.lat != null && place.lng != null ? { lat: place.lat, lng: place.lng } : null;
-    setSuggestedQuote(null);
-    fetchQuote({ pickup, dest, destination: place.name }).then((q) => {
-      if (!live) return;
-      // A suggestion we cannot serve shows no price rather than a wrong one. The card still
-      // appears — it is the traveler's own history — and tapping it says why on the next screen.
-      if (isUnavailable(q) || !q) {
-        setSuggestedCents(null);
-        setSuggestedQuote(null);
-        return;
-      }
-      setSuggestedCents(q.travelerPays ?? null);
-      setSuggestedMinutes(typeof q.minutes === 'number' ? Math.max(1, Math.round(q.minutes)) : null);
-      setSuggestedQuote({
-        travelCostCents: q.travelCostCents,
-        feeLines: q.feeLines,
-        pickup,
-        dest,
-      });
-    });
-    return () => {
-      live = false;
-    };
-  }, [suggestion, ride.departure]);
 
   const go = (path: Parameters<typeof router.navigate>[0]) => {
     setMenuOpen(false);
@@ -402,7 +345,9 @@ export default function Home() {
           label: t('traveler.aboutAmericanRider'),
           onPress: () => {
             setMenuOpen(false);
-            Linking.openURL(`${LEGAL_URL}/about`);
+            Linking.openURL(`${LEGAL_URL}/about`).catch(() => {
+              router.navigate('/settings');
+            });
           },
         },
       ],
@@ -444,9 +389,7 @@ export default function Home() {
                 <Text style={styles.ongoingSub}>{t('traveler.tapToSeeRide')}</Text>
               </View>
             </View>
-            <Num size={13} weight="600" color={colors.blueSoft}>
-              {etas[ride.status]}
-            </Num>
+            {/* No ETA is rendered until dispatch supplies authoritative timing. */}
           </View>
         </Pressable>
       )}
@@ -527,6 +470,7 @@ export default function Home() {
               {ride.schedState.closedReason || t('traveler.noOperatorAvailable')} {t('traveler.noChargeMade')}
             </Text>
           )}
+          {scheduledCancelError ? <Text style={styles.schedError}>{scheduledCancelError}</Text> : null}
           {ride.schedState?.status === 'payment_failed' && (
             <Text style={styles.upcomingFail}>
               {ride.schedState.paymentError || t('traveler.cardDeclined')} {t('traveler.noOperatorSent')}
@@ -625,104 +569,17 @@ export default function Home() {
       {suggestion && (
         <>
           <SectionLabel style={styles.labelSuggested}>{t('traveler.suggestedTravel')}</SectionLabel>
-          <Pressable
-            onPress={() => {
-              // ONE TAP TO THE PRICE, ONE TAP TO CONFIRM (Chad, 13 Sept 2026, approving the
-              // route to confirmation rather than a single-tap charge). The traveler sees the
-              // Complete Travel Cost as one total before anything is authorised; nothing is
-              // charged here. Where the quote has not arrived — offline, or a suggestion we
-              // cannot serve — the old path still runs, so the price is never invented to
-              // save a step.
-              ride.startBooking(suggestion.place);
-              if (suggestedQuote) {
-                ride.setQuotedFareCents(suggestedQuote.travelCostCents);
-                ride.setQuotedFeeLines(suggestedQuote.feeLines);
-                ride.setTripCoords(
-                  suggestedQuote.pickup && suggestedQuote.dest
-                    ? { pickup: suggestedQuote.pickup, dest: suggestedQuote.dest }
-                    : null,
-                );
-                router.navigate('/reserve');
-                return;
-              }
-              router.navigate('/reserve');
-            }}
-          >
+          <Pressable accessibilityRole="button" onPress={() => {
+            ride.startBooking();
+            router.navigate({ pathname: '/reserve', params: { search: '1', q: suggestion.query } });
+          }}>
             <View style={styles.itemCard}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.itemName}>{prettyPlace(suggestion.place.name)}</Text>
-                {/* The number has to say what it measures. The demo prints a bare "24 min"
-                    and we printed "24 min away", and neither tells a traveler whether it is
-                    how long the journey takes or how far off their operator is. Chad, 15 Aug:
-                    use the short form only where there is no realistic way to misread it —
-                    sat beside a price and a Select link, there is. Ambiguity about time sits
-                    next to ambiguity about money on the list of things this app must not do. */}
-                {/* NO TIME RATHER THAN A WRONG ONE. Until the quote answers we do not know how
-                    long this journey takes from where the traveler is standing, and the
-                    number that used to sit here was a time from Brickell. */}
-                {suggestedMinutes != null && (
-                  <Text style={styles.itemMeta}>
-                    {t('traveler.estimatedTravelTime', { n: suggestedMinutes })}
-                  </Text>
-                )}
+                <Text style={styles.itemName}>{prettyPlace(suggestion.query)}</Text>
               </View>
-              <View style={styles.rowRight}>
-                {suggestedCents != null && (
-                  <Num size={16} weight="600">
-                    {fmt(suggestedCents / 100)}
-                  </Num>
-                )}
-              </View>
+              <Text style={styles.select}>{t('traveler.select')} ›</Text>
             </View>
           </Pressable>
-        </>
-      )}
-
-      {/* DESTINATIONS — what a new account sees instead of nothing.
-          Chad, 16 Aug: "when someone first creates an account, there won't be any recent
-          travels, does the Home Screen merely stay mostly blank? That may not be optimal."
-          It did: a title, a field and a button.
-
-          These are NOT suggestions — SUGGESTED TRAVEL stays earned from real trips
-          (Adrian, 8 Aug) and never appears to someone who has not travelled. This is the
-          list of places American Rider can actually book, stated plainly. It answers the
-          question the empty field could not: a first-time traveler has no way of knowing
-          what this app accepts until they type something and hope.
-
-          No prices. A price belongs to a chosen route, not a menu (Chad, 16 Aug), and the
-          server re-quotes anyway. It retires itself the moment the traveler has history,
-          so the screen fills in with use rather than changing shape. */}
-      {/* THE LIST COMES FROM THE SERVER, FOR THE REGION THE TRAVELER IS STANDING IN.
-          It was hardcoded here until 20 Sept 2026 — five Miami-Dade places shown to every
-          first-time traveler wherever they were, each with a journey time computed from
-          Brickell. Fort Lauderdale is inside our market: a traveler there was served, offered
-          destinations twenty-five miles away, and read times for a journey starting somewhere
-          they were not.
-
-          AN EMPTY LIST RENDERS NOTHING, on purpose. Outside a region, or with no position yet,
-          the traveler sees no destination list rather than another city's. */}
-      {ride.myRides.length === 0 && nearby.length > 0 && (
-        <>
-          <SectionLabel style={styles.labelSuggested}>{t('traveler.destinations')}</SectionLabel>
-          <View style={styles.listCard}>
-            {nearby.map((p, i) => (
-              <Pressable
-                key={p.name}
-                onPress={() => {
-                  ride.startBooking({ name: p.name, short: p.short, cost: 0, meta: '', lat: p.lat, lng: p.lng });
-                  router.navigate('/reserve');
-                }}
-              >
-                <View style={[styles.listRow, i > 0 && styles.listRowDivider]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.listName}>{p.name}</Text>
-                    <Text style={styles.listMeta}>{t('traveler.estimatedTravelTime', { n: p.minutes })}</Text>
-                  </View>
-                  <Chev />
-                </View>
-              </Pressable>
-            ))}
-          </View>
         </>
       )}
 
@@ -870,6 +727,7 @@ const styles = StyleSheet.create({
   // INK (Chad, 19 Sept 2026). Cancelling a reservation that has not been dispatched is an
   // ordinary correction, not a destructive act, and it sits on the home screen.
   upcomingCancel: { fontSize: 13, fontWeight: '600', color: colors.ink },
+  schedError: { fontSize: 13, color: colors.red, marginTop: 8 },
   upcomingOpen: { fontSize: 13, fontWeight: '600', color: colors.blue },
   upcomingNo: { fontSize: 11.5, color: colors.muted, marginTop: 6, letterSpacing: 0.6 },
   upcomingFail: { fontSize: 13, color: colors.ink2, marginTop: 11, lineHeight: 18.5 },

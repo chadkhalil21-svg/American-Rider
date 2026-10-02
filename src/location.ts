@@ -9,17 +9,22 @@
 // It also priced wrongly: the fare is quoted from the departure coordinates, so anyone not
 // in Brickell was quoted for a journey that started somewhere they were not.
 import * as Location from 'expo-location';
-import { DEP_PLACES, type DepPlace } from './data';
+import { type DepPlace } from './data';
 
-/** The honest fallback: a named pickup the traveler can change, never a guess. */
-export const DEFAULT_DEPARTURE: DepPlace = DEP_PLACES[1]; // "Home — Brickell City Centre"
+/** Unresolved means exactly that: no invented neighbourhood and no coordinates. */
+export const DEFAULT_DEPARTURE: DepPlace = {
+  // Empty is an internal unresolved sentinel. UI owns the localized status text.
+  name: '',
+  short: '',
+};
 
 /**
  * Resolve the device's real position into a departure.
  *
  * Returns null when we cannot establish it — permission refused, location off, a timeout,
  * or the simulator with no position set. Null means "say nothing", NOT "assume Brickell":
- * the caller keeps the named fallback, which is honest because the traveler chose it.
+ * the caller keeps a coordinate-free unresolved state. Location-dependent destinations,
+ * maps, routing and quotes therefore remain closed until a real device fix exists.
  *
  * Never throws. A pickup that cannot be resolved must degrade to a name the traveler can
  * correct, never to a crash or an invented street.
@@ -30,13 +35,15 @@ export async function resolveCurrentDeparture(): Promise<DepPlace | null> {
     if (status !== 'granted') return null;
 
     const pos = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.Balanced, // street-level is enough to price a pickup
+      accuracy: Location.Accuracy.High, // pickup/dispatch needs curb-scale precision, not ~100 m
     });
     const { latitude: lat, longitude: lng } = pos.coords;
 
-    // Turn coordinates into something a person recognises. If this fails we still have a
-    // usable pickup — the coordinates are what actually price and dispatch the trip.
-    let label = 'Current location';
+    // Coordinates alone are not a complete pickup contract. The Traveler and Operator need a
+    // human-readable place to verify where pickup occurs. If reverse geocoding cannot establish
+    // one, keep pickup unresolved rather than presenting a bare “Current location” as though it
+    // were operationally sufficient.
+    let label = '';
     try {
       const [place] = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
       if (place) {
@@ -67,12 +74,15 @@ export async function resolveCurrentDeparture(): Promise<DepPlace | null> {
         if (area) label = `Current location — ${area}`;
       }
     } catch {
-      // Keep the bare label; coordinates still do the real work.
+      // Fall through to unresolved below. Coordinates are retained nowhere until a place the
+      // Traveler can recognize has also been established.
     }
+
+    if (!label) return null;
 
     return {
       name: label,
-      short: label.replace(/^Current location — /, '') || 'Current location',
+      short: label.replace(/^Current location — /, ''),
       lat,
       lng,
       resolved: true,

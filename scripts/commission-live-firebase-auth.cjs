@@ -66,6 +66,12 @@ async function refresh(token) {
     if (!rejected) throw new Error('wrong-password: unexpectedly accepted');
     console.log('PASS wrong password rejected');
 
+    // Exercise the same Firebase password-reset issuance endpoint used by the app. This does
+    // not pretend CI can prove inbox delivery, but it prevents a broken/disabled reset provider
+    // path from remaining invisible while create/sign-in tests stay green.
+    await call('sendOobCode', {requestType:'PASSWORD_RESET', email});
+    console.log('PASS password-reset action accepted by live Firebase');
+
     await call('delete', {idToken});
     idToken = null;
     console.log('PASS cleanup');

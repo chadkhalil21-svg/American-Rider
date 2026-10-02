@@ -181,7 +181,7 @@ const K_ROLE = 'ar:role';
 const K_VERIFICATION = 'ar:operator-verification';
 const K_COMMISSIONED = 'ar:operator-commissioned'; // ISO date when commissioned
 const K_DOCS = 'ar:operator-docs';
-const K_BGCHECK = 'ar:operator-bgcheck'; // ISO date of the simulated screening pass
+const K_BGCHECK = 'ar:operator-bgcheck'; // ISO date of the verified screening record
 const K_REVENUE = 'ar:operator-revenue';
 
 // How often an on-duty phone re-states that it is there. Comfortably inside the server's
@@ -202,7 +202,7 @@ const K_VEHICLE = 'ar:operator-vehicle'; // the car a traveler will be looking f
 const K_COVERAGE = 'ar:operator-coverage'; // the date the commercial policy runs out
 
 type RevenueBlob = { ops: CompletedOp[]; withdrawn: number; seq: number };
-const EMPTY_REVENUE: RevenueBlob = { ops: [], withdrawn: 0, seq: 2047 };
+const EMPTY_REVENUE: RevenueBlob = { ops: [], withdrawn: 0, seq: 0 };
 
 type OperatorState = {
   ready: boolean;
@@ -591,7 +591,7 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
       dest: t.dest,
       // THE FARE, NOT THE ALL-IN PRICE. costCents is what the TRAVELER paid — the fare plus
       // the platform fee — and earnOf takes 1% off whatever it is given.
-      fare: fareFromTotal(t.costCents / 100),
+      fare: t.travelCostCents > 0 ? t.travelCostCents / 100 : fareFromTotal(t.costCents / 100),
     });
   }, []);
 
@@ -686,7 +686,11 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
       // and a label describing something the value is not. `tripNo` arrives on every
       // dispatched request (see SimRequest); rideId stays the fallback only for a record old
       // enough to predate it, and the scripted number for the test program.
-      setOp({ ...r, no: r.tripNo || r.rideId || `AR-${seq}-MIA`, earn: earnOf(r.fare) });
+      if (!r.tripNo && !r.rideId) {
+        setOnlineError(tr('traveler.travelIdentityUnavailable'));
+        return false;
+      }
+      setOp({ ...r, no: r.tripNo || r.rideId!, earn: earnOf(r.fare) });
       setArrived(false);
       setMsgs([]);
       return true;
@@ -770,7 +774,7 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
             ACTIVE_RESTORE_MAX_MS,
       );
       if (underway && !opRef.current) {
-        const fare = fareFromTotal(underway.costCents / 100);
+        const fare = underway.travelCostCents > 0 ? underway.travelCostCents / 100 : fareFromTotal(underway.costCents / 100);
         setOp({
           rideId: underway.rideId,
           tripNo: underway.tripNo,
@@ -920,10 +924,12 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const cancelOp = useCallback(() => {
-    setOp(null);
-    setArrived(false);
+    // There is no authoritative “Operator cancelled an accepted Travel” transition yet.
+    // Never erase the local operation and pretend the Travel disappeared while the server
+    // still assigns it to this Operator. Going off duty may stop new offers, but the accepted
+    // Travel remains visible until an authoritative terminal/reassignment path exists.
     setOnlineState(false);
-    goOffline(); // leave the dispatchable fleet too, not just this screen's state
+    goOffline();
   }, []);
 
   opRef.current = op;
@@ -1155,8 +1161,10 @@ tr('traveler.blockCoverage'),
     return out;
   }, [user?.displayName, vehicle, insuranceExpiry, coverageDaysLeft]);
 
+  const dutyAttemptRef = useRef(0);
   const setOnline = useCallback(
     (want: boolean) => {
+      const attempt = ++dutyAttemptRef.current;
       setOnlineError(null);
       setOnlineErrorCode(null);
       if (!want) {
@@ -1200,6 +1208,7 @@ tr('traveler.gateCoverageExpired'),
       setOnlineBusy(true);
       (async () => {
         const here = await resolveCurrentDeparture();
+        if (attempt !== dutyAttemptRef.current) return;
         // Coordinates are optional on a DepPlace (a named pickup has none), and dispatch
         // matches purely by distance — so a position we cannot use is the same as no position.
         if (!here || !Number.isFinite(here.lat) || !Number.isFinite(here.lng)) {
@@ -1219,6 +1228,13 @@ tr('traveler.gateLocation'),
           classes: ['Standard'],
           insuranceExpiry: coverageRef.current ?? '',
         });
+        if (attempt !== dutyAttemptRef.current) {
+          // A newer duty choice superseded this request. If this stale request reached the
+          // server successfully, explicitly withdraw that presence rather than resurrecting
+          // an Operator who has since gone off duty.
+          if (r.ok) goOffline();
+          return;
+        }
         setOnlineBusy(false);
         if (!r.ok) {
           setOnlineState(false);

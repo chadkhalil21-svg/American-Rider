@@ -132,7 +132,7 @@ export default function OperatorDocuments() {
                 )}
 
                 {!accepted && !checking && (
-                  <Pressable onPress={() => submit(d.key, d.title)} hitSlop={6}>
+                  <Pressable accessibilityRole="button" onPress={() => submit(d.key, d.title)} hitSlop={6}>
                     <Text style={styles.action}>
                       {review ? t('traveler.submitDifferentDoc') : `${t('traveler.submit')} ›`}
                     </Text>
@@ -157,7 +157,7 @@ export default function OperatorDocuments() {
             <Text style={styles.rowTitle}>{t('traveler.backgroundCheck')}</Text>
             <Text style={styles.rowSub}>{bgLabel}</Text>
             {op.docs.background !== 'ok' && (
-              <Pressable onPress={() => router.navigate('/operator/background')} hitSlop={6}>
+              <Pressable accessibilityRole="button" onPress={() => router.navigate('/operator/background')} hitSlop={6}>
                 <Text style={styles.action}>{t('traveler.open')} ›</Text>
               </Pressable>
             )}

@@ -54,7 +54,7 @@ export default function Settings() {
             English headings is how a translated app stays English for the people it was
             translated for. The device's language is already applied on first launch, so this
             is for correcting that guess rather than making it. */}
-        <Pressable onPress={() => router.navigate('/language')}>
+        <Pressable accessibilityRole="button" onPress={() => router.navigate('/language')}>
           <View style={styles.row}>
             <Text style={[styles.rowTitle, styles.rowTitleWrap]}>{t('common.language')}</Text>
             <View style={styles.rowRight}>
@@ -63,19 +63,19 @@ export default function Settings() {
             </View>
           </View>
         </Pressable>
-        <Pressable onPress={() => router.navigate('/family')}>
+        <Pressable accessibilityRole="button" onPress={() => router.navigate('/family')}>
           <View style={[styles.row, styles.hair]}>
             <Text style={[styles.rowTitle, styles.rowTitleWrap]}>{t('traveler.familyTitle')}</Text>
             <Chev />
           </View>
         </Pressable>
-        <Pressable onPress={() => router.navigate('/notifications')}>
+        <Pressable accessibilityRole="button" onPress={() => router.navigate('/notifications')}>
           <View style={[styles.row, styles.hair]}>
             <Text style={[styles.rowTitle, styles.rowTitleWrap]}>{t('traveler.notifications')}</Text>
             <Chev />
           </View>
         </Pressable>
-        <Pressable onPress={() => router.navigate('/account-security')}>
+        <Pressable accessibilityRole="button" onPress={() => router.navigate('/account-security')}>
           <View style={[styles.row, styles.hair]}>
             <Text style={[styles.rowTitle, styles.rowTitleWrap]}>{t('traveler.signInSecurity')}</Text>
             <Chev />
@@ -95,13 +95,13 @@ export default function Settings() {
             "Regulatory & Legal Repository"). Both are served by our own backend in five
             languages, so the row opens the reader's language rather than English. There is no
             separate "National Network Policy" document, so the row is not named after one. */}
-        <Pressable onPress={() => Linking.openURL(`${LEGAL_URL}/terms?lang=${encodeURIComponent(language)}`)}>
+        <Pressable accessibilityRole="link" onPress={() => Linking.openURL(`${LEGAL_URL}/terms?lang=${encodeURIComponent(language)}`)}>
           <View style={[styles.row, styles.hair]}>
             <Text style={[styles.rowTitle, styles.rowTitleWrap]}>{t('traveler.termsOfService')}</Text>
             <Chev />
           </View>
         </Pressable>
-        <Pressable onPress={() => Linking.openURL(`${LEGAL_URL}/privacy?lang=${encodeURIComponent(language)}`)}>
+        <Pressable accessibilityRole="link" onPress={() => Linking.openURL(`${LEGAL_URL}/privacy?lang=${encodeURIComponent(language)}`)}>
           <View style={[styles.row, styles.hair]}>
             <Text style={[styles.rowTitle, styles.rowTitleWrap]}>{t('traveler.privacy')}</Text>
             <Chev />
@@ -119,7 +119,7 @@ export default function Settings() {
           beyond Call 911. */}
       <SectionLabel style={{ marginTop: 26 }}>{t('traveler.acctGovernance')}</SectionLabel>
       <Card style={styles.card}>
-        <Pressable onPress={() => router.navigate('/delete-account')}>
+        <Pressable accessibilityRole="button" onPress={() => router.navigate('/delete-account')}>
           <View style={styles.row}>
             <Text style={[styles.rowTitle, styles.rowTitleWrap]}>{t('traveler.acctTermination')}</Text>
             <Chev />

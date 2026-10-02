@@ -37,3 +37,12 @@ const insurance = fs.readFileSync(path.join(__dirname, '..', 'app', 'operator', 
 for (const literal of ["'Not recorded'", "'Not sent'", "'Not submitted'", "'Not checked'", "'Not accepted'", "'Being checked'", "'Take a photograph'", "'Choose a file'"]) assert.equal(insurance.includes(literal), false, 'Insurance workflow must localize user-visible literal: ' + literal);
 console.log('✓ Operator acceptance fails closed on missing authoritative Travel identity');
 console.log('✓ Insurance action and failure states are localized');
+
+
+assert.ok(operatorContext.includes("useState(UNKNOWN_PICKUP_WAIT)") || fs.readFileSync(path.join(__dirname, '..', 'src', 'state', 'RideContext.tsx'), 'utf8').includes("useState(UNKNOWN_PICKUP_WAIT)"), 'Pickup ETA must initialize unknown, not as a fabricated minute estimate');
+assert.ok(reserve.includes("ride.pickupWait > 0 ?"), 'Travel confirmation must hide pickup ETA until an estimate exists');
+const operatorVehicle = fs.readFileSync(path.join(__dirname, '..', 'app', 'operator', 'vehicle.tsx'), 'utf8');
+assert.equal(operatorVehicle.includes("showNote('Saved.')"), false, 'Operator vehicle save confirmation must be localized');
+assert.equal(operatorVehicle.includes(": 'Save'"), false, 'Operator vehicle save action must be localized');
+console.log('✓ Pickup ETA remains unknown until authoritative evidence exists');
+console.log('✓ Operator vehicle save states are localized');

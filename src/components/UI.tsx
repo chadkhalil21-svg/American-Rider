@@ -134,7 +134,7 @@ export function useNote(): { note: string | null; showNote: (t: string) => void 
 
 export function BackLink({ label, onPress }: { label: string; onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} hitSlop={10}>
+    <Pressable onPress={onPress} hitSlop={10} accessibilityRole="button" accessibilityLabel={label}>
       <Text style={styles.backLink}>‹ {label}</Text>
     </Pressable>
   );
@@ -153,7 +153,7 @@ export function LetterheadBar({ onBack, onMenu }: { onBack?: () => void; onMenu?
   return (
     <View style={styles.bar}>
       {onMenu ? (
-        <Pressable onPress={onMenu} hitSlop={12} style={styles.barIcon}>
+        <Pressable onPress={onMenu} hitSlop={12} style={styles.barIcon} accessibilityRole="button" accessibilityLabel="Open menu">
           <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
             <Path
               d="M4 7h16M4 12h16M4 17h16"
@@ -164,7 +164,7 @@ export function LetterheadBar({ onBack, onMenu }: { onBack?: () => void; onMenu?
           </Svg>
         </Pressable>
       ) : (
-        <Pressable onPress={onBack} hitSlop={12} style={styles.barIcon}>
+        <Pressable onPress={onBack} hitSlop={12} style={styles.barIcon} accessibilityRole="button" accessibilityLabel="Back">
           <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
             <Path
               d="M15 5l-7 7 7 7"
@@ -180,7 +180,7 @@ export function LetterheadBar({ onBack, onMenu }: { onBack?: () => void; onMenu?
         <Text style={styles.barBrand}>AMERICAN RIDER</Text>
         <Text style={styles.barTagline}>NATIONAL TRANSPORTATION</Text>
       </View>
-      <Pressable onPress={() => router.navigate('/profile')} hitSlop={12} style={styles.barIcon}>
+      <Pressable onPress={() => router.navigate('/profile')} hitSlop={12} style={styles.barIcon} accessibilityRole="button" accessibilityLabel="Profile">
         <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
           <Circle cx={12} cy={8} r={3.4} stroke={colors.faint} strokeWidth={1.6} />
           <Path
@@ -330,6 +330,9 @@ export function PrimaryButton({
   return (
     <Pressable
       onPress={disabled ? undefined : onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled }}
       style={({ pressed }) => [
         styles.primaryBtn,
         { backgroundColor: disabled ? colors.disabled : color },
@@ -360,6 +363,8 @@ export function OutlineButton({
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
       style={({ pressed }) => [
         styles.outlineBtn,
         { borderColor },

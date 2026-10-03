@@ -1,0 +1,39 @@
+name: Council Ground Truth
+
+on:
+  pull_request:
+    branches: [release/current]
+  push:
+    branches: [release/current]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Generate exact-SHA Council inventory
+        run: node scripts/council-inventory.mjs
+      - name: Assert repository tree is fully enumerated
+        run: |
+          node - <<'NODE'
+          const fs=require('fs'), cp=require('child_process');
+          const r=JSON.parse(fs.readFileSync('artifacts/council/inventory.json','utf8'));
+          const n=cp.execFileSync('git',['ls-files','-z']).toString().split('\0').filter(Boolean).length;
+          if(r.counts.trackedBlobs!==n) throw new Error('Council inventory omitted tracked files');
+          if(r.files.length!==n) throw new Error('Council file ledger is incomplete');
+          console.log('Tracked-file denominator reconciled:', n);
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: council-ground-truth
+          path: artifacts/council/inventory.json
+          if-no-files-found: error

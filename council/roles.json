@@ -1,9 +1,40 @@
 {
-  "version": "0.1",
+  "version": "0.2",
+  "organization": "Plenum AI Engineering Institution",
   "candidateBaseSha": "f749644c862e1da128359ddf2693a95506b9b52a",
   "roles": [
     {
-      "id": "mapper",
+      "id": "orchestrator",
+      "mayModify": false,
+      "independent": false
+    },
+    {
+      "id": "repository_mapper",
+      "mayModify": false,
+      "independent": true
+    },
+    {
+      "id": "runtime_mapper",
+      "mayModify": false,
+      "independent": true
+    },
+    {
+      "id": "state_machine_mapper",
+      "mayModify": false,
+      "independent": true
+    },
+    {
+      "id": "dependency_mapper",
+      "mayModify": false,
+      "independent": true
+    },
+    {
+      "id": "requirements_mapper",
+      "mayModify": false,
+      "independent": true
+    },
+    {
+      "id": "historical_claim_reconciler",
       "mayModify": false,
       "independent": true
     },
@@ -48,12 +79,17 @@
       "independent": true
     },
     {
-      "id": "ux_design",
+      "id": "ux_visual",
       "mayModify": false,
       "independent": true
     },
     {
-      "id": "language_hospitality",
+      "id": "interaction_design",
+      "mayModify": false,
+      "independent": true
+    },
+    {
+      "id": "language_editorial",
       "mayModify": false,
       "independent": true
     },
@@ -63,7 +99,57 @@
       "independent": true
     },
     {
+      "id": "localization",
+      "mayModify": false,
+      "independent": true
+    },
+    {
+      "id": "reliability",
+      "mayModify": false,
+      "independent": true
+    },
+    {
+      "id": "mobile_device",
+      "mayModify": false,
+      "independent": true
+    },
+    {
+      "id": "performance",
+      "mayModify": false,
+      "independent": true
+    },
+    {
       "id": "standards_research",
+      "mayModify": false,
+      "independent": true
+    },
+    {
+      "id": "omission_hunter",
+      "mayModify": false,
+      "independent": true
+    },
+    {
+      "id": "contradiction_hunter",
+      "mayModify": false,
+      "independent": true
+    },
+    {
+      "id": "stale_claim_hunter",
+      "mayModify": false,
+      "independent": true
+    },
+    {
+      "id": "journey_breaker",
+      "mayModify": false,
+      "independent": true
+    },
+    {
+      "id": "design_critic",
+      "mayModify": false,
+      "independent": true
+    },
+    {
+      "id": "regression_hunter",
       "mayModify": false,
       "independent": true
     },
@@ -73,7 +159,7 @@
       "independent": false
     },
     {
-      "id": "adversarial",
+      "id": "independent_verifier",
       "mayModify": false,
       "independent": true
     },

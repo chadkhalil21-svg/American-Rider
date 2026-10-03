@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "American Rider Council Evidence",
+  "type": "object",
+  "required": [
+    "candidateSha",
+    "generatedAt",
+    "coverage",
+    "findings"
+  ],
+  "properties": {
+    "candidateSha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "generatedAt": {
+      "type": "string"
+    },
+    "coverage": {
+      "type": "object",
+      "required": [
+        "trackedBlobs",
+        "classifiedBlobs",
+        "routes",
+        "classifiedRoutes",
+        "controls",
+        "classifiedControls"
+      ],
+      "properties": {
+        "trackedBlobs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "classifiedBlobs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "routes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "classifiedRoutes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "controls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "classifiedControls": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "domain",
+          "verdict",
+          "claim",
+          "evidence"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "domain": {
+            "type": "string"
+          },
+          "verdict": {
+            "enum": [
+              "VERIFIED",
+              "DEFECT",
+              "EXTERNAL_BLOCKER",
+              "NOT_TESTED",
+              "NOT_APPLICABLE"
+            ]
+          },
+          "claim": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "kind",
+                "reference"
+              ],
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "source",
+                    "test",
+                    "runtime",
+                    "device",
+                    "workflow",
+                    "external_primary_source"
+                  ]
+                },
+                "reference": {
+                  "type": "string"
+                },
+                "sha": {
+                  "type": "string"
+                },
+                "retrievedAt": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

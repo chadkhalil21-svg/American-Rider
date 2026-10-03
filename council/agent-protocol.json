@@ -1,0 +1,184 @@
+{
+  "version": "0.2",
+  "purpose": "Plenum Council multi-agent engineering protocol",
+  "candidateBinding": "Every run binds to one immutable candidate SHA. Evidence from another SHA is stale unless an arbiter records an invariant.",
+  "claimStates": [
+    "PROPOSED",
+    "SUPPORTED",
+    "CHALLENGED",
+    "VERIFIED",
+    "DEFECT",
+    "EXTERNAL_BLOCKER",
+    "NOT_TESTED",
+    "NOT_APPLICABLE"
+  ],
+  "rules": [
+    "Agents are separately invoked workers, not role labels for one reviewer.",
+    "Ground-truth agents map before specialist agents judge.",
+    "No current defect may be emitted until stale-claim reconciliation searches the candidate SHA for an existing implementation and its tests/runtime consequences.",
+    "An implementer cannot be the sole verifier of its repair.",
+    "VERIFIED requires evidence appropriate to the claim; source presence alone does not prove runtime behavior.",
+    "DEFECT requires exact-SHA evidence and a falsifiable expected-versus-observed statement.",
+    "Every specialist output is exposed to contradiction, omission, bypass and stale-claim challenge.",
+    "Arbiter resolves claims from evidence; it does not repair code.",
+    "Candidate SHA changes invalidate runtime and source evidence unless explicitly proven invariant."
+  ],
+  "claimContract": {
+    "required": [
+      "claimId",
+      "candidateSha",
+      "proposition",
+      "domain",
+      "producer",
+      "status",
+      "evidence",
+      "counterEvidence",
+      "dependencies"
+    ],
+    "evidenceKinds": [
+      "source",
+      "static_analysis",
+      "test",
+      "runtime",
+      "device",
+      "workflow",
+      "external_primary_source"
+    ],
+    "minimumReview": {
+      "VERIFIED": [
+        "producer evidence",
+        "independent reviewer",
+        "adversarial opportunity"
+      ],
+      "DEFECT": [
+        "exact-SHA observation",
+        "expected behavior/source",
+        "independent confirmation"
+      ]
+    }
+  },
+  "executionPhases": [
+    {
+      "phase": 0,
+      "name": "bind",
+      "workers": [
+        "orchestrator"
+      ],
+      "outputs": [
+        "candidate SHA",
+        "run ID"
+      ]
+    },
+    {
+      "phase": 1,
+      "name": "ground_truth",
+      "workers": [
+        "repository_mapper",
+        "runtime_mapper",
+        "state_machine_mapper",
+        "dependency_mapper",
+        "requirements_mapper",
+        "historical_claim_reconciler"
+      ],
+      "outputs": [
+        "evidence graph",
+        "known denominators",
+        "existing implementation map"
+      ]
+    },
+    {
+      "phase": 2,
+      "name": "specialist_review",
+      "workers": [
+        "architecture",
+        "traveler",
+        "operator",
+        "payments",
+        "security_privacy",
+        "safety",
+        "family_teen",
+        "smart_travel",
+        "ux_visual",
+        "interaction_design",
+        "language_editorial",
+        "accessibility",
+        "localization",
+        "reliability",
+        "mobile_device",
+        "performance",
+        "standards_research"
+      ],
+      "outputs": [
+        "claims with evidence"
+      ]
+    },
+    {
+      "phase": 3,
+      "name": "falsification",
+      "workers": [
+        "omission_hunter",
+        "contradiction_hunter",
+        "stale_claim_hunter",
+        "journey_breaker",
+        "design_critic",
+        "regression_hunter"
+      ],
+      "outputs": [
+        "challenges",
+        "counter-evidence",
+        "missing-surface candidates"
+      ]
+    },
+    {
+      "phase": 4,
+      "name": "adjudication",
+      "workers": [
+        "evidence_arbiter"
+      ],
+      "outputs": [
+        "adjudicated claim ledger",
+        "repair authorization"
+      ]
+    },
+    {
+      "phase": 5,
+      "name": "repair",
+      "workers": [
+        "repair"
+      ],
+      "outputs": [
+        "candidate changes",
+        "finding IDs addressed"
+      ]
+    },
+    {
+      "phase": 6,
+      "name": "reverification",
+      "workers": [
+        "independent verifier",
+        "regression_hunter",
+        "evidence_arbiter"
+      ],
+      "outputs": [
+        "new-SHA evidence",
+        "release verdict"
+      ]
+    }
+  ],
+  "commissioningCases": [
+    {
+      "caseId": "INSURANCE-LAPSE-001",
+      "proposition": "An Operator whose qualifying insurance has expired or otherwise fails the continuing-coverage gate cannot commence operations or accept Travel.",
+      "requiredTraces": [
+        "document expiry/current status",
+        "qualification blocker",
+        "commence-operations gate",
+        "accept-Travel gate",
+        "operator-facing explanation",
+        "recovery path",
+        "bypass attempt"
+      ],
+      "purpose": "Regression case created from a prior stale auditor claim; Council must discover existing implementation before alleging absence."
+    }
+  ]
+}

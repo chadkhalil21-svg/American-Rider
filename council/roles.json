@@ -1,0 +1,86 @@
+{
+  "version": "0.1",
+  "candidateBaseSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+  "roles": [
+    {
+      "id": "mapper",
+      "mayModify": false,
+      "independent": true
+    },
+    {
+      "id": "architecture",
+      "mayModify": false,
+      "independent": true
+    },
+    {
+      "id": "traveler",
+      "mayModify": false,
+      "independent": true
+    },
+    {
+      "id": "operator",
+      "mayModify": false,
+      "independent": true
+    },
+    {
+      "id": "payments",
+      "mayModify": false,
+      "independent": true
+    },
+    {
+      "id": "security_privacy",
+      "mayModify": false,
+      "independent": true
+    },
+    {
+      "id": "safety",
+      "mayModify": false,
+      "independent": true
+    },
+    {
+      "id": "family_teen",
+      "mayModify": false,
+      "independent": true
+    },
+    {
+      "id": "smart_travel",
+      "mayModify": false,
+      "independent": true
+    },
+    {
+      "id": "ux_design",
+      "mayModify": false,
+      "independent": true
+    },
+    {
+      "id": "language_hospitality",
+      "mayModify": false,
+      "independent": true
+    },
+    {
+      "id": "accessibility",
+      "mayModify": false,
+      "independent": true
+    },
+    {
+      "id": "standards_research",
+      "mayModify": false,
+      "independent": true
+    },
+    {
+      "id": "repair",
+      "mayModify": true,
+      "independent": false
+    },
+    {
+      "id": "adversarial",
+      "mayModify": false,
+      "independent": true
+    },
+    {
+      "id": "evidence_arbiter",
+      "mayModify": false,
+      "independent": true
+    }
+  ]
+}

@@ -47,10 +47,10 @@ const { notify } = require('./push');
 // enough that a stuck queue cannot quietly spend a day's read budget before anyone notices.
 const ASSIGNED_SCAN_LIMIT = 50;
 
-// Travels underway that one monitoring tick will cover. Deliberately far above any plausible
-// concurrent load for a single market, because exceeding it means somebody is not being
-// watched — see the note at the query itself.
-const LIVE_SCAN_LIMIT = 500;
+// A page limits the size of each Firestore RPC; it is NOT a cap on Travels covered per tick.
+const LIVE_PAGE_SIZE = 200;
+const MONITOR_READ_WARNING_MS = 30_000;
+const FLEET_CELL_DEG = 0.01;
 
 const STILL_RADIUS_MI = 0.03; // ~48 metres
 
@@ -93,30 +93,26 @@ async function sweepMonitor({ now = Date.now() } = {}) {
 
   let live;
   try {
-    // Queried on status alone — one equality filter, no composite index. See scheduler.js for
-    // why that matters more than the extra rows.
-    // BOUNDED, BUT NEVER SILENTLY. This reads every travel underway, once a minute — so the
-    // cost is 1,440 x the number of journeys in progress, per day, and it is the one sweep
-    // whose size grows with real success rather than with a backlog.
-    //
-    // A CAP HERE IS NOT LIKE THE OTHERS. sweepAssignments can safely look at fifty unanswered
-    // travels and catch the rest next minute. This sweep is route monitoring: a travel it does
-    // not read is a vehicle nobody is watching, which is the one thing this file exists to
-    // prevent. So the limit is high, and when it is reached the overflow is REPORTED — it
-    // reaches /health and /ops rather than being quietly dropped. A safety sweep that silently
-    // stops covering everybody is worse than one that fails loudly.
-    const snap = await db
-      .collection('rides')
-      .where('status', 'in', ['accepted', 'arrived', 'onboard'])
-      .limit(LIVE_SCAN_LIMIT + 1)
-      .get();
-    live = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-    if (live.length > LIVE_SCAN_LIMIT) {
-      live = live.slice(0, LIVE_SCAN_LIMIT);
-      report.unwatched = true;
-      report.reason =
-        `More than ${LIVE_SCAN_LIMIT} travels are underway; only the first ${LIVE_SCAN_LIMIT} ` +
-        'were monitored this tick. Raise LIVE_SCAN_LIMIT — the fleet has outgrown it.';
+    // The same ordered query pages to exhaustion: 501 or 8,001 active Travels must not make
+    // the first 500 the only vehicles watched. A slow scan is loud in /health and Ops.
+    live=[];
+    let cursor=null;const started=Date.now();let pages=0;
+    for (;;) {
+      let query=db.collection('rides').where('status','in',['accepted','arrived','onboard'])
+        .orderBy('__name__');
+      if(cursor)query=query.startAfter(cursor);
+      const snap=await query.limit(LIVE_PAGE_SIZE).get();
+      pages++;
+      live.push(...snap.docs.map((d)=>({id:d.id,...d.data()})));
+      if(snap.docs.length<LIVE_PAGE_SIZE)break;
+      cursor=snap.docs.at(-1).id;
+    }
+    report.activeReadPages=pages;
+    report.activeReadMs=Date.now()-started;
+    report.activeTravelsRead=live.length;
+    if(report.activeReadMs>MONITOR_READ_WARNING_MS) {
+      report.slowScan=true;
+      report.reason=`Active Travel scan took ${report.activeReadMs}ms; add capacity before monitoring falls behind.`;
     }
   } catch (e) {
     return { ok: false, reason: `could not read travel underway: ${e.message}`, watching: 0 };
@@ -132,6 +128,12 @@ async function sweepMonitor({ now = Date.now() } = {}) {
       lng: r.opLng,
       stillMin: r.stillSince ? minutesSince(r.stillSince, now) : 0,
     }));
+  const grid=new Map();
+  for(const v of fleetNow) {
+    const key=`${Math.floor(v.lat/FLEET_CELL_DEG)}:${Math.floor(v.lng/FLEET_CELL_DEG)}`;
+    if(!grid.has(key))grid.set(key,[]);
+    grid.get(key).push(v);
+  }
 
   for (const ride of live) {
     // A vehicle waiting AT the pickup is doing its job by being stationary. Watching it would
@@ -188,9 +190,16 @@ async function sweepMonitor({ now = Date.now() } = {}) {
     }
 
     // ---- 1. Is it the road? -----------------------------------------------------------
-    const neighbours = fleetNow.filter(
-      (v) => v.id !== ride.id && distanceMiles(v, { lat: ride.opLat, lng: ride.opLng }) <= NEARBY_MI,
-    );
+    const latRadius=NEARBY_MI/68;
+    const lngRadius=NEARBY_MI/(68*Math.max(0.05,Math.cos(ride.opLat*Math.PI/180)));
+    const neighbours=[];
+    for(let y=Math.floor((ride.opLat-latRadius)/FLEET_CELL_DEG);y<=Math.floor((ride.opLat+latRadius)/FLEET_CELL_DEG);y++) {
+      for(let x=Math.floor((ride.opLng-lngRadius)/FLEET_CELL_DEG);x<=Math.floor((ride.opLng+lngRadius)/FLEET_CELL_DEG);x++) {
+        for(const v of grid.get(`${y}:${x}`)||[]) {
+          if(v.id!==ride.id&&distanceMiles(v,{lat:ride.opLat,lng:ride.opLng})<=NEARBY_MI)neighbours.push(v);
+        }
+      }
+    }
     const alsoStopped = neighbours.filter((v) => v.stillMin >= STILL_MIN / 2).length;
 
     if (alsoStopped >= CONGESTION_MIN_VEHICLES) {

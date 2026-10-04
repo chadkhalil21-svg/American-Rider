@@ -37,6 +37,7 @@ async function notifyByEmail(ticket) {
   const key = readKey('RESEND_API_KEY');
   if (!to || !key) return false; // not configured — the caller must not claim otherwise
   const emergency = ticket.kind === 'emergency';
+  const paymentDeadline = ticket.reason === 'Payment disputed';
   try {
     const r = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -44,7 +45,9 @@ async function notifyByEmail(ticket) {
       body: JSON.stringify({
         from: 'American Rider <support@americanrider.app>',
         to: [to],
-        subject: emergency
+        subject: paymentDeadline
+          ? `PAYMENT DEADLINE · ${ticket.caseNo} · ${ticket.trip?.no || 'no travel number'}`
+          : emergency
           ? // First word in the inbox says what it is. Nothing else we send is capitalised
             // like this, so an emergency cannot be mistaken for a billing question.
             `EMERGENCY · ${ticket.caseNo} · ${ticket.trip?.no || 'no travel number'}`

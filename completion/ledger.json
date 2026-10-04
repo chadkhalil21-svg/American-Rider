@@ -3,7 +3,7 @@
   "branch": "integrate/commercial-completion-2026-10-03",
   "baseSha": "f749644c862e1da128359ddf2693a95506b9b52a",
   "candidateSha": "551b72db40db360029b90864febd443430ddb1f8",
-  "generatedAt": "2026-10-04T21:08:24.806324+00:00",
+  "generatedAt": "2026-10-04T21:24:53.093350+00:00",
   "allowedStatuses": [
     "FIXED",
     "VERIFIED ALREADY FIXED",
@@ -30,7 +30,10 @@
     "Stripe capture policy remains confirmed capture before offer, with unmatched-charge refund obligation. The manual authorization/capture alternative, expiry windows, supported methods, cost and consumer-hold risk are documented in completion/evidence/stripe-capture-decision.md; merchant/consumer policy and live provider evidence remain external release gates.",
     "Local Ops checklist mock rendered at 390×844 and 1440×900 with system Chromium, no horizontal overflow, 46px action controls; this is not a signed-in Ops session, actual production evidence or a mobile-native test.",
     "Stripe dispute/Connect-event durability candidate passes local deterministic and full npm run check; actual signed provider webhooks, deliverability and human acknowledgement NOT TESTED.",
-    "Bounded independent market review found exactly F073/F074; no confirmed new paid quote, charge or offer bypass and no prelaunch intake deadlock. Both candidate source repairs and focused fake-Firestore tests are present; the complete npm run check passed locally. This is not a live-service authorization. Source/cost/control details in completion/evidence/commercial-release-runbook.md and provider-dependency-register.md."
+    "Bounded independent market review found exactly F073/F074; no confirmed new paid quote, charge or offer bypass and no prelaunch intake deadlock. Both candidate source repairs and focused fake-Firestore tests are present; the complete npm run check passed locally. This is not a live-service authorization. Source/cost/control details in completion/evidence/commercial-release-runbook.md and provider-dependency-register.md.",
+    "IMPLEMENT NOW scale/dispute/Ops source slice: F075–F077 built with bounded deterministic fakes and PII-free phone layout; VERIFY exact SHA, Firestore indexes, MFA/full case queues and live 10k/100k/1m concurrency; EXTERNAL provider quotas, insurer/legal/custody and financial submission policy. No code has been merged or commercially deployed.",
+    "IMPLEMENT NOW F078 case exceptions: 85-page synthetic test, human ack/close with two audit writes, separate safety/payment labels. VERIFY live index, named MFA session, true staffed safety response and Stripe deadlines; do not treat email acceptance as human contact.",
+    "TESTED / PASS on candidate: npm run check; new Ops case/evidence UI captured only in PII-free 390px Chromium mocks (completion/evidence/rendered/), not authenticated or native sessions. Exact-commit and live evidence remain required."
   ],
   "records": [
     {
@@ -204,7 +207,8 @@
       "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
       "evidence": [
         "Queue/outbox defects",
-        "Stripe handler now propagates required storage/alert failures to leased provider retry rather than silently marking the event done; local mock passes only. Actual queue/Resend/Stripe/staff drill remains NOT TESTED."
+        "Stripe handler now propagates required storage/alert failures to leased provider retry rather than silently marking the event done; local mock passes only. Actual queue/Resend/Stripe/staff drill remains NOT TESTED.",
+        "National-source follow-up F075 adds 330-event multi-page and 900-active full-coverage fakes, fenced queue claims and index declarations; real throughput, staff alarms and unit costs are still release blockers."
       ],
       "candidatePrs": [],
       "implementingCommit": null,
@@ -349,7 +353,8 @@
       "source": "coverage-and-omissions.md",
       "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
       "evidence": [
-        "**NOT TESTED**; scenarios incompatible"
+        "**NOT TESTED**; scenarios incompatible",
+        "National-source follow-up F075 adds 330-event multi-page and 900-active full-coverage fakes, fenced queue claims and index declarations; real throughput, staff alarms and unit costs are still release blockers."
       ],
       "candidatePrs": [],
       "implementingCommit": null,
@@ -672,7 +677,8 @@
       "evidence": [
         "Inherited source review; revalidate against integration head.",
         "Provider event sweeps prioritize due pending/expired leased events, dead-letter after 12 attempts and expose named Ops replay with transactional audit.",
-        "Stripe handler now propagates required storage/alert failures to leased provider retry rather than silently marking the event done; local mock passes only. Actual queue/Resend/Stripe/staff drill remains NOT TESTED."
+        "Stripe handler now propagates required storage/alert failures to leased provider retry rather than silently marking the event done; local mock passes only. Actual queue/Resend/Stripe/staff drill remains NOT TESTED.",
+        "National-source follow-up F075 adds 330-event multi-page and 900-active full-coverage fakes, fenced queue claims and index declarations; real throughput, staff alarms and unit costs are still release blockers."
       ],
       "candidatePrs": [],
       "implementingCommit": null,
@@ -1155,7 +1161,8 @@
       "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
       "evidence": [
         "Split bounded due-pending and expired-lease queries; 12-attempt dead letter and named auditable replay.",
-        "Stripe handler now propagates required storage/alert failures to leased provider retry rather than silently marking the event done; local mock passes only. Actual queue/Resend/Stripe/staff drill remains NOT TESTED."
+        "Stripe handler now propagates required storage/alert failures to leased provider retry rather than silently marking the event done; local mock passes only. Actual queue/Resend/Stripe/staff drill remains NOT TESTED.",
+        "National-source follow-up F075 adds 330-event multi-page and 900-active full-coverage fakes, fenced queue claims and index declarations; real throughput, staff alarms and unit costs are still release blockers."
       ],
       "candidatePrs": [
         59
@@ -1388,6 +1395,89 @@
         "backend/market-fleet.test.js PASS including a simulated Firestore transaction retry during concurrent pause, old/new fleet off-duty, unrelated county untouched; backend/market-readiness.test.js PASS; npm run check PASS locally. Actual Firestore cursor/index deployment, Operator device status, multi-instance concurrent pause, national-volume cleanup and exact-SHA CI NOT TESTED."
       ],
       "releaseCondition": "Deploy and await availability-query index; rehearse county pause with real on-duty fleet and concurrent renewal, check cleanup completion, live Operator device/off-duty display, no new offer, residual unknown/legacy records and staffed exception handling before activation."
+    },
+    {
+      "id": "F075",
+      "category": "implementation-new-defect",
+      "title": "Provider event and active-Travel hard ceilings at national workload",
+      "status": "NOT TESTED",
+      "owner": "Engineering + Operations/Finance",
+      "source": "backend/providerqueue.js; backend/providerqueue.recovery.test.js; backend/monitor.js; backend/monitor.test.js; firestore.indexes.json",
+      "sourceSha": "51d1680ca18192284b614ecac07d206ca59db210",
+      "evidence": [
+        "Source now drains due-indexed pages up to 1,200 provider events/25-second tick with eight fenced claims, tracks queue age and saturation, and reads every active Travel in 200-row ordered pages with a local fleet spatial grid. Deterministic 330-due-event, stale-worker interleaving, 900-active-Travel and 0.59-mile grid-boundary tests PASS."
+      ],
+      "candidatePrs": [
+        59
+      ],
+      "implementingCommit": null,
+      "verification": [
+        "Candidate npm run check PASS on working tree before commit (completion/evidence/ops-cases-candidate-check.log.gz); exact final-SHA CI, live devices/providers, indexes, staffing and load remain NOT TESTED."
+      ],
+      "releaseCondition": "Deploy and verify both indexes, actual 10k/100k/1m/month workload, 10× peak and retry storms, host/lease duration, provider quotas, p95/p99, queue-age alarms, Firestore/Stripe invoice unit cost and operations intervention before national scale claims."
+    },
+    {
+      "id": "F076",
+      "category": "implementation-new-defect",
+      "title": "Operations exception console downloaded every historical Travel on one phone",
+      "status": "NOT TESTED",
+      "owner": "Engineering + Operations/Finance",
+      "source": "backend/opsboarddata.js; backend/opsboarddata.test.js; backend/ops.js; firestore.indexes.json",
+      "sourceSha": "51d1680ca18192284b614ecac07d206ca59db210",
+      "evidence": [
+        "Replaced unbounded /ops home reads with ten focused queries returning at most 600 records together; saturation marked “+” and financial values explicitly labelled recent sample, never full-day accounting. A deterministic 180-Travels/90-Operators/75-cases fake passed and phone-width private dispute mock has no overflow.",
+        "Follow-up: backend/opscases.js pages all urgent/support cases 40 at a time and audits separate named acknowledgement/closure in one transaction; 85 synthetic urgent cases verified over three pages. Ops board stays capped as a dashboard, not a case queue."
+      ],
+      "candidatePrs": [
+        59
+      ],
+      "implementingCommit": null,
+      "verification": [
+        "Candidate npm run check PASS on working tree before commit (completion/evidence/ops-cases-candidate-check.log.gz); exact final-SHA CI, live devices/providers, indexes, staffing and load remain NOT TESTED."
+      ],
+      "releaseCondition": "Deploy and verify support_tickets indexes; authenticate a named MFA Operations session and execute 85-case pagination plus real case acknowledgement/closure, staffed safety and financial deadline escalations; reconcile complete finance figures outside the bounded dashboard sample."
+    },
+    {
+      "id": "F077",
+      "category": "implementation-new-defect",
+      "title": "Stripe dispute arrived without immutable reviewed Travel-evidence packet",
+      "status": "NOT TESTED",
+      "owner": "Engineering + Operations/Finance",
+      "source": "backend/disputeevidence.js; backend/disputeevidence-ui.js; backend/webhook.js; backend/webhookdurability.test.js; backend/server.js",
+      "sourceSha": "51d1680ca18192284b614ecac07d206ca59db210",
+      "evidence": [
+        "Signed dispute handler now writes a create-only hash-fingerprinted, PII-minimized Travel/payment snapshot and will retry on storage failure; duplicate or conflicting events cannot overwrite it. Named Ops gets a bounded review-only page. Synthetic creation/retry/escaping tests PASS; no financial evidence was submitted.",
+        "The alert email now distinguishes PAYMENT DEADLINE from safety EMERGENCY without changing the historic idempotent case identity. Ops evidence page is review-only, not Stripe representment."
+      ],
+      "candidatePrs": [
+        59
+      ],
+      "implementingCommit": null,
+      "verification": [
+        "Candidate npm run check PASS on working tree before commit (completion/evidence/ops-cases-candidate-check.log.gz); exact final-SHA CI, live devices/providers, indexes, staffing and load remain NOT TESTED."
+      ],
+      "releaseCondition": "Test live signed Stripe dispute fixtures and deployed index/rules, retention/legal hold and evidence deadline desk; have qualified staff review and approve actual representment, test historical/missing-Travel corrections. Submission is deliberately not automated or authorized."
+    },
+    {
+      "id": "F078",
+      "category": "implementation-new-defect",
+      "title": "Stored exception cases had no pageable, named human acknowledgement or audited closure",
+      "status": "NOT TESTED",
+      "owner": "Engineering + staffed Safety/Support",
+      "source": "backend/opscases.js; backend/opscases-ui.js; backend/opscases.test.js; backend/ops.js; backend/server.js; firestore.indexes.json",
+      "sourceSha": "51d1680ca18192284b614ecac07d206ca59db210",
+      "evidence": [
+        "Named MFA Operations now sees 40 oldest-open cases per page, with explicit safety/deadline labels. A case requires named, noted, transactional acknowledgement before separately noted closure. 85 synthetic urgent cases paginated and two audit records verified locally; 360px phone mock had no overflow and 46px action button."
+      ],
+      "candidatePrs": [
+        59
+      ],
+      "implementingCommit": null,
+      "verification": [
+        "Source tests PASS; exact final SHA CI, deployed index, named MFA login, case escalation and physical-world staffing NOT TESTED.",
+        "Candidate npm run check PASS on working tree before commit (completion/evidence/ops-cases-candidate-check.log.gz); exact final-SHA CI, live devices/providers, indexes, staffing and load remain NOT TESTED."
+      ],
+      "releaseCondition": "Verify production index and staff capacity, safety/911 and insurer notices, payment deadlines, all-pages pagination, actual acknowledgment and escalation coverage on device under realistic queue loads."
     }
   ],
   "features": [

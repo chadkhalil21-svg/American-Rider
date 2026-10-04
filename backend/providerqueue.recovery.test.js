@@ -2,7 +2,7 @@ const assert=require('node:assert/strict');
 const path=require('node:path');
 const rows=new Map();
 const clone=(v)=>structuredClone(v);
-const ref=(collection,id)=>({id,path:`${collection}/${id}`,get:async()=>({exists:rows.has(`${collection}/${id}`),data:()=>clone(rows.get(`${collection}/${id}`))}),
+const ref=(collection,id)=>({id,path:`${collection}/${id}`,data:()=>clone(rows.get(`${collection}/${id}`)),get:async()=>({exists:rows.has(`${collection}/${id}`),data:()=>clone(rows.get(`${collection}/${id}`))}),
   async create(v){assert(!rows.has(this.path));rows.set(this.path,clone(v));},
   async set(v,opts){rows.set(this.path,opts?.merge?{...rows.get(this.path),...clone(v)}:clone(v));}});
 let auto=0;
@@ -41,5 +41,26 @@ const {sweepProviderEvents,processProviderEvent,replayDeadEvent,MAX_ATTEMPTS}=re
  assert.equal([...rows].filter(([key])=>key.startsWith('audit_log/')).length,1);
  assert.equal((await processProviderEvent({id:'poison',handlers:{stripe:async()=>({ok:true})},workerId:'test'})).ok,true);
  assert.equal(rows.get('provider_events/poison').status,'done');
+ for(let i=0;i<330;i++)rows.set(`provider_events/backlog${i}`,{
+  provider:'stripe',event:{id:`backlog${i}`},status:'pending',attempts:0,
+  receivedAt:now-120_000,nextAttemptAt:0,leaseUntil:0,
+ });
+ const backlog=[];
+ const drained=await sweepProviderEvents({handlers:{stripe:async(e)=>{backlog.push(e.id);return {ok:true};}},workerId:'bulk-test'});
+ assert.equal(drained.processed,330,'an indexed multi-page tick drains more than the old 40-event ceiling');
+ assert.ok(drained.duePages>=2);assert.ok(drained.oldestDueAgeMs>=120_000);
+ rows.set('provider_events/leaseRace',{provider:'stripe',event:{id:'leaseRace'},status:'pending',attempts:0,nextAttemptAt:0,leaseUntil:0});
+ let releaseOld,oldStarted;
+ const started=new Promise((resolve)=>{oldStarted=resolve;});
+ const old=processProviderEvent({id:'leaseRace',handlers:{stripe:async()=>{
+  oldStarted();await new Promise((resolve)=>{releaseOld=resolve;});return {ok:true,owner:'old'};
+ }},workerId:'old'});
+ await started;
+ rows.get('provider_events/leaseRace').leaseUntil=Date.now()-1;
+ rows.get('provider_events/leaseRace').nextAttemptAt=Date.now()-1;
+ assert.equal((await processProviderEvent({id:'leaseRace',handlers:{stripe:async()=>({ok:true,owner:'new'})},workerId:'new'})).ok,true);
+ releaseOld();assert.equal((await old).superseded,true);
+ assert.equal(rows.get('provider_events/leaseRace').result.owner,'new',
+  'an expired old worker cannot overwrite a newer claim');
  console.log('PASS due queue avoids 80 future events, recovers expired lease, dead-letters poison and audits named replay');
 })().catch(e=>{console.error(e);process.exitCode=1;});

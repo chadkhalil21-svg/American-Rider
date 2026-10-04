@@ -24,6 +24,7 @@ const { REQUIRED_DOCS, resolveDocument, setSuspension, assessAndRecord } = requi
 const { disclosureStale } = require('./matching');
 const { applyIndependentConfirmation, continuingStatus } = require('./insurance-monitoring');
 const { codeFor, totpStep, sessionFor, verifySession } = require('./opssecurity');
+const { loadOpsBoard, UNDERWAY } = require('./opsboarddata');
 
 const COOKIE = 'ar_ops';
 
@@ -162,8 +163,6 @@ const LOGIN = `
 const stat = (k, v, mono) =>
   `<div><span class="k">${esc(k)}</span><span class="${mono ? 'amount' : ''}">${v}</span></div>`;
 
-const UNDERWAY = ['assigned', 'accepted', 'arrived', 'onboard'];
-
 const DOC_TITLES = {
   license: 'Driver licence',
   registration: 'Vehicle registration',
@@ -247,30 +246,21 @@ async function board() {
   }
 
   const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
-  const [ridesSnap, opsSnap, schedSnap, caseSnap, pendingSnap] = await Promise.all([
-    db.collection('rides').get(),
-    db.collection('operators').get(),
-    db.collection('scheduled_rides').where('status', '==', 'reserved').get(),
-    db.collection('support_tickets').where('status', '==', 'open').get(),
-    // THE EXCEPTION QUEUE. The snapshot is only an index for this query; every gate re-assesses.
-    db.collection('users').where('qualification.status', 'in', ['exception', 'refused', 'suspended']).get(),
-  ]);
-  const pending = pendingSnap.docs
-    .map((d) => ({ id: d.id, ...d.data() }))
+  const loaded = await loadOpsBoard(db, dayAgo);
+  const size = (k) => `${loaded[k].rows.length}${loaded[k].saturated ? '+' : ''}`;
+  const pending = loaded.pending.rows
     .sort((a, b) => (a.qualification?.evaluatedAt || 0) - (b.qualification?.evaluatedAt || 0));
 
-  const rides = ridesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  const operators = opsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  const scheduled = schedSnap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => a.atMs - b.atMs);
-  const cases = caseSnap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => b.createdAt - a.createdAt);
-
-  const underway = rides.filter((r) => UNDERWAY.includes(r.status)).sort((a, b) => b.createdAt - a.createdAt);
-  const today = rides.filter((r) => Number(r.createdAt) > dayAgo);
+  const operators = loaded.operators.rows;
+  const scheduled = loaded.scheduled.rows;
+  const cases = loaded.cases.rows;
+  const underway = loaded.underway.rows.filter((r) => UNDERWAY.includes(r.status)).sort((a, b) => b.createdAt - a.createdAt);
+  const today = loaded.recent.rows;
   const completed = today.filter((r) => r.status === 'completed');
   const onDuty = operators.filter((o) => o.available);
-  const owed = rides.filter((r) => r.payoutPending);
-  const disputed = rides.filter((r) => r.disputed);
-  const attention = rides.filter((r) => r.monitor?.state === 'emergency' || r.monitor?.state === 'escalated');
+  const owed = loaded.owed.rows;
+  const disputed = loaded.disputed.rows;
+  const attention = loaded.attention.rows;
 
   const paid = completed.reduce((n, r) => n + (Number(r.operatorPaidCents) || 0), 0);
   const took = completed.reduce((n, r) => n + (Number(r.platformTakeCents) || 0), 0);
@@ -278,13 +268,13 @@ async function board() {
 
   // THE ONE THING THAT MUST BE AT THE TOP. Anything on fire outranks the numbers.
   const alarms = [];
-  if (attention.length) alarms.push(`${attention.length} travel needing attention`);
-  if (disputed.length) alarms.push(`${disputed.length} disputed payment${disputed.length > 1 ? 's' : ''}`);
-  if (owed.length) alarms.push(`${owed.length} operator payout${owed.length > 1 ? 's' : ''} owed`);
-  const noReceipt = rides.filter((r) => r.receiptFailed);
-  if (noReceipt.length) alarms.push(`${noReceipt.length} receipt${noReceipt.length > 1 ? 's' : ''} not delivered`);
+  if (attention.length) alarms.push(`${size('attention')} travel needing attention`);
+  if (disputed.length) alarms.push(`${size('disputed')} disputed payment${disputed.length > 1 ? 's' : ''}`);
+  if (owed.length) alarms.push(`${size('owed')} operator payout${owed.length > 1 ? 's' : ''} owed`);
+  const noReceipt = loaded.noReceipt.rows;
+  if (noReceipt.length) alarms.push(`${size('noReceipt')} receipt${noReceipt.length > 1 ? 's' : ''} not delivered`);
   const waiting = pending.filter((u) => u.qualification?.status === 'exception');
-  if (waiting.length) alarms.push(`${waiting.length} operator exception${waiting.length > 1 ? 's' : ''} to decide`);
+  if (waiting.length) alarms.push(`${size('pending')} operator qualification item${waiting.length > 1 ? 's' : ''} to review`);
   // Real operators only — the demonstration stand-ins are never stored.
   const staleDisclosure = operators.filter((o) => disclosureStale(o));
 
@@ -301,6 +291,10 @@ async function board() {
 <h1>Operations</h1>
 <p class="lede">${new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })}</p>
 <p><a href="/ops/markets">Market readiness, evidence and pause controls →</a></p>
+<p><a href="/ops/cases?kind=emergency">Urgent and deadline cases · acknowledge →</a> · <a href="/ops/cases?kind=support">Support cases →</a></p>
+<p><a href="/ops/disputes">Stripe dispute evidence · review only →</a></p>
+${Object.entries(loaded).some(([,g]) => g.saturated)
+  ? '<p role="alert"><strong>Some sections show a bounded sample.</strong> A “+” means more records exist. Do not use sample amounts for accounting; reconcile with Stripe and the financial ledger. Check /health for worker saturation.</p>' : ''}
 
 ${alarms.length
   ? `<div class="panel" style="background:#FFF4F4;border-color:#F3D8D8;margin-top:18px;">
@@ -310,23 +304,24 @@ ${alarms.length
 
 <div class="statement">
   <div class="lbl">Travel Underway</div>
-  <div class="figure">${underway.length}</div>
-  <div class="note">${onDuty.length} operator${onDuty.length === 1 ? '' : 's'} on duty ·
-    ${scheduled.length} reservation${scheduled.length === 1 ? '' : 's'} upcoming</div>
+  <div class="figure">${size('underway')}</div>
+  <div class="note">${size('operators')} operator${onDuty.length === 1 ? '' : 's'} on duty ·
+    ${size('scheduled')} reservation${scheduled.length === 1 ? '' : 's'} upcoming</div>
 </div>
 
 <section>
-  <h2>Last 24 hours</h2>
+  <h2>Recent activity · up to 120 Travels in the last 24 hours</h2>
+  <p>These numbers and amounts describe only the records shown, not a complete daily financial or operational total.</p>
   <div class="rows">
     ${stat('Travel completed', completed.length)}
     ${stat('Travel started', today.length)}
-    ${stat('Paid to operators', money(paid), true)}
-    ${stat('American Rider kept', money(took), true)}
+    ${stat('Paid to operators · sample', money(paid), true)}
+    ${stat('American Rider kept · sample', money(took), true)}
     <div class="split"></div>
-    ${stat('Payouts owed', `${owed.length} · ${money(owedCents)}`, true)}
-    ${stat('Disputed', disputed.length)}
-    ${stat('Open cases', cases.length)}
-    ${stat('Receipts not delivered', noReceipt.length)}
+    ${stat('Payouts owed · shown', `${size('owed')} · ${money(owedCents)}`, true)}
+    ${stat('Disputed · shown', size('disputed'))}
+    ${stat('Open cases · shown', size('cases'))}
+    ${stat('Receipts not delivered · shown', size('noReceipt'))}
   </div>
 </section>
 
@@ -339,6 +334,7 @@ ${alarms.length
 
 <section>
   <h2>Operator exceptions</h2>
+  ${loaded.pending.saturated ? '<p role="alert">More Operator qualification exceptions exist than this page can show. Do not treat the list below as the entire review queue.</p>' : ''}
   <p>Operators qualify automatically when every check passes. Only what the checks cannot settle
     — held documents, refusals to reconsider, suspensions — appears here. Every decision is
     recorded with a note and the name of the person who made it.${shared() ? ` <strong>Signed in with the shared password (${esc(sharedMode())}): decisions are recorded as “${esc(opsAccounts()[0]?.name || 'ops')}”, not a named person. Set OPS_USERS.</strong>` : ''}</p>
@@ -416,7 +412,7 @@ ${alarms.length
     ${stat('Stripe webhook', webhookReady() ? 'configured' : 'NOT CONFIGURED')}
     ${stat('Email receipts', emailReady() ? 'configured' : 'NOT CONFIGURED')}
     ${stat('Operator screening', screeningReady() ? 'configured' : 'NOT CONFIGURED')}
-    ${stat('Assistant', readKey('ANTHROPIC_API_KEY') ? 'on' : 'off')}
+    ${stat('Optional incident/support analysis', readKey('ANTHROPIC_API_KEY') ? 'configured' : 'off')}
   </div>
   <a class="more" href="/health">Full health report ›</a>
 </section>`;

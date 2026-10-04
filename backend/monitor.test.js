@@ -24,10 +24,19 @@ function makeDb(seed) {
         // `limit` HONOURS THE BOUND rather than ignoring it. A double that accepts .limit(n)
         // and returns everything anyway would let an unbounded scan pass its own test — which
         // is exactly the read bill that exhausted the quota on 30 Aug 2026.
-        return {
-          async get() { return snap(rowsFor()); },
-          limit: (n) => ({ async get() { return snap(rowsFor().slice(0, n)); } }),
+        let cursor = null, limit = Infinity, ordered = false;
+        const query = {
+          orderBy(field) { ordered = field === '__name__'; return query; },
+          startAfter(id) { cursor = id; return query; },
+          limit(n) { limit = n; return query; },
+          async get() {
+            let rows = rowsFor();
+            if (ordered) rows.sort(([a],[b]) => a < b ? -1 : a > b ? 1 : 0);
+            if (cursor) rows = rows.filter(([id]) => id > cursor);
+            return snap(rows.slice(0, limit));
+          },
         };
+        return query;
       },
       // sweepAssignments lists the whole operator collection to find a replacement.
       async get() {
@@ -133,6 +142,20 @@ const check = (l, c, d) => results.push({ l, ok: !!c, d });
       rep.congestion === 3 && rep.asked.length === 0, JSON.stringify({ c: rep.congestion, a: rep.asked }));
     check('  and both parties are TOLD what the delay is',
       /vehicles in this area/.test(h.data.rides.r1.monitor.note), h.data.rides.r1.monitor.note);
+  }
+
+  // 5b. Both 0.59-mile neighboring vehicles count near a high-latitude cell edge.
+  {
+    const center={lat:47.61,lng:-122.33};
+    const edgeLat={lat:center.lat+0.00853908,lng:center.lng};
+    const edgeLng={lat:center.lat,lng:center.lng+0.01266599};
+    const stopped=(p,op)=>ride({operatorId:op,opLat:p.lat,opLng:p.lng,
+      monitorSeen:{lat:p.lat,lng:p.lng,at:now-12*MIN}});
+    const h=makeDb({rides:{r1:stopped(center,'op1'),r2:stopped(edgeLat,'op2'),r3:stopped(edgeLng,'op3')}});
+    const rep=await inject(h.db).sweepMonitor({now});
+    check('regional spatial buckets keep 0.59-mile boundary neighbors visible',
+      rep.congestion>=1&&h.data.rides.r1.monitor.state==='congestion',
+      JSON.stringify({congestion:rep.congestion,state:h.data.rides.r1.monitor.state}));
   }
 
   // 6. One stopped, two moving nearby: NOT traffic — this one is asked.
@@ -327,11 +350,12 @@ const check = (l, c, d) => results.push({ l, ok: !!c, d });
 
   // 14b. THE SAFETY SWEEP SAYS SO WHEN IT CANNOT COVER EVERYBODY. Route monitoring is bounded
   // like the others, because it reads every travel underway once a minute. Unlike the others,
-  // a travel it skips is a vehicle nobody is watching — so exceeding the bound must reach
-  // /health, not be absorbed. This fails if the overflow ever becomes silent.
+  // A page bound is not a coverage bound: 900 underway Travels (above the modeled 1m/month
+  // 833-active peak) must all be read in one
+  // tick, with no silent first-500-only window and without an unbounded single RPC.
   {
     const many = {};
-    for (let i = 0; i < 600; i += 1) {
+    for (let i = 0; i < 900; i += 1) {
       many[`live${i}`] = {
         status: 'onboard', operatorId: 'op1', travelerUid: 'u1', tripNo: `AR-${i}-MIA`,
         opLat: 25.77, opLng: -80.19, opAt: now, createdAt: now,
@@ -339,9 +363,9 @@ const check = (l, c, d) => results.push({ l, ok: !!c, d });
     }
     const h = makeDb({ rides: many, operators: freeOperator });
     const rep = await inject(h.db).sweepMonitor({ now });
-    check('monitoring more travel than one tick can read is REPORTED, never silent',
-      rep.unwatched === true && typeof rep.reason === 'string' && rep.reason.length > 0,
-      JSON.stringify({ unwatched: rep.unwatched, watching: rep.watching }));
+    check('all 900 active Travels are paged and none are silently excluded',
+      rep.activeTravelsRead === 900 && rep.activeReadPages === 5 && rep.unwatched !== true,
+      JSON.stringify({ read: rep.activeTravelsRead, pages: rep.activeReadPages, unwatched: rep.unwatched }));
   }
 
   // 15b. THE READ BILL (30 Aug 2026). This query runs every 60 seconds — 1,440 times a day —

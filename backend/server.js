@@ -36,6 +36,9 @@ const { forMarket: insuranceForMarket, publicConfig: publicInsuranceConfig } = r
 const { manifestFor, inspectMarket, recordEvidence, activateMarket, authorizeOnboarding, pauseMarket } = require('./market-readiness');
 const { setAdmittedFleetOnline, deactivateMarketFleet, sweepPausedMarketFleet } = require('./market-fleet');
 const { marketChecklistPage } = require('./market-readiness-ui');
+const { disputePage } = require('./disputeevidence-ui');
+const { listOpsCases, actOnCase } = require('./opscases');
+const { casesPage } = require('./opscases-ui');
 
 // ——— WHAT A THROWAWAY ACCOUNT MAY DO, AND HOW OFTEN ————————————————————————————
 // Booking was never the exposure: a travel needs a payment method, and a card is far harder to
@@ -2188,6 +2191,50 @@ function requireOpsMutation(req, res, next) {
   }
   return next();
 }
+app.get('/ops/cases', requireOps, async (req, res) => {
+  if (opsAuthMode() !== 'named') return res.status(403).send('Named Operations account required.');
+  try {
+    const result=await listOpsCases({db:adminDb(),kind:String(req.query?.kind||'emergency'),
+      after:String(req.query?.after||'')});
+    return res.type('html').send(casesPage(result,String(req.query?.kind||'emergency')));
+  } catch(e) {
+    console.error('[ops] case queue unavailable',e?.message||e);
+    return res.status(503).send('Case queue cannot be loaded; verify the index and retry.');
+  }
+});
+app.post('/ops/cases/:id/action', requireOps, requireOpsMutation, async (req, res) => {
+  if (opsAuthMode() !== 'named') return res.status(403).json({ok:false,code:'named_ops_required'});
+  try {
+    const out=await actOnCase({db:adminDb(),caseNo:req.params.id,action:req.body?.action,
+      actor:req.opsUser,note:req.body?.note});
+    return res.status(out.ok?200:409).json(out);
+  } catch(e) {
+    console.error('[ops] case action unavailable',e?.message||e);
+    return res.status(503).json({ok:false,code:'case_action_unavailable'});
+  }
+});
+app.get('/ops/disputes', requireOps, async (req, res) => {
+  if (opsAuthMode() !== 'named') return res.status(403).send('Named Operations account required.');
+  const db = adminDb();
+  if (!db) return res.status(503).send('Dispute evidence storage is unavailable.');
+  const after = String(req.query?.after || '');
+  if (after && !/^dp_[A-Za-z0-9_]{1,96}$/.test(after)) return res.status(400).send('Invalid page cursor.');
+  try {
+    let query = db.collection('dispute_evidence').orderBy('capturedAt','desc').orderBy('__name__','desc');
+    if (after) {
+      const cursor = await db.collection('dispute_evidence').doc(after).get();
+      if (!cursor.exists) return res.status(404).send('Dispute page cursor not found.');
+      query = query.startAfter(cursor);
+    }
+    const snap = await query.limit(51).get();
+    const shown = snap.docs.slice(0,50);
+    return res.type('html').send(disputePage(shown.map((d)=>d.data()),
+      {next:snap.docs.length>50?shown.at(-1).id:null}));
+  } catch (e) {
+    console.error('[ops] dispute evidence unavailable',e?.message||e);
+    return res.status(503).send('Dispute evidence cannot be loaded; retry or check the index.');
+  }
+});
 app.get('/ops/markets', requireOps, async (req, res) => {
   const markets = allMarkets().filter((m) => m.regionId);
   const items = await Promise.all(markets.map(async (market) => ({ market, state: await admittedMarket(market) })));

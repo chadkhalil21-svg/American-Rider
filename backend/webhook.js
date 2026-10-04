@@ -22,6 +22,7 @@ const { fileTicket } = require('./tickets');
 const { readKey } = require('./env');
 const { money } = require('./email');
 const { recordPayoutActivity } = require('./operatorfees');
+const { saveDisputeEvidence } = require('./disputeevidence');
 
 /**
  * Handle one verified event. Provider-queue failures retry with a lease and end in an
@@ -65,8 +66,9 @@ async function handleEvent(event) {
           `PaymentIntent ${obj.payment_intent}. Dispute ${obj.id}.\n` +
           (ride ? `Route: ${ride.dep} to ${ride.dest}. Operator: ${ride.operatorName}.\n` : ''),
       }, event);
+      const evidence = await saveDisputeEvidence({ db, ride, event });
       if (ride) await mark(db, ride.id, { disputed: true, disputeId: obj.id, disputeAt: Date.now(), caseNo });
-      return { ok: true, action: 'dispute opened', caseNo };
+      return { ok: true, action: 'dispute opened', caseNo, evidenceRef: evidence.ref };
     }
 
     case 'charge.dispute.closed': {

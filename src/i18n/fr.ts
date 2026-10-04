@@ -572,7 +572,7 @@ export default {
     errNoAccountDelete: 'Aucun compte connecté à supprimer.',
     errPasswordMismatch: 'Ce mot de passe ne correspond pas à ce compte.',
     errTooManyAttempts: 'Trop de tentatives. Attendez quelques minutes et réessayez.',
-    errDeleteFailed: 'Le compte n’a pas pu être supprimé. Confirmez votre mot de passe et réessayez.',
+    errDeleteFailed: 'La suppression du compte n’a pas pu être confirmée. Reconnectez-vous pour réessayer ou contactez l’assistance. Les nouveaux voyages restent suspendus jusque-là.',
     errReauthenticationCancelled: 'La suppression du compte a été annulée. Votre compte reste ouvert.',
     deleteConfirmApple: 'Continuez avec Apple pour confirmer qu’il s’agit de votre compte.',
     deleteConfirmGoogle: 'Continuez avec Google pour confirmer qu’il s’agit de votre compte.',

@@ -586,7 +586,7 @@ export default {
     errNoAccountDelete: 'No signed-in account to delete.',
     errPasswordMismatch: 'That password does not match this account.',
     errTooManyAttempts: 'Too many attempts. Wait a few minutes and try again.',
-    errDeleteFailed: 'The account could not be deleted. Confirm your password and try again.',
+    errDeleteFailed: 'Account deletion could not be confirmed. Sign in to retry or contact Support. New Travel remains paused until this is resolved.',
     errReauthenticationCancelled: 'Account deletion was cancelled. Your account remains open.',
     deleteConfirmApple: 'Continue with Apple to confirm that this is your account.',
     deleteConfirmGoogle: 'Continue with Google to confirm that this is your account.',

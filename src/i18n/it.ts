@@ -565,7 +565,7 @@ export default {
     errNoAccountDelete: 'Nessun account con accesso effettuato da eliminare.',
     errPasswordMismatch: 'Quella password non corrisponde a questo account.',
     errTooManyAttempts: 'Troppi tentativi. Attenda qualche minuto e riprovi.',
-    errDeleteFailed: 'Non è stato possibile eliminare l’account. Confermi la password e riprovi.',
+    errDeleteFailed: 'Non è stato possibile confermare l’eliminazione dell’account. Acceda di nuovo per riprovare o contatti l’assistenza. I nuovi viaggi restano sospesi fino alla risoluzione.',
     errReauthenticationCancelled: 'L’eliminazione dell’account è stata annullata. L’account rimane aperto.',
     deleteConfirmApple: 'Continui con Apple per confermare che questo è il suo account.',
     deleteConfirmGoogle: 'Continui con Google per confermare che questo è il suo account.',

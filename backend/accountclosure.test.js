@@ -46,7 +46,7 @@ function fakeDb({ traveler = [], operator = [], scheduled = [], advance = null }
   const db = fakeDb({ traveler: ['completed:T-1'], operator: ['cancelled:T-2'], scheduled: ['reserved:S-1', 'reserved:S-2'] });
   assert.deepStrictEqual(await closeOperationalAccount({ db, uid: 'u', now: 123 }), { ok: true, cancelledScheduled: 2 });
   assert.deepStrictEqual(db.operations, [
-    ['set', 'account_closures/u', { closingAt: 123 }, { merge: true }],
+    ['set', 'account_closures/u', { closingAt: 123, state: 'closing', nextCheckAt: 60123 }, { merge: true }],
     ['set', 'operators/u', { available: false, offlineAt: 123, lat: null, lng: null }, { merge: true }],
     ['delete', 'reserved:S-1'],
     ['delete', 'reserved:S-2'],

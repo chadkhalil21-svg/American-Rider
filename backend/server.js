@@ -103,6 +103,7 @@ const { fileTicket, updateTicketLocation, listTickets, resolveTicket } = require
 const { lostItemTicket, stampLostItemCase, notifyLostItemOperators, operatorLostItem, respondLostItem } = require('./lostitem');
 const { adminDb, adminStatus, accountDisabled } = require('./firebase-admin');
 const { closeOperationalAccount } = require('./accountclosure');
+const { finalizeAccountDeletion, sweepAccountDeletion } = require('./accountdeletion');
 const { acceptOffer } = require('./eligibility');
 const { bookingId, prepareBooking, paymentMatches, assignPaidTravel } = require('./booking');
 const { progressTravel } = require('./travelprogress');
@@ -496,6 +497,8 @@ app.get('/config', async (req, res) => {
 // policy. It does cancel scheduled Travel and remove an Operator from service, so account
 // deletion cannot cause a later dispatch or charge under a login that no longer exists.
 app.post('/account/close', requireAuth, async (req, res) => {
+  if (productionMode) return res.status(426).json({ code: 'account_update_required',
+    error: 'Update American Rider to delete your account safely.' });
   try {
     const out = await closeOperationalAccount({ db: adminDb(), uid: req.uid });
     if (!out.ok) {
@@ -511,6 +514,30 @@ app.post('/account/close', requireAuth, async (req, res) => {
   } catch (e) {
     console.error('[account] close failed:', e.message);
     return res.status(503).json({ code: 'account_close_failed', error: 'Account closure is not available at this time.' });
+  }
+});
+
+// The device confirms this destructive action and reauthenticates with its linked provider.
+// A client timestamp is not proof of reauthentication; Firebase Admin verifies auth_time.
+app.post('/account/delete', requireAuth, requireFreshAuth, async (req, res) => {
+  try {
+    const { getAuth } = require('firebase-admin/auth');
+    const firebaseAuth = getAuth();
+    const token = String(req.headers.authorization || '').replace(/^Bearer /, '');
+    const verified = await firebaseAuth.verifyIdToken(token, true);
+    const age = Date.now() / 1000 - Number(verified.auth_time);
+    if (String(verified.uid) !== String(req.uid) || !Number.isFinite(age) || age < -60 || age > 300)
+      return res.status(401).json({ code: 'recent_sign_in_required', error: 'Reauthenticate to delete this account.' });
+    const out = await finalizeAccountDeletion({ db: adminDb(), auth: firebaseAuth, uid: req.uid });
+    if (!out.ok) return res.status(out.code === 'active_travel' || out.code === 'account_delete_in_progress' ? 409 : 503)
+      .json({ code: out.code, error: out.code === 'active_travel'
+        ? 'Complete or cancel the current Travel before deleting the account.'
+        : 'Account deletion could not be completed. Sign in again and retry.' });
+    return res.status(out.profileCleanupPending ? 202 : 200).json(out);
+  } catch (error) {
+    console.error('[account] delete failed:', error?.message || error);
+    return res.status(503).json({ code: 'account_delete_unavailable',
+      error: 'Account deletion could not be completed. Sign in again and retry.' });
   }
 });
 
@@ -1842,7 +1869,7 @@ async function runAllSweeps() {
     if (!marketStatuses.has(market.id)) marketStatuses.set(market.id, admittedMarket(market).then((state) => state.status));
     return marketStatuses.get(market.id);
   };
-  const [scheduled, monitor, assignments, screening, settlements, bookingRecovery, providerEvents, operatorFees, familyAgeOut, insuranceMonitoring, marketReference, marketFleet] = await Promise.allSettled([
+  const [scheduled, monitor, assignments, screening, settlements, bookingRecovery, providerEvents, operatorFees, familyAgeOut, insuranceMonitoring, marketReference, marketFleet, accountDeletion] = await Promise.allSettled([
     sweepScheduled({ checkMarket: async (pickup) => {
       const market = marketFor(pickup);
       return market ? (await admittedMarket(market)).status : 'waitlist';
@@ -1864,6 +1891,7 @@ async function runAllSweeps() {
     sweepInsuranceMonitoring({ db: adminDb(), requestConfirmation: issueInsuranceConfirmationRequest, notify }),
     runMarketReferenceSweep({ collectors: marketReferenceCollectors() }),
     sweepPausedMarketFleet({ db: adminDb(), marketById: (id) => allMarkets().find((m) => m.id === id) }),
+    sweepAccountDeletion({ db: adminDb(), auth: adminStatus().ok ? require('firebase-admin/auth').getAuth() : null }),
   ]);
   const unwrap = (r) => (r.status === 'fulfilled' ? r.value : { ok: false, reason: String(r.reason) });
   return {
@@ -1879,6 +1907,7 @@ async function runAllSweeps() {
     insuranceMonitoring: unwrap(insuranceMonitoring),
     marketReference: unwrap(marketReference),
     marketFleet: unwrap(marketFleet),
+    accountDeletion: unwrap(accountDeletion),
   };
 }
 

@@ -566,7 +566,7 @@ export default {
     errNoAccountDelete: 'Kein angemeldetes Konto zum Löschen.',
     errPasswordMismatch: 'Dieses Passwort gehört nicht zu diesem Konto.',
     errTooManyAttempts: 'Zu viele Versuche. Warten Sie einige Minuten und versuchen Sie es erneut.',
-    errDeleteFailed: 'Das Konto konnte nicht gelöscht werden. Bestätigen Sie Ihr Passwort und versuchen Sie es erneut.',
+    errDeleteFailed: 'Die Kontolöschung konnte nicht bestätigt werden. Melden Sie sich erneut an oder wenden Sie sich an den Support. Neue Fahrten bleiben bis zur Klärung ausgesetzt.',
     errReauthenticationCancelled: 'Die Kontolöschung wurde abgebrochen. Ihr Konto bleibt bestehen.',
     deleteConfirmApple: 'Fahren Sie mit Apple fort, um dieses Konto zu bestätigen.',
     deleteConfirmGoogle: 'Fahren Sie mit Google fort, um dieses Konto zu bestätigen.',

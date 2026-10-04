@@ -582,7 +582,7 @@ export default {
     errNoAccountDelete: 'No hay ninguna cuenta con la sesión iniciada que eliminar.',
     errPasswordMismatch: 'Esa contraseña no coincide con esta cuenta.',
     errTooManyAttempts: 'Demasiados intentos. Espere unos minutos e inténtelo de nuevo.',
-    errDeleteFailed: 'No se pudo eliminar la cuenta. Confirme su contraseña e inténtelo de nuevo.',
+    errDeleteFailed: 'No se pudo confirmar la eliminación de la cuenta. Inicie sesión para reintentar o contacte con Atención. Los viajes nuevos permanecerán en pausa hasta resolverlo.',
     errReauthenticationCancelled: 'Se canceló la eliminación de la cuenta. Su cuenta permanece abierta.',
     deleteConfirmApple: 'Continúe con Apple para confirmar que esta es su cuenta.',
     deleteConfirmGoogle: 'Continúe con Google para confirmar que esta es su cuenta.',

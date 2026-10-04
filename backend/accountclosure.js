@@ -36,10 +36,11 @@ async function closeOperationalAccount({ db, uid, now = Date.now() }) {
   // after a conflict and sees closingAt. Operator assignment reads the offline fleet record.
   const fenced=await db.runTransaction(async(tx)=>{
     const fenceRef=db.collection('account_closures').doc(uid),opRef=db.collection('operators').doc(uid);
-    await tx.get(fenceRef);
+    const prior=await tx.get(fenceRef);
+    if(prior.exists&&['deleting','auth_deleted'].includes(String(prior.data()?.state)))return false;
     const op=await tx.get(opRef);
     if(op.exists&&op.data()?.currentRideId)return false;
-    tx.set(fenceRef,{closingAt:now},{merge:true});
+    tx.set(fenceRef,{closingAt:now,state:'closing',nextCheckAt:now+60_000},{merge:true});
     tx.set(opRef,{available:false,offlineAt:now,lat:null,lng:null},{merge:true});
     return true;
   });

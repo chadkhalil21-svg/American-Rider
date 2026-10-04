@@ -16,6 +16,7 @@
 // an operator off the fleet and open emergency-grade cases. Unverified, it would be an
 // unauthenticated way for anyone on the internet to do both. The route is mounted with the RAW
 // body before express.json(), because a parsed body cannot be verified.
+const { createHash } = require('node:crypto');
 const { adminDb, adminStatus } = require('./firebase-admin');
 const { fileTicket } = require('./tickets');
 const { readKey } = require('./env');
@@ -23,8 +24,9 @@ const { money } = require('./email');
 const { recordPayoutActivity } = require('./operatorfees');
 
 /**
- * Handle one verified event. Returns a short report; never throws — Stripe reads a non-2xx as
- * "retry", and retrying a crash forever is worse than recording it once.
+ * Handle one verified event. Provider-queue failures retry with a lease and end in an
+ * audited dead letter; never mark a payment dispute or account restriction done before
+ * the authoritative state/case is durable and its alert was accepted.
  */
 async function handleEvent(event) {
   const db = adminDb();
@@ -62,7 +64,7 @@ async function handleEvent(event) {
           `Evidence is due ${dueDate(obj.evidence_details?.due_by)}.\n` +
           `PaymentIntent ${obj.payment_intent}. Dispute ${obj.id}.\n` +
           (ride ? `Route: ${ride.dep} to ${ride.dest}. Operator: ${ride.operatorName}.\n` : ''),
-      });
+      }, event);
       if (ride) await mark(db, ride.id, { disputed: true, disputeId: obj.id, disputeAt: Date.now(), caseNo });
       return { ok: true, action: 'dispute opened', caseNo };
     }
@@ -96,7 +98,7 @@ async function handleEvent(event) {
             ? `THE OPERATOR HAS ALREADY BEEN PAID — transfer ${ride.transferId}. Funds are owed back.\n`
             : 'No transfer had been made.\n') +
           `PaymentIntent ${obj.payment_intent}.\n`,
-      });
+      }, event);
       if (ride) await mark(db, ride.id, { chargeFailed: true, chargeFailedAt: Date.now(), caseNo });
       return { ok: true, action: 'charge failure recorded', caseNo };
     }
@@ -123,7 +125,7 @@ async function handleEvent(event) {
           `${event.type} for ${money(obj.amount)} on account ${event.account || obj.destination || '—'}.\n` +
           `Reason: ${obj.failure_message || obj.failure_code || '—'}\nObject ${obj.id}.\n` +
           `An operator has not received money they earned.`,
-      });
+      }, event);
       return { ok: true, action: 'payout failure recorded', caseNo };
     }
 
@@ -136,8 +138,7 @@ async function handleEvent(event) {
       // AN OPERATOR STRIPE HAS RESTRICTED MUST NOT KEEP TAKING TRAVEL. They would be driving
       // for money that cannot reach them, which is the one thing the 99% promise cannot
       // survive. Removed from the dispatchable fleet, not deleted — the record stays.
-      try {
-        await db.collection('operators').doc(String(uid)).set(
+      await db.collection('operators').doc(String(uid)).set(
           {
             payoutsEnabled: enabled,
             ...(enabled ? {} : { available: false }),
@@ -146,9 +147,6 @@ async function handleEvent(event) {
           },
           { merge: true },
         );
-      } catch {
-        /* reported below by the return value, not raised */
-      }
       return { ok: true, action: enabled ? 'operator payable' : 'operator taken off duty' };
     }
 
@@ -162,47 +160,33 @@ const dueDate = (secs) =>
 
 async function rideByPaymentIntent(db, pi) {
   if (!pi) return null;
-  try {
-    const snap = await db.collection('rides').where('paymentIntentId', '==', String(pi)).get();
-    const d = snap.docs[0];
-    return d ? { id: d.id, ...d.data() } : null;
-  } catch {
-    return null;
-  }
+  const snap = await db.collection('rides').where('paymentIntentId', '==', String(pi)).limit(2).get();
+  if (snap.docs.length > 1) throw new Error('payment reference attached to multiple Travels');
+  const d = snap.docs[0];
+  return d ? { id: d.id, ...d.data() } : null;
 }
 
 async function uidByStripeAccount(db, accountId) {
   if (!accountId) return null;
-  try {
-    const snap = await db.collection('users').where('stripeAccountId', '==', String(accountId)).get();
-    return snap.docs[0]?.id || null;
-  } catch {
-    return null;
-  }
+  const snap = await db.collection('users').where('stripeAccountId', '==', String(accountId)).limit(2).get();
+  if (snap.docs.length > 1) throw new Error('Stripe account mapped to multiple Operators');
+  return snap.docs[0]?.id || null;
 }
 
-async function open(db, ride, { kind, reason, description }) {
-  try {
-    const filed = await fileTicket({
-      uid: ride?.travelerUid || null,
-      email: ride?.travelerEmail || '',
-      kind,
-      reason,
-      trip: ride?.tripNo || '',
-      description,
-    });
-    return filed?.caseNo || null;
-  } catch {
-    return null;
-  }
+async function open(db, ride, { kind, reason, description }, providerEvent) {
+  const idempotencyKey = createHash('sha256').update(String(providerEvent?.id ||
+    `${providerEvent?.type}:${providerEvent?.data?.object?.id}`)).digest('hex');
+  const filed = await fileTicket({
+    uid: ride?.travelerUid || 'stripe-system',
+    email: ride?.travelerEmail || '',
+    kind, reason, trip: ride?.tripNo || '', description, idempotencyKey,
+  });
+  if (!filed?.stored || !filed?.emailed) throw new Error('Stripe exception case not stored and alerted');
+  return filed.caseNo;
 }
 
 async function mark(db, rideId, fields) {
-  try {
-    await db.collection('rides').doc(rideId).set(fields, { merge: true });
-  } catch {
-    /* the case carries the story either way */
-  }
+  await db.collection('rides').doc(rideId).set(fields, { merge: true });
 }
 
 /** Is the webhook configured? `/health` reports it, so a silent outage is impossible. */

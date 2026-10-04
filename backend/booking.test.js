@@ -115,7 +115,7 @@ async function main() {
     const version = readiness.manifestFor(market, regionById(market.regionId)).version;
     const evidence = Object.fromEntries(readiness.REQUIRED_EVIDENCE.map((domain) => [domain, {
       reference: `external-record-${domain}`, issuer: 'Independent issuer', verifiedBy: 'named-ops',
-      reviewedAt: now - 1, validUntil: now + 86_400_000,
+      reviewedAt: now - 1, validUntil: now + 86_400_000, manifestVersion: version,
     }]));
     const core = Object.fromEntries(readiness.ONBOARDING_EVIDENCE.map((domain) => [domain, evidence[domain]]));
     live.data.set(`market_admission/${market.id}`, { status: 'onboarding', manifestVersion: version, evidence: core });

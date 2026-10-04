@@ -80,7 +80,8 @@ async function notifyByEmail(ticket) {
  * The caller must distinguish stored, emailed and neither from the returned flags.
  */
 async function fileTicket({ uid, email, description, trip, reason, kind, emergency, category, idempotencyKey }) {
-  const keyed = kind === 'emergency' && !!uid && /^[\w-]{16,100}$/.test(String(idempotencyKey || ''));
+  const keyed = (kind === 'emergency' || kind === 'support') && !!uid &&
+    /^[\w-]{16,100}$/.test(String(idempotencyKey || ''));
   const caseNo = keyed ? `AR-C-${crypto.createHash('sha256').update(`${uid}:${idempotencyKey}`).digest('hex').slice(0,24).toUpperCase()}` : newCaseNo();
   const ticket = {
     caseNo, uid: uid || null, email: email || null,
@@ -104,9 +105,9 @@ async function fileTicket({ uid, email, description, trip, reason, kind, emergen
       if (keyed) {
         const previous=await ref.get();
         if (previous.exists) {
-          if (previous.data()?.uid !== uid || previous.data()?.kind !== 'emergency') return {ok:false,caseNo:null,stored:false,emailed:false};
+          if (previous.data()?.uid !== uid || previous.data()?.kind !== kind) return {ok:false,caseNo:null,stored:false,emailed:false};
           if (previous.data()?.alertAcceptedAt) return {ok:true,caseNo,stored:true,emailed:true,repeated:true};
-          // Preserve the original emergency and its latest location during an alert retry.
+          // Preserve the original case and its latest evidence during an alert retry.
           Object.assign(ticket,previous.data());
         } else await ref.create(ticket);
       } else await ref.create(ticket);

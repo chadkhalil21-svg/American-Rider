@@ -34,6 +34,7 @@ const { perAccount, countOnly, perIp } = require('./ratelimit');
 const { marketFor, servesPoint, listMarkets, markets: allMarkets } = require('./markets');
 const { forMarket: insuranceForMarket, publicConfig: publicInsuranceConfig } = require('./insurance-jurisdictions');
 const { manifestFor, inspectMarket, recordEvidence, activateMarket, authorizeOnboarding, pauseMarket } = require('./market-readiness');
+const { setAdmittedFleetOnline, deactivateMarketFleet, sweepPausedMarketFleet } = require('./market-fleet');
 const { marketChecklistPage } = require('./market-readiness-ui');
 
 // ——— WHAT A THROWAWAY ACCOUNT MAY DO, AND HOW OFTEN ————————————————————————————
@@ -1096,8 +1097,8 @@ app.post('/operator/online', requireAuth, requireFreshAuth, requireOperationalRe
     if (b.plate !== undefined) identity.plate = String(b.plate).slice(0, 16);
     if (Array.isArray(b.classes) && b.classes.length) identity.classes = b.classes.slice(0, 6);
 
-    await db.collection('operators').doc(String(req.uid)).set(
-      {
+    const fleetRef = db.collection('operators').doc(String(req.uid));
+    const fleetUpdate = {
         uid: String(req.uid),
         ...identity,
         // Stored on the fleet record so dispatch can drop an operator whose policy runs out
@@ -1125,11 +1126,20 @@ app.post('/operator/online', requireAuth, requireFreshAuth, requireOperationalRe
         lat,
         lng,
         geohash: encodeGeohash(lat, lng),
+        marketId: marketFor({ lat, lng })?.id || null,
         available: b.available !== false,
         onlineAt: Date.now(),
-      },
-      { merge: true },
-    );
+    };
+    if (productionMode) {
+      const physical = marketFor({ lat, lng });
+      const selected = operatingMarketOf(rec) || physical;
+      if (!physical || !selected) return refuse({ code: 'market_waitlist', error: 'No admitted market at this position.' });
+      const saved = await setAdmittedFleetOnline({ db, operatorId: req.uid, fleetUpdate,
+        markets: [physical, selected], providerMissing: productionReadiness().missing });
+      if (!saved) return refuse({ code: 'market_waitlist', error: 'Operator duty was paused in this market.' });
+    } else {
+      await fleetRef.set(fleetUpdate, { merge: true });
+    }
     res.json({ ok: true, operatorId: String(req.uid), available: b.available !== false });
   } catch (e) {
     res.status(502).json({ error: e.message });
@@ -1828,8 +1838,11 @@ async function runAllSweeps() {
     if (!marketStatuses.has(market.id)) marketStatuses.set(market.id, admittedMarket(market).then((state) => state.status));
     return marketStatuses.get(market.id);
   };
-  const [scheduled, monitor, assignments, screening, settlements, bookingRecovery, providerEvents, operatorFees, familyAgeOut, insuranceMonitoring, marketReference] = await Promise.allSettled([
-    sweepScheduled({ checkMarket }),
+  const [scheduled, monitor, assignments, screening, settlements, bookingRecovery, providerEvents, operatorFees, familyAgeOut, insuranceMonitoring, marketReference, marketFleet] = await Promise.allSettled([
+    sweepScheduled({ checkMarket: async (pickup) => {
+      const market = marketFor(pickup);
+      return market ? (await admittedMarket(market)).status : 'waitlist';
+    } }),
     sweepMonitor(),
     sweepAssignments({ checkMarket }),
     sweepScreening(),
@@ -1846,6 +1859,7 @@ async function runAllSweeps() {
     family.sweepFamilyAgeOut(),
     sweepInsuranceMonitoring({ db: adminDb(), requestConfirmation: issueInsuranceConfirmationRequest, notify }),
     runMarketReferenceSweep({ collectors: marketReferenceCollectors() }),
+    sweepPausedMarketFleet({ db: adminDb(), marketById: (id) => allMarkets().find((m) => m.id === id) }),
   ]);
   const unwrap = (r) => (r.status === 'fulfilled' ? r.value : { ok: false, reason: String(r.reason) });
   return {
@@ -1860,6 +1874,7 @@ async function runAllSweeps() {
     familyAgeOut: unwrap(familyAgeOut),
     insuranceMonitoring: unwrap(insuranceMonitoring),
     marketReference: unwrap(marketReference),
+    marketFleet: unwrap(marketFleet),
   };
 }
 
@@ -2189,10 +2204,15 @@ app.post('/ops/markets/:id/evidence', requireOps, requireOpsMutation, async (req
   if (!market) return;
   if (opsAuthMode() !== 'named') return res.status(403).json({ code: 'named_ops_required' });
   try {
-    const out = await recordEvidence({ db: adminDb(), market, domain: req.body?.domain,
-      input: req.body, actor: req.opsUser });
-    if (out.ok) invalidatePublicMarkets();
-    return res.status(out.ok ? 200 : 400).json(out);
+    const region = REGIONS.find((r) => r.id === market.regionId);
+    const out = await recordEvidence({ db: adminDb(), market, region, domain: req.body?.domain,
+      input: req.body, actor: req.opsUser, expectedVersion: req.body?.manifestVersion });
+    if (!out.ok) return res.status(400).json(out);
+    invalidatePublicMarkets();
+    let fleetCleanup;
+    try { fleetCleanup = await deactivateMarketFleet({ db: adminDb(), market, maxPages: 2 }); }
+    catch (e) { fleetCleanup = { ok: false, reason: e.message, done: false }; }
+    return res.json({ ...out, fleetCleanup });
   } catch { return res.status(503).json({ code: 'market_evidence_unavailable' }); }
 });
 app.post('/ops/markets/:id/onboard', requireOps, requireOpsMutation, async (req, res) => {
@@ -2228,8 +2248,12 @@ app.post('/ops/markets/:id/pause', requireOps, requireOpsMutation, async (req, r
   if (!market) return;
   try {
     const out = await pauseMarket({ db: adminDb(), market, actor: req.opsUser, reason: req.body?.reason });
-    if (out.ok) invalidatePublicMarkets();
-    return res.status(out.ok ? 200 : 409).json(out);
+    if (!out.ok) return res.status(409).json(out);
+    invalidatePublicMarkets();
+    let fleetCleanup;
+    try { fleetCleanup = await deactivateMarketFleet({ db: adminDb(), market, maxPages: 2 }); }
+    catch (e) { fleetCleanup = { ok: false, reason: e.message, done: false }; }
+    return res.json({ ...out, fleetCleanup });
   } catch { return res.status(503).json({ code: 'market_pause_unavailable' }); }
 });
 

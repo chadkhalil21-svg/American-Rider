@@ -13,6 +13,7 @@ const now = 1_800_000_000_000;
 const evidence = Object.fromEntries(M.REQUIRED_EVIDENCE.map((id) => [id, {
   reference: `external-record-${id}`, issuer: 'Verified external authority',
   verifiedBy: 'named-ops', reviewedAt: now - 5_000, validUntil: now + 10_000,
+  manifestVersion: manifest.version,
 }]));
 const rec = { status: 'active', manifestVersion: manifest.version, evidence };
 assert.equal(M.readinessFor({ market, region, record: rec, now }).status, 'active');
@@ -43,7 +44,8 @@ function memoryDb() {
   assert.equal((await M.inspectMarket({ db, market, region, now })).status, 'waitlist');
   assert.equal((await M.activateMarket({ db, market, region, actor: 'named-ops', expectedVersion: manifest.version, now })).code, 'market_not_ready');
   for (const id of M.ONBOARDING_EVIDENCE) {
-    const out = await M.recordEvidence({ db, market, domain: id, actor: 'named-ops', now,
+    const out = await M.recordEvidence({ db, market, region, domain: id, actor: 'named-ops',
+      expectedVersion: manifest.version, now,
       input: { reference: `external-record-${id}`, issuer: 'Independent issuer', validUntil: now + 10_000 } });
     assert.deepEqual(out, { ok: true, status: 'paused' });
   }
@@ -52,17 +54,33 @@ function memoryDb() {
   assert.equal((await M.inspectMarket({ db, market, region, now })).status, 'onboarding');
   assert.equal((await M.activateMarket({ db, market, region, actor: 'named-ops', expectedVersion: manifest.version, now })).code, 'market_not_ready');
   for (const id of M.REQUIRED_EVIDENCE.filter((domain) => !M.ONBOARDING_EVIDENCE.includes(domain))) {
-    await M.recordEvidence({ db, market, domain: id, actor: 'named-ops', now,
+    await M.recordEvidence({ db, market, region, domain: id, actor: 'named-ops',
+      expectedVersion: manifest.version, now,
       input: { reference: `external-record-${id}`, issuer: 'Independent issuer', validUntil: now + 10_000 } });
   }
+  assert.equal(db.data.get(`market_admission/${market.id}`).fleetCleanupPending,true,
+    'reviewing evidence while intake is enabled pauses intake and queues fleet cleanup');
+  assert.equal((await M.inspectMarket({ db, market, region, now })).readyToActivate,false);
+  // The dedicated market-fleet test exercises cleanup; only after that work may Ops reactivate.
+  db.data.get(`market_admission/${market.id}`).fleetCleanupPending=false;
   assert.equal((await M.inspectMarket({ db, market, region, now })).readyToActivate, true);
   assert.equal((await M.activateMarket({ db, market, region, actor: 'named-ops', expectedVersion: 'stale', now })).code, 'stale_manifest');
   assert.equal((await M.activateMarket({ db, market, region, actor: 'named-ops', expectedVersion: manifest.version, now, providerMissing: ['stripe'] })).code, 'market_not_ready');
   const activated = await M.activateMarket({ db, market, region, actor: 'named-ops', expectedVersion: manifest.version, now });
   assert.equal(activated.status, 'active');
   assert.equal((await M.inspectMarket({ db, market, region, now })).status, 'active');
+  const changedRegion = { ...region, timezone: 'America/New_York-v2' };
+  const changed = M.manifestFor(market, changedRegion);
+  assert.notEqual(changed.version, manifest.version);
+  assert.equal((await M.inspectMarket({ db, market, region: changedRegion, now })).status, 'waitlist');
+  assert.equal((await M.activateMarket({ db, market, region: changedRegion, actor: 'named-ops',
+    expectedVersion: changed.version, now })).code, 'market_not_ready');
+  assert.equal((await M.recordEvidence({ db, market, region: changedRegion, domain: 'company_insurance_bound',
+    actor: 'named-ops', expectedVersion: manifest.version, now,
+    input: { reference: 'old-manifest-review', issuer: 'Independent issuer', validUntil: now+10_000 } })).code, 'stale_manifest');
   const paused = await M.pauseMarket({ db, market, actor: 'named-ops', reason: 'Carrier lapse in this market', now: now + 1 });
   assert.equal(paused.status, 'paused');
+  assert.equal(db.data.get(`market_admission/${market.id}`).fleetCleanupPending,true);
   assert.equal((await M.inspectMarket({ db, market, region, now })).status, 'waitlist');
   assert.equal(db.data.get('audit_log/audit-2')?.actor?.name, 'named-ops');
   console.log('PASS versioned market admission, expiry, production dependencies, audited evidence, activate and pause');

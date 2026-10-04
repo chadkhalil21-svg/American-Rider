@@ -2,8 +2,8 @@
   "schemaVersion": "1.0",
   "branch": "integrate/commercial-completion-2026-10-03",
   "baseSha": "f749644c862e1da128359ddf2693a95506b9b52a",
-  "candidateSha": "596f5f45af17bb4a6db510c71daa322f2f7d6e7f",
-  "generatedAt": "2026-10-04T20:55:30.967631+00:00",
+  "candidateSha": "551b72db40db360029b90864febd443430ddb1f8",
+  "generatedAt": "2026-10-04T21:08:24.806324+00:00",
   "allowedStatuses": [
     "FIXED",
     "VERIFIED ALREADY FIXED",
@@ -27,7 +27,10 @@
     "Expo Web visual evidence was limited to the unauthenticated login shell at 360/390/430 px; protected/native screens were not rendered. The temporary preview later exited with ExpoMaps native-module errors; do not certify UI/design/Android from these screenshots.",
     "At candidate working tree after 596f5f45af17bb4a6db510c71daa322f2f7d6e7f: source now has a versioned per-county admission manifest, named audited Ops evidence/intake/activation/pause, fail-closed production booking, scheduled, reoffer and Operator duty checks. backend/market-readiness.test.js, backend/market-readiness-ui.test.js, backend/sched.test.js 27/27, backend/monitor.test.js 30/30, backend/booking.test.js and npm run check passed locally. The compressed full local candidate log is completion/evidence/market-admission-candidate-check.log.gz. No market was activated or provider charged. Exact commit CI, live Firestore/Stripe/CRA/device and independent institutional evidence are NOT TESTED.",
     "A prelaunch intake stage is necessary: requiring a qualified fleet before allowing any Operator qualification is a circular launch deadlock. Seven independent institutional/provider records unlock only Operator intake; the additional fleet, release and money evidence unlock commercial activation. Market records start waitlisted. Any lapsed evidence or changed source manifest fails closed. Human records have NOT been supplied.",
-    "Stripe capture policy remains confirmed capture before offer, with unmatched-charge refund obligation. The manual authorization/capture alternative, expiry windows, supported methods, cost and consumer-hold risk are documented in completion/evidence/stripe-capture-decision.md; merchant/consumer policy and live provider evidence remain external release gates."
+    "Stripe capture policy remains confirmed capture before offer, with unmatched-charge refund obligation. The manual authorization/capture alternative, expiry windows, supported methods, cost and consumer-hold risk are documented in completion/evidence/stripe-capture-decision.md; merchant/consumer policy and live provider evidence remain external release gates.",
+    "Local Ops checklist mock rendered at 390×844 and 1440×900 with system Chromium, no horizontal overflow, 46px action controls; this is not a signed-in Ops session, actual production evidence or a mobile-native test.",
+    "Stripe dispute/Connect-event durability candidate passes local deterministic and full npm run check; actual signed provider webhooks, deliverability and human acknowledgement NOT TESTED.",
+    "Bounded independent market review found exactly F073/F074; no confirmed new paid quote, charge or offer bypass and no prelaunch intake deadlock. Both candidate source repairs and focused fake-Firestore tests are present; the complete npm run check passed locally. This is not a live-service authorization. Source/cost/control details in completion/evidence/commercial-release-runbook.md and provider-dependency-register.md."
   ],
   "records": [
     {
@@ -200,7 +203,8 @@
       "source": "coverage-and-omissions.md",
       "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
       "evidence": [
-        "Queue/outbox defects"
+        "Queue/outbox defects",
+        "Stripe handler now propagates required storage/alert failures to leased provider retry rather than silently marking the event done; local mock passes only. Actual queue/Resend/Stripe/staff drill remains NOT TESTED."
       ],
       "candidatePrs": [],
       "implementingCommit": null,
@@ -667,7 +671,8 @@
       "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
       "evidence": [
         "Inherited source review; revalidate against integration head.",
-        "Provider event sweeps prioritize due pending/expired leased events, dead-letter after 12 attempts and expose named Ops replay with transactional audit."
+        "Provider event sweeps prioritize due pending/expired leased events, dead-letter after 12 attempts and expose named Ops replay with transactional audit.",
+        "Stripe handler now propagates required storage/alert failures to leased provider retry rather than silently marking the event done; local mock passes only. Actual queue/Resend/Stripe/staff drill remains NOT TESTED."
       ],
       "candidatePrs": [],
       "implementingCommit": null,
@@ -1149,7 +1154,8 @@
       "source": "backend/providerqueue.js",
       "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
       "evidence": [
-        "Split bounded due-pending and expired-lease queries; 12-attempt dead letter and named auditable replay."
+        "Split bounded due-pending and expired-lease queries; 12-attempt dead letter and named auditable replay.",
+        "Stripe handler now propagates required storage/alert failures to leased provider retry rather than silently marking the event done; local mock passes only. Actual queue/Resend/Stripe/staff drill remains NOT TESTED."
       ],
       "candidatePrs": [
         59
@@ -1270,7 +1276,8 @@
       "source": "backend/market-readiness.js; backend/server.js; backend/booking.js; backend/scheduler.js; backend/monitor.js; app/operator/qualify.tsx",
       "sourceSha": "596f5f45af17bb4a6db510c71daa322f2f7d6e7f",
       "evidence": [
-        "Candidate two-stage market manifest, named Ops evidence audit, pre-provider waitlist gates, same-document atomic assignment/pause. No commercial county activated."
+        "Candidate two-stage market manifest, named Ops evidence audit, pre-provider waitlist gates, same-document atomic assignment/pause. No commercial county activated.",
+        "Independent P1 verification identified stale manifest-proof reuse and post-pause on-duty availability. Candidate follow-up F073/F074 repairs source/test cases; production Firestore/device and exact-SHA tests remain open."
       ],
       "candidatePrs": [
         59
@@ -1290,7 +1297,8 @@
       "source": "backend/market-readiness.js; backend/server.js; src/backend/connect.ts; app/operator/qualify.tsx",
       "sourceSha": "596f5f45af17bb4a6db510c71daa322f2f7d6e7f",
       "evidence": [
-        "Candidate prelaunch onboarding stage requires seven independent core obligations and essential provider readiness, enables only qualification/Connect/OCR/screening; no paid duty or new Travel. Unsupported counties remain cheap waitlist."
+        "Candidate prelaunch onboarding stage requires seven independent core obligations and essential provider readiness, enables only qualification/Connect/OCR/screening; no paid duty or new Travel. Unsupported counties remain cheap waitlist.",
+        "Independent P1 verification identified stale manifest-proof reuse and post-pause on-duty availability. Candidate follow-up F073/F074 repairs source/test cases; production Firestore/device and exact-SHA tests remain open."
       ],
       "candidatePrs": [
         59
@@ -1320,6 +1328,66 @@
         "No payment authority changed in this slice. No live provider/merchant fees, reserves, consumer disclosure or card-network testing."
       ],
       "releaseCondition": "Approve an explicit capture/refund/authorization policy with disclosure, economic reserve and reconciliation; execute low-value authenticated Stripe/device and bank drills before launch."
+    },
+    {
+      "id": "F072",
+      "category": "implementation-new-defect",
+      "title": "Stripe dispute, payout exception or restricted-Operator event was acknowledged after storage or alert failure",
+      "status": "NOT TESTED",
+      "owner": "Payments + Safety Operations + Engineering",
+      "source": "backend/webhook.js; backend/tickets.js; backend/providerqueue.js; backend/webhookdurability.test.js",
+      "sourceSha": "551b72db40db360029b90864febd443430ddb1f8",
+      "evidence": [
+        "Candidate change: signed provider handler retries on required Firestore reads/writes or absent durable case/accepted email; support and emergency provider cases now reuse one event-derived idempotency key. No Stripe webhook or provider email was sent in this task."
+      ],
+      "candidatePrs": [
+        59
+      ],
+      "implementingCommit": null,
+      "verification": [
+        "backend/webhookdurability.test.js PASS; backend/webhookrecovery.test.js PASS; backend/emergencyretry.test.js PASS; npm run check PASS on uncommitted candidate; compressed log completion/evidence/webhook-durable-candidate-check.log.gz. Provider ordering, actual Resend alert reception, staff acknowledgement, failed webhook retries and exact-SHA CI NOT TESTED."
+      ],
+      "releaseCondition": "Real signed Stripe test events including dispute, restricted Connect, payout failure and storage/email fault injection; deployed provider queue/index, staff alert acknowledgement and reviewed dead-letter replay evidence before commercial release."
+    },
+    {
+      "id": "F073",
+      "category": "adversarial-new-defect",
+      "title": "Old institutional evidence could activate a changed market manifest",
+      "status": "NOT TESTED",
+      "owner": "Engineering + Legal/Insurer/Market Operations",
+      "source": "backend/market-readiness.js; backend/market-readiness.test.js; backend/market-readiness-ui.js; backend/server.js",
+      "sourceSha": "551b72db40db360029b90864febd443430ddb1f8",
+      "evidence": [
+        "Independent read-only reviewer reproduced activation of a changed source manifest using unchanged prior-version proof. Candidate repair bumps admission schema to v2, binds each proof and evidence form to displayed manifest, invalidates all old-version proofs, and requires re-review before activating."
+      ],
+      "candidatePrs": [
+        59
+      ],
+      "implementingCommit": null,
+      "verification": [
+        "backend/market-readiness.test.js PASS including stale proof and stale form regression; backend/booking.test.js PASS with versioned evidence; npm run check PASS on uncommitted candidate. Deployed Ops MFA, independent physical proof, source-change drill and exact-SHA CI NOT TESTED."
+      ],
+      "releaseCondition": "Deploy reviewed manifest and Firestore rules, verify every county document against current version with independent real authority, human sign-off and a real source-drift activation denial before live service."
+    },
+    {
+      "id": "F074",
+      "category": "adversarial-new-defect",
+      "title": "A county pause could leave Operators available or an in-flight duty renewal could re-enable them",
+      "status": "NOT TESTED",
+      "owner": "Engineering + Safety/Market Operations",
+      "source": "backend/market-fleet.js; backend/market-fleet.test.js; backend/server.js; backend/market-readiness.js; firestore.indexes.json",
+      "sourceSha": "551b72db40db360029b90864febd443430ddb1f8",
+      "evidence": [
+        "Independent reviewer confirmed raw Operator availability after pause and post-check renewal race; no same-market paid-offer bypass confirmed because paid assignment already serialized with admission. Candidate repair fences final renewal in same Firestore transaction as both county records and performs bounded, resumable on-duty fleet shutdown including geo-only legacy records. Fleet cleanup pending blocks commercial reactivation."
+      ],
+      "candidatePrs": [
+        59
+      ],
+      "implementingCommit": null,
+      "verification": [
+        "backend/market-fleet.test.js PASS including a simulated Firestore transaction retry during concurrent pause, old/new fleet off-duty, unrelated county untouched; backend/market-readiness.test.js PASS; npm run check PASS locally. Actual Firestore cursor/index deployment, Operator device status, multi-instance concurrent pause, national-volume cleanup and exact-SHA CI NOT TESTED."
+      ],
+      "releaseCondition": "Deploy and await availability-query index; rehearse county pause with real on-duty fleet and concurrent renewal, check cleanup completion, live Operator device/off-duty display, no new offer, residual unknown/legacy records and staffed exception handling before activation."
     }
   ],
   "features": [
@@ -1925,6 +1993,180 @@
         "e",
         "n",
         "t",
+        ".",
+        " ",
+        "P",
+        "1",
+        " ",
+        "m",
+        "a",
+        "r",
+        "k",
+        "e",
+        "t",
+        " ",
+        "d",
+        "r",
+        "i",
+        "f",
+        "t",
+        " ",
+        "a",
+        "n",
+        "d",
+        " ",
+        "O",
+        "p",
+        "e",
+        "r",
+        "a",
+        "t",
+        "o",
+        "r",
+        " ",
+        "p",
+        "a",
+        "u",
+        "s",
+        "e",
+        " ",
+        "r",
+        "a",
+        "c",
+        "e",
+        "s",
+        " ",
+        "h",
+        "a",
+        "v",
+        "e",
+        " ",
+        "l",
+        "o",
+        "c",
+        "a",
+        "l",
+        " ",
+        "s",
+        "o",
+        "u",
+        "r",
+        "c",
+        "e",
+        "/",
+        "t",
+        "e",
+        "s",
+        "t",
+        " ",
+        "r",
+        "e",
+        "p",
+        "a",
+        "i",
+        "r",
+        "s",
+        ";",
+        " ",
+        "r",
+        "e",
+        "a",
+        "l",
+        " ",
+        "F",
+        "i",
+        "r",
+        "e",
+        "s",
+        "t",
+        "o",
+        "r",
+        "e",
+        " ",
+        "i",
+        "n",
+        "d",
+        "e",
+        "x",
+        ",",
+        " ",
+        "s",
+        "i",
+        "g",
+        "n",
+        "e",
+        "d",
+        " ",
+        "a",
+        "u",
+        "d",
+        "i",
+        "t",
+        ",",
+        " ",
+        "a",
+        "c",
+        "t",
+        "u",
+        "a",
+        "l",
+        " ",
+        "O",
+        "p",
+        "e",
+        "r",
+        "a",
+        "t",
+        "o",
+        "r",
+        " ",
+        "o",
+        "f",
+        "f",
+        "-",
+        "d",
+        "u",
+        "t",
+        "y",
+        " ",
+        "a",
+        "n",
+        "d",
+        " ",
+        "e",
+        "x",
+        "a",
+        "c",
+        "t",
+        "-",
+        "S",
+        "H",
+        "A",
+        " ",
+        "e",
+        "v",
+        "i",
+        "d",
+        "e",
+        "n",
+        "c",
+        "e",
+        " ",
+        "r",
+        "e",
+        "m",
+        "a",
+        "i",
+        "n",
+        " ",
+        "u",
+        "n",
+        "t",
+        "e",
+        "s",
+        "t",
+        "e",
+        "d",
         "."
       ],
       "withholdingReason": "Even the limited South Florida non-facility fallback lacks presented bound company TNC insurance, fully qualified real fleet, provider credentials and settlement reconciliation, 24/7 safety/support, live route/toll/drill and device/deployed-build approval.",

@@ -4,7 +4,7 @@ const { createHash } = require('node:crypto');
 const { regionAdmissionProblems } = require('./market-admission');
 const { forState: insuranceForState } = require('./insurance-jurisdictions');
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 const REQUIRED_EVIDENCE = Object.freeze([
   'jurisdiction_authority', 'company_insurance_bound', 'operator_insurance_process',
   'screening_agreement', 'disclosure_and_retention', 'pricing_and_taxes',
@@ -42,9 +42,11 @@ function manifestFor(market, region) {
 function requirementsFor(manifest, record = {}, now = Date.now(), providerMissing = [], level = 'commercial') {
   if (!manifest) return [{ id: 'source', reason: 'No configured market or service region' }];
   const missing = manifest.sourceProblems.map((reason) => ({ id: 'source', reason }));
+  if (record.fleetCleanupPending) missing.push({ id: 'fleet_cleanup', reason: 'Operator availability cleanup after a market pause has not completed' });
   for (const id of level === 'onboarding' ? ONBOARDING_EVIDENCE : REQUIRED_EVIDENCE) {
     const proof = record.evidence?.[id];
     if (!proof || typeof proof !== 'object' ||
+        proof.manifestVersion !== manifest.version ||
         !String(proof.reference || '').trim() || !String(proof.issuer || '').trim() ||
         !String(proof.verifiedBy || '').trim() ||
         !Number.isFinite(Number(proof.reviewedAt)) || Number(proof.reviewedAt) <= 0 ||
@@ -70,7 +72,7 @@ function readinessFor({ market, region, record = {}, now = Date.now(), providerM
     status: active ? 'active' : onboarding ? 'onboarding' : 'waitlist',
     storedStatus: record.status || 'waitlist', readyToOnboard: onboardingMissing.length === 0,
     readyToActivate: missing.length === 0, onboardingMissing, missing,
-    evidenceCount: REQUIRED_EVIDENCE.length,
+    evidenceCount: REQUIRED_EVIDENCE.length, fleetCleanupPending: !!record.fleetCleanupPending,
   };
 }
 
@@ -95,19 +97,25 @@ function validEvidenceInput(domain, input) {
 
 // A named, MFA-authenticated Operations user may register an externally verified reference.
 // Recording evidence pauses an active market; a separate readiness check and activation is needed.
-async function recordEvidence({ db, market, domain, input, actor, now = Date.now() }) {
+async function recordEvidence({ db, market, region, domain, input, actor, expectedVersion, now = Date.now() }) {
   const proof = validEvidenceInput(domain, input);
-  if (!db || !market || !actor || !proof || proof.validUntil <= now) return { ok: false, code: 'invalid_evidence' };
+  const manifest = manifestFor(market, region);
+  if (!db || !manifest || !actor || !proof || proof.validUntil <= now) return { ok: false, code: 'invalid_evidence' };
+  if (expectedVersion !== manifest.version) return { ok: false, code: 'stale_manifest' };
   const ref = db.collection(COLLECTION).doc(market.id);
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref); const prior = snap.exists ? snap.data() : {};
     tx.set(ref, {
-      evidence: { ...(prior.evidence || {}), [domain]: { ...proof, verifiedBy: actor, reviewedAt: now } },
+      evidence: { ...(prior.evidence || {}), [domain]: { ...proof, manifestVersion: manifest.version,
+        verifiedBy: actor, reviewedAt: now } },
       status: 'paused', updatedAt: now, updatedBy: actor,
+      ...(prior.status === 'active' || prior.status === 'onboarding'
+        ? { fleetCleanupPending: true, fleetCleanupCursor: null } : {}),
     }, { merge: true });
     tx.create(db.collection('audit_log').doc(), {
       at: now, action: 'market_evidence_recorded', marketId: market.id,
-      domain, actor: { name: actor, method: 'named_ops_mfa' }, reference: proof.reference,
+      domain, manifestVersion: manifest.version,
+      actor: { name: actor, method: 'named_ops_mfa' }, reference: proof.reference,
     });
     return { ok: true, status: 'paused' };
   });
@@ -157,7 +165,8 @@ async function pauseMarket({ db, market, actor, reason, now = Date.now() }) {
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     if (!snap.exists || !['active', 'onboarding'].includes(snap.data().status)) return { ok: false, code: 'not_active' };
-    tx.update(ref, { status: 'paused', pausedAt: now, pausedBy: actor, pauseReason: String(reason).slice(0, 500) });
+    tx.update(ref, { status: 'paused', pausedAt: now, pausedBy: actor, pauseReason: String(reason).slice(0, 500),
+      fleetCleanupPending: true, fleetCleanupCursor: null });
     tx.create(db.collection('audit_log').doc(), {
       at: now, action: 'market_paused', marketId: market.id,
       actor: { name: actor, method: 'named_ops_mfa' }, reason: String(reason).slice(0, 500),

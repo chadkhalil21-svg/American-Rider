@@ -1,6 +1,14 @@
 {
   "indexes": [
     {
+      "collectionGroup": "operators",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "available", "order": "ASCENDING" },
+        { "fieldPath": "__name__", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "rides",
       "queryScope": "COLLECTION",
       "fields": [

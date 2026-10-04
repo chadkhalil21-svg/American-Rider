@@ -31,7 +31,7 @@ const { screeningReady } = require('./screening');
 const { adminDb, adminStatus } = require('./firebase-admin');
 const { chargeScheduledTravel, verifiedTravelPayment, quote, operatorPayoutAccount, connectAccountStatus } = require('./payments');
 const { bookingId, prepareBooking, assignPaidTravel } = require('./booking');
-const { createHash } = require('node:crypto');
+const { createHash, randomUUID } = require('node:crypto');
 const { assessOperator } = require('./qualification');
 const { fileTicket } = require('./tickets');
 const { notify } = require('./push');
@@ -73,6 +73,7 @@ async function sweepScheduled({ now = Date.now() } = {}) {
   if (!db) return { ok: false, reason: adminStatus().reason, considered: 0 };
 
   const report = { ok: true, considered: 0, dispatched: [], waiting: 0, failed: [] };
+  if (!await recoverStaleClaims(db, now, report)) return { ...report, ok: false };
 
   let due;
   try {
@@ -170,9 +171,10 @@ async function sweepScheduled({ now = Date.now() } = {}) {
 
     // Family authorization is revalidated at dispatch time, not trusted from reservation time.
     if (r.party?.teen === true) {
-      const link = await activeFamilyLink({ id: r.party.familyLinkId, guardianUid: r.party.guardianUid, now });
+      const link = await activeFamilyLink({ id: r.party.familyLinkId, guardianUid: r.party.guardianUid, now: Date.now() });
       if (!link || String(link.teenUid) !== String(r.party.teenUid)) {
-        await close(db, id, 'unmatched', 'Family authorization is no longer active.');
+        await touchClaimed(db, id, claimed, {status:'unmatched',claimedAt:null,claimNonce:null,
+          closedReason:'Family authorization is no longer active.',closedAt:Date.now()});
         report.failed.push({ id, reason: 'Family authorization revoked or expired' });
         continue;
       }
@@ -199,7 +201,8 @@ async function sweepScheduled({ now = Date.now() } = {}) {
       });
       if (!assessment.eligible) {
         const first = assessment.blockers[0];
-        await touch(db, id, { claimedAt: null, lastSweepAt: now, lastSweepResult: `operator ineligible: ${first.code}` });
+        await touchClaimed(db, id, claimed, { status:'reserved', claimedAt: null, claimNonce:null,
+          lastSweepAt: now, lastSweepResult: `operator ineligible: ${first.code}` });
         await db.collection('operators').doc(String(match.operator.id)).set(
           { available: false, offDutyReason: first.code, offDutyAt: now },
           { merge: true },
@@ -208,7 +211,8 @@ async function sweepScheduled({ now = Date.now() } = {}) {
         continue;
       }
     } catch (e) {
-      await touch(db, id, { claimedAt: null, lastSweepAt: now, lastSweepResult: 'operator eligibility unavailable' });
+      await touchClaimed(db, id, claimed, { status:'reserved', claimedAt: null, claimNonce:null,
+        lastSweepAt: now, lastSweepResult: 'operator eligibility unavailable' });
       report.failed.push({ id, reason: `operator eligibility unavailable: ${e.message}` });
       continue;
     }
@@ -216,7 +220,8 @@ async function sweepScheduled({ now = Date.now() } = {}) {
     // ---- 2. Prepare one immutable Travel BEFORE moving money. ------------------------
     const fareCents = Number(r.travelCostCents);
     if (!Number.isFinite(fareCents) || fareCents <= 0) {
-      await close(db, id, 'unmatched', 'This reservation has no price on it and cannot be dispatched.');
+      await touchClaimed(db,id,claimed,{status:'unmatched',claimedAt:null,claimNonce:null,
+        closedReason:'This reservation has no price on it and cannot be dispatched.',closedAt:Date.now()});
       report.failed.push({ id, reason: 'no fare on the reservation' });
       continue;
     }
@@ -224,7 +229,8 @@ async function sweepScheduled({ now = Date.now() } = {}) {
     const billed = quote(fareCents, undefined, Array.isArray(r.feeLines) ? r.feeLines : [],
       r.cardCountry || null, tollCents).travelerPays;
     if (Number(r.costCents) !== billed) {
-      await close(db, id, 'price_changed', 'The saved fare is no longer the quoted total. No charge was made.');
+      await touchClaimed(db,id,claimed,{status:'price_changed',claimedAt:null,claimNonce:null,
+        closedReason:'The saved fare is no longer the quoted total. No charge was made.',closedAt:Date.now()});
       report.failed.push({ id, reason: 'scheduled price changed before charge' });
       continue;
     }
@@ -252,7 +258,7 @@ async function sweepScheduled({ now = Date.now() } = {}) {
         throw new Error('This scheduled booking is already closed');
       }
     } catch (e) {
-      await touch(db, id, { status: 'needs_attention', claimedAt: null,
+      await touchClaimed(db,id,claimed,{ status: 'needs_attention', claimedAt: null,claimNonce:null,
         dispatchError: `Booking could not be staged before charge: ${e.message}` });
       report.failed.push({ id, reason: `booking prepare failed; no charge: ${e.message}` });
       continue;
@@ -261,7 +267,7 @@ async function sweepScheduled({ now = Date.now() } = {}) {
     if (r.party?.teen) {
       try { await provisionTeenPin({ rideRef, rideId, party: r.party, now }); }
       catch (e) {
-        await touch(db,id,{status:'needs_attention',claimedAt:null,rideId,
+        await touchClaimed(db,id,claimed,{status:'needs_attention',claimedAt:null,claimNonce:null,rideId,
           dispatchError:`Teen pickup protection unavailable before charge: ${e.message}`});
         report.failed.push({id,reason:'Teen pickup protection unavailable; no charge'});
         continue;
@@ -269,6 +275,12 @@ async function sweepScheduled({ now = Date.now() } = {}) {
     }
 
     // ---- 3. Off-session charge with a stable provider idempotency key. ----------------
+    if (!await stillClaimed(db,id,claimed,r.party)) {
+      await touchClaimed(db,id,claimed,{status:'unmatched',claimedAt:null,claimNonce:null,
+        closedReason:'Reservation or Family authorization changed before charge.',closedAt:Date.now()});
+      report.failed.push({id,reason:'reservation or Family authorization changed; no charge requested'});
+      continue;
+    }
     const paid = await chargeScheduledTravel({
       travelCostCents: fareCents, uid: r.travelerUid, email: r.travelerEmail || '',
       tripNo: r.tripNo || '', reservationId: id, rideId, dep: r.dep || '', dest: r.dest || '',
@@ -276,8 +288,8 @@ async function sweepScheduled({ now = Date.now() } = {}) {
       cardCountry: r.cardCountry || null, tollCents,
     });
     if (!paid.ok) {
-      await touch(db, id, {
-        status: late ? 'payment_failed' : 'reserved', claimedAt: null,
+      await touchClaimed(db,id,claimed,{
+        status: late ? 'payment_failed' : 'reserved', claimedAt: null,claimNonce:null,
         lastSweepAt: now, paymentError: paid.error || 'Payment failed',
         paymentErrorCode: paid.code || 'charge_failed',
       });
@@ -295,21 +307,25 @@ async function sweepScheduled({ now = Date.now() } = {}) {
       // If this write fails, Stripe's payment_intent.succeeded webhook uses rideId metadata to
       // attach the charge to this already-existing ride; booking recovery then refunds it.
       await rideRef.set({ paymentIntentId: paid.paymentIntentId }, { merge: true });
+      if (!await stillClaimed(db,id,claimed,r.party)) {
+        throw new Error('Reservation or Family authorization changed after charge; refund is owed');
+      }
       const payment = await verifiedTravelPayment(paid.paymentIntentId);
       const assigned = await assignPaidTravel({ db, uid: r.travelerUid, rideId,
-        payment, candidate: match, now, requireScreening: screeningReady() });
+        payment, candidate: match, now:Date.now(), requireScreening: screeningReady() });
       if (assigned.status !== 200 || !assigned.body.matched) {
         throw new Error(assigned.body.code || 'Paid Travel could not reserve Operator');
       }
       taken.add(match.operator.id);
       // Transition the reservation before notifications. A push outage cannot transform a
       // correctly paid/assigned ride into a duplicate charge on a later sweep.
-      await touch(db, id, {
-        status: 'dispatched', claimedAt: null, rideId, operatorId: assigned.body.matched.id,
+      const finished = await touchClaimed(db,id,claimed,{
+        status: 'dispatched', claimedAt: null, claimNonce:null, rideId, operatorId: assigned.body.matched.id,
         operatorName: assigned.body.matched.name || '', etaMin: assigned.body.matched.etaMin,
         paymentIntentId: paid.paymentIntentId, chargedCents: paid.chargedCents,
         dispatchedAt: now, paymentError: null,
       });
+      if (!finished) throw new Error('Reservation changed after assignment; Operations reconciliation required');
       report.dispatched.push({ id, rideId, tripNo: r.tripNo || '',
         operator: assigned.body.matched.name, etaMin: assigned.body.matched.etaMin });
       try {
@@ -337,7 +353,7 @@ async function sweepScheduled({ now = Date.now() } = {}) {
     } catch (e) {
       // The charge cannot vanish into a case alone: a durable ride was staged BEFORE charging.
       // The webhook can attach its PI if this write failed; booking recovery then refunds.
-      await touch(db, id, { status: 'needs_attention', claimedAt: null, rideId,
+      await touchClaimed(db,id,claimed,{ status: 'needs_attention', claimedAt: null,claimNonce:null, rideId,
         paymentIntentId: paid.paymentIntentId, chargedCents: paid.chargedCents,
         dispatchError: e.message, dispatchErrorAt: now });
       let caseNo = null;
@@ -374,12 +390,67 @@ async function claim(db, id, now) {
       if (r.status !== 'reserved') return false;
       const held = Number(r.claimedAt) || 0;
       if (held && now - held < CLAIM_STALE_MS) return false; // somebody else has it
-      tx.update(ref, { claimedAt: now });
-      return true;
+      const nonce=randomUUID();
+      tx.update(ref, { status:'dispatching',claimedAt:now,claimNonce:nonce });
+      return nonce;
     });
   } catch {
     return false;
   }
+}
+
+async function stillClaimed(db,id,nonce,party){
+ const snap=await db.collection('scheduled_rides').doc(id).get();
+ const r=snap.exists?snap.data():null;
+ if(!r||r.status!=='dispatching'||r.claimNonce!==nonce||r.cancelRequestedAt)return false;
+ if(party?.teen){
+  const link=await activeFamilyLink({id:party.familyLinkId,guardianUid:party.guardianUid,now:Date.now()});
+  if(!link||String(link.teenUid)!==String(party.teenUid))return false;
+ }
+ return true;
+}
+
+async function touchClaimed(db,id,nonce,fields){
+ const ref=db.collection('scheduled_rides').doc(id);
+ return db.runTransaction(async tx=>{
+  const snap=await tx.get(ref);const r=snap.exists?snap.data():null;
+  if(!r||r.status!=='dispatching'||r.claimNonce!==nonce)return false;
+  tx.update(ref,fields);return true;
+ });
+}
+
+// Only a claim that never staged a Travel can be safely retried. An already-assigned ride
+// is reconstructed; ambiguous staged money goes to Operations and booking refund recovery.
+async function recoverStaleClaims(db,now,report){
+ try{
+  const q=await db.collection('scheduled_rides').where('status','==','dispatching')
+    .where('claimedAt','<=',now-CLAIM_STALE_MS).limit(25).get();
+  report.staleClaims=q.docs.length;
+  for(const d of q.docs){
+   await db.runTransaction(async tx=>{
+    const ref=db.collection('scheduled_rides').doc(d.id);
+    const snap=await tx.get(ref);const r=snap.exists?snap.data():null;
+    if(!r||r.status!=='dispatching'||Number(r.claimedAt)>now-CLAIM_STALE_MS)return;
+    const bookingKey=`scheduled-${d.id}`.padEnd(16,'_');
+    const rideId=bookingId(r.travelerUid,bookingKey);
+    const rideSnap=await tx.get(db.collection('rides').doc(rideId));
+    if(!rideSnap.exists){
+     tx.update(ref,{status:'reserved',claimedAt:null,claimNonce:null,
+       lastSweepResult:'Recovered abandoned claim before payment'});return;
+    }
+    const ride=rideSnap.data();
+    if(['assigned','accepted','arrived','onboard','completed'].includes(ride.status)&&ride.paymentIntentId){
+     tx.update(ref,{status:'dispatched',rideId,paymentIntentId:ride.paymentIntentId,
+       operatorId:ride.operatorId||null,operatorName:ride.operatorName||'',
+       claimedAt:null,claimNonce:null,dispatchedAt:ride.offeredAt||now,
+       lastSweepResult:'Recovered already-paid assigned Travel'});return;
+    }
+    tx.update(ref,{status:'needs_attention',rideId,paymentIntentId:ride.paymentIntentId||null,
+      claimedAt:null,claimNonce:null,dispatchError:'Stale claim with staged Travel: verify charge/refund before retry'});
+   });
+  }
+  return true;
+ }catch(e){report.failed.push({reason:`stale scheduled claims could not be reconciled: ${e.message}`});return false;}
 }
 
 /** Write to the reservation. Never throws — a lost note must not stop the sweep. */
@@ -393,7 +464,12 @@ async function touch(db, id, fields) {
 
 /** End the reservation with a reason the traveler can be shown verbatim. */
 async function close(db, id, status, reason) {
-  await touch(db, id, { status, claimedAt: null, closedAt: Date.now(), closedReason: reason });
+  const ref=db.collection('scheduled_rides').doc(id);
+  await db.runTransaction(async tx=>{
+   const snap=await tx.get(ref);
+   if(snap.exists&&snap.data().status==='reserved')
+    tx.update(ref,{status,claimedAt:null,claimNonce:null,closedAt:Date.now(),closedReason:reason});
+  });
 }
 
 // The interval that drives this lives in server.js, next to the route monitor, because the

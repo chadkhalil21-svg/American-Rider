@@ -1,0 +1,11 @@
+# Commercial completion checkpoint — evidence boundary
+
+**Branch:** `integrate/commercial-completion-2026-10-03`; PR #59 remains **draft** against untouched `release/current` at `f749644c862e1da128359ddf2693a95506b9b52a` when last checked. The exact pushed integration SHA is recorded in GitHub and the task response, not self-referentially inside this commit.
+
+**Observed local results:** `npm run check` passed before the final scheduled/cancellation race repairs. After those repairs, `backend/sched.test.js` passed **26/26**, `backend/travelmoney.test.js` passed **49/49**, `backend/familyrevocation.test.js` passed, and backend lint passed. The subsequent full-suite run failed only because the just-added Family test double omitted the Firestore `QueryDocumentSnapshot.ref`; that fake was repaired and its targeted test and lint passed. **The full suite has not been rerun on the final source/SHA.** Do not count previous green results as final-SHA attestation.
+
+**Adversarial findings:** two confirmed P1 races were repaired in candidate source: F067 scheduled cancellation/revocation during dispatch, and F068 cancellation using a stale pre-payment snapshot. Deterministic interleaving tests exercise both, but deployed Firestore indexes, real Stripe state, human response and physical-device behavior remain **NOT TESTED**. The source audit identified no claimed production live pilot.
+
+**Visual boundary:** 15 browser screenshots at 360×800, 390×844 and 430×932 are all unauthenticated Expo Web login shells, even for protected route URLs. They do not verify the protected screens, native iOS/Android layouts or interactions. The temporary Expo Web preview later stopped after `ExpoMaps` native-module errors; it is not a deployable preview or platform sign-off.
+
+**Commercial decision:** **NO-GO** for the whole product and even the limited adult South Florida fallback until bound insurance, real qualified Operators, signed market/facility approvals, staffed safety/financial operations, live provider/device and exact-deployed-SHA evidence are independently obtained. The feature-specific reasons and release-later requirements are in `../ledger.json`; rollback and provider obligations are in this folder. Neither this push nor CI checks authorize a merge or launch.

@@ -257,6 +257,10 @@ export type RideRecord = {
   tripNo: string;
   dep: string;
   arr: string;
+  pickupLat?: number;
+  pickupLng?: number;
+  destinationLat?: number;
+  destinationLng?: number;
   operatorName: string;
   // Which operator, not just their name — a lost item has to be routed back to the person
   // who drove the travel, and two operators can share a first name and an initial.
@@ -307,6 +311,10 @@ export async function fetchMyRides(): Promise<RideRecord[]> {
         tripNo: x.tripNo ?? '',
         dep: typeof x.dep === 'string' ? x.dep : '',
         arr: x.dest ?? '',
+        pickupLat: typeof x.pickupLat === 'number' ? x.pickupLat : undefined,
+        pickupLng: typeof x.pickupLng === 'number' ? x.pickupLng : undefined,
+        destinationLat: typeof x.destinationLat === 'number' ? x.destinationLat : undefined,
+        destinationLng: typeof x.destinationLng === 'number' ? x.destinationLng : undefined,
         operatorName: x.operatorName ?? '',
         operatorId: x.operatorId ?? '',
         totalCents: x.costCents ?? 0,

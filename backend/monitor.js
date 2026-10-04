@@ -363,6 +363,11 @@ async function readReply({ reply, stillMin, stage }) {
     return { resolved: false, urgent: false, note: `The operator's answer needs review: ${reply}` };
   };
 
+  // These words are an escalation floor, not a model suggestion. A paid classifier may
+  // contextualize ordinary traffic, but may never dismiss a reported injury or threat.
+  const deterministic = fallback();
+  if (deterministic.urgent) return deterministic;
+
   const key = readKey('ANTHROPIC_API_KEY');
   if (!key) return fallback();
 

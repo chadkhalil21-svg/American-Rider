@@ -21,6 +21,16 @@ check('a token cannot be minted while it is off',
   accessToken({ rideId: 'ride2048', side: 'traveler' }).ok === false);
 check('/health reports it, so a silent outage is impossible',
   /platformCalling: voiceReady\(\)/.test(server));
+try {
+  require.resolve('twilio');
+} catch {
+  const vars=['TWILIO_ACCOUNT_SID','TWILIO_API_KEY_SID','TWILIO_API_KEY_SECRET','TWILIO_TWIML_APP_SID'];
+  const old=Object.fromEntries(vars.map(k=>[k,process.env[k]]));
+  try {
+    for(const key of vars)process.env[key]='test-credential-not-real';
+    check('credentials alone cannot mark calling ready without the server SDK',!ready()&&/SDK not installed/.test(reason()));
+  }finally{for(const key of vars){if(old[key]===undefined)delete process.env[key];else process.env[key]=old[key];}}
+}
 
 // ---- The identity says which travel and which side, and nothing about who ---------------
 const id = identityFor('ride2048', 'traveler');

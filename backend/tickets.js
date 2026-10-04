@@ -20,16 +20,16 @@
 // /health reports whether each is actually working, so this cannot hide again.
 const { readKey } = require('./env');
 const { adminDb, adminStatus } = require('./firebase-admin');
+const crypto = require('node:crypto');
 
 // WAS: a require inside a try/catch that swallowed the reason, against a package that was
 // not in package.json — so this returned false forever and every ticket silently vanished.
 // See backend/firebase-admin.js for the full account of it.
 const db = () => adminDb();
 
-/** AR-C-XXXXXX. Short enough to read aloud, long enough not to collide. */
+/** An unguessable case id. Earlier six-digit random numbers could collide and overwrite cases. */
 function newCaseNo() {
-  const n = Math.floor(Math.random() * 1e6).toString().padStart(6, '0');
-  return `AR-C-${n}`;
+  return `AR-C-${crypto.randomBytes(8).toString('hex').toUpperCase()}`;
 }
 
 async function notifyByEmail(ticket) {
@@ -76,10 +76,12 @@ async function notifyByEmail(ticket) {
 
 /**
  * File a case. Returns { ok, caseNo }.
- * ok=false means NOBODY has been told — the caller must say that plainly.
+ * ok=true means a case was stored or an email was accepted, NOT that a person answered.
+ * The caller must distinguish stored, emailed and neither from the returned flags.
  */
-async function fileTicket({ uid, email, description, trip, reason, kind, emergency, category }) {
-  const caseNo = newCaseNo();
+async function fileTicket({ uid, email, description, trip, reason, kind, emergency, category, idempotencyKey }) {
+  const keyed = kind === 'emergency' && !!uid && /^[\w-]{16,100}$/.test(String(idempotencyKey || ''));
+  const caseNo = keyed ? `AR-C-${crypto.createHash('sha256').update(`${uid}:${idempotencyKey}`).digest('hex').slice(0,24).toUpperCase()}` : newCaseNo();
   const ticket = {
     caseNo, uid: uid || null, email: email || null,
     description: String(description || '').slice(0, 4000),
@@ -98,7 +100,16 @@ async function fileTicket({ uid, email, description, trip, reason, kind, emergen
   const d = db();
   if (d) {
     try {
-      await d.collection('support_tickets').doc(caseNo).set(ticket);
+      const ref=d.collection('support_tickets').doc(caseNo);
+      if (keyed) {
+        const previous=await ref.get();
+        if (previous.exists) {
+          if (previous.data()?.uid !== uid || previous.data()?.kind !== 'emergency') return {ok:false,caseNo:null,stored:false,emailed:false};
+          if (previous.data()?.alertAcceptedAt) return {ok:true,caseNo,stored:true,emailed:true,repeated:true};
+          // Preserve the original emergency and its latest location during an alert retry.
+          Object.assign(ticket,previous.data());
+        } else await ref.create(ticket);
+      } else await ref.create(ticket);
       stored = true;
     } catch (e) {
       failReason = `Firestore write failed: ${e.message}`;
@@ -106,6 +117,10 @@ async function fileTicket({ uid, email, description, trip, reason, kind, emergen
   }
 
   const emailed = await notifyByEmail(ticket);
+  if (emailed && stored && keyed) {
+    try { await d.collection('support_tickets').doc(caseNo).set({alertAcceptedAt:Date.now()},{merge:true}); }
+    catch { /* delivery can be duplicated on retry, but the case and need for attention remain */ }
+  }
 
   // A case is only "reaching a person" if it is somewhere a person will find it.
   // `reason` is logged rather than returned to the app: the traveler needs to know it
@@ -122,8 +137,8 @@ async function fileTicket({ uid, email, description, trip, reason, kind, emergen
 /**
  * Move an open emergency case's location on, as the vehicle moves.
  *
- * Only the traveler who opened the case may write to it — a case number is short enough to
- * guess, and nobody should be able to move somebody else's reported position.
+ * Only the traveler who opened the case may write to it. An unguessable case identifier
+ * is not authorization to move somebody else's reported position.
  *
  * Returns { ok }. Best-effort by design: the app has already told the traveler where the
  * notification stands, and a dropped update must not change that.

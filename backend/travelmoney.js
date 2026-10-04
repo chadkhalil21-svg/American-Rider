@@ -146,12 +146,10 @@ async function cancelTravel({ db, uid, rideId, deps, stripeConfigured = true, no
 
   // Before arrival: full refund. After arrival: less a $3 arrival fee paid to the operator.
   // Onboard or completed: refused, and directed to Patron Support. (Unchanged.)
-  const stage = String(ride.cancelledFrom || ride.status || '');
-  if (stage === 'onboard' || stage === 'completed') {
+  if (ride.status === 'onboard' || ride.status === 'completed') {
     return fail(409, 'This travel is already underway and cannot be cancelled. Patron Support can settle anything that went wrong with it.', 'travel_underway');
   }
   const ARRIVAL_FEE_CENTS = 300;
-  const arrivalFee = stage === 'arrived' ? ARRIVAL_FEE_CENTS : 0;
 
   // Close and release the one-Operator reservation together. A concurrent completion or
   // payment claim cannot be raced by an out-of-date read above.
@@ -177,12 +175,15 @@ async function cancelTravel({ db, uid, rideId, deps, stripeConfigured = true, no
     tx.update(rideRef, { status: 'cancelled', statusAt: now,
       cancelledFrom: current.cancelledFrom || current.status,
       refundPending: !!current.paymentIntentId });
-    return null;
+    return { current };
   });
-  if (closed) return closed;
+  if (closed.status) return closed;
+  const currentRide = closed.current;
+  const arrivalFee = String(currentRide.cancelledFrom || currentRide.status || '') === 'arrived'
+    ? ARRIVAL_FEE_CENTS : 0;
 
   // THE PAYMENT IS THE TRAVEL'S OWN. Never the request's: see the header.
-  const paymentIntentId = String(ride.paymentIntentId || '');
+  const paymentIntentId = String(currentRide.paymentIntentId || '');
   if (!paymentIntentId) return { status: 200, body: { ok: true, refunded: false, reason: 'no payment was taken' } };
   if (!stripeConfigured) return fail(500, 'No Stripe key configured');
 
@@ -218,13 +219,13 @@ async function cancelTravel({ db, uid, rideId, deps, stripeConfigured = true, no
 
   // Pay the arrival fee to the operator who was standing there. Best effort, recorded if owed.
   if (withheld > 0) {
-    const { accountId } = await deps.operatorPayoutAccount(db, ride.operatorId);
+    const { accountId } = await deps.operatorPayoutAccount(db, currentRide.operatorId);
     if (accountId) {
       const paid = await deps.transferFixed({
         paymentIntentId,
         operatorStripeAccount: accountId,
         amountCents: withheld,
-        reference: `arrival fee ${ride.tripNo || id}`,
+        reference: `arrival fee ${currentRide.tripNo || id}`,
       });
       await rideRef.set(
         paid.ok

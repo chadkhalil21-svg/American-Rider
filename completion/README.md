@@ -1,6 +1,6 @@
 # Commercial Completion Ledger
 
-`ledger.json` is the living, machine-readable disposition of inherited findings, institutional domains and intended capabilities. It began at `release/current` SHA `f749644c862e1da128359ddf2693a95506b9b52a` using the corrected prior investigation; the parent report and 14 completed workstreams live in the current Manus task's `/home/ubuntu/architecture-review/`. WS14 was missing and remains an explicit gap until written and checked. This seed is **not exhaustive certification**.
+`ledger.json` is the living, machine-readable disposition of inherited findings, institutional domains and intended capabilities. It began at `release/current` SHA `f749644c862e1da128359ddf2693a95506b9b52a` using the corrected prior investigation; the parent report and 14 completed workstreams live in the current Manus task's `/home/ubuntu/architecture-review/`. The targeted WS14 source and primary-provider review is now in `/home/ubuntu/architecture-review/lanes/WS14.md`; **deployed configuration, restore, security and release controls remain unverified**. This ledger is not exhaustive certification.
 
 ## Evidence contract
 

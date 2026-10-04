@@ -35,22 +35,26 @@ function makeDb(seed) {
     collection: (col) => ({
       doc: (id) => docRef(col, id),
       where: (field, op, val) => {
-        const rowsFor = () => Object.entries(data[col] || {}).filter(([, r]) => r[field] === val);
+        const rowsFor = (filters) => Object.entries(data[col] || {}).filter(([, r]) =>
+          filters.every(([key,comparison,value]) => comparison==='==' ? r[key]===value :
+            comparison==='<=' ? Number(r[key])<=value : comparison==='>=' ? Number(r[key])>=value : false));
         const snap = (rows) => ({
           docs: rows.map(([id, r]) => ({ id, data: () => JSON.parse(JSON.stringify(r)) })),
         });
         // Honours the bound — see the note in monitor.test.js. A double that swallowed
         // .limit(n) would let an unbounded per-tick scan pass its own test.
-        return {
-          async get() { return snap(rowsFor()); },
-          limit: (n) => ({ async get() { return snap(rowsFor().slice(0, n)); } }),
+        const query=(filters)=>({
+          where:(key,comparison,value)=>query([...filters,[key,comparison,value]]),
+          async get() { return snap(rowsFor(filters)); },
+          limit: (n) => ({ async get() { return snap(rowsFor(filters).slice(0, n)); } }),
           orderBy: (sortField) => ({
             limit: (n) => ({ async get() {
-              return snap(rowsFor().sort((a,b) => Number(a[1][sortField]) - Number(b[1][sortField])).slice(0,n));
+              return snap(rowsFor(filters).sort((a,b) => Number(a[1][sortField]) - Number(b[1][sortField])).slice(0,n));
             } }),
-            startAt: () => ({ endAt: () => ({ limit: (n) => ({ async get() { return snap(rowsFor().slice(0,n)); } }) }) }),
+            startAt: () => ({ endAt: () => ({ limit: (n) => ({ async get() { return snap(rowsFor(filters).slice(0,n)); } }) }) }),
           }),
-        };
+        });
+        return query([[field,op,val]]);
       },
       async get() {
         const rows = Object.entries(data[col] || {});
@@ -169,6 +173,43 @@ const check = (label, cond, detail) => { results.push({ label, ok: !!cond, detai
     check('  claim released', h.data.scheduled_rides.r1.claimedAt === null, h.data.scheduled_rides.r1.claimedAt);
   }
 
+  // Cancellation must not answer 200 after the worker has claimed an off-session charge.
+  {
+    const h=makeDb({scheduled_rides:{r1:base(3)},operators:FLEET,
+      users:{opA:QUALIFIED_USER('opA'),opB:QUALIFIED_USER('opB')}});
+    let acceptedCancellation=null;
+    charge=async()=>{acceptedCancellation=h.data.scheduled_rides.r1.status==='reserved';
+      return {ok:true,paymentIntentId:'pi_r1',chargedCents:2720};};
+    const rep=await inject(h.db).sweepScheduled();
+    check('claim→Traveler cancellation cannot return success while Stripe is charging',
+      acceptedCancellation===false && rep.dispatched.length===1 && h.data.scheduled_rides.r1.status==='dispatched');
+    charge=async(opts)=>({ok:true,paymentIntentId:`pi_${opts.reservationId}`,chargedCents:2720});
+  }
+  {
+    const h=makeDb({scheduled_rides:{r1:base(3)},operators:FLEET,
+      users:{opA:QUALIFIED_USER('opA'),opB:QUALIFIED_USER('opB')}});
+    charge=async()=>{h.data.scheduled_rides.r1.cancelRequestedAt=Date.now();
+      return {ok:true,paymentIntentId:'pi_r1',chargedCents:2720};};
+    const rep=await inject(h.db).sweepScheduled();
+    const ride=Object.values(h.data.rides||{})[0];
+    check('revocation during provider call never offers the charged Travel',
+      rep.dispatched.length===0 && h.data.scheduled_rides.r1.status==='needs_attention' &&
+      ride?.status==='awaiting_payment' && ride.paymentIntentId==='pi_r1' && !h.data.operators.opA.currentRideId);
+    charge=async(opts)=>({ok:true,paymentIntentId:`pi_${opts.reservationId}`,chargedCents:2720});
+  }
+  {
+    const {bookingId}=require('./booking');
+    const r=base(3,{status:'dispatching',claimedAt:Date.now()-4*MIN,claimNonce:'abandoned'});
+    const rideId=bookingId('u1','scheduled-r1'.padEnd(16,'_'));
+    const h=makeDb({scheduled_rides:{r1:r},rides:{[rideId]:{status:'awaiting_payment',paymentIntentId:'pi_orphan'}},
+      operators:FLEET,users:{opA:QUALIFIED_USER('opA'),opB:QUALIFIED_USER('opB')}});
+    let charged=0;charge=async()=>{charged++;return {ok:true,paymentIntentId:'pi_new',chargedCents:2720};};
+    const rep=await inject(h.db).sweepScheduled();
+    check('stale claim with staged money requires reconciliation, not a second off-session charge',
+      rep.staleClaims===1 && h.data.scheduled_rides.r1.status==='needs_attention' && charged===0);
+    charge=async(opts)=>({ok:true,paymentIntentId:`pi_${opts.reservationId}`,chargedCents:2720});
+  }
+
   // 4. Two reservations at once do not both get the same operator.
   {
     const h = makeDb({ scheduled_rides: { r1: base(3), r2: base(3, { tripNo: 'AR-2049-MIA' }) }, operators: FLEET, users: { opA: QUALIFIED_USER('opA'), opB: QUALIFIED_USER('opB') } });
@@ -223,7 +264,7 @@ const check = (label, cond, detail) => { results.push({ label, ok: !!cond, detai
     check('  a prepared unoffered Travel already exists before charging',
       Object.values(h.data.rides || {}).some((ride) => ride.status === 'awaiting_payment' && ride.reservationId === 'r1'));
     check('  a support case was opened automatically',
-      tickets.length === 1 && /REFUND IS OWED/.test(tickets[0].description), tickets[0]?.reason);
+      tickets.some(t=>t.reason==='Scheduled travel charged but not dispatched' && /REFUND IS OWED/.test(t.description)), tickets.at(-1)?.reason);
     check('  the case number is on the reservation', r.caseNo === 'AR-CASE-1', r.caseNo);
   }
   // 7b. A failure to create the booking occurs BEFORE charging, not after it.

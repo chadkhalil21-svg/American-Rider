@@ -1,0 +1,428 @@
+[
+  {
+    "viewport": "iphone-390x844",
+    "route": "/",
+    "screenshot": "/home/ubuntu/architecture-review/visual/iphone-390x844-home.png",
+    "metrics": {
+      "width": 390,
+      "height": 844,
+      "bodyWidth": 390,
+      "rootText": "AMERICAN RIDER\nNATIONAL TRANSPORTATION\nArrange Your Travel\n\u00a9 OpenStreetMap contributors\nDeparture\nSelect your destination\nBegin Reservation\nSchedule Travel\nEnglish\nAMERICAN RIDER\nNATIONAL TRANSPORTATION\nSafe. Reliable. American.\nContinue\nBy proceeding, you agree to our Terms of Service and Privacy Policy.\nAmerican Rider Network \u2014 Unreachable",
+      "buttons": [
+        {
+          "text": "English",
+          "aria": "Language",
+          "width": 57,
+          "height": 26
+        }
+      ]
+    },
+    "pageErrors": []
+  },
+  {
+    "viewport": "iphone-390x844",
+    "route": "/emergency",
+    "screenshot": "/home/ubuntu/architecture-review/visual/iphone-390x844-emergency.png",
+    "metrics": {
+      "width": 390,
+      "height": 844,
+      "bodyWidth": 390,
+      "rootText": "AMERICAN RIDER\nNATIONAL TRANSPORTATION\nEmergency\nRead these to the dispatcher. Your location updates as the vehicle moves.\nCall 911\nWHERE YOU ARE\nNot established\nLocation is off for American Rider. Turn it on in Settings to show your address here.\nAMERICAN RIDER\nNot reached from this device\n911 is the call that matters. American Rider can be told afterwards.\nTry again\nTRUSTED CONTACTS\nNone saved. The message below can still be sent to anyone.\nSend my location\nEnglish\nAMERICAN RIDER\nNATIONAL TRANSPORTATION\nSafe. Reliable. American.\nContinue\nBy proceeding, you agree to our Terms of Service and Privacy Policy.\nAmerican Rider Network \u2014 Unreachable",
+      "buttons": [
+        {
+          "text": "Call 911",
+          "aria": null,
+          "width": 342,
+          "height": 69
+        },
+        {
+          "text": "Try again",
+          "aria": null,
+          "width": 300,
+          "height": 46
+        },
+        {
+          "text": "Send my location",
+          "aria": null,
+          "width": 300,
+          "height": 46
+        },
+        {
+          "text": "English",
+          "aria": "Language",
+          "width": 57,
+          "height": 26
+        }
+      ]
+    },
+    "pageErrors": []
+  },
+  {
+    "viewport": "iphone-390x844",
+    "route": "/family-travel",
+    "screenshot": "/home/ubuntu/architecture-review/visual/iphone-390x844-family-travel.png",
+    "metrics": {
+      "width": 390,
+      "height": 844,
+      "bodyWidth": 390,
+      "rootText": "AMERICAN RIDER\nNATIONAL TRANSPORTATION\nTeen Travel\nTeen Traveler\nTravel Number\n\u2014\nOperator: \u2014\nShow Pickup Code\nFAMILY CONVERSATION\nNo messages in this Travel.\nSend Message\nEnglish\nAMERICAN RIDER\nNATIONAL TRANSPORTATION\nSafe. Reliable. American.\nContinue\nBy proceeding, you agree to our Terms of Service and Privacy Policy.\nAmerican Rider Network \u2014 Unreachable",
+      "buttons": [
+        {
+          "text": "English",
+          "aria": "Language",
+          "width": 57,
+          "height": 26
+        }
+      ]
+    },
+    "pageErrors": []
+  },
+  {
+    "viewport": "iphone-390x844",
+    "route": "/ride",
+    "screenshot": "/home/ubuntu/architecture-review/visual/iphone-390x844-ride.png",
+    "metrics": {
+      "width": 390,
+      "height": 844,
+      "bodyWidth": 390,
+      "rootText": "AMERICAN RIDER\nNATIONAL TRANSPORTATION\nTravel Confirmed\nPreparing your reservation.\nARRIVAL\n\u2014\nLIVE \u00b7 MIAMI\nEn Route\nArrived\nOnboard\nArrival\nTraveler Safety\n911 \u00b7 Share your travel \u00b7 Verify your operator\n\u203a\nTravel Number\nCommunicate\nPatron Support\nCancel Travel\nEnglish\nAMERICAN RIDER\nNATIONAL TRANSPORTATION\nSafe. Reliable. American.\nContinue\nBy proceeding, you agree to our Terms of Service and Privacy Policy.\nAmerican Rider Network \u2014 Unreachable",
+      "buttons": [
+        {
+          "text": "English",
+          "aria": "Language",
+          "width": 57,
+          "height": 26
+        }
+      ]
+    },
+    "pageErrors": []
+  },
+  {
+    "viewport": "iphone-390x844",
+    "route": "/operator/documents",
+    "screenshot": "/home/ubuntu/architecture-review/visual/iphone-390x844-operator-documents.png",
+    "metrics": {
+      "width": 390,
+      "height": 844,
+      "bodyWidth": 390,
+      "rootText": "\u2039 Back\nDocuments\nWhat American Rider holds for you, and what is still needed.\nDriver License\nPhotograph the front, flat and in focus.\nSubmit \u203a\nVehicle Registration\nThe current registration for the vehicle you operate.\nSubmit \u203a\nCommercial Insurance\nThe declarations page, which shows the limits and the type of use.\nSubmit \u203a\nBackground Check\nNot yet completed\nOpen \u203a\nExpiry dates are taken from the documents themselves. American Rider does not yet send a reminder before one lapses \u2014 check them yourself.\nEnglish\nAMERICAN RIDER\nNATIONAL TRANSPORTATION\nSafe. Reliable. American.\nContinue\nBy proceeding, you agree to our Terms of Service and Privacy Policy.\nAmerican Rider Network \u2014 Unreachable",
+      "buttons": [
+        {
+          "text": "Submit \u203a",
+          "aria": null,
+          "width": 288,
+          "height": 22
+        },
+        {
+          "text": "Submit \u203a",
+          "aria": null,
+          "width": 288,
+          "height": 22
+        },
+        {
+          "text": "Submit \u203a",
+          "aria": null,
+          "width": 288,
+          "height": 22
+        },
+        {
+          "text": "Open \u203a",
+          "aria": null,
+          "width": 300,
+          "height": 22
+        },
+        {
+          "text": "English",
+          "aria": "Language",
+          "width": 57,
+          "height": 26
+        }
+      ]
+    },
+    "pageErrors": []
+  },
+  {
+    "viewport": "android-360x800",
+    "route": "/",
+    "screenshot": "/home/ubuntu/architecture-review/visual/android-360x800-home.png",
+    "metrics": {
+      "width": 360,
+      "height": 800,
+      "bodyWidth": 360,
+      "rootText": "AMERICAN RIDER\nNATIONAL TRANSPORTATION\nArrange Your Travel\n\u00a9 OpenStreetMap contributors\nDeparture\nSelect your destination\nBegin Reservation\nSchedule Travel\nEnglish\nAMERICAN RIDER\nNATIONAL TRANSPORTATION\nSafe. Reliable. American.\nContinue\nBy proceeding, you agree to our Terms of Service and Privacy Policy.\nAmerican Rider Network \u2014 Unreachable",
+      "buttons": [
+        {
+          "text": "English",
+          "aria": "Language",
+          "width": 57,
+          "height": 26
+        }
+      ]
+    },
+    "pageErrors": []
+  },
+  {
+    "viewport": "android-360x800",
+    "route": "/emergency",
+    "screenshot": "/home/ubuntu/architecture-review/visual/android-360x800-emergency.png",
+    "metrics": {
+      "width": 360,
+      "height": 800,
+      "bodyWidth": 360,
+      "rootText": "AMERICAN RIDER\nNATIONAL TRANSPORTATION\nEmergency\nRead these to the dispatcher. Your location updates as the vehicle moves.\nCall 911\nWHERE YOU ARE\nNot established\nLocation is off for American Rider. Turn it on in Settings to show your address here.\nAMERICAN RIDER\nNot reached from this device\n911 is the call that matters. American Rider can be told afterwards.\nTry again\nTRUSTED CONTACTS\nNone saved. The message below can still be sent to anyone.\nSend my location\nEnglish\nAMERICAN RIDER\nNATIONAL TRANSPORTATION\nSafe. Reliable. American.\nContinue\nBy proceeding, you agree to our Terms of Service and Privacy Policy.\nAmerican Rider Network \u2014 Unreachable",
+      "buttons": [
+        {
+          "text": "Call 911",
+          "aria": null,
+          "width": 312,
+          "height": 69
+        },
+        {
+          "text": "Try again",
+          "aria": null,
+          "width": 270,
+          "height": 46
+        },
+        {
+          "text": "Send my location",
+          "aria": null,
+          "width": 270,
+          "height": 46
+        },
+        {
+          "text": "English",
+          "aria": "Language",
+          "width": 57,
+          "height": 26
+        }
+      ]
+    },
+    "pageErrors": []
+  },
+  {
+    "viewport": "android-360x800",
+    "route": "/family-travel",
+    "screenshot": "/home/ubuntu/architecture-review/visual/android-360x800-family-travel.png",
+    "metrics": {
+      "width": 360,
+      "height": 800,
+      "bodyWidth": 360,
+      "rootText": "AMERICAN RIDER\nNATIONAL TRANSPORTATION\nTeen Travel\nTeen Traveler\nTravel Number\n\u2014\nOperator: \u2014\nShow Pickup Code\nFAMILY CONVERSATION\nNo messages in this Travel.\nSend Message\nEnglish\nAMERICAN RIDER\nNATIONAL TRANSPORTATION\nSafe. Reliable. American.\nContinue\nBy proceeding, you agree to our Terms of Service and Privacy Policy.\nAmerican Rider Network \u2014 Unreachable",
+      "buttons": [
+        {
+          "text": "English",
+          "aria": "Language",
+          "width": 57,
+          "height": 26
+        }
+      ]
+    },
+    "pageErrors": []
+  },
+  {
+    "viewport": "android-360x800",
+    "route": "/ride",
+    "screenshot": "/home/ubuntu/architecture-review/visual/android-360x800-ride.png",
+    "metrics": {
+      "width": 360,
+      "height": 800,
+      "bodyWidth": 360,
+      "rootText": "AMERICAN RIDER\nNATIONAL TRANSPORTATION\nTravel Confirmed\nPreparing your reservation.\nARRIVAL\n\u2014\nLIVE \u00b7 MIAMI\nEn Route\nArrived\nOnboard\nArrival\nTraveler Safety\n911 \u00b7 Share your travel \u00b7 Verify your operator\n\u203a\nTravel Number\nCommunicate\nPatron Support\nCancel Travel\nEnglish\nAMERICAN RIDER\nNATIONAL TRANSPORTATION\nSafe. Reliable. American.\nContinue\nBy proceeding, you agree to our Terms of Service and Privacy Policy.\nAmerican Rider Network \u2014 Unreachable",
+      "buttons": [
+        {
+          "text": "English",
+          "aria": "Language",
+          "width": 57,
+          "height": 26
+        }
+      ]
+    },
+    "pageErrors": []
+  },
+  {
+    "viewport": "android-360x800",
+    "route": "/operator/documents",
+    "screenshot": "/home/ubuntu/architecture-review/visual/android-360x800-operator-documents.png",
+    "metrics": {
+      "width": 360,
+      "height": 800,
+      "bodyWidth": 360,
+      "rootText": "\u2039 Back\nDocuments\nWhat American Rider holds for you, and what is still needed.\nDriver License\nPhotograph the front, flat and in focus.\nSubmit \u203a\nVehicle Registration\nThe current registration for the vehicle you operate.\nSubmit \u203a\nCommercial Insurance\nThe declarations page, which shows the limits and the type of use.\nSubmit \u203a\nBackground Check\nNot yet completed\nOpen \u203a\nExpiry dates are taken from the documents themselves. American Rider does not yet send a reminder before one lapses \u2014 check them yourself.\nEnglish\nAMERICAN RIDER\nNATIONAL TRANSPORTATION\nSafe. Reliable. American.\nContinue\nBy proceeding, you agree to our Terms of Service and Privacy Policy.\nAmerican Rider Network \u2014 Unreachable",
+      "buttons": [
+        {
+          "text": "Submit \u203a",
+          "aria": null,
+          "width": 258,
+          "height": 22
+        },
+        {
+          "text": "Submit \u203a",
+          "aria": null,
+          "width": 258,
+          "height": 22
+        },
+        {
+          "text": "Submit \u203a",
+          "aria": null,
+          "width": 258,
+          "height": 22
+        },
+        {
+          "text": "Open \u203a",
+          "aria": null,
+          "width": 270,
+          "height": 22
+        },
+        {
+          "text": "English",
+          "aria": "Language",
+          "width": 57,
+          "height": 26
+        }
+      ]
+    },
+    "pageErrors": []
+  },
+  {
+    "viewport": "large-430x932",
+    "route": "/",
+    "screenshot": "/home/ubuntu/architecture-review/visual/large-430x932-home.png",
+    "metrics": {
+      "width": 430,
+      "height": 932,
+      "bodyWidth": 430,
+      "rootText": "AMERICAN RIDER\nNATIONAL TRANSPORTATION\nArrange Your Travel\n\u00a9 OpenStreetMap contributors\nDeparture\nSelect your destination\nBegin Reservation\nSchedule Travel\nEnglish\nAMERICAN RIDER\nNATIONAL TRANSPORTATION\nSafe. Reliable. American.\nContinue\nBy proceeding, you agree to our Terms of Service and Privacy Policy.\nAmerican Rider Network \u2014 Unreachable",
+      "buttons": [
+        {
+          "text": "English",
+          "aria": "Language",
+          "width": 57,
+          "height": 26
+        }
+      ]
+    },
+    "pageErrors": []
+  },
+  {
+    "viewport": "large-430x932",
+    "route": "/emergency",
+    "screenshot": "/home/ubuntu/architecture-review/visual/large-430x932-emergency.png",
+    "metrics": {
+      "width": 430,
+      "height": 932,
+      "bodyWidth": 430,
+      "rootText": "AMERICAN RIDER\nNATIONAL TRANSPORTATION\nEmergency\nRead these to the dispatcher. Your location updates as the vehicle moves.\nCall 911\nWHERE YOU ARE\nNot established\nLocation is off for American Rider. Turn it on in Settings to show your address here.\nAMERICAN RIDER\nNot reached from this device\n911 is the call that matters. American Rider can be told afterwards.\nTry again\nTRUSTED CONTACTS\nNone saved. The message below can still be sent to anyone.\nSend my location\nEnglish\nAMERICAN RIDER\nNATIONAL TRANSPORTATION\nSafe. Reliable. American.\nContinue\nBy proceeding, you agree to our Terms of Service and Privacy Policy.\nAmerican Rider Network \u2014 Unreachable",
+      "buttons": [
+        {
+          "text": "Call 911",
+          "aria": null,
+          "width": 382,
+          "height": 69
+        },
+        {
+          "text": "Try again",
+          "aria": null,
+          "width": 340,
+          "height": 46
+        },
+        {
+          "text": "Send my location",
+          "aria": null,
+          "width": 340,
+          "height": 46
+        },
+        {
+          "text": "English",
+          "aria": "Language",
+          "width": 57,
+          "height": 26
+        }
+      ]
+    },
+    "pageErrors": []
+  },
+  {
+    "viewport": "large-430x932",
+    "route": "/family-travel",
+    "screenshot": "/home/ubuntu/architecture-review/visual/large-430x932-family-travel.png",
+    "metrics": {
+      "width": 430,
+      "height": 932,
+      "bodyWidth": 430,
+      "rootText": "AMERICAN RIDER\nNATIONAL TRANSPORTATION\nTeen Travel\nTeen Traveler\nTravel Number\n\u2014\nOperator: \u2014\nShow Pickup Code\nFAMILY CONVERSATION\nNo messages in this Travel.\nSend Message\nEnglish\nAMERICAN RIDER\nNATIONAL TRANSPORTATION\nSafe. Reliable. American.\nContinue\nBy proceeding, you agree to our Terms of Service and Privacy Policy.\nAmerican Rider Network \u2014 Unreachable",
+      "buttons": [
+        {
+          "text": "English",
+          "aria": "Language",
+          "width": 57,
+          "height": 26
+        }
+      ]
+    },
+    "pageErrors": []
+  },
+  {
+    "viewport": "large-430x932",
+    "route": "/ride",
+    "screenshot": "/home/ubuntu/architecture-review/visual/large-430x932-ride.png",
+    "metrics": {
+      "width": 430,
+      "height": 932,
+      "bodyWidth": 430,
+      "rootText": "AMERICAN RIDER\nNATIONAL TRANSPORTATION\nTravel Confirmed\nPreparing your reservation.\nARRIVAL\n\u2014\nLIVE \u00b7 MIAMI\nEn Route\nArrived\nOnboard\nArrival\nTraveler Safety\n911 \u00b7 Share your travel \u00b7 Verify your operator\n\u203a\nTravel Number\nCommunicate\nPatron Support\nCancel Travel\nEnglish\nAMERICAN RIDER\nNATIONAL TRANSPORTATION\nSafe. Reliable. American.\nContinue\nBy proceeding, you agree to our Terms of Service and Privacy Policy.\nAmerican Rider Network \u2014 Unreachable",
+      "buttons": [
+        {
+          "text": "English",
+          "aria": "Language",
+          "width": 57,
+          "height": 26
+        }
+      ]
+    },
+    "pageErrors": []
+  },
+  {
+    "viewport": "large-430x932",
+    "route": "/operator/documents",
+    "screenshot": "/home/ubuntu/architecture-review/visual/large-430x932-operator-documents.png",
+    "metrics": {
+      "width": 430,
+      "height": 932,
+      "bodyWidth": 430,
+      "rootText": "\u2039 Back\nDocuments\nWhat American Rider holds for you, and what is still needed.\nDriver License\nPhotograph the front, flat and in focus.\nSubmit \u203a\nVehicle Registration\nThe current registration for the vehicle you operate.\nSubmit \u203a\nCommercial Insurance\nThe declarations page, which shows the limits and the type of use.\nSubmit \u203a\nBackground Check\nNot yet completed\nOpen \u203a\nExpiry dates are taken from the documents themselves. American Rider does not yet send a reminder before one lapses \u2014 check them yourself.\nEnglish\nAMERICAN RIDER\nNATIONAL TRANSPORTATION\nSafe. Reliable. American.\nContinue\nBy proceeding, you agree to our Terms of Service and Privacy Policy.\nAmerican Rider Network \u2014 Unreachable",
+      "buttons": [
+        {
+          "text": "Submit \u203a",
+          "aria": null,
+          "width": 328,
+          "height": 22
+        },
+        {
+          "text": "Submit \u203a",
+          "aria": null,
+          "width": 328,
+          "height": 22
+        },
+        {
+          "text": "Submit \u203a",
+          "aria": null,
+          "width": 328,
+          "height": 22
+        },
+        {
+          "text": "Open \u203a",
+          "aria": null,
+          "width": 340,
+          "height": 22
+        },
+        {
+          "text": "English",
+          "aria": "Language",
+          "width": 57,
+          "height": 26
+        }
+      ]
+    },
+    "pageErrors": []
+  }
+]

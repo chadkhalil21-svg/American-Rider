@@ -112,7 +112,7 @@ const { sweepBookingRecovery } = require('./bookingrecovery');
 const { sweepMonitor, sweepAssignments } = require('./monitor');
 const { notify } = require('./push');
 const { handleEvent, webhookReady } = require('./webhook');
-const { enqueueProviderEvent, processProviderEvent, sweepProviderEvents } = require('./providerqueue');
+const { enqueueProviderEvent, processProviderEvent, sweepProviderEvents, replayDeadEvent } = require('./providerqueue');
 const { acquireLease, renewLease, releaseLease, DEFAULT_LEASE_MS } = require('./schedulerlease');
 const { sweepOperatorAccountFees } = require('./operatorfees');
 const crypto = require('node:crypto');
@@ -714,6 +714,21 @@ app.post('/ops/support/cases/:caseNo/resolve', requireOps, async (req, res) => {
     actor: req.opsUser || req.user?.email || 'operations',
   });
   return res.status(out.ok ? 200 : out.reason === 'not found' ? 404 : 400).json(out);
+});
+
+app.get('/ops/provider-events/dead', requireOps, async(req,res)=>{
+  const db=adminDb();if(!db)return res.status(503).json({error:adminStatus().reason});
+  try{
+    const snap=await db.collection('provider_events').where('status','==','dead').orderBy('deadAt','desc').limit(50).get();
+    return res.json({events:snap.docs.map((d)=>({id:d.id,provider:d.data().provider,
+      eventId:d.data().eventId,attempts:d.data().attempts,lastError:d.data().lastError,
+      receivedAt:d.data().receivedAt,deadAt:d.data().deadAt})),saturated:snap.docs.length===50});
+  }catch{return res.status(503).json({error:'Dead-letter inbox is unavailable'});}
+});
+app.post('/ops/provider-events/:id/replay',requireOps,async(req,res)=>{
+  try{const out=await replayDeadEvent({id:req.params.id,actor:req.opsUser});
+    return res.status(out.ok?200:409).json(out);
+  }catch{return res.status(503).json({error:'Provider event replay is unavailable'});}
 });
 
 // Family / Teen Travel: guardian-created relationship, accepted by the teen account.
@@ -1385,6 +1400,7 @@ app.post('/emergency', requireAuth, LIMITS.emergency, async (req, res) => {
     uid: req.uid,
     email: req.email,
     kind: 'emergency',
+    idempotencyKey: String(b.requestId || ''),
     emergency,
     trip,
     reason: 'Traveler opened the emergency screen.',
@@ -1396,7 +1412,8 @@ app.post('/emergency', requireAuth, LIMITS.emergency, async (req, res) => {
       (emergency.coords ? ` (${emergency.coords.lat}, ${emergency.coords.lng})` : ''),
   });
 
-  res.json({ ok: filed.ok, caseNo: filed.caseNo, stored: filed.stored, emailed: filed.emailed });
+  res.json({ ok: filed.stored && filed.emailed, caseNo: filed.caseNo,
+    stored: filed.stored, emailed: filed.emailed, repeated: filed.repeated === true });
 });
 
 // --- Emergency: the vehicle has moved. ----------------------------------------------------

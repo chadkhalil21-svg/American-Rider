@@ -35,17 +35,46 @@ async function acceptFamilyInvite({id,inviteToken,teenUid,teenEmail,emailVerifie
  });
 }
 async function revokeFamilyLink({id,guardianUid,now=Date.now()}){
- const db=adminDb();if(!db)return {ok:false,reason:adminStatus().reason};const ref=db.collection(COLLECTION).doc(String(id));const s=await ref.get();if(!s.exists||String(s.data()?.guardianUid)!==String(guardianUid))return {ok:false,reason:'not authorized'};
- await ref.set({status:'revoked',revokedAt:now,updatedAt:now},{merge:true});
+ const db=adminDb();if(!db)return {ok:false,reason:adminStatus().reason};const ref=db.collection(COLLECTION).doc(String(id));
+ const revoked=await db.runTransaction(async tx=>{
+  const s=await tx.get(ref);if(!s.exists||String(s.data()?.guardianUid)!==String(guardianUid))return false;
+  tx.set(ref,{status:'revoked',revokedAt:now,updatedAt:now},{merge:true});return true;
+ });
+ if(!revoked)return {ok:false,reason:'not authorized'};
  // Revocation governs future Teen Travel. A Teen already onboard is never stranded by
  // administrative relationship changes; underway Travels retain their existing safety envelope.
- const q=await db.collection('scheduled_rides').where('status','==','reserved').get();
- let cancelledScheduledTravels=0;
- for(const d of q.docs){const r=d.data()||{};if(r.party?.teen===true&&String(r.party?.familyLinkId)===String(id)){
-   await d.ref.set({status:'cancelled',cancelledAt:now,closedReason:'Family authorization revoked.'},{merge:true});
-   cancelledScheduledTravels++;
- }}
- return {ok:true,cancelledScheduledTravels};
+ let cancelledScheduledTravels=0,pendingScheduledTravels=0;
+ for(let page=0;page<20;page++){
+  const q=await db.collection('scheduled_rides').where('party.familyLinkId','==',String(id)).where('status','==','reserved').limit(100).get();
+  if(!q.docs.length)break;
+  for(const d of q.docs){
+   const disposition=await db.runTransaction(async tx=>{
+    const current=await tx.get(d.ref);const row=current.exists?current.data():null;
+    if(String(row?.party?.familyLinkId)!==String(id))return 'unchanged';
+    if(row.status==='reserved'){
+     tx.update(d.ref,{status:'cancelled',cancelledAt:now,closedReason:'Family authorization revoked.'});return 'cancelled';
+    }
+    if(row.status==='dispatching'){
+     tx.update(d.ref,{cancelRequestedAt:now,closedReason:'Family authorization revoked during dispatch.'});return 'pending';
+    }
+    return 'unchanged';
+   });
+   if(disposition==='cancelled')cancelledScheduledTravels++;
+   if(disposition==='pending')pendingScheduledTravels++;
+  }
+ }
+ const active=await db.collection('scheduled_rides').where('party.familyLinkId','==',String(id)).where('status','==','dispatching').limit(100).get();
+ for(const d of active.docs){
+  const pending=await db.runTransaction(async tx=>{
+   const s=await tx.get(d.ref);if(!s.exists||s.data().status!=='dispatching'||String(s.data().party?.familyLinkId)!==String(id)||s.data().cancelRequestedAt)return false;
+   tx.update(d.ref,{cancelRequestedAt:now,closedReason:'Family authorization revoked during dispatch.'});return true;
+  });
+  if(pending)pendingScheduledTravels++;
+ }
+ const remaining=await db.collection('scheduled_rides').where('party.familyLinkId','==',String(id)).where('status','==','reserved').limit(1).get();
+ const overCapacity=active.docs.length===100||remaining.docs.length>0;
+ return {ok:!overCapacity,cancelledScheduledTravels,pendingScheduledTravels,
+  ...(overCapacity?{reason:'Family authorization revoked, but scheduled reservations require Operations reconciliation'}:{})};
 }
 async function listFamilyLinks({uid,now=Date.now()}){const db=adminDb();if(!db)return {ok:false,reason:adminStatus().reason};const [g,t]=await Promise.all([db.collection(COLLECTION).where('guardianUid','==',String(uid)).get(),db.collection(COLLECTION).where('teenUid','==',String(uid)).get()]);const seen=new Map();for(const d of [...g.docs,...t.docs]){const x={id:d.id,...d.data()};seen.set(d.id,{id:d.id,status:x.status,role:String(x.guardianUid)===String(uid)?'guardian':'teen',guardianName:x.guardianName,teenName:x.teenName,eligible:x.status==='active'&&ageOn(x.teenDob,now)>=MIN_AGE&&ageOn(x.teenDob,now)<=MAX_AGE,inviteExpiresAt:x.status==='invited'?x.inviteExpiresAt:null});}return {ok:true,links:[...seen.values()]};}
 async function activeFamilyLink({id,guardianUid=null,teenUid=null,now=Date.now()}){

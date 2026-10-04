@@ -38,8 +38,12 @@ const API_KEY = () => readKey('TWILIO_API_KEY_SID');
 const API_SECRET = () => readKey('TWILIO_API_KEY_SECRET');
 const TWIML_APP = () => readKey('TWILIO_TWIML_APP_SID');
 
+function serverSdkPresent() {
+  try { require.resolve('twilio'); return true; } catch { return false; }
+}
+
 /** Is platform calling configured at all? `/health` reports this so a silent outage cannot happen. */
-const ready = () => !!(SID() && API_KEY() && API_SECRET() && TWIML_APP());
+const ready = () => !!(SID() && API_KEY() && API_SECRET() && TWIML_APP() && serverSdkPresent());
 
 /** Why it is off, in words a founder can act on rather than a boolean. */
 function reason() {
@@ -49,8 +53,9 @@ function reason() {
     !API_KEY() && 'TWILIO_API_KEY_SID',
     !API_SECRET() && 'TWILIO_API_KEY_SECRET',
     !TWIML_APP() && 'TWILIO_TWIML_APP_SID',
+    !serverSdkPresent() && 'Twilio server SDK not installed',
   ].filter(Boolean);
-  return `Platform calling is not configured: ${missing.join(', ')} not set.`;
+  return `Platform calling is not configured: ${missing.join(', ')}.`;
 }
 
 /**

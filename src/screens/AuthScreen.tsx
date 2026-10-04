@@ -49,6 +49,9 @@ function InkButton({
     <Pressable
       onPress={onPress}
       disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !!disabled }}
       style={({ pressed }) => [
         s.btn,
         disabled ? s.btnDisabled : s.btnInk,
@@ -143,6 +146,8 @@ function GhostButton({ label, onPress }: { label: string; onPress: () => void })
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
       style={({ pressed }) => [s.btn, s.btnGhost, pressed && { opacity: 0.86 }]}
     >
       <Text style={[s.btnText, s.btnTextGhost]}>{label}</Text>
@@ -327,6 +332,9 @@ export function AuthScreen() {
             {languages.map((l, i) => (
               <Pressable
                 key={l.code}
+                accessibilityRole="button"
+                accessibilityLabel={l.label}
+                accessibilityState={{ selected: l.code === language }}
                 onPress={() => {
                   setLanguage(l.code);
                   setLangOpen(false);

@@ -1,5 +1,6 @@
 const { createHash } = require('node:crypto');
 const { matchOperator } = require('./matching');
+const { ageOn, MIN_AGE, MAX_AGE } = require('./family');
 
 const deny = (status, code, error) => ({ status, body: { ok: false, code, error } });
 const digest = (value) => createHash('sha256').update(String(value)).digest('hex');
@@ -59,6 +60,18 @@ async function assignPaidTravel({ db, uid, rideId, payment, candidate, now = Dat
     if (String(ride.travelerUid) !== String(uid)) return deny(403, 'not_yours', 'This Travel belongs to another Traveler');
     if (ride.party?.teen && (!ride.teenPickup?.required || !/^[0-9a-f]{64}$/.test(String(ride.teenPickup.hash || '')))) {
       return deny(409, 'teen_pin_unavailable', 'Teen pickup code has not been securely prepared');
+    }
+    if (ride.party?.teen && !ride.party.continuedFromJourneyNo) {
+      const linkId = String(ride.party.familyLinkId || '');
+      if (!linkId) return deny(409, 'family_authorization_required', 'Family authorization is not available');
+      const linkSnap = await tx.get(db.collection('family_links').doc(linkId));
+      const link = linkSnap.exists ? linkSnap.data() : null;
+      const age = ageOn(link?.teenDob, now);
+      if (!link || link.status !== 'active' || age === null || age < MIN_AGE || age > MAX_AGE ||
+          String(link.guardianUid) !== String(ride.party.guardianUid) ||
+          String(link.teenUid) !== String(ride.party.teenUid)) {
+        return deny(409, 'family_authorization_revoked', 'Family authorization is no longer active');
+      }
     }
     if (ride.status === 'assigned' && ride.operatorId && !ride.releasedAt) {
       if (!paymentMatches(ride, payment, uid, rideId)) return deny(409, 'payment_unconfirmed', 'Payment is not confirmed for this Travel');

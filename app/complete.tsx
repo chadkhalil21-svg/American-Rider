@@ -109,9 +109,9 @@ export default function TravelComplete() {
         <View style={styles.factRow}>
           <Text style={styles.factLabel}>
             {ride.payment.status === 'paid'
-              ? 'Total Charged'
+              ? t('traveler.totalCharged')
               : ride.payment.status === 'failed'
-                ? 'Total Due'
+                ? t('traveler.totalDue')
                 : t('traveler.totalPaymentInProgress')}
           </Text>
           <Num size={15} weight="600">
@@ -181,7 +181,7 @@ export default function TravelComplete() {
           />
         ) : (
           <PrimaryButton
-            label={saving ? t('traveler.busySaving') : 'Complete'}
+            label={saving ? t('traveler.busySaving') : t('traveler.complete')}
             onPress={() => finish()}
             disabled={saving}
             style={{ marginTop: 11 }}

@@ -82,6 +82,21 @@ async function main() {
   assert.equal(db.data.get('operators/operator-1').currentRideId, null);
   assert.equal(db.data.get('operators/operator-2').currentRideId, id);
   assert.deepEqual(db.data.get(`rides/${id}`).declinedBy, [operator.id]);
+  const teen = await prepareBooking({ db, uid: 'guardian', key:'teen-booking-uuid-0001',
+    fingerprint:'teen-route', record:{...quote,party:{teen:true,familyLinkId:'family-1',guardianUid:'guardian',teenUid:'teen'}}, now });
+  const teenId=teen.body.rideId;
+  db.data.set(`rides/${teenId}`,{...db.data.get(`rides/${teenId}`),paymentIntentId:`pi_${teenId}`,
+    teenPickup:{required:true,hash:'a'.repeat(64)}});
+  db.data.set('family_links/family-1',{status:'active',guardianUid:'guardian',teenUid:'teen',
+    teenDob:new Date(now-15*365*86400000).toISOString().slice(0,10)});
+  const pendingTeen=await assignPaidTravel({db,uid:'guardian',rideId:teenId,
+    payment:provider(teenId,'guardian'),candidate:null,now});
+  assert.equal(pendingTeen.status,200);
+  db.data.set('family_links/family-1',{...db.data.get('family_links/family-1'),status:'revoked'});
+  const revokedTeen=await assignPaidTravel({db,uid:'guardian',rideId:teenId,
+    payment:provider(teenId,'guardian'),candidate:null,now:now+1});
+  assert.equal(revokedTeen.body.code,'family_authorization_revoked');
+  assert.equal(db.data.get(`rides/${teenId}`).status,'awaiting_assignment');
   console.log('PASS canonical paid booking, ownership, amount, idempotency and one-Operator capacity');
 }
 main().catch((error) => { console.error(error); process.exitCode = 1; });

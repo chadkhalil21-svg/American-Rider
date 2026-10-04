@@ -201,6 +201,8 @@ export type RideStore = {
   /** True while the travel is being re-priced after the pickup moved. */
   repricing: boolean;
   startBooking: (arrival?: Place) => void; // seeds trip prefs + fresh quote
+  /** Reverse a completed Travel with saved real endpoints; no earlier fare or charge is reused. */
+  startReturnBooking: (tripNo: string) => boolean;
 
   // live ride
   status: number; // 0..5
@@ -676,6 +678,21 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     },
     [defaultPrefs],
   );
+
+  const startReturnBooking = useCallback((tripNo: string): boolean => {
+    const previous = myRides.find((r) => r.tripNo === tripNo && r.status === 'completed');
+    if (!previous?.dep || !previous.arr ||
+        !Number.isFinite(previous.pickupLat) || !Number.isFinite(previous.pickupLng) ||
+        !Number.isFinite(previous.destinationLat) || !Number.isFinite(previous.destinationLng)) return false;
+    const pickup = { lat: previous.destinationLat as number, lng: previous.destinationLng as number };
+    const dest = { lat: previous.pickupLat as number, lng: previous.pickupLng as number };
+    // Book a distinct Travel through the same server quote → payment → offer path. The
+    // traveler must confirm the precise pickup and current price on the Reserve screen.
+    startBooking({name:previous.dep,short:previous.dep,cost:0,meta:'',...dest});
+    setDeparture({name:previous.arr,short:previous.arr,...pickup,resolved:false});
+    setTripCoords({pickup,dest});
+    return true;
+  },[myRides,startBooking]);
 
   const refreshMyRides = useCallback(async () => {
     try {
@@ -1625,6 +1642,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     pickupWait,
     demand,
     startBooking,
+    startReturnBooking,
     status,
     rideActive,
     confirmRide,

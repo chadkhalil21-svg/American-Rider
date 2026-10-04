@@ -17,6 +17,7 @@
 // pickup address — a confidently wrong address is worse than an admitted blank, because the
 // dispatcher would send help to it.
 import * as Location from 'expo-location';
+import * as Crypto from 'expo-crypto';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Linking, Platform, Pressable, Share, StyleSheet, View } from 'react-native';
 import { Text } from '../src/components/AppText';
@@ -79,9 +80,11 @@ export default function Emergency() {
 
   const [fix, setFix] = useState<Fix | null>(null);
   const [locationDenied, setLocationDenied] = useState(false);
-  const [notify, setNotify] = useState<{ state: 'sending' | 'sent' | 'failed'; caseNo: string | null }>(
+  const [notify, setNotify] = useState<{ state: 'sending' | 'sent' | 'recorded' | 'failed'; caseNo: string | null }>(
     { state: 'sending', caseNo: null },
   );
+  const [requestId] = useState(() => Crypto.randomUUID());
+  const alertBusy = useRef(false);
   const [contacts, setContacts] = useState<TrustedContact[]>([]);
   const [contactStatus, setContactStatus] = useState<string | null>(null);
 
@@ -162,11 +165,12 @@ export default function Emergency() {
   // ---- 2. Tell American Rider, once, on arrival at this screen. ---------------------------
   // Opening this screen IS the alert. Waiting for a second tap would mean a traveler who
   // dials 911 and never comes back to the app was never reported at all.
-  const alerted = useRef(false);
-  useEffect(() => {
-    if (alerted.current) return;
-    alerted.current = true;
-    alertEmergency({
+  const issueAlert = useCallback(async () => {
+    if (alertBusy.current) return;
+    alertBusy.current = true;
+    setNotify((prior) => ({ state: 'sending', caseNo: prior.caseNo }));
+    const result = await alertEmergency({
+      requestId,
       // NO TRAVEL, NO TRAVEL DETAILS. Sending the seeded journey's route and fare with an
       // emergency would put a case in front of a person describing a trip to the airport on
       // 6 July that never happened, next to a real person in real trouble.
@@ -185,14 +189,20 @@ export default function Emergency() {
       plate,
       address: fixRef.current ? [fixRef.current.address, fixRef.current.region].filter(Boolean).join(', ') : null,
       coords: fixRef.current?.coords ?? null,
-    }).then((r) =>
-      setNotify({ state: r.ok ? 'sent' : 'failed', caseNo: r.caseNo }),
-    );
-  }, [tripNo, operator, vehicle, plate, ride.lastTrip]);
+    });
+    setNotify({ state: result.stored && result.emailed ? 'sent' : result.stored ? 'recorded' : 'failed', caseNo: result.caseNo });
+    alertBusy.current = false;
+  }, [requestId, tripNo, operator, vehicle, plate, ride.lastTrip]);
+  const alerted = useRef(false);
+  useEffect(() => {
+    if (alerted.current) return;
+    alerted.current = true;
+    void issueAlert();
+  }, [issueAlert]);
 
   // ---- 3. Keep the filed case current while this screen is open. --------------------------
   useEffect(() => {
-    if (notify.state !== 'sent' || !notify.caseNo) return;
+    if (!['sent', 'recorded'].includes(notify.state) || !notify.caseNo) return;
     const caseNo = notify.caseNo;
     const push = () => {
       const f = fixRef.current;
@@ -363,6 +373,12 @@ export default function Emergency() {
             )}
           </>
         )}
+        {notify.state === 'recorded' && (
+          <>
+            <Text style={styles.notifyFailed}>{t('traveler.emgRecordedNotAlerted')}</Text>
+            {notify.caseNo && <Mono size={13.5}>{notify.caseNo}</Mono>}
+          </>
+        )}
         {notify.state === 'failed' && (
           <>
             <Text style={styles.notifyFailed}>{t('traveler.notReachedDevice')}</Text>
@@ -370,6 +386,11 @@ export default function Emergency() {
               {t('traveler.call911First')}
             </Text>
           </>
+        )}
+        {(notify.state === 'failed' || notify.state === 'recorded') && (
+          <Pressable accessibilityRole="button" onPress={() => void issueAlert()} style={styles.sendBtn}>
+            <Text style={styles.sendBtnText}>{t('traveler.tryAgain')}</Text>
+          </Pressable>
         )}
       </Card>
 

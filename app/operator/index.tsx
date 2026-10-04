@@ -82,14 +82,20 @@ export default function OperatorHome() {
   // The open request, readable from callbacks without making them depend on it.
   const requestRef = useRef<SimRequest | null>(null);
   requestRef.current = request;
+  const acceptingRef = useRef(false);
+  const [accepting, setAccepting] = useState(false);
+  const [acceptError, setAcceptError] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(RESPOND_SECONDS);
   const armTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tickTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const cbar = useRef(new Animated.Value(1)).current;
 
-  // Only a commissioned account operates.
+  // Show the fare-share math before asking a new Operator to buy coverage.
+  // This is orientation, never a shortcut around server qualification.
   useEffect(() => {
-    if (op.ready && op.verification !== 'commissioned') router.replace('/operator/qualify');
+    if (op.ready && op.verification !== 'commissioned') {
+      router.replace(op.verification === 'pending' ? '/operator/review' : '/operator/economics' as never);
+    }
   }, [op.ready, op.verification, router]);
 
   const clearTimers = useCallback(() => {
@@ -103,6 +109,7 @@ export default function OperatorHome() {
   // harmless while requests were invented and is not now: a real travel left on one phone that
   // said nothing keeps a traveler waiting for an operator who already walked away.
   const closeRequest = useCallback(() => {
+    if (acceptingRef.current) return;
     if (tickTimer.current) clearInterval(tickTimer.current);
     tickTimer.current = null;
     cbar.stopAnimation();
@@ -118,6 +125,15 @@ export default function OperatorHome() {
     // not be re-offered to the only operator in the market. See lapseRequest.
     if (open) op.lapseRequest(open);
   }, [cbar, op]);
+
+  // Visual dismissal is not a transport transition. Only an explicit Decline or an
+  // observed timeout may lapse the offer; successful acceptance is decided by the server.
+  const dismissAccepted = useCallback(() => {
+    clearTimers();
+    cbar.stopAnimation();
+    setRequest(null);
+    setAcceptError(null);
+  }, [clearTimers, cbar]);
 
   const openRequest = useCallback((r: SimRequest) => {
     setRequest(r);
@@ -165,8 +181,8 @@ export default function OperatorHome() {
   }, [cbar]);
 
   useEffect(() => {
-    if (request && countdown <= 0 && AppState.currentState === 'active') closeRequest();
-  }, [countdown, request, closeRequest]);
+    if (request && countdown <= 0 && !accepting && AppState.currentState === 'active') closeRequest();
+  }, [countdown, request, accepting, closeRequest]);
 
   // A REQUEST APPEARS BECAUSE ONE WAS DISPATCHED, not because a timer fired.
   //
@@ -182,6 +198,14 @@ export default function OperatorHome() {
   useFocusEffect(clearTimers);
 
   const earn = request ? earnOf(request.fare) : 0;
+
+  if (!op.ready || op.verification !== 'commissioned') {
+    return (
+      <OperatorScreen nav="home" note={note}>
+        <Text style={styles.sub}>{t('operator.checking')}</Text>
+      </OperatorScreen>
+    );
+  }
 
   return (
     <OperatorScreen nav="home" note={note}>
@@ -334,7 +358,9 @@ export default function OperatorHome() {
       )}
 
       {/* The demo's Operation Request sheet: scrim, countdown bar, 15s window. */}
-      <Modal visible={!!request} transparent animationType="fade" onRequestClose={closeRequest}>
+      <Modal visible={!!request} transparent animationType="fade" onRequestClose={() => {
+        // Android Back cannot silently refuse or locally hide an assigned, paid Travel.
+      }}>
         {request && (
           <View style={styles.requestRoot}>
             <View style={styles.requestCard}>
@@ -409,8 +435,8 @@ export default function OperatorHome() {
                   label={t('operator.decline')}
                   textColor={colors.red}
                   borderColor={colors.redBorder}
-                  onPress={closeRequest}
-                  style={{ flex: 1 }}
+                  onPress={() => { if (!acceptingRef.current) closeRequest(); }}
+                  style={{ flex: 1, opacity: accepting ? 0.5 : 1 }}
                 />
                 <PrimaryButton
                   // ACCEPT TRAVELER, not Accept Travel (Chad, 4 Sept 2026, overruling me).
@@ -429,15 +455,33 @@ export default function OperatorHome() {
                   label={t('operator.acceptTraveler')}
                   color={colors.green}
                   onPress={async () => {
-                    const r = request;
-                    closeRequest();
-                    // Only once the server has accepted it. A refusal stays on this screen,
-                    // where the reason is shown.
-                    if (await op.acceptRequest(r)) router.navigate('/operator/pickup');
+                    if (acceptingRef.current) return;
+                    acceptingRef.current = true;
+                    setAccepting(true);
+                    setAcceptError(null);
+                    clearTimers();
+                    cbar.stopAnimation();
+                    try {
+                      if (await op.acceptRequest(request)) {
+                        dismissAccepted();
+                        router.navigate('/operator/pickup');
+                      } else {
+                        setAcceptError(t('traveler.couldNotSaveConn'));
+                        openRequest(request);
+                      }
+                    } catch {
+                      setAcceptError(t('traveler.couldNotSaveConn'));
+                      openRequest(request);
+                    } finally {
+                      acceptingRef.current = false;
+                      setAccepting(false);
+                    }
                   }}
+                  disabled={accepting}
                   style={{ flex: 1.6 }}
                 />
               </View>
+              {acceptError && <Text accessibilityRole="alert" style={styles.dutyError}>{acceptError}</Text>}
             </View>
           </View>
         )}

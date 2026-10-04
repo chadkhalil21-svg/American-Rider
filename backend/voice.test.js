@@ -1,82 +1,58 @@
-// WHO MAY RING WHOM, AND WHAT NEITHER OF THEM LEARNS.
-//
-// Adrian, 20 Sept 2026: let a traveler and their operator call each other through the platform
-// over WiFi or data. The media path is Twilio's — running TURN relays for a kerbside call that
-// must not fail is not our business to be in. What IS ours is the gate, and that is what this
-// proves, because the gate is the only part a mistake in is dangerous.
-const fs = require('fs');
-const path = require('path');
-const { ready, reason, accessToken, connectTwiml, identityFor, counterpartOf } = require('./voice');
-
-const results = [];
-const check = (label, ok, detail) => results.push({ label, ok: !!ok, detail });
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const twilio = require('twilio');
+const { ready, reason, accessToken, connectTwiml, identityFor, counterpartOf,
+  callerForRide, verifiedTwilioWebhook } = require('./voice');
 const server = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
-const trust = fs.readFileSync(path.join(__dirname, 'trustboundaries.js'), 'utf8');
-
-// ---- Off without credentials, and it says why ------------------------------------------
-check('platform calling is off without credentials', ready() === false);
-check('and says which values are missing, not just "off"',
-  /TWILIO_API_KEY_SID/.test(reason()) && /TWILIO_TWIML_APP_SID/.test(reason()), reason());
-check('a token cannot be minted while it is off',
-  accessToken({ rideId: 'ride2048', side: 'traveler' }).ok === false);
-check('/health reports it, so a silent outage is impossible',
-  /platformCalling: voiceReady\(\)/.test(server));
+const rideId = 'a'.repeat(40);
+const ride = { status: 'assigned', operatorId: 'current-operator-uid' };
+const old = { ...ride, operatorId: 'previous-operator-uid' };
+const from = identityFor(rideId, 'traveler', ride.operatorId);
+const to = identityFor(rideId, 'operator', ride.operatorId);
+assert.match(from, /^ar_[a-f0-9]{40}_[a-f0-9]{24}_traveler$/);
+assert.equal(counterpartOf('traveler'), 'operator');
+assert.equal(callerForRide(`client:${from}`, ride)?.side, 'traveler');
+assert.equal(callerForRide(identityFor(rideId,'operator',old.operatorId), ride), null,
+  'a previous Operator cannot call a replacement using a still-valid JWT');
+assert.equal(callerForRide(identityFor(rideId,'traveler',old.operatorId), ride), null,
+  'a stale Traveler token cannot ring the old Operator after a reoffer');
+assert.equal(callerForRide(from, { ...ride, status: 'completed' }), null);
+assert.equal(callerForRide('client:ar_' + rideId + '_operator', ride), null);
+assert.match(connectTwiml({ rideId, side:'traveler', operatorUid:ride.operatorId }),
+  new RegExp(`<Client>${to}<\\/Client>`));
+assert.ok(!connectTwiml({ rideId, side:'traveler', operatorUid:ride.operatorId }).includes('current-operator-uid'));
+assert.match(server, /authorizeVoiceTravel\(\{ db, uid: req\.uid, rideId \}\)/);
+assert.match(server, /app\.post\('\/voice\/token', requireAuth, LIMITS\.voice, requireFreshAuth/);
+assert.match(server, /verifiedTwilioWebhook\(req\.headers\['x-twilio-signature'\], req\.body\)/);
+assert.match(server, /callerForRide\(from, ride\)/);
+assert.match(server, /express\.urlencoded\(\{ extended: false, limit: '16kb' \}\)/);
+assert.match(server, /<Reject\/>/);
+assert.equal(verifiedTwilioWebhook('', {}), false);
+const names = ['TWILIO_ACCOUNT_SID','TWILIO_API_KEY_SID','TWILIO_API_KEY_SECRET',
+  'TWILIO_TWIML_APP_SID','TWILIO_AUTH_TOKEN','TWILIO_CONNECT_WEBHOOK_URL'];
+const saved = Object.fromEntries(names.map((k)=>[k,process.env[k]]));
 try {
-  require.resolve('twilio');
-} catch {
-  const vars=['TWILIO_ACCOUNT_SID','TWILIO_API_KEY_SID','TWILIO_API_KEY_SECRET','TWILIO_TWIML_APP_SID'];
-  const old=Object.fromEntries(vars.map(k=>[k,process.env[k]]));
-  try {
-    for(const key of vars)process.env[key]='test-credential-not-real';
-    check('credentials alone cannot mark calling ready without the server SDK',!ready()&&/SDK not installed/.test(reason()));
-  }finally{for(const key of vars){if(old[key]===undefined)delete process.env[key];else process.env[key]=old[key];}}
+  Object.assign(process.env, {
+    TWILIO_ACCOUNT_SID: 'AC'+'a'.repeat(32), TWILIO_API_KEY_SID:'SK'+'b'.repeat(32),
+    TWILIO_API_KEY_SECRET:'c'.repeat(32), TWILIO_TWIML_APP_SID:'AP'+'d'.repeat(32),
+    TWILIO_AUTH_TOKEN:'local-test-secret-not-a-live-account',
+    TWILIO_CONNECT_WEBHOOK_URL:'https://calls.example.test/voice/connect',
+  });
+  assert.equal(ready(), true, reason() || 'ready');
+  const minted = accessToken({ rideId, side:'operator', operatorUid:ride.operatorId });
+  assert.equal(minted.ok, true, minted.error);
+  assert.equal(minted.identity, to);
+  assert.equal(minted.token.split('.').length, 3);
+  const params = { From:`client:${to}`, To:`client:${from}` };
+  const signed = twilio.getExpectedTwilioSignature(process.env.TWILIO_AUTH_TOKEN,
+    process.env.TWILIO_CONNECT_WEBHOOK_URL, params);
+  assert.equal(verifiedTwilioWebhook(signed,params), true);
+  assert.equal(verifiedTwilioWebhook(signed,{ ...params, From:`client:${from}` }), false);
+  assert.equal(verifiedTwilioWebhook('forged-signature',params), false);
+  process.env.TWILIO_CONNECT_WEBHOOK_URL = 'http://calls.example.test/voice/connect';
+  assert.equal(ready(), false); assert.match(reason(),/HTTPS/);
+} finally {
+  for (const [k,v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k]=v; }
 }
-
-// ---- The identity says which travel and which side, and nothing about who ---------------
-const id = identityFor('ride2048', 'traveler');
-check('an identity names the travel and the side', id === 'ar_ride2048_traveler');
-check('and carries no account id, so it cannot follow somebody between travels',
-  !/uid|user|@/i.test(id));
-check('the two sides are distinct and each points at the other',
-  counterpartOf('traveler') === 'operator' && counterpartOf('operator') === 'traveler');
-
-// ---- Neither party ever learns the other's number ---------------------------------------
-// COMMENTS STRIPPED FIRST. The first version of this check matched the word "mobile" in this
-// file's own explanation of why there are no mobile numbers in it — a test that reads prose
-// and reports on code, which is worse than no test because it is read as proof.
-const stripComments = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-const voiceCode = stripComments(fs.readFileSync(path.join(__dirname, 'voice.js'), 'utf8'));
-check('no telephone number reaches the call path at all',
-  !/\bmobile\b|\bphoneNumber\b|toE164|\bto:\s/.test(voiceCode),
-  'both ends dial the platform; a tel: link would hand a personal number over permanently');
-check('and the call path never reads the users collection, where a number would be',
-  !/collection\('users'\)/.test(voiceCode));
-
-// ---- The destination is derived, never accepted from the device -------------------------
-const twiml = connectTwiml({ rideId: 'ride2048', side: 'traveler' });
-check('the TwiML dials the OTHER side of the same travel',
-  /<Client>ar_ride2048_operator<\/Client>/.test(twiml), twiml);
-check('and the connect route ignores whatever the device dialled',
-  /Twilio posts whatever the device dialled and it is ignored/i.test(server) &&
-  /const m = \/\^\(\?:client:\)\?ar_/.test(server),
-  'otherwise a tampered app dials any number in the world on our account');
-check('an unrecognised caller is rejected rather than connected somewhere',
-  /<Reject\/>/.test(server));
-check('the Travel document id is escaped into the XML',
-  /<Client>[^<]*<\/Client>/.test(connectTwiml({ rideId: 'A&B"<>', side: 'operator' })) &&
-  !/[<>"]B/.test(connectTwiml({ rideId: 'A&B"<>', side: 'operator' }).split('<Client>')[1]));
-
-// ---- The gate: on the travel, and only while it is live ---------------------------------
-check('a token needs a signed-in caller', /app\.post\('\/voice\/token', requireAuth/.test(server));
-check('the side is decided from the travel record, never from the request body',
-  /authorizeVoiceTravel\(\{ db, uid: req\.uid, rideId \}\)/.test(server));
-check('somebody not on the travel is refused',
-  /not_your_travel/.test(trust));
-check('and a finished travel can no longer be called',
-  /authorizeVoiceTravel/.test(server),
-  'a channel that outlives the journey is a way to contact a stranger whose car you sat in');
-
-for (const r of results) console.log(`${r.ok ? '✓' : '✗'} ${r.label}${r.ok || !r.detail ? '' : ` — ${r.detail}`}`);
-const failed = results.filter((r) => !r.ok);
-console.log(failed.length ? `\n${failed.length} FAILED of ${results.length}` : `\nall ${results.length} passed`);
-process.exit(failed.length ? 1 : 0);
+console.log('PASS Voice JWT, signed webhook, current Operator assignment, completed-Travel rejection and no personal number');

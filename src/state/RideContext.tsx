@@ -179,6 +179,7 @@ export type RideStore = {
   setSmartStatus: (s: SmartStatus) => void;
   /** A Smart Travel journey in progress: the plan, and which car travel is being taken. */
   smartJourney: SmartJourney | null;
+  adoptSmartReplan: (plan: SmartPlan) => boolean;
   /**
    * Seed the booking screens for car travel 1 (pickup → boarding stop) or car travel 2
    * (alighting stop → destination). Each is a real travel with its own Travel Number and
@@ -927,6 +928,25 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     dispatchInFlightRef.current = running;
     return running;
   }, [arrival, departure, refreshMyRides]);
+  const adoptSmartReplan = useCallback((plan: SmartPlan): boolean => {
+    const existing = smartJourneyRef.current;
+    if (!existing || existing.stage !== 'leg1' || !existing.leg1No || rideActiveRef.current || !plan?.revision) return false;
+    const oldFirst = existing.plan.legs.findIndex((l) => l.kind === 'transit');
+    const newFirst = plan.legs.findIndex((l) => l.kind === 'transit');
+    if (oldFirst < 1 || newFirst !== oldFirst || plan.from.id !== existing.plan.from.id ||
+        plan.from.lat !== existing.plan.from.lat || plan.from.lng !== existing.plan.from.lng ||
+        JSON.stringify(plan.legs.slice(0, newFirst)) !== JSON.stringify(existing.plan.legs.slice(0, oldFirst)) ||
+        plan.legs.slice(newFirst).some((l) => l.kind === 'car' && l !== plan.legs.at(-1))) return false;
+    const next = { ...existing, plan };
+    smartJourneyRef.current = next;
+    setSmartJourney(next);
+    setSmartPlan(plan);
+    setSmartStatus('ok');
+    setQuotedFareCents(null);
+    setTripCoords(null);
+    return true;
+  }, []);
+
   const beginSmartLeg = useCallback(
     (which: 1 | 2): boolean => {
       const plan = which === 1 ? smartPlan : smartJourneyRef.current?.plan ?? smartPlan;
@@ -1627,6 +1647,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     smartStatus,
     setSmartStatus,
     smartJourney,
+    adoptSmartReplan,
     beginSmartLeg,
     endSmartJourney,
     quotedFareCents,

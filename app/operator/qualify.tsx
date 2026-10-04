@@ -94,6 +94,9 @@ export default function OperatorQualification() {
 
       <View style={styles.banner}>
         <Text style={styles.bannerText}>{t('operator.retainOnceCommissioned')}</Text>
+        <Pressable accessibilityRole="button" onPress={() => router.navigate('/operator/economics' as never)} style={{ minHeight: 44, justifyContent: 'center', marginTop: 4 }}>
+          <Text style={styles.bannerText}>{t('operator.econYourScenario')} ›</Text>
+        </Pressable>
       </View>
 
       {area && (

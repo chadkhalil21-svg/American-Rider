@@ -414,6 +414,42 @@ async function smartQuote(pickup, dest, opts = {}) {
   return { status: 'ok', plan: built };
 }
 
+// After car Travel 1, a changed itinerary may continue only from the SAME boarding
+// stop the Traveler already paid to reach. Car leg 1 is immutable; the transit and
+// second car are repriced by the existing canonical quote function. This is a preview:
+// /travel/prepare independently reprices against the real completed first Travel.
+async function replacementAfterFirstCar(current, destination, opts = {}) {
+  if (!isCoord(destination) || !Array.isArray(current?.legs)) return null;
+  const firstTransit = current.legs.findIndex((l) => l.kind === 'transit');
+  const paidCar = firstTransit > 0 ? current.legs.slice(0, firstTransit).find((l) => l.kind === 'car') : null;
+  if (!paidCar || !Number.isSafeInteger(paidCar.cents) || paidCar.cents <= 0) return null;
+  const fresh = await smartQuote(current.from, destination, opts);
+  if (fresh.status !== 'ok') return null;
+  const next = fresh.plan;
+  const nextTransit = next.legs.findIndex((l) => l.kind === 'transit');
+  if (nextTransit < 0 || next.legs.slice(0, nextTransit).some((l) => l.kind === 'car')) return null;
+  if (current.from.id && next.from.id && current.from.id !== next.from.id) return null;
+  if (straightLineMiles(current.from, next.from) > 0.05) return null;
+  const first = current.legs.slice(0, firstTransit);
+  const tail = next.legs.slice(nextTransit);
+  const last = tail.filter((l) => l.kind === 'car').at(-1) || null;
+  if (!last || !Number.isSafeInteger(last.cents) || last.cents <= 0) return null;
+  const q1 = quote(paidCar.cents, null, paidCar.feeLines || [], null, 0);
+  const q2 = quote(last.cents, {
+    journeyNo: 'smart-preview', leg1FareCents: paidCar.cents,
+    leg1GovernmentFeeCents: paidCar.governmentFeeCents || 0, leg1TollCents: 0,
+  }, last.feeLines || [], null, 0);
+  const smartCents = q1.travelerPays + q2.travelerPays;
+  return {
+    ...next, status: 'ok', revision: true, from: current.from, legs: [...first, ...tail],
+    carCents: paidCar.cents + last.cents,
+    feeCents: q1.appFee + q2.appFee,
+    smartCents, journeyCents: smartCents + next.transitFareCents,
+    // The original direct journey is no longer current. The UI hides comparison.
+    directCents: 0, saveCents: 0, saveMin: 0,
+  };
+}
+
 /**
  * Re-checks the transit middle of an already selected Smart Travel against the region's current
  * OTP state. This is intentionally geography-agnostic: OTP decides which configured GTFS /
@@ -434,6 +470,9 @@ async function revalidateTransit(currentPlan, opts = {}) {
   const newTransit = (itinerary.legs || []).filter((l) => l.kind === 'transit');
   const sig = (legs) => legs.map((l) => [l.route?.gtfsId || '', l.from?.stopId || '', l.to?.stopId || ''].join('|')).join('>');
   const changed = sig(oldTransit) !== sig(newTransit);
+  const replacementPlan = changed && opts.destination
+    ? await replacementAfterFirstCar(currentPlan, opts.destination, { planTransit: plan, when })
+    : null;
   return {
     status: 'ok',
     changed,
@@ -441,7 +480,8 @@ async function revalidateTransit(currentPlan, opts = {}) {
     departAt: newTransit[0]?.startTime || itinerary.startTime || null,
     arriveAt: newTransit[newTransit.length - 1]?.endTime || itinerary.endTime || null,
     routeSignature: sig(newTransit),
+    ...(replacementPlan ? { replacementPlan } : {}),
   };
 }
 
-module.exports = { smartQuote, revalidateTransit, transitFareFor, transitFareGroup, fareGroupsFor, pickItinerary, tidyName, WALK_MILES };
+module.exports = { smartQuote, revalidateTransit, replacementAfterFirstCar, transitFareFor, transitFareGroup, fareGroupsFor, pickItinerary, tidyName, WALK_MILES };

@@ -128,7 +128,23 @@ const accept = (db, extra = {}) => acceptOffer({ db, uid: 'op', rideId: 'r1', ex
     const out = await accept(db);
     check('an eligible operator accepts', out.status === 200 && db.data.rides.r1.status === 'accepted' && db.data.rides.r1.acceptedAt === NOW, JSON.stringify(out));
     const twice = await accept(db);
-    check('an accepted travel cannot be accepted twice', twice.status === 409 && twice.body.code === 'not_open');
+    check('a lost response reuses the already accepted Travel without a second transition',
+      twice.status === 200 && twice.body.reused === true && db.data.rides.r1.acceptedAt === NOW);
+    const disabled = await accept(db, { externals: { ...OK, account: { disabled: true } } });
+    check('an account disabled since the acceptance receives no success on retry', disabled.status === 409);
+  }
+  {
+    const paidRide = { bookingFingerprint: 'same-booking', travelerUid: 'traveler',
+      paymentIntentId: 'pi_one', costCents: 1825 };
+    const db = fakeDb(seed({}, { currentRideId: 'r1' }, paidRide));
+    const payment = { id: 'pi_one', status: 'succeeded', currency: 'usd', amount_received: 1825,
+      metadata: { uid: 'traveler', rideId: 'r1' } };
+    const real = await accept(db, { externals: { ...OK, payment } });
+    const retried = await accept(db, { externals: { ...OK, payment } });
+    check('paid lost-response retry succeeds on the same Operator, same Stripe receipt and same Travel',
+      real.status === 200 && retried.status === 200 && retried.body.reused === true && db.data.rides.r1.acceptedAt === NOW);
+    const wrong = await accept(db, { externals: { ...OK, payment: { ...payment, amount_received: 1 } } });
+    check('paid retry cannot reuse a payment with a different captured amount', wrong.status === 409);
   }
   {
     const db = fakeDb(seed({}, {}, { operatorId: 'someone-else' }));

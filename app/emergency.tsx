@@ -169,7 +169,8 @@ export default function Emergency() {
     if (alertBusy.current) return;
     alertBusy.current = true;
     setNotify((prior) => ({ state: 'sending', caseNo: prior.caseNo }));
-    const result = await alertEmergency({
+    try {
+      const result = await alertEmergency({
       requestId,
       // NO TRAVEL, NO TRAVEL DETAILS. Sending the seeded journey's route and fare with an
       // emergency would put a case in front of a person describing a trip to the airport on
@@ -189,9 +190,15 @@ export default function Emergency() {
       plate,
       address: fixRef.current ? [fixRef.current.address, fixRef.current.region].filter(Boolean).join(', ') : null,
       coords: fixRef.current?.coords ?? null,
-    });
-    setNotify({ state: result.stored && result.emailed ? 'sent' : result.stored ? 'recorded' : 'failed', caseNo: result.caseNo });
-    alertBusy.current = false;
+      });
+      setNotify({ state: result.stored && result.emailed ? 'sent' : result.stored ? 'recorded' : 'failed', caseNo: result.caseNo });
+    } catch {
+      // A network exception is not evidence that a person was alerted. The same request
+      // id makes a retry idempotent if the first response was lost after storage.
+      setNotify((prior) => ({ state: 'failed', caseNo: prior.caseNo }));
+    } finally {
+      alertBusy.current = false;
+    }
   }, [requestId, tripNo, operator, vehicle, plate, ride.lastTrip]);
   const alerted = useRef(false);
   useEffect(() => {

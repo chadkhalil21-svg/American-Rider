@@ -25,6 +25,17 @@ async function acceptOffer({ db, uid, rideId, externals, liveMoney = false, now 
     if (String(ride.operatorId || '') !== String(uid)) {
       return { status: 409, body: { error: 'This travel is no longer offered to you.', code: 'not_offered' } };
     }
+    // A mobile response can be lost after this exact transaction commits. Return the
+    // already-accepted state for the same eligible, paid and still-reserved Operator;
+    // never write acceptedAt twice or accept on a released/cancelled Travel.
+    if (ride.status === 'accepted' && !ride.releasedAt &&
+        externals?.account?.disabled === false && externals?.payouts?.enabled === true &&
+        (!ride.bookingFingerprint || (
+          paymentMatches(ride, externals?.payment, ride.travelerUid, rideId) &&
+          opSnap.exists && String(opSnap.data().currentRideId || '') === String(rideId)
+        ))) {
+      return { status: 200, body: { ok: true, acceptedAt: ride.acceptedAt, reused: true } };
+    }
     if (ride.status !== 'assigned') {
       return { status: 409, body: { error: 'This travel is no longer open.', code: 'not_open' } };
     }

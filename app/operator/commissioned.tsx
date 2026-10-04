@@ -18,6 +18,25 @@ export default function OperatorCommissioned() {
   const op = useOperator();
   const first = op.opName.split(/\s+/)[0];
 
+  if (!op.ready || op.verification !== 'commissioned') {
+    const pending = op.ready && op.verification === 'pending';
+    return (
+      <Screen>
+        <Text style={styles.title}>{t('operator.operatorQualification')}</Text>
+        <Text style={styles.sub}>
+          {op.ready ? t('operator.operationalReadinessBody') : t('operator.checking')}
+        </Text>
+        {op.ready && (
+          <PrimaryButton
+            label={pending ? t('traveler.underReview') : t('operator.operatorQualification')}
+            onPress={() => router.replace(pending ? '/operator/review' : '/operator/qualify')}
+            style={{ marginTop: 24 }}
+          />
+        )}
+      </Screen>
+    );
+  }
+
   return (
     <Screen scroll={false}>
       <View style={{ flex: 1, alignItems: 'center' }}>

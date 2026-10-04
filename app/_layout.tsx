@@ -16,6 +16,7 @@ import { LanguageProvider } from '../src/state/LanguageContext';
 import { PaymentConfigProvider } from '../src/state/PaymentConfigContext';
 import { OperatorProvider } from '../src/state/OperatorContext';
 import { RideProvider } from '../src/state/RideContext';
+import { VoiceProvider } from '../src/state/VoiceContext';
 import { colors } from '../src/theme';
 
 // The Stack is always mounted (so expo-router routing works). Until the user is
@@ -109,6 +110,7 @@ export default function RootLayout() {
       <PaymentConfigProvider>
       <RideProvider>
       <OperatorProvider>
+      <VoiceProvider>
         <StatusBar style="dark" />
         {Platform.OS === 'web' ? (
           <View style={{ flex: 1, backgroundColor: colors.canvas, alignItems: 'center' }}>
@@ -127,6 +129,7 @@ export default function RootLayout() {
         ) : (
           <AppGate />
         )}
+      </VoiceProvider>
       </OperatorProvider>
       </RideProvider>
       </PaymentConfigProvider>

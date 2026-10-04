@@ -77,7 +77,8 @@ const { outsideMarket, outsideMarketMessage } = require('./market');
 const { permitRequired, permitRequiredMessage } = require('./fees');
 const { destinationsNear } = require('./places');
 const { searchPlaces } = require('./place-search');
-const { ready: voiceReady, reason: voiceReason, accessToken: voiceToken, connectTwiml } = require('./voice');
+const { ready: voiceReady, reason: voiceReason, accessToken: voiceToken,
+  connectTwiml, callerForRide, verifiedTwilioWebhook } = require('./voice');
 const { REGIONS, defaultRegion } = require('./regions');
 const { presenceStale, coverageLapsed, matchOperator, etaMinutes } = require('./matching');
 const { encodeGeohash, nearbyOperatorCandidates } = require('./geooperators');
@@ -1581,7 +1582,7 @@ app.post('/smart-quote', LIMITS.routeIp, requireOperationalReadiness, requireAdm
 
 app.post('/smart-revalidate', LIMITS.routeIp, requireOperationalReadiness, async (req, res) => {
   const plan = req.body?.plan;
-  const out = await revalidateTransit(plan);
+  const out = await revalidateTransit(plan, { destination: req.body?.destination });
   if (out.status === 'unavailable') return res.status(503).json(out);
   return res.json(out);
 });
@@ -3462,7 +3463,7 @@ app.post('/travel/schedule', requireAuth, LIMITS.dispatch, requireFreshAuth, req
 // other — the lost-item path is how somebody reaches an operator afterwards, and it goes
 // through us. A call channel that outlives the journey is a way to contact a stranger whose
 // car you once sat in, which is not a feature.
-app.post('/voice/token', requireAuth, LIMITS.voice, async (req, res) => {
+app.post('/voice/token', requireAuth, LIMITS.voice, requireFreshAuth, async (req, res) => {
   if (!voiceReady()) return res.status(503).json({ error: voiceReason(), code: 'voice_not_configured' });
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
@@ -3477,7 +3478,7 @@ app.post('/voice/token', requireAuth, LIMITS.voice, async (req, res) => {
     return res.status(502).json({ error: e.message, code: 'travel_unreadable' });
   }
   if (!authz.ok) return res.status(authz.status).json({ error: authz.error, code: authz.code });
-  const out = voiceToken({ rideId, side: authz.side });
+  const out = voiceToken({ rideId, side: authz.side, operatorUid: authz.ride.operatorId });
   if (!out.ok) return res.status(503).json({ error: out.error, code: out.code });
   return res.json({ token: out.token, identity: out.identity, side: authz.side, tripNo: authz.tripNo });
 });
@@ -3487,23 +3488,22 @@ app.post('/voice/token', requireAuth, LIMITS.voice, async (req, res) => {
 // TWILIO POSTS WHATEVER THE DEVICE DIALLED AND IT IS IGNORED. The destination is derived from
 // the travel and the caller's own identity, so a tampered app cannot dial an arbitrary number
 // through our account — which would be our telephone bill and somebody else's harassment.
-app.post('/voice/connect', async (req, res) => {
+app.post('/voice/connect', express.urlencoded({ extended: false, limit: '16kb' }), async (req, res) => {
+  const reject = () => res.type('text/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>');
+  if (!verifiedTwilioWebhook(req.headers['x-twilio-signature'], req.body)) return reject();
   const from = String(req.body?.From || '');
-  // 'ar_AR-2048-MIA_traveler' — the identity the token was minted with, which Twilio supplies
-  // and the device cannot choose.
-  const m = /^(?:client:)?ar_([^_]+)_(traveler|operator)$/.exec(from);
-  if (!m) return res.type('text/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>');
+  const m = /^(?:client:)?ar_([a-f0-9]{40})_[a-f0-9]{24}_(traveler|operator)$/.exec(from);
+  if (!m) return reject();
   const db = adminDb();
-  if (!db) return res.type('text/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>');
+  if (!db) return reject();
   try {
     const snap = await db.collection('rides').doc(m[1]).get();
     const ride = snap.exists ? snap.data() : null;
-    if (!ride || !['assigned', 'accepted', 'arrived', 'onboard'].includes(String(ride.status))) {
-      return res.type('text/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>');
-    }
-    return res.type('text/xml').send(connectTwiml({ rideId: m[1], side: m[2] }));
+    const caller = callerForRide(from, ride);
+    if (!caller) return reject();
+    return res.type('text/xml').send(connectTwiml({ ...caller, operatorUid: ride.operatorId }));
   } catch {
-    return res.type('text/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>');
+    return reject();
   }
 });
 

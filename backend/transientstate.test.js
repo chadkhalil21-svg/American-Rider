@@ -37,4 +37,17 @@ assert.match(communicate, /disabled=\{sending \|\| !draft\.trim\(\) \|\| !tripNo
 const home = read('app/index.tsx');
 assert.match(home, /if \(!await ride\.cancelScheduled\(\)\) setScheduledCancelError/);
 assert.match(home, /disabled=\{cancellingScheduled\}/);
+const operatorHome = read('app/operator/index.tsx');
+assert.match(operatorHome, /if \(await op\.acceptRequest\(request\)\) \{\s*dismissAccepted\(\)/,
+  'server accepts before the offer sheet is visually dismissed');
+assert.doesNotMatch(operatorHome, /closeRequest\(\);[\s\S]{0,220}op\.acceptRequest/,
+  'accept cannot lapse an offer before the authoritative transition');
+assert.match(operatorHome, /if \(acceptingRef\.current\) return/);
+const commissioned = read('app/operator/commissioned.tsx');
+assert.match(commissioned, /if \(!op\.ready \|\| op\.verification !== 'commissioned'\)/,
+  'the commissioned title is unreachable until server qualification resolves');
+const emergency = read('app/emergency.tsx');
+assert.match(emergency, /try \{\s*const result = await alertEmergency/);
+assert.match(emergency, /catch \{[\s\S]*?state: 'failed'[\s\S]*?finally \{\s*alertBusy\.current = false/,
+  'a thrown emergency request must preserve the retry action');
 console.log('PASS transient UI/authority boundary invariants');

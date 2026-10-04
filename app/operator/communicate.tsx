@@ -29,10 +29,12 @@ import { useGoBack } from '../../src/components/nav';
 import { Avatar, BackLink, Screen } from '../../src/components/UI';
 import { useOperator } from '../../src/state/OperatorContext';
 import { useLanguage } from '../../src/state/LanguageContext';
+import { useTravelVoice } from '../../src/state/VoiceContext';
 import { colors } from '../../src/theme';
 
 export default function OperatorCommunicate() {
   const { t } = useLanguage();
+  const voice = useTravelVoice();
   const goBack = useGoBack();
   const op = useOperator();
   const [draft, setDraft] = useState('');
@@ -91,6 +93,13 @@ export default function OperatorCommunicate() {
         </View>
       </View>
 
+      {op.op?.rideId && voice.available && voice.activeId === op.op.rideId && (
+        <Pressable accessibilityRole="button" style={styles.callAction}
+          onPress={() => { if (op.op?.rideId) void voice.start(op.op.rideId); }}>
+          <Text style={styles.name}>{t('common.voiceCallTraveler')}</Text>
+        </Pressable>
+      )}
+
       {!!threadError && <Text style={styles.simNote}>{threadError}</Text>}
       {unsent && (
         <Text style={styles.simNote}>
@@ -137,6 +146,8 @@ export default function OperatorCommunicate() {
 }
 
 const styles = StyleSheet.create({
+  callAction: { minHeight: 48, justifyContent: 'center', marginTop: 16, paddingHorizontal: 16,
+    borderRadius: 12, borderWidth: 1, borderColor: colors.border },
   head: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 6 },
   simNote: { fontSize: 11.5, color: colors.faint, marginTop: 14, lineHeight: 17.25 },
   name: { fontSize: 18, fontWeight: '600', color: colors.ink },

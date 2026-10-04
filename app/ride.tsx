@@ -10,6 +10,7 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Platform, Pressable, Share, StyleSheet, View } from 'react-native';
 import { Text } from '../src/components/AppText';
+import { useTravelVoice } from '../src/state/VoiceContext';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
 import { useNative } from '../src/components/anim';
 import { FindMiguel } from '../src/components/FindMiguel';
@@ -120,7 +121,8 @@ function PinIcon() {
   );
 }
 
-export default function Status() {
+export default function RideScreen() {
+  const voice = useTravelVoice();
   const { t } = useLanguage();
   const router = useRouter();
   const ride = useRide();
@@ -595,6 +597,13 @@ export default function Status() {
               style={{ flex: 1 }}
             />
           </View>
+          {ride.matchedOp?.rideId && voice.available && voice.activeId === ride.matchedOp.rideId && (
+            <OutlineButton
+              label={t('common.voiceCallOperator')}
+              onPress={() => { void voice.start(ride.matchedOp!.rideId!); }}
+              style={{ marginTop: 12 }}
+            />
+          )}
           {canCancel && (
             <Pressable onPress={() => setCancelAsk(true)} hitSlop={10}>
               <Text style={styles.cancelLink}>{t('traveler.cancelTravel')}</Text>

@@ -38,7 +38,7 @@ export default function OperatorInsurance() {
   const [configResolved, setConfigResolved] = useState(false);
   const [brokerEmail, setBrokerEmail] = useState('');
   const [statusBusy, setStatusBusy] = useState(false);
-  const [monthlyPremium, setMonthlyPremium] = useState('600');
+  const [monthlyPremium, setMonthlyPremium] = useState('');
 
   useEffect(() => {
     insuranceConfig().then((x) => {
@@ -110,26 +110,12 @@ export default function OperatorInsurance() {
   };
   const st = op.docs.insurance;
 
-  const premiumN = Math.max(0, Number(monthlyPremium) || 0);
-  const AR_SHARE = 0.99;
-  // Consumer Reports, June 2026: observed Uber/Lyft platform retention of 43%–49.5%
-  // in its matched rider/driver sample. The companies dispute that accounting treatment
-  // because CR includes external costs such as insurance. This remains a benchmark, not
-  // a forecast or earnings promise.
-  const BENCH_DRIVER_HIGH = 0.57;
-  const BENCH_DRIVER_LOW = 0.505;
-  const arPer100 = 100 * AR_SHARE;
-  const benchmarkPer100Low = 100 * BENCH_DRIVER_LOW;
-  const benchmarkPer100High = 100 * BENCH_DRIVER_HIGH;
-  const additionalLow = arPer100 - benchmarkPer100High;
-  const additionalHigh = arPer100 - benchmarkPer100Low;
-  const fareNeededAR = premiumN / AR_SHARE;
-  const fareNeededBenchmarkLow = premiumN / BENCH_DRIVER_HIGH;
-  const fareNeededBenchmarkHigh = premiumN / BENCH_DRIVER_LOW;
-  const advantageOffsetLow = premiumN / (AR_SHARE - BENCH_DRIVER_LOW);
-  const advantageOffsetHigh = premiumN / (AR_SHARE - BENCH_DRIVER_HIGH);
+  const premiumN = /^\d+(?:[.,]\d{0,2})?$/.test(monthlyPremium.trim())
+    ? Math.min(1000000, Math.max(0, Number(monthlyPremium.trim().replace(',', '.'))))
+    : null;
+  // An example of gross fare volume, not net income or a premium recommendation.
+  const fareNeededAR = premiumN == null ? null : premiumN / 0.99;
   const money = (n: number) => String.fromCharCode(36) + n.toFixed(0);
-  const rangeMoney = (a: number, b: number) => money(a) + '–' + money(b);
   const marketState = config?.state || null;
   const nationalInsurers = config ? INSURERS.filter((x) => !x.states) : [];
   const stateInsurers = config ? INSURERS.filter((x) => x.states?.includes(config.state)) : [];
@@ -242,90 +228,24 @@ export default function OperatorInsurance() {
         )}
       </Card>
 
-      <SectionLabel style={styles.lbl}>{t('traveler.insCompareTitle')}</SectionLabel>
+      <SectionLabel style={styles.lbl}>{t('operator.econTitle')}</SectionLabel>
       <Card style={styles.econCard}>
-        <Text style={styles.body}>{t('traveler.insCompareBody')}</Text>
-
-        <View style={styles.compareBlock}>
-          <Text style={styles.coverLabel}>{t('traveler.insPer100')}</Text>
-          <View style={styles.econRow}>
-            <Text style={styles.body}>{t('traveler.insAmericanRider')}</Text>
-            <Text style={styles.econValue}>{money(arPer100)}</Text>
-          </View>
-          <View style={styles.econRow}>
-            <Text style={styles.body}>{t('traveler.insObservedBenchmark')}</Text>
-            <Text style={styles.econValue}>{rangeMoney(benchmarkPer100Low, benchmarkPer100High)}</Text>
-          </View>
-          <View style={styles.econRow}>
-            <Text style={styles.body}>{t('traveler.insDifference')}</Text>
-            <Text style={styles.econValue}>{rangeMoney(additionalLow, additionalHigh)}</Text>
-          </View>
-        </View>
-
-        <Text style={[styles.statusTitle, { marginTop: 18 }]}>{t('traveler.insScaleTitle')}</Text>
-        {[1000, 5000].map((gross) => {
-          const ar = gross * AR_SHARE;
-          const low = gross * BENCH_DRIVER_LOW;
-          const high = gross * BENCH_DRIVER_HIGH;
-          return (
-            <View key={gross} style={styles.scaleBlock}>
-              <Text style={styles.coverLabel}>
-                {gross === 1000 ? t('traveler.insScale1000') : t('traveler.insScale5000')}
-              </Text>
-              <View style={styles.econRow}>
-                <Text style={styles.body}>{t('traveler.insScaleArKeeps')}</Text>
-                <Text style={styles.econValue}>{money(ar)}</Text>
-              </View>
-              <View style={styles.econRow}>
-                <Text style={styles.body}>{t('traveler.insScaleBenchmarkKeeps')}</Text>
-                <Text style={styles.econValue}>{rangeMoney(low, high)}</Text>
-              </View>
-              <View style={styles.econRow}>
-                <Text style={styles.body}>{t('traveler.insScaleDifference')}</Text>
-                <Text style={styles.econValue}>{rangeMoney(ar - high, ar - low)}</Text>
-              </View>
-            </View>
-          );
-        })}
-        <View style={styles.scaleBlock}>
-          <Text style={styles.coverLabel}>{t('traveler.insScaleAnnual')}</Text>
-          <View style={styles.econRow}>
-            <Text style={styles.body}>{t('traveler.insScaleDifference')}</Text>
-            <Text style={styles.econValue}>
-              {rangeMoney((5000 * AR_SHARE - 5000 * BENCH_DRIVER_HIGH) * 12, (5000 * AR_SHARE - 5000 * BENCH_DRIVER_LOW) * 12)}
-            </Text>
-          </View>
-        </View>
-        <Text style={styles.disclaimer}>{t('traveler.insScaleAnnualNote')}</Text>
-
+        <Text style={styles.body}>{t('operator.econIntro')}</Text>
+        <PrimaryButton label={t('operator.econYourScenario')} onPress={() => router.navigate('/operator/economics' as never)} style={{ marginTop: 14 }} />
         <Text style={[styles.body, { marginTop: 16 }]}>{t('traveler.insNoHoursNeeded')}</Text>
         <View style={styles.econInputs}>
           <View style={styles.econField}>
             <Text style={styles.coverLabel}>{t('traveler.insMonthlyPremium')}</Text>
-            <TextInput value={monthlyPremium} onChangeText={setMonthlyPremium} keyboardType="decimal-pad" style={styles.econInput} />
+            <TextInput value={monthlyPremium} onChangeText={setMonthlyPremium} keyboardType="decimal-pad" maxLength={10} accessibilityLabel={t('traveler.insMonthlyPremium')} style={styles.econInput} />
           </View>
         </View>
-
-        <Text style={[styles.coverLabel, { marginTop: 18 }]}>{t('traveler.insPremiumOffset')}</Text>
-        <View style={styles.econRows}>
+        {fareNeededAR != null && <><Text style={[styles.coverLabel, { marginTop: 18 }]}>{t('traveler.insPremiumOffset')}</Text><View style={styles.econRows}>
           <View style={styles.econRow}>
             <Text style={styles.body}>{t('traveler.insPremiumOffsetAR')}</Text>
             <Text style={styles.econValue}>{money(fareNeededAR)}</Text>
           </View>
-          <View style={styles.econRow}>
-            <Text style={styles.body}>{t('traveler.insPremiumOffsetBenchmark')}</Text>
-            <Text style={styles.econValue}>{rangeMoney(fareNeededBenchmarkLow, fareNeededBenchmarkHigh)}</Text>
-          </View>
-        </View>
-        <Text style={[styles.coverLabel, { marginTop: 18 }]}>{t('traveler.insAdvantageOffset')}</Text>
-        <View style={styles.econRows}>
-          <View style={styles.econRow}>
-            <Text style={styles.body}>{t('traveler.insAdvantageOffsetRange')}</Text>
-            <Text style={styles.econValue}>{rangeMoney(advantageOffsetLow, advantageOffsetHigh)}</Text>
-          </View>
-        </View>
-
-        <Text style={styles.disclaimer}>{t('traveler.insBenchmarkSource')}</Text>
+        </View></>}
+        <Text style={styles.disclaimer}>{t('operator.econDisclaimer')}</Text>
       </Card>
 
       {/* CONTINUING COVERAGE. The expiry date is deterministic and gates duty/acceptance.

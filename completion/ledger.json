@@ -3,7 +3,7 @@
   "branch": "integrate/commercial-completion-2026-10-03",
   "baseSha": "f749644c862e1da128359ddf2693a95506b9b52a",
   "candidateSha": "551b72db40db360029b90864febd443430ddb1f8",
-  "generatedAt": "2026-10-04T21:57:20.418898+00:00",
+  "generatedAt": "2026-10-04T22:52:43.354733+00:00",
   "allowedStatuses": [
     "FIXED",
     "VERIFIED ALREADY FIXED",
@@ -577,16 +577,18 @@
       "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
       "evidence": [
         "Inherited source review; revalidate against integration head.",
-        "Emergency attempts reuse one stable per-screen request key; case recorded and email accepted are separate; UI offers retry, states that 911 is primary, and does not imply human acknowledgement."
+        "Emergency attempts reuse one stable per-screen request key; case recorded and email accepted are separate; UI offers retry, states that 911 is primary, and does not imply human acknowledgement.",
+        "Emergency network/provider exceptions now restore a retryable screen instead of leaving a permanent sending state; backend/emergencyretry.test.js and backend/transientstate.test.js pass."
       ],
       "candidatePrs": [
         56
       ],
       "implementingCommit": null,
       "verification": [
-        "backend/emergencyretry.test.js; npm run check; staffed monitoring/actual receipt/physical-device NOT TESTED."
+        "backend/emergencyretry.test.js; npm run check; staffed monitoring/actual receipt/physical-device NOT TESTED.",
+        "Targeted local behavioral/source tests and TypeScript/i18n/lint pass on uncommitted integration candidate; no exact-SHA or live provider/native evidence yet."
       ],
-      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate. A signed-in real device, deliverability, staffed acknowledgement/escalation and 911 handoff remain unverified."
     },
     {
       "id": "F010",
@@ -631,12 +633,15 @@
       "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/backend/voice.js",
       "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
       "evidence": [
-        "Inherited source review; revalidate against integration head."
+        "Inherited source review; revalidate against integration head.",
+        "Official pinned Twilio server SDK 6.1.2 and native Expo Voice SDK 1.8.0 integrated behind an explicit FCM/APNs/build flag. Native UI registers against a live Travel, rechecks token authority, provides incoming answer/reject and outgoing/hangup, never an unbacked call button. Signed Twilio call setup and assignment-specific identities reject an old Operator after reoffer; backend/voice.test.js and backend/nativevoice.test.js pass."
       ],
       "candidatePrs": [],
       "implementingCommit": null,
-      "verification": [],
-      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+      "verification": [
+        "Targeted local behavioral/source tests and TypeScript/i18n/lint pass on uncommitted integration candidate; no exact-SHA or live provider/native evidence yet."
+      ],
+      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate. Twilio account/TwiML/signed webhook values, correct Firebase FCM file, iOS APNs VoIP entitlement, real signed iOS/Android two-device incoming/outgoing/background/failed-call drills, voice costs and consent/retention decisions are absent. Feature remains withheld."
     },
     {
       "id": "F013",
@@ -829,12 +834,15 @@
       "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/backend/smart.js",
       "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
       "evidence": [
-        "Inherited source review; revalidate against integration head."
+        "Inherited source review; revalidate against integration head.",
+        "A same-boarding-stop changed transit itinerary is now server-requoted without changing the first paid car leg; the Traveler must explicitly adopt it or start a freshly priced direct trip. backend/smartcontinuation.test.js passes with mocked OTP."
       ],
       "candidatePrs": [],
       "implementingCommit": null,
-      "verification": [],
-      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+      "verification": [
+        "Targeted local behavioral/source tests and TypeScript/i18n/lint pass on uncommitted integration candidate; no exact-SHA or live provider/native evidence yet."
+      ],
+      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate. Live per-market GTFS/OTP rights, real fares, missed connections, refunds, accessible physical transfer and native-device drills remain unverified."
     },
     {
       "id": "F024",
@@ -1146,16 +1154,18 @@
       "source": "app/emergency.tsx; backend/tickets.js",
       "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
       "evidence": [
-        "A stable per-mounted-screen request id, stored-versus-emailed semantics, retry and explicit no-acknowledgement UI replace the one-shot misleading state."
+        "A stable per-mounted-screen request id, stored-versus-emailed semantics, retry and explicit no-acknowledgement UI replace the one-shot misleading state.",
+        "Thrown emergency filing is now caught with repeatable UI state; one request keeps the same case key and only claims stored/alert-accepted, not human response."
       ],
       "candidatePrs": [
         59
       ],
       "implementingCommit": null,
       "verification": [
-        "backend/emergencyretry.test.js; npm run check; actual 911 call/Resend delivery/staff acknowledgement NOT TESTED."
+        "backend/emergencyretry.test.js; npm run check; actual 911 call/Resend delivery/staff acknowledgement NOT TESTED.",
+        "Targeted local behavioral/source tests and TypeScript/i18n/lint pass on uncommitted integration candidate; no exact-SHA or live provider/native evidence yet."
       ],
-      "releaseCondition": "Exact-SHA CI plus live provider/index/operational verification before release."
+      "releaseCondition": "Exact-SHA CI plus live provider/index/operational verification before release. Provider-delivery drills, 24/7 staff and native tests remain unverified."
     },
     {
       "id": "F063",
@@ -1595,6 +1605,66 @@
         "Final working-tree npm run check PASS after Operator closing preflight and transactional renewal fence; candidate log sha256 9c5fce024907b3ec284de33e5d3694106fe53c74c666c59cca30f8a344f07f02. Live Firebase and real devices still untested."
       ],
       "releaseCondition": "Deploy the server and rules atomically; rehearse closing-vs-on-duty-renewal with real Firestore transactions and iOS/Android Operator background presence. Confirm no assigned Travel, safety push or new offered duty after account deletion begins."
+    },
+    {
+      "id": "F084",
+      "category": "commercial completion",
+      "title": "Operator offer acceptance could disappear before server confirmation and a lost response could falsely fail a committed acceptance",
+      "status": "FIXED",
+      "owner": "engineering / Operations",
+      "source": "app/operator/index.tsx; src/state/OperatorContext.tsx; backend/eligibility.js; backend/acceptance.test.js",
+      "sourceSha": "0477d2d2d1ccb1afa745a4d3ee3ccd844e6efff1",
+      "evidence": [
+        "app/operator/index.tsx; src/state/OperatorContext.tsx; backend/eligibility.js; backend/acceptance.test.js"
+      ],
+      "candidatePrs": [
+        59
+      ],
+      "implementingCommit": null,
+      "verification": [
+        "Operator server-first acceptance and paid same-Operator replay targeted tests passed."
+      ],
+      "releaseCondition": "Physical Operator two-device loss/retry, expiry, reassignment and payment drills remain unverified."
+    },
+    {
+      "id": "F085",
+      "category": "commercial completion",
+      "title": "Commissioned badge and Operator fare/insurance information required truthful pre-spend gates",
+      "status": "FIXED",
+      "owner": "engineering / Operations",
+      "source": "app/operator/commissioned.tsx; app/operator/economics.tsx; app/operator/insurance.tsx; src/i18n/*.ts",
+      "sourceSha": "0477d2d2d1ccb1afa745a4d3ee3ccd844e6efff1",
+      "evidence": [
+        "app/operator/commissioned.tsx; app/operator/economics.tsx; app/operator/insurance.tsx; src/i18n/*.ts"
+      ],
+      "candidatePrs": [
+        59
+      ],
+      "implementingCommit": null,
+      "verification": [
+        "TypeScript, five-language i18n and targeted UI source invariants passed; no signed-device usability study."
+      ],
+      "releaseCondition": "Human legal and insurance review of policy/copy; signed iOS/Android accessibility, procurement and eligibility checks; actual earnings/tax/coverage terms remain external."
+    },
+    {
+      "id": "F086",
+      "category": "commercial completion",
+      "title": "Voice reassignment and unsigned webhook allowed a previous Operator token to call the new assignment",
+      "status": "FIXED",
+      "owner": "engineering / Operations",
+      "source": "backend/voice.js; backend/server.js; backend/voice.test.js; src/state/VoiceContext.tsx",
+      "sourceSha": "0477d2d2d1ccb1afa745a4d3ee3ccd844e6efff1",
+      "evidence": [
+        "backend/voice.js; backend/server.js; backend/voice.test.js; src/state/VoiceContext.tsx"
+      ],
+      "candidatePrs": [
+        59
+      ],
+      "implementingCommit": null,
+      "verification": [
+        "Targeted signed-callback and old/new assignment behavioral tests passed with synthetic Twilio tokens."
+      ],
+      "releaseCondition": "Production Twilio callback URL/signature, signer config, short-lifetime reoffer and device denial tests required before feature flag can turn on."
     }
   ],
   "features": [
@@ -1620,7 +1690,8 @@
       "objective": "Complete and verify if technically, economically, legally and operationally supportable.",
       "launchState": "INTENTIONALLY WITHHELD FROM LAUNCH",
       "attemptedWork": [
-        "Existing OTP-backed transit plan, revalidation, two separately paid car legs, one journey fee and honest unknown agency fare remain wired; source regression suites cover saved continuation and provider-failure paths."
+        "Existing OTP-backed transit plan, revalidation, two separately paid car legs, one journey fee and honest unknown agency fare remain wired; source regression suites cover saved continuation and provider-failure paths.",
+        "Source now offers only a same-boarding-stop server-requoted itinerary after a changed transit service, with explicit adoption; first paid car leg remains immutable. A fresh direct Travel uses the ordinary price-confirmation path. Mocked OTP tests pass."
       ],
       "withholdingReason": "Live per-market OTP graph/GTFS feed, actual timetable/fare currency, transfer/missed-connection handling, transit operator terms and device tests have not been verified; no real transit operator or 24/7 assistance is contracted.",
       "releaseLaterRequirements": [
@@ -1712,13 +1783,14 @@
       "objective": "Complete and verify if technically, economically, legally and operationally supportable.",
       "launchState": "INTENTIONALLY WITHHELD FROM LAUNCH",
       "attemptedWork": [
-        "Backend Twilio token/TwiML identity authorization and route tests exist; code search found no mobile voice client or native Voice SDK in the bundle. Android microphone permission was removed instead of exposing a dead call control."
+        "Backend Twilio token/TwiML identity authorization and route tests exist; code search found no mobile voice client or native Voice SDK in the bundle. Android microphone permission was removed instead of exposing a dead call control.",
+        "Twilio 1.8 Expo and server SDK installed; opt-in Android/iOS build config, authenticated current-Travel native registration/answer/reject/outgoing/hangup, signed Twilio webhook and assignment-rotating identities are source-tested without provider credentials. The feature stays OFF by default."
       ],
-      "withholdingReason": "Twilio native SDK integration needs account/TwiML credentials, native prebuild/entitlements and real call connect/reconnect/device privacy tests. The API alone cannot place an in-app call.",
+      "withholdingReason": "No configured Twilio account/TwiML/signed callback or FCM/APNs credentials; signed device ringing, background recovery, two-party audio, call privacy/consent and ongoing cost have not been tested or approved. Source integration alone does not permit launch.",
       "releaseLaterRequirements": [
-        "Provision provider account/credentials and number/consent/call-retention policy",
-        "Integrate compatible native SDK and iOS/Android microphone entitlements only then",
-        "Test masked two-party calls, denial, offline, dropped calls and emergency fallback on devices"
+        "Provision Twilio account/API/Auth Token/TwiML app with exact HTTPS callback URL; approve call-cost, abuse, consent and retention policies",
+        "Provide real Android Firebase google-services.json and iOS APNs VoIP entitlement matching the signed build; only then set the native build flag",
+        "On physical iOS and Android devices test permission refusal, simultaneous calls, two-party audio, incoming while locked/backgrounded, expired/rotated tokens, reoffer, cancellation, disconnection and disabled-provider fallback"
       ]
     },
     {

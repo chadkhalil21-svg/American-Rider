@@ -662,7 +662,10 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
 
   const acceptRequest = useCallback(
     async (r: SimRequest) => {
-      setIncoming(null);
+      if (!r.tripNo && !r.rideId) {
+        setOnlineError(tr('traveler.travelIdentityUnavailable'));
+        return false;
+      }
       // THE SERVER DECIDES, AND FIRST. This wrote 'accepted' to the travel and moved the
       // operator on in the same breath, whatever the write's outcome. POST /travel/accept now
       // re-checks eligibility at this moment, so nothing on this phone changes until it says
@@ -687,10 +690,7 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
       // and a label describing something the value is not. `tripNo` arrives on every
       // dispatched request (see SimRequest); rideId stays the fallback only for a record old
       // enough to predate it, and the scripted number for the test program.
-      if (!r.tripNo && !r.rideId) {
-        setOnlineError(tr('traveler.travelIdentityUnavailable'));
-        return false;
-      }
+      setIncoming(null);
       setOp({ ...r, no: r.tripNo || r.rideId!, earn: earnOf(r.fare) });
       setArrived(false);
       setMsgs([]);

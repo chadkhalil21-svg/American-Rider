@@ -3,7 +3,7 @@
   "branch": "integrate/commercial-completion-2026-10-03",
   "baseSha": "f749644c862e1da128359ddf2693a95506b9b52a",
   "candidateSha": "7bca3cc2cec25ed91403dd89c8585a9005943c80",
-  "generatedAt": "2026-10-04T02:13:22.734165+00:00",
+  "generatedAt": "2026-10-04T02:33:31.045224+00:00",
   "allowedStatuses": [
     "FIXED",
     "VERIFIED ALREADY FIXED",
@@ -20,7 +20,8 @@
     "Initial seed from inherited evidence, not an exhaustive control inventory or certification.",
     "PR #56 candidate integrated at 7bca3cc2cec25ed91403dd89c8585a9005943c80 and locally checked; PR #57 transient patches and PR #58 inventory generator are under integration and are not yet a verified final release.",
     "Targeted WS14 source/official-documentation review completed at architecture-review/lanes/WS14.md; security/DR code and deployed controls remain unverified.",
-    "A feature is withheld only after reasonable completion/verification work and precise unresolved reason."
+    "A feature is withheld only after reasonable completion/verification work and precise unresolved reason.",
+    "No commercial feature was marked launch-ready by this source-only checkpoint; the existing statuses remain open until final exact-SHA and external evidence."
   ],
   "records": [
     {
@@ -485,7 +486,8 @@
       "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
       "evidence": [
         "Inherited source review; revalidate against integration head.",
-        "Scheduled create pricing predicate repaired; off-session charge metadata extended to rideId (caller still to be integrated). Full scheduled transaction not yet repaired."
+        "Scheduled create pricing predicate repaired; off-session charge metadata extended to rideId (caller still to be integrated). Full scheduled transaction not yet repaired.",
+        "Scheduler stages one deterministic ride before charge, verifies amount and ownership, reserves Operator transactionally, bounds due-time scan with new composite index, retries orphan charges/refunds without a phone."
       ],
       "candidatePrs": [
         56,
@@ -493,9 +495,10 @@
       ],
       "implementingCommit": null,
       "verification": [
-        "backend/sched.test.js; npm run check (local)"
+        "backend/sched.test.js; npm run check (local)",
+        "backend/sched.test.js (23/23); backend/bookingrecovery.test.js; backend/webhookrecovery.test.js; npm run check local"
       ],
-      "releaseCondition": "Do not mark commercial PASS until exact-SHA CI plus credentialed provider, real Firestore concurrency, physical device and relevant operational evidence are captured; unresolved items remain launch blockers."
+      "releaseCondition": "Exact-SHA CI plus provider, device, operational, legal/insurance and live data evidence appropriate to this control; source-level local tests are not commercial release certification."
     },
     {
       "id": "F007",
@@ -527,14 +530,16 @@
       "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
       "evidence": [
         "Inherited source review; revalidate against integration head.",
-        "Guardian paid-assignment alert restored; Teen PIN provisioning and retry still needs safety proof."
+        "Guardian paid-assignment alert restored; Teen PIN provisioning and retry still needs safety proof.",
+        "Teen pickup PIN is keyed, retry-stable, provisioned before any offer/charge; five-attempt lockout and authorized Guardian on-demand recovery; Guardian-booked Teen Travel now appears in active tracking."
       ],
       "candidatePrs": [],
       "implementingCommit": null,
       "verification": [
-        "backend/family.test.js; npm run check (local)"
+        "backend/family.test.js; npm run check (local)",
+        "backend/teenpickup.test.js; backend/familytracking.test.js; npm run check local"
       ],
-      "releaseCondition": "Do not mark commercial PASS until exact-SHA CI plus credentialed provider, real Firestore concurrency, physical device and relevant operational evidence are captured; unresolved items remain launch blockers."
+      "releaseCondition": "Exact-SHA CI plus provider, device, operational, legal/insurance and live data evidence appropriate to this control; source-level local tests are not commercial release certification."
     },
     {
       "id": "F009",
@@ -664,14 +669,16 @@
       "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
       "evidence": [
         "Inherited source review; revalidate against integration head.",
-        "Added Firebase Admin verifyIdToken(token,true) to sensitive money/transport mutations; privileged Ops IAM, revocation/latency at scale still open."
+        "Added Firebase Admin verifyIdToken(token,true) to sensitive money/transport mutations; privileged Ops IAM, revocation/latency at scale still open.",
+        "Sensitive transport/storage mutations check revoked/disabled Firebase tokens; Ops production requires named MFA, one-use Firestore OTP step, independent signed 12-hour cookie and secret."
       ],
       "candidatePrs": [],
       "implementingCommit": null,
       "verification": [
-        "backend/auth.js; backend/server.js; npm run check (local)"
+        "backend/auth.js; backend/server.js; npm run check (local)",
+        "backend/opssecurity.test.js; backend/qualification.test.js; npm run check local"
       ],
-      "releaseCondition": "Do not mark commercial PASS until exact-SHA CI plus credentialed provider, real Firestore concurrency, physical device and relevant operational evidence are captured; unresolved items remain launch blockers."
+      "releaseCondition": "Exact-SHA CI plus provider, device, operational, legal/insurance and live data evidence appropriate to this control; source-level local tests are not commercial release certification."
     },
     {
       "id": "F017",
@@ -682,12 +689,15 @@
       "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/backend/r2.js",
       "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
       "evidence": [
-        "Inherited source review; revalidate against integration head."
+        "Inherited source review; revalidate against integration head.",
+        "Replaced ordinary Anthropic image document reading with pinned local Tesseract WASM and bundled language; every result remains pending qualified human review and independent insurer/CRA authority."
       ],
       "candidatePrs": [],
       "implementingCommit": null,
-      "verification": [],
-      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+      "verification": [
+        "backend/localocr.test.js synthetic smoke; backend/documents.test.js; backend/qualification.test.js; npm run check local"
+      ],
+      "releaseCondition": "Exact-SHA CI plus provider, device, operational, legal/insurance and live data evidence appropriate to this control; source-level local tests are not commercial release certification."
     },
     {
       "id": "F018",
@@ -730,12 +740,15 @@
       "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/backend/push.js",
       "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
       "evidence": [
-        "Inherited source review; revalidate against integration head."
+        "Inherited source review; revalidate against integration head.",
+        "Guardian can retrieve authorized Teen pickup code in-app when push is delayed; general delivery receipts/escalation remain unresolved."
       ],
       "candidatePrs": [],
       "implementingCommit": null,
-      "verification": [],
-      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+      "verification": [
+        "app/family-travel.tsx; backend/server.js /travel/teen-pickup/code; npm run check local"
+      ],
+      "releaseCondition": "Exact-SHA CI plus provider, device, operational, legal/insurance and live data evidence appropriate to this control; source-level local tests are not commercial release certification."
     },
     {
       "id": "F021",
@@ -906,6 +919,166 @@
       "implementingCommit": null,
       "verification": [],
       "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+    },
+    {
+      "id": "F053",
+      "category": "new-source-finding",
+      "title": "Scheduled saved fare drift",
+      "status": "NOT TESTED",
+      "owner": "Backend",
+      "source": "backend/scheduler.js",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Stale fare is now compared with current quote before charge; mismatch closes reservation without taking money."
+      ],
+      "candidatePrs": [
+        59
+      ],
+      "implementingCommit": null,
+      "verification": [
+        "backend/sched.test.js (simulated); exact live pricing authority still open."
+      ],
+      "releaseCondition": "Confirm exact implementing SHA and appropriate live/provider/device/operational evidence before commercial release."
+    },
+    {
+      "id": "F054",
+      "category": "new-source-finding",
+      "title": "Charged scheduled Travel orphan after database write failure",
+      "status": "NOT TESTED",
+      "owner": "Backend",
+      "source": "backend/scheduler.js; backend/bookingrecovery.js",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Booking exists before charge; Stripe webhook and scheduled reservation PI support two independent recovery paths to refund."
+      ],
+      "candidatePrs": [
+        59
+      ],
+      "implementingCommit": null,
+      "verification": [
+        "backend/sched.test.js failure injection; backend/bookingrecovery.test.js; live provider replay open."
+      ],
+      "releaseCondition": "Confirm exact implementing SHA and appropriate live/provider/device/operational evidence before commercial release."
+    },
+    {
+      "id": "F055",
+      "category": "new-source-finding",
+      "title": "Metered general-purpose model was ordinary document reader",
+      "status": "NOT TESTED",
+      "owner": "Backend/Operations",
+      "source": "backend/documents.js",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Local OCR extracts deterministically; all uncertain original documents require human exception review; paid model call removed from this path."
+      ],
+      "candidatePrs": [
+        59
+      ],
+      "implementingCommit": null,
+      "verification": [
+        "backend/localocr.test.js; no labelled-document benchmark or human reviewer capacity evidence."
+      ],
+      "releaseCondition": "Confirm exact implementing SHA and appropriate live/provider/device/operational evidence before commercial release."
+    },
+    {
+      "id": "F056",
+      "category": "new-source-finding",
+      "title": "Privileged Ops password-derived indefinite session and no MFA",
+      "status": "NOT TESTED",
+      "owner": "Security/Operations",
+      "source": "backend/ops.js",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Production Ops now requires MFA, one-use server-recorded OTP and expiring signed session; credentials not provisioned."
+      ],
+      "candidatePrs": [
+        59
+      ],
+      "implementingCommit": null,
+      "verification": [
+        "backend/opssecurity.test.js and RFC 6238; external enrollment and identity/access policy open."
+      ],
+      "releaseCondition": "Confirm exact implementing SHA and appropriate live/provider/device/operational evidence before commercial release."
+    },
+    {
+      "id": "F057",
+      "category": "new-source-finding",
+      "title": "Four-digit Teen PIN stored as offline-brute-forceable hash and created after offer",
+      "status": "NOT TESTED",
+      "owner": "Safety/Backend",
+      "source": "backend/teenpickup.js",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Secret-keyed stable code now staged before paid offer; no secret means Teen flow stops before money moves."
+      ],
+      "candidatePrs": [
+        59
+      ],
+      "implementingCommit": null,
+      "verification": [
+        "backend/teenpickup.test.js; external secret, human custody training and real devices open."
+      ],
+      "releaseCondition": "Confirm exact implementing SHA and appropriate live/provider/device/operational evidence before commercial release."
+    },
+    {
+      "id": "F058",
+      "category": "new-source-finding",
+      "title": "Guardian-booked Teen Travel absent from Guardian active tracking",
+      "status": "NOT TESTED",
+      "owner": "Family/Backend",
+      "source": "backend/family.js",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Bounded query now filters by Guardian authorization in party rather than travelerUid only; live follow link already existed."
+      ],
+      "candidatePrs": [
+        59
+      ],
+      "implementingCommit": null,
+      "verification": [
+        "backend/familytracking.test.js; deployed Firestore index and live tracking proof open."
+      ],
+      "releaseCondition": "Confirm exact implementing SHA and appropriate live/provider/device/operational evidence before commercial release."
+    },
+    {
+      "id": "F059",
+      "category": "new-source-finding",
+      "title": "Required scheduled and Guardian Firestore indexes not deployed",
+      "status": "LAUNCH BLOCKER",
+      "owner": "Infrastructure",
+      "source": "firestore.indexes.json",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Declared composite indexes in source; production deployment and query probes not performed."
+      ],
+      "candidatePrs": [
+        59
+      ],
+      "implementingCommit": null,
+      "verification": [
+        "firebase.json includes firestore.indexes.json; external deploy evidence open."
+      ],
+      "releaseCondition": "Confirm exact implementing SHA and appropriate live/provider/device/operational evidence before commercial release."
+    },
+    {
+      "id": "F060",
+      "category": "new-source-finding",
+      "title": "Family link can be revoked after Teen booking preparation but before assignment",
+      "status": "LAUNCH BLOCKER",
+      "owner": "Safety/Backend",
+      "source": "backend/family.js; backend/server.js",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Dispatch-time family revocation transaction remains to be completed; scheduled dispatch checks it before charge."
+      ],
+      "candidatePrs": [
+        59
+      ],
+      "implementingCommit": null,
+      "verification": [
+        "NOT TESTED; close before Teen release."
+      ],
+      "releaseCondition": "Confirm exact implementing SHA and appropriate live/provider/device/operational evidence before commercial release."
     }
   ],
   "features": [
@@ -914,7 +1087,9 @@
       "linkedFinding": "F008",
       "objective": "Complete and verify if technically, economically, legally and operationally supportable.",
       "launchState": "UNDER_REVIEW",
-      "attemptedWork": [],
+      "attemptedWork": [
+        "Secret-keyed pre-offer PIN, Guardian in-app recovery, and Guardian-booked active tracking implemented/tested locally; revocation race, physical custody, delivery and credential gates remain."
+      ],
       "withholdingReason": null,
       "releaseLaterRequirements": []
     },
@@ -941,7 +1116,9 @@
       "linkedFinding": "F006",
       "objective": "Complete and verify if technically, economically, legally and operationally supportable.",
       "launchState": "UNDER_REVIEW",
-      "attemptedWork": [],
+      "attemptedWork": [
+        "Deterministic staged ride, saved-fare verification, scheduled charge metadata, atomic offer and unattended orphan reconciliation implemented; local 23-case scheduler suite passes. Index deployment and provider/device proof open."
+      ],
       "withholdingReason": null,
       "releaseLaterRequirements": []
     },
@@ -1027,25 +1204,31 @@
       "id": 1,
       "status": "NOT TESTED",
       "evidence": [
-        "Local implementation candidate: keyed booking, provider-confirmed payment-before-offer, one-Operator transaction, same-Travel reoffer, bounded refund recovery; npm run check passed on working copy; no credentialed Stripe/Firestore or device tests. Phase remains NOT TESTED for commercial release."
+        "Local implementation candidate: keyed booking, provider-confirmed payment-before-offer, one-Operator transaction, same-Travel reoffer, bounded refund recovery; npm run check passed on working copy; no credentialed Stripe/Firestore or device tests. Phase remains NOT TESTED for commercial release.",
+        "Scheduled charging and unattended refunds now follow canonical paid booking; local suite PASS, credentialed integration open."
       ]
     },
     {
       "id": 2,
       "status": "NOT TESTED",
-      "evidence": []
+      "evidence": [
+        "Pinned local OCR implemented; zero marginal generative-AI API calls for ordinary documents; qualified review and insurer/CRA proof external."
+      ]
     },
     {
       "id": 3,
       "status": "NOT TESTED",
       "evidence": [
-        "WS14 source/primary guidance review completed in /home/ubuntu/architecture-review/lanes/WS14.md; controls and deployment evidence remain open."
+        "WS14 source/primary guidance review completed in /home/ubuntu/architecture-review/lanes/WS14.md; controls and deployment evidence remain open.",
+        "Ops MFA/signed sessions, revocation checks and Firestore index declarations added; deployed MFA, index, backup/restore and privileged operations still open."
       ]
     },
     {
       "id": 4,
       "status": "NOT TESTED",
-      "evidence": []
+      "evidence": [
+        "Teen PIN code and Guardian tracking/recovery repairs tested locally; other product journeys still under review."
+      ]
     },
     {
       "id": 5,

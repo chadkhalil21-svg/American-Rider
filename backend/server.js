@@ -47,7 +47,7 @@ const LIMITS = {
   // somebody in trouble has failed at the one thing it must not fail at.
   emergency: countOnly({ name: 'emergency', limit: 6, windowMs: 60 * 60 * 1000 }),
   // COST CONTROLS (22 Sept 2026). Each of these calls something that costs money or reaches a
-  // third party: the document reader (a model call), screening support workflow, Stripe, push notifications,
+  // third party: screening support workflow, Stripe, push notifications; document OCR runs locally,
   // the routers. The client cannot be trusted to hold back, so the server does. Generous for a
   // real person — nobody photographs a licence 20 times an hour — and a hard stop for a loop.
   document: perAccount({ name: 'document', limit: 20, windowMs: 60 * 60 * 1000 }),
@@ -129,7 +129,7 @@ const {
 } = require('./insurance-monitoring');
 const { normalizeParty, operatorPartyView } = require('./travelparty');
 const family = require('./family');
-const { provisionTeenPin, verifyTeenPin } = require('./teenpickup');
+const { provisionTeenPin, verifyTeenPin, teenPinReady, pinForRide } = require('./teenpickup');
 const { listPlatformMessages, markPlatformMessageRead } = require('./platforminbox');
 const { page } = require('./shell');
 const { screeningReady, screeningCurrent, sweepScreening } = require('./screening');
@@ -1765,7 +1765,8 @@ async function runAllSweeps() {
     sweepScreening(),
     sweepSettlements(),
     sweepBookingRecovery({ db: adminDb(), stripeConfigured: keyMode !== 'no-key',
-      deps: { refundableFor, refundTravel, cancelUnpaidIntent, transferFixed, operatorPayoutAccount } }),
+      deps: { refundableFor, refundTravel, cancelUnpaidIntent, verifiedTravelPayment,
+        transferFixed, operatorPayoutAccount } }),
     sweepProviderEvents({ handlers: PROVIDER_HANDLERS, workerId: WORKER_ID }),
     sweepOperatorAccountFees({
       charge: ({ uid, email, month, amountCents }) =>
@@ -1842,7 +1843,7 @@ async function runSweep(req, res) {
 // --- Private file storage. -----------------------------------------------------------------
 // The mobile app may request a five-minute upload URL only for its own namespace. R2 remains
 // private; credentials never leave this server. Object keys, not public URLs, are persisted.
-app.post('/storage/upload-url', requireAuth, LIMITS.document, async (req, res) => {
+app.post('/storage/upload-url', requireAuth, LIMITS.document, requireFreshAuth, async (req, res) => {
   if (!r2Ready()) return res.status(503).json({ error: 'Private storage is not configured.', code: 'storage_not_configured' });
   const purpose = String(req.body?.purpose || '');
   const kind = String(req.body?.kind || '');
@@ -1854,7 +1855,7 @@ app.post('/storage/upload-url', requireAuth, LIMITS.document, async (req, res) =
   } catch (e) { return res.status(502).json({ error: e.message, code: 'storage_sign_failed' }); }
 });
 
-app.get('/storage/object', requireAuth, LIMITS.document, async (req, res) => {
+app.get('/storage/object', requireAuth, LIMITS.document, requireFreshAuth, async (req, res) => {
   const key = String(req.query?.key || '');
   const purpose = String(req.query?.purpose || '');
   if (!r2Owns(key, req.uid, purpose)) return res.status(403).json({ error: 'That file belongs to another account' });
@@ -1872,7 +1873,7 @@ app.get('/storage/object', requireAuth, LIMITS.document, async (req, res) => {
 // information about transactions or experiences between the consumer and the report-maker.
 // Nothing here is looked up about the person — see the header of backend/documents.js for the
 // other edge of that line, which is CFPB Circular 2024-06.
-app.post('/operator/document', requireAuth, LIMITS.document, async (req, res) => {
+app.post('/operator/document', requireAuth, LIMITS.document, requireFreshAuth, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
 
@@ -1897,14 +1898,14 @@ app.post('/operator/document', requireAuth, LIMITS.document, async (req, res) =>
     const u = userSnap.exists ? userSnap.data() : {};
     const o = opSnap.exists ? opSnap.data() : {};
 
-    // ONLY IN AN ACTIVE MARKET. Reading a document is a paid model call and the start of a
+    // ONLY IN AN ACTIVE MARKET. Reviewing a document starts a
     // regulated workflow; an operator whose declared operating market is on the waitlist gets
     // neither. See POST /operator/market.
     const gate = operatingMarketGate(u);
     if (gate) return res.status(409).json(gate);
 
     // THE SAME UPLOAD IS READ ONCE. A retry, a double tap or a loop that re-sends one file gets
-    // the stored reading back instead of another model call.
+    // the stored reading back instead of consuming another OCR/human-review slot.
     const prior = u.documents?.[kind];
     if (prior && prior.objectKey === objectKey && prior.evidence && prior.readerVersion === READER_VERSION) {
       return res.json({ verdict: prior.verdict, reasons: prior.reasons || [], summary: prior.summary || '', expiry: prior.expiry || null, repeated: true });
@@ -2949,6 +2950,7 @@ app.post('/travel/prepare', requireAuth, LIMITS.dispatch, requireFreshAuth, requ
       : await normalizeParty(b, { uid: req.uid, name: req.name || b.bookerName || b.travelerName || '' });
     if (!partyResult.ok) return res.status(400).json({ error: partyResult.error, code: partyResult.code });
     const party = partyResult.party;
+    if (party.teen && !teenPinReady()) return res.status(503).json({ error: 'Teen pickup security is unavailable', code: 'teen_pin_unavailable' });
     const raw = b.cabinPreferences && typeof b.cabinPreferences === 'object' ? b.cabinPreferences : {};
     const cabinPreferences = {
       climate: ['Cool', 'Moderate', 'Warm'].includes(String(raw.climate)) ? String(raw.climate) : 'Moderate',
@@ -2974,6 +2976,9 @@ app.post('/travel/prepare', requireAuth, LIMITS.dispatch, requireFreshAuth, requ
       pricedBy: priced.pricedBy, cardCountry: priced.cardCountry,
       journey: priced.journey || null, cabinPreferences,
     } });
+    if (party.teen && [200,201].includes(outcome.status)) {
+      await provisionTeenPin({ rideRef: db.collection('rides').doc(id), rideId: id, party });
+    }
     return res.status(outcome.status).json({ ...outcome.body, amountCents: priced.travelerPays });
   } catch (e) { return res.status(502).json({ error: e.message, code: 'prepare_unavailable' }); }
 });
@@ -2998,6 +3003,8 @@ app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, requireFreshAuth, req
     if (!paymentMatches(ride, payment, req.uid, id)) {
       return res.status(409).json({ error: 'Payment is not confirmed for this Travel', code: 'payment_unconfirmed' });
     }
+    if (ride.party?.teen && !teenPinReady()) return res.status(503).json({ error: 'Teen pickup security is unavailable', code: 'teen_pin_unavailable' });
+    const teen = await provisionTeenPin({ rideRef: ref, rideId: id, party: ride.party });
     const pickup = { lat: Number(ride.pickupLat), lng: Number(ride.pickupLng) };
     if (!servesPoint(pickup)) return res.status(409).json({ error: outsideMarketMessage('pickup'), code: 'outside_market' });
     let candidate = null;
@@ -3011,8 +3018,7 @@ app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, requireFreshAuth, req
     if (outcome.status !== 200) return res.status(outcome.status).json(outcome.body);
     if (outcome.body.matched && !outcome.body.reused) {
       // Non-delivery cannot roll back the money/assignment transaction. The assignment sweep
-      // retries missing notifications. Teen PIN errors must remain visible in Ops before launch.
-      const teen = await provisionTeenPin({ rideRef: ref, rideId: id, party: ride.party });
+      // retries missing notifications. The Teen code was provisioned before the offer.
       if (teen.required && ride.party?.teenUid) await notify({ uid: ride.party.teenUid, kind: 'teen_pickup_code', title: 'Your pickup code', body: `Give ${teen.pin} to your Operator after confirming the vehicle and Operator.`, data: { screen: '/ride', rideId: id, tripNo: ride.tripNo } });
       if (teen.required && ride.party?.guardianUid && ride.party.guardianUid !== ride.party.teenUid) {
         await notify({ uid: ride.party.guardianUid, kind: 'guardian_travel', title: 'Teen Travel assigned',
@@ -3057,8 +3063,10 @@ app.post('/travel/schedule', requireAuth, LIMITS.dispatch, requireFreshAuth, req
   const pickup = { lat: Number(b.pickup?.lat), lng: Number(b.pickup?.lng) };
   const destinationPoint = { lat: Number(b.destinationPoint?.lat), lng: Number(b.destinationPoint?.lng) };
   const atMs = Number(b.atMs);
-  if (!Number.isFinite(pickup.lat) || !Number.isFinite(pickup.lng) || !Number.isFinite(atMs)) {
-    return res.status(400).json({ error: 'A pickup position and scheduled time are required' });
+  if (!Number.isFinite(pickup.lat) || !Number.isFinite(pickup.lng) ||
+      !Number.isFinite(destinationPoint.lat) || !Number.isFinite(destinationPoint.lng) ||
+      !Number.isFinite(atMs)) {
+    return res.status(400).json({ error: 'Pickup, destination and scheduled time require verified positions', code: 'route_geometry_required' });
   }
   if (atMs <= Date.now()) {
     return res.status(400).json({ error: 'Scheduled Travel must be set for a future time.', code: 'scheduled_time_required' });
@@ -3174,7 +3182,20 @@ app.post('/voice/connect', async (req, res) => {
   }
 });
 
-app.post('/travel/teen-pickup/verify', requireAuth, async (req,res)=>{const out=await verifyTeenPin({rideId:req.body?.rideId,operatorUid:req.uid,pin:req.body?.pin});return res.status(out.status||500).json(out);});
+app.get('/travel/teen-pickup/code', requireAuth, LIMITS.document, requireFreshAuth, async (req,res)=>{
+  const id=String(req.query?.rideId||'');
+  if(!/^[a-f0-9]{40}$/.test(id))return res.status(400).json({error:'Travel id is required'});
+  if(!teenPinReady())return res.status(503).json({error:'Teen pickup security is unavailable',code:'teen_pin_unavailable'});
+  const db=adminDb();if(!db)return res.status(503).json({error:adminStatus().reason});
+  const snap=await db.collection('rides').doc(id).get();
+  if(!snap.exists)return res.status(404).json({error:'No such Travel'});
+  const ride=snap.data()||{},party=ride.party||{};
+  if(party.teen!==true||![String(party.teenUid),String(party.guardianUid)].includes(String(req.uid)))return res.status(403).json({error:'Not authorized for this Teen Travel'});
+  if(!['assigned','accepted','arrived'].includes(ride.status)||!ride.teenPickup?.required||ride.teenPickup.verifiedAt||Number(ride.teenPickup.failedAttempts||0)>=5)return res.status(409).json({error:'Pickup code is not available in this Travel state'});
+  try{return res.json({rideId:id,tripNo:ride.tripNo||'',pin:pinForRide(id,ride.teenPickup.hash)});}
+  catch{return res.status(503).json({error:'Pickup code needs secure assistance',code:'teen_pin_unavailable'});}
+});
+app.post('/travel/teen-pickup/verify', requireAuth, requireFreshAuth, async (req,res)=>{const out=await verifyTeenPin({rideId:req.body?.rideId,operatorUid:req.uid,pin:req.body?.pin});return res.status(out.status||500).json(out);});
 // One server-stamped three-party thread. The client supplies words and the Travel id; the
 // server derives every participant id from the Travel so nobody can forge a correspondent.
 app.post('/travel/message', requireAuth, async (req,res)=>{

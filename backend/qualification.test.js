@@ -219,7 +219,10 @@ const codes = (a) => a.blockers.map((b) => b.code);
     delete process.env.INSURANCE_UM_REJECTION_ACCEPTED;
     check('4b. the legacy summary limit remains a conservative pre-check while structured statutory evidence is also enforced', C({}, { limits: '$300,000' }).includes('insurance_limits_insufficient'));
     const src = fs.readFileSync(path.join(__dirname, 'documents.js'), 'utf8');
-    check('4b. the reader is not asked whether the policy complies', !/compliant|complies with|meets florida/i.test(src.slice(src.indexOf('const INSURANCE'), src.indexOf('const SCHEMA'))));
+    check('4b. ordinary document review uses local OCR and never calls a metered model',
+      /require\('\.\/localocr'\)/.test(src) && !/Anthropic|messages\.create|ANTHROPIC_API_KEY/.test(src));
+    check('4b. OCR cannot approve insurance without a human and independent continuing-status evidence',
+      /verdict:'review'/.test(src) && /required = 'A qualified person/.test(src));
   }
 
   // ——— 5. Checkr screening in production ————————————————————————————————————————————
@@ -403,11 +406,13 @@ const codes = (a) => a.blockers.map((b) => b.code);
     }
     delete process.env.OPS_ALLOW_SHARED_PASSWORD;
     check('10b. unset (the default) keeps it closed in production', ops.opsAccounts().length === 0 && ops.sharedMode() === 'off');
+    process.env.OPS_SESSION_SECRET = 'qualified-operations-session-key-for-tests-only';
+    process.env.OPS_MFA_SECRETS = 'ops-shared-emergency:GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ,alice:GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
     process.env.OPS_ALLOW_SHARED_PASSWORD = 'emergency';
     check('10b. production emergency switch: allowed, recorded as "ops-shared-emergency"', ops.opsAccounts().map((a) => a.name).join() === 'ops-shared-emergency' && ops.opsAuthMode() === 'shared-emergency');
     process.env.OPS_USERS = 'alice:correct-horse-battery';
     check('10b. named users win over the shared password everywhere', ops.opsAccounts().map((a) => a.name).join() === 'alice' && ops.opsAuthMode() === 'named');
-    for (const k of ['OPS_USERS', 'OPS_PASSWORD', 'OPS_ALLOW_SHARED_PASSWORD', 'RENDER']) delete process.env[k];
+    for (const k of ['OPS_USERS', 'OPS_PASSWORD', 'OPS_ALLOW_SHARED_PASSWORD', 'RENDER', 'OPS_SESSION_SECRET', 'OPS_MFA_SECRETS']) delete process.env[k];
   }
 
   // ——— the pieces ————————————————————————————————————————————————————————————————

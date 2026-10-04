@@ -10,19 +10,28 @@ function makeDb(seed) {
   const data = JSON.parse(JSON.stringify(seed));
   let addCount = 0;
   let addShouldThrow = false;
+  let attachShouldThrow = false;
   const docRef = (col, id) => ({
-    __col: col, __id: id,
+    __col: col, __id: id, id,
     async get() {
       const d = data[col]?.[id];
       return { exists: !!d, id, data: () => JSON.parse(JSON.stringify(d)) };
     },
     async set(fields, opts) {
+      if (attachShouldThrow && col === 'rides' && fields.paymentIntentId) throw new Error('payment attachment failed (simulated)');
       data[col] = data[col] || {};
       data[col][id] = opts?.merge ? { ...(data[col][id] || {}), ...fields } : { ...fields };
+    },
+    async create(fields) {
+      if (addShouldThrow) throw new Error('permission denied (simulated)');
+      data[col] = data[col] || {};
+      if (data[col][id]) throw new Error('already exists');
+      data[col][id] = { ...fields };
     },
     async update(fields) { Object.assign(data[col][id], fields); },
   });
   const db = {
+    __data: data,
     collection: (col) => ({
       doc: (id) => docRef(col, id),
       where: (field, op, val) => {
@@ -35,7 +44,12 @@ function makeDb(seed) {
         return {
           async get() { return snap(rowsFor()); },
           limit: (n) => ({ async get() { return snap(rowsFor().slice(0, n)); } }),
-          orderBy: () => ({ startAt: () => ({ endAt: () => ({ limit: (n) => ({ async get() { return snap(rowsFor().slice(0, n)); } }) }) }) }),
+          orderBy: (sortField) => ({
+            limit: (n) => ({ async get() {
+              return snap(rowsFor().sort((a,b) => Number(a[1][sortField]) - Number(b[1][sortField])).slice(0,n));
+            } }),
+            startAt: () => ({ endAt: () => ({ limit: (n) => ({ async get() { return snap(rowsFor().slice(0,n)); } }) }) }),
+          }),
         };
       },
       async get() {
@@ -54,19 +68,27 @@ function makeDb(seed) {
       return fn({
         get: (ref) => ref.get(),
         update: (ref, fields) => { Object.assign(data[ref.__col][ref.__id], fields); },
+        create: (ref, fields) => { if (addShouldThrow) throw new Error('permission denied (simulated)'); data[ref.__col] = data[ref.__col] || {}; if (data[ref.__col][ref.__id]) throw new Error('already exists'); data[ref.__col][ref.__id] = { ...fields }; },
       });
     },
   };
-  return { db, data, failAdds: () => { addShouldThrow = true; } };
+  return { db, data, failAdds: () => { addShouldThrow = true; }, failPaymentAttach: () => { attachShouldThrow = true; } };
 }
 
 // ---- inject stubs BEFORE scheduler.js is required ------------------------------------
-let charge = async () => ({ ok: true, paymentIntentId: 'pi_fake', chargedCents: 2600 });
+let charge = async (opts) => ({ ok: true, paymentIntentId: `pi_${opts.reservationId}`, chargedCents: 2720 });
 const tickets = [];
 function inject(dbHandle) {
+  const pricing = require('./payments').quote || require(path.join(ROOT, 'payments.js')).quote;
   for (const [rel, exports] of [
     ['./firebase-admin.js', { adminDb: () => dbHandle, adminStatus: () => ({ ok: true, reason: null }) }],
-    ['./payments.js', { chargeScheduledTravel: (...a) => charge(...a), connectAccountStatus: async () => ({ payoutsEnabled:true }) }],
+    ['./payments.js', { quote: pricing,
+      chargeScheduledTravel: (...a) => charge(...a), connectAccountStatus: async () => ({ payoutsEnabled:true }),
+      verifiedTravelPayment: async (id) => {
+        const [rideId, ride] = Object.entries(dbHandle.__data.rides || {}).find(([,r]) => r.paymentIntentId === id) || [];
+        return ride ? { id, status:'succeeded', currency:'usd', amount_received: ride.costCents,
+          metadata:{ uid:ride.travelerUid, rideId } } : null;
+      } }],
     ['./tickets.js', { fileTicket: async (t) => { tickets.push(t); return { caseNo: 'AR-CASE-1' }; } }],
   ]) {
     const p = require.resolve(path.join(ROOT, rel));
@@ -82,7 +104,7 @@ const base = (atMinFromNow, extra = {}) => ({
   atMs: Date.now() + atMinFromNow * MIN,
   dep: 'Brickell', dest: 'Miami International Airport',
   pickupLat: 25.7617, pickupLng: -80.1918,
-  travelClass: 'Standard', travelCostCents: 2450, costCents: 2600,
+  travelClass: 'Standard', travelCostCents: 2450, costCents: 2720,
   tripNo: 'AR-2048-MIA', status: 'reserved', ...extra,
 });
 // THE FIXTURES CARRY A CURRENT DISCLOSURE. Dispatch has filtered on disclosureVersion since
@@ -118,6 +140,19 @@ const check = (label, cond, detail) => { results.push({ label, ok: !!cond, detai
       h.data.scheduled_rides.r1.lastSweepResult);
   }
 
+  // A bounded unsorted status scan can hide the only due reservation behind 100 future ones.
+  {
+    const many={};
+    for(let i=0;i<100;i++) many[`future${i}`]=base(40);
+    many.due=base(3);
+    const h=makeDb({ scheduled_rides:many, operators:FLEET,
+      users:{opA:QUALIFIED_USER('opA'),opB:QUALIFIED_USER('opB')} });
+    const rep=await inject(h.db).sweepScheduled();
+    check('due-time order finds due Travel beyond 100 future reservations',
+      rep.dispatched.length===1 && rep.dispatched[0].id==='due', JSON.stringify(rep));
+    check('a full scheduled scan reports saturation',rep.overCapacity===true);
+  }
+
   // 3. 3 minutes out: dispatched, charged, travel created, operator recorded.
   {
     const h = makeDb({ scheduled_rides: { r1: base(3) }, operators: FLEET, users: { opA: QUALIFIED_USER('opA'), opB: QUALIFIED_USER('opB') } });
@@ -126,11 +161,11 @@ const check = (label, cond, detail) => { results.push({ label, ok: !!cond, detai
     check('3 min out: dispatched to the NEAREST operator',
       rep.dispatched.length === 1 && ride?.operatorId === 'opA' && ride?.status === 'assigned',
       JSON.stringify({ rep: rep.dispatched, op: ride?.operatorName }));
-    check('  travel carries the payment for settlement', ride?.paymentIntentId === 'pi_fake', ride?.paymentIntentId);
+    check('  travel carries the payment for settlement', ride?.paymentIntentId === 'pi_r1', ride?.paymentIntentId);
     check('  travel carries the promised hour', typeof ride?.scheduledFor === 'number', ride?.scheduledFor);
     check('  reservation marked dispatched with an ETA',
       h.data.scheduled_rides.r1.status === 'dispatched' && h.data.scheduled_rides.r1.etaMin >= 1,
-      JSON.stringify(h.data.scheduled_rides.r1.status));
+      JSON.stringify({ status:h.data.scheduled_rides.r1.status, error:h.data.scheduled_rides.r1.dispatchError }));
     check('  claim released', h.data.scheduled_rides.r1.claimedAt === null, h.data.scheduled_rides.r1.claimedAt);
   }
 
@@ -156,7 +191,7 @@ const check = (label, cond, detail) => { results.push({ label, ok: !!cond, detai
     check('no operators, past grace: unmatched and never charged',
       h2.data.scheduled_rides.r1.status === 'unmatched' && charged === 0,
       h2.data.scheduled_rides.r1.closedReason);
-    charge = async () => ({ ok: true, paymentIntentId: 'pi_fake', chargedCents: 2600 });
+    charge = async (opts) => ({ ok: true, paymentIntentId: `pi_${opts.reservationId}`, chargedCents: 2720 });
   }
 
   // 6. Card declined: NOBODY is sent, and the reservation is released to try again.
@@ -165,8 +200,9 @@ const check = (label, cond, detail) => { results.push({ label, ok: !!cond, detai
     const h = makeDb({ scheduled_rides: { r1: base(3) }, operators: FLEET, users: { opA: QUALIFIED_USER('opA'), opB: QUALIFIED_USER('opB') } });
     await inject(h.db).sweepScheduled();
     const r = h.data.scheduled_rides.r1;
-    check('card declined: no travel created',
-      !h.data.rides && r.status === 'reserved' && r.claimedAt === null, JSON.stringify(r.status));
+    check('card declined: staged Travel is never offered or paid',
+      Object.values(h.data.rides || {}).every((ride) => ride.status === 'awaiting_payment' && !ride.operatorId && !ride.paymentIntentId)
+      && r.status === 'reserved' && r.claimedAt === null, JSON.stringify(r.status));
     check('  the reason is on the record for the traveler', r.paymentError === 'Your card was declined.', r.paymentError);
 
     // Past the grace it stops retrying and says so.
@@ -174,19 +210,33 @@ const check = (label, cond, detail) => { results.push({ label, ok: !!cond, detai
     await inject(h2.db).sweepScheduled();
     check('  past grace: payment_failed', h2.data.scheduled_rides.r1.status === 'payment_failed',
       h2.data.scheduled_rides.r1.status);
-    charge = async () => ({ ok: true, paymentIntentId: 'pi_fake', chargedCents: 2600 });
+    charge = async (opts) => ({ ok: true, paymentIntentId: `pi_${opts.reservationId}`, chargedCents: 2720 });
   }
 
-  // 7. Charged but the travel could not be written: flagged AND a case opened.
+  // 7. A failed post-charge attachment remains a durable, webhook-recoverable obligation.
   {
     const h = makeDb({ scheduled_rides: { r1: base(3) }, operators: FLEET, users: { opA: QUALIFIED_USER('opA'), opB: QUALIFIED_USER('opB') } });
-    h.failAdds();
+    h.failPaymentAttach();
     const rep = await inject(h.db).sweepScheduled();
     const r = h.data.scheduled_rides.r1;
     check('charged but not dispatched: needs_attention', r.status === 'needs_attention', r.status);
+    check('  a prepared unoffered Travel already exists before charging',
+      Object.values(h.data.rides || {}).some((ride) => ride.status === 'awaiting_payment' && ride.reservationId === 'r1'));
     check('  a support case was opened automatically',
       tickets.length === 1 && /REFUND IS OWED/.test(tickets[0].description), tickets[0]?.reason);
     check('  the case number is on the reservation', r.caseNo === 'AR-CASE-1', r.caseNo);
+  }
+  // 7b. A failure to create the booking occurs BEFORE charging, not after it.
+  {
+    let charged = 0;
+    charge = async () => { charged++; return { ok:true, paymentIntentId:'pi_wrong', chargedCents:2720 }; };
+    const h = makeDb({ scheduled_rides: { r1: base(3) }, operators: FLEET,
+      users: { opA: QUALIFIED_USER('opA'), opB: QUALIFIED_USER('opB') } });
+    h.failAdds();
+    const rep = await inject(h.db).sweepScheduled();
+    check('failed durable prepare never opens an off-session charge',
+      charged === 0 && rep.failed.length === 1 && h.data.scheduled_rides.r1.status === 'needs_attention');
+    charge = async (opts) => ({ ok: true, paymentIntentId: `pi_${opts.reservationId}`, chargedCents: 2720 });
   }
 
   // 8. A legacy reservation with no pickup is closed, not retried forever.

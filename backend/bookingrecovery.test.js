@@ -30,7 +30,12 @@ async function main() {
     paidAt: now - PAID_UNMATCHED_TTL_MS - 1, paymentIntentId: 'pi_paid', costCents: 2350 });
   db.rows.set('rides/retry', { travelerUid: 'u', status: 'cancelled', createdAt: now - 900000,
     refundPending: true, paymentIntentId: 'pi_retry', cancelledFrom: 'assigned', costCents: 2350 });
+  db.rows.set('rides/scheduled', { travelerUid: 'u', status: 'awaiting_payment',
+    reservationId:'reservation', createdAt:now-900000, costCents:2350 });
+  db.rows.set('scheduled_rides/reservation', { paymentIntentId:'pi_schedule' });
   const deps={
+    verifiedTravelPayment: async (id) => ({ id, status:'succeeded', amount_received:2350,
+      currency:'usd', metadata:{uid:'u',rideId:'scheduled'} }),
     refundableFor: async () => ({ cents: 2350 }),
     refundTravel: async (args) => { refunds.push(args); return { ok: true, refundId: `re_${args.paymentIntentId}`, amountCents: args.amountCents, status: 'succeeded' }; },
     operatorPayoutAccount: async () => ({ accountId: null }),
@@ -42,10 +47,15 @@ async function main() {
   assert.equal(db.rows.get('rides/paid').status,'cancelled');
   assert.equal(db.rows.get('rides/paid').refundPending,false);
   assert.deepEqual(refunds.map((r)=>r.paymentIntentId).sort(), ['pi_paid','pi_retry']);
+  assert.equal(db.rows.get('rides/scheduled').paymentIntentId, 'pi_schedule');
   assert(refunds.every((r)=>r.idempotencyKey.startsWith('ar_cancel_refund_')));
   const again=await sweepBookingRecovery({ db, deps, stripeConfigured:true, now:now+1000 });
   assert.equal(again.closed.length,0);
   assert.equal(refunds.length,2,'completed refunds cannot repeat');
+  const later=await sweepBookingRecovery({ db, deps, stripeConfigured:true,
+    now:now+PAID_UNMATCHED_TTL_MS+1000 });
+  assert(later.closed.includes('scheduled'));
+  assert.equal(refunds.length,3,'the scheduled orphan was automatically refunded');
   console.log('PASS unattended prepared-booking closure, paid-unmatched refund and pending retry');
 }
 main().catch((e) => { console.error(e); process.exitCode=1; });

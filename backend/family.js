@@ -77,11 +77,11 @@ async function normalizeTeenParty({familyLinkId,requesterUid,bookerUid,journeyNo
 
 async function listGuardianActiveTravels({guardianUid}){
  const db=adminDb();if(!db)return {ok:false,reason:adminStatus().reason};
- const links=await db.collection(COLLECTION).where('guardianUid','==',String(guardianUid)).get();const teenUids=new Set();
- for(const d of links.docs){const x=d.data()||{};if(x.teenUid)teenUids.add(String(x.teenUid));}
+ const q=await db.collection('rides').where('party.guardianUid','==',String(guardianUid))
+   .where('status','in',['assigned','accepted','arrived','onboard']).limit(100).get();
  const active=[];
- for(const teenUid of teenUids){const q=await db.collection('rides').where('travelerUid','==',teenUid).get();for(const d of q.docs){const r=d.data()||{};if(r.party?.teen===true&&String(r.party?.guardianUid)===String(guardianUid)&&['assigned','accepted','arrived','onboard'].includes(String(r.status)))active.push({id:d.id,tripNo:r.tripNo||d.id,status:r.status,travelerName:r.party?.travelerName||'Teen Traveler',operatorName:r.operatorName||'',operatorId:r.operatorId||'',travelerUid:r.travelerUid||teenUid,dep:r.dep||'',dest:r.dest||'',createdAt:Number(r.createdAt)||0});}}
- active.sort((a,b)=>b.createdAt-a.createdAt);return {ok:true,travels:active};
+ for(const d of q.docs){const r=d.data()||{};if(r.party?.teen===true&&String(r.party?.guardianUid)===String(guardianUid))active.push({id:d.id,tripNo:r.tripNo||d.id,status:r.status,travelerName:r.party?.travelerName||'Teen Traveler',operatorName:r.operatorName||'',operatorId:r.operatorId||'',travelerUid:r.travelerUid||'',dep:r.dep||'',dest:r.dest||'',createdAt:Number(r.createdAt)||0});}
+ active.sort((a,b)=>b.createdAt-a.createdAt);return {ok:true,travels:active,overCapacity:q.docs.length>=100};
 }
 async function sweepFamilyAgeOut({now=Date.now()}={}){
  const db=adminDb();if(!db)return {ok:false,reason:adminStatus().reason};

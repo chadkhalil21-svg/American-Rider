@@ -29,7 +29,9 @@ const { nearbyOperatorCandidates } = require('./geooperators');
 const { matchOperator, etaMinutes, coverageLapsed } = require('./matching');
 const { screeningReady } = require('./screening');
 const { adminDb, adminStatus } = require('./firebase-admin');
-const { chargeScheduledTravel, operatorPayoutAccount, connectAccountStatus } = require('./payments');
+const { chargeScheduledTravel, verifiedTravelPayment, quote, operatorPayoutAccount, connectAccountStatus } = require('./payments');
+const { bookingId, prepareBooking, assignPaidTravel } = require('./booking');
+const { createHash } = require('node:crypto');
 const { assessOperator } = require('./qualification');
 const { fileTicket } = require('./tickets');
 const { notify } = require('./push');
@@ -74,17 +76,15 @@ async function sweepScheduled({ now = Date.now() } = {}) {
 
   let due;
   try {
-    // Queried on status alone, with the time filtered in memory. Two range/equality filters
-    // would need a composite index, and a dispatcher that silently returns nothing because an
-    // index was never created is precisely the failure this file exists to remove.
-    // BOUNDED, for the same reason sweepAssignments is: every reservation this returns is
-    // re-read once a minute until it is served, so ten standing reservations cost 14,400
-    // reads a day whether or not anybody is using the app.
+    // Status + due time uses the declared composite index. Without the index, return a loud
+    // failure; an arbitrary first 100 reserved records can starve the actually due bookings.
     const snap = await db
       .collection('scheduled_rides')
       .where('status', '==', 'reserved')
+      .orderBy('atMs', 'asc')
       .limit(RESERVED_SCAN_LIMIT)
       .get();
+    if (snap.docs.length >= RESERVED_SCAN_LIMIT) report.overCapacity = true;
     due = snap.docs.filter((d) => {
       const r = d.data();
       return typeof r.atMs === 'number' && r.atMs - now <= WINDOW_MS;
@@ -213,171 +213,144 @@ async function sweepScheduled({ now = Date.now() } = {}) {
       continue;
     }
 
-    // ---- 2/3. Charge the card on file. ------------------------------------------------
+    // ---- 2. Prepare one immutable Travel BEFORE moving money. ------------------------
     const fareCents = Number(r.travelCostCents);
     if (!Number.isFinite(fareCents) || fareCents <= 0) {
       await close(db, id, 'unmatched', 'This reservation has no price on it and cannot be dispatched.');
       report.failed.push({ id, reason: 'no fare on the reservation' });
       continue;
     }
+    const tollCents = Math.max(0, Number(r.tollCents) || 0);
+    const billed = quote(fareCents, undefined, Array.isArray(r.feeLines) ? r.feeLines : [],
+      r.cardCountry || null, tollCents).travelerPays;
+    if (Number(r.costCents) !== billed) {
+      await close(db, id, 'price_changed', 'The saved fare is no longer the quoted total. No charge was made.');
+      report.failed.push({ id, reason: 'scheduled price changed before charge' });
+      continue;
+    }
+    const bookingKey = `scheduled-${id}`.padEnd(16, '_');
+    const rideId = bookingId(r.travelerUid, bookingKey);
+    const fingerprint = createHash('sha256').update(JSON.stringify({ reservationId: id,
+      atMs: r.atMs, tripNo: r.tripNo, billed })).digest('hex');
+    let prepared;
+    try {
+      prepared = await prepareBooking({ db, uid: r.travelerUid, key: bookingKey,
+        fingerprint, now, record: {
+          tripNo: r.tripNo || '', travelerName: r.travelerName || '', party: r.party || null,
+          travelerEmail: r.travelerEmail || '', dep: r.dep || '', dest: r.dest || '',
+          pickupLat: pickup.lat, pickupLng: pickup.lng,
+          destinationLat: r.destinationLat == null ? null : Number(r.destinationLat),
+          destinationLng: r.destinationLng == null ? null : Number(r.destinationLng),
+          travelClass: r.travelClass || 'Standard', travelCostCents: fareCents, costCents: billed,
+          miles: Number.isFinite(Number(r.miles)) ? Number(r.miles) : null,
+          governmentFeeCents: Number(r.governmentFeeCents) || 0, tollCents,
+          feeLines: Array.isArray(r.feeLines) ? r.feeLines : [], cardCountry: r.cardCountry || null,
+          scheduledFor: r.atMs, reservationId: id,
+        } });
+      if (prepared.status !== 201 && prepared.status !== 200) throw new Error(prepared.body.code || 'booking not prepared');
+      if (prepared.body.status === 'cancelled' || prepared.body.status === 'expired') {
+        throw new Error('This scheduled booking is already closed');
+      }
+    } catch (e) {
+      await touch(db, id, { status: 'needs_attention', claimedAt: null,
+        dispatchError: `Booking could not be staged before charge: ${e.message}` });
+      report.failed.push({ id, reason: `booking prepare failed; no charge: ${e.message}` });
+      continue;
+    }
+    const rideRef = db.collection('rides').doc(rideId);
+    if (r.party?.teen) {
+      try { await provisionTeenPin({ rideRef, rideId, party: r.party, now }); }
+      catch (e) {
+        await touch(db,id,{status:'needs_attention',claimedAt:null,rideId,
+          dispatchError:`Teen pickup protection unavailable before charge: ${e.message}`});
+        report.failed.push({id,reason:'Teen pickup protection unavailable; no charge'});
+        continue;
+      }
+    }
 
+    // ---- 3. Off-session charge with a stable provider idempotency key. ----------------
     const paid = await chargeScheduledTravel({
-      travelCostCents: fareCents,
-      uid: r.travelerUid,
-      email: r.travelerEmail || '',
-      tripNo: r.tripNo || '',
-      reservationId: id,
-      dep: r.dep || '',
-      dest: r.dest || '',
-      // The traveler was quoted with the government fee for this pickup; the charge must be
-      // the quote. A reservation carries its pickup coordinates and only the NAME of its
-      // destination, so a drop-off fee — none exists today — would need destLat/destLng here.
+      travelCostCents: fareCents, uid: r.travelerUid, email: r.travelerEmail || '',
+      tripNo: r.tripNo || '', reservationId: id, rideId, dep: r.dep || '', dest: r.dest || '',
       governmentFees: Array.isArray(r.feeLines) ? r.feeLines : [],
-      cardCountry: r.cardCountry || null,
+      cardCountry: r.cardCountry || null, tollCents,
     });
-
     if (!paid.ok) {
-      // The card failed, or the bank wants the traveler present. Either way NOBODY IS SENT.
-      // The reservation is released so a traveler who fixes their card in the next few
-      // minutes is still picked up, and it carries the reason so the app can say it.
       await touch(db, id, {
-        status: late ? 'payment_failed' : 'reserved',
-        claimedAt: null,
-        lastSweepAt: now,
-        paymentError: paid.error || 'Payment failed',
+        status: late ? 'payment_failed' : 'reserved', claimedAt: null,
+        lastSweepAt: now, paymentError: paid.error || 'Payment failed',
         paymentErrorCode: paid.code || 'charge_failed',
       });
-      if (late) {
-        await notify({
-          uid: r.travelerUid,
-          kind: 'scheduled_failed',
-          title: 'Payment could not be taken',
-          body: 'Your scheduled travel was not dispatched. Update your payment method to book again.',
-          data: { screen: '/wallet', tripNo: r.tripNo || '' },
-        });
-      }
+      if (late) await notify({ uid: r.travelerUid, kind: 'scheduled_failed',
+        title: 'Payment could not be taken',
+        body: 'Your scheduled travel was not dispatched. Update your payment method to book again.',
+        data: { screen: '/wallet', tripNo: r.tripNo || '' } });
       report.failed.push({ id, reason: paid.code || 'charge failed' });
       continue;
     }
 
-    // ---- 4. Create the travel. --------------------------------------------------------
-    // Field for field the document dispatchRide() writes, so the operator app, the traveler's
-    // live screen, settlement and the receipt all read it without knowing it was scheduled.
+    // ---- 4. Attach the provider charge, verify it and atomically reserve the Operator. ----
     try {
-      const rideRef = await db.collection('rides').add({
-        travelerUid: r.travelerUid,
-        travelerName: r.travelerName || '',
-        party: r.party || null,
-        tripNo: r.tripNo || '',
-        operatorId: match.operator.id,
-        operatorName: match.operator.name || '',
-        operatorCar: match.operator.car || '',
-        operatorPlate: match.operator.plate || '',
-        operatorEtaMin: match.etaMin,
-        dep: r.dep || '',
-        dest: r.dest || '',
-        travelClass: r.travelClass || 'Standard',
-        travelCostCents: fareCents,
-        costCents: Number(r.costCents) || paid.chargedCents,
-        miles: Number.isFinite(Number(r.miles)) ? Number(r.miles) : null,
-        governmentFeeCents: Number(r.governmentFeeCents) || 0,
-        feeLines: Array.isArray(r.feeLines) ? r.feeLines : [],
-        cardCountry: r.cardCountry || null,
-        status: 'assigned',
-        createdAt: Date.now(),
-        // What makes it legible as a scheduled travel afterwards, to us and to a reader of the
-        // record: the hour it was promised for, and the reservation it came from.
-        scheduledFor: r.atMs,
-        reservationId: id,
-        // Settlement reads this when the traveler's app has no intent to name — see
-        // POST /travel/settle.
-        paymentIntentId: paid.paymentIntentId,
-      });
-
+      if (Number(paid.chargedCents) !== billed) throw new Error('Provider amount differs from reserved price');
+      // If this write fails, Stripe's payment_intent.succeeded webhook uses rideId metadata to
+      // attach the charge to this already-existing ride; booking recovery then refunds it.
+      await rideRef.set({ paymentIntentId: paid.paymentIntentId }, { merge: true });
+      const payment = await verifiedTravelPayment(paid.paymentIntentId);
+      const assigned = await assignPaidTravel({ db, uid: r.travelerUid, rideId,
+        payment, candidate: match, now, requireScreening: screeningReady() });
+      if (assigned.status !== 200 || !assigned.body.matched) {
+        throw new Error(assigned.body.code || 'Paid Travel could not reserve Operator');
+      }
       taken.add(match.operator.id);
-
-      // TELL BOTH OF THEM. A scheduled travel is dispatched while nobody is looking at a
-      // phone — that is the entire point of it — so a reservation that becomes a travel in
-      // silence is a car arriving at a door nobody is behind.
-      await notify({
-        uid: match.operator.id,
-        kind: 'travel_assigned',
-        title: 'Scheduled travel assigned',
-        body: `${r.dep || 'Pickup'} to ${r.dest || 'destination'}. Open to accept.`,
-        data: { screen: '/operator', rideId: rideRef.id, tripNo: r.tripNo || '' },
-      });
-      await notify({
-        uid: r.travelerUid,
-        kind: 'operator_assigned',
-        title: 'Your operator is on the way',
-        body:
-          `${match.operator.name || 'An operator'} is ${match.etaMin} minutes from ` +
-          `${r.dep || 'your pickup'}.`,
-        data: { screen: '/ride', rideId: rideRef.id, tripNo: r.tripNo || '' },
-      });
-
-      const teenPickup = await provisionTeenPin({ rideRef, rideId: rideRef.id, party: r.party || null, now });
-      if (teenPickup.required && r.party?.teenUid) await notify({ uid:r.party.teenUid, kind:'teen_pickup_code', title:'Your pickup code', body:`Give ${teenPickup.pin} to your Operator after confirming the vehicle and Operator.`, data:{screen:'/ride',rideId:rideRef.id,tripNo:r.tripNo||''} });
-      if (teenPickup.required && r.party?.guardianUid && r.party.guardianUid !== r.party.teenUid) await notify({ uid:r.party.guardianUid, kind:'guardian_travel', title:'Teen Travel assigned', body:`${r.party.travelerName || 'Teen Traveler'}'s scheduled Travel has been assigned.`, data:{screen:'/ride',rideId:rideRef.id,tripNo:r.tripNo||''} });
-
+      // Transition the reservation before notifications. A push outage cannot transform a
+      // correctly paid/assigned ride into a duplicate charge on a later sweep.
       await touch(db, id, {
-        status: 'dispatched',
-        claimedAt: null,
-        rideId: rideRef.id,
-        operatorId: match.operator.id,
-        operatorName: match.operator.name || '',
-        etaMin: match.etaMin,
-        paymentIntentId: paid.paymentIntentId,
-        chargedCents: paid.chargedCents,
-        dispatchedAt: now,
-        paymentError: null,
+        status: 'dispatched', claimedAt: null, rideId, operatorId: assigned.body.matched.id,
+        operatorName: assigned.body.matched.name || '', etaMin: assigned.body.matched.etaMin,
+        paymentIntentId: paid.paymentIntentId, chargedCents: paid.chargedCents,
+        dispatchedAt: now, paymentError: null,
       });
-      report.dispatched.push({
-        id,
-        rideId: rideRef.id,
-        tripNo: r.tripNo || '',
-        operator: match.operator.name,
-        etaMin: match.etaMin,
-      });
+      report.dispatched.push({ id, rideId, tripNo: r.tripNo || '',
+        operator: assigned.body.matched.name, etaMin: assigned.body.matched.etaMin });
+      try {
+        const teenPickup = await provisionTeenPin({ rideRef, rideId, party: r.party || null, now });
+        if (teenPickup.required && r.party?.teenUid) await notify({ uid: r.party.teenUid,
+          kind: 'teen_pickup_code', title: 'Your pickup code',
+          body: `Give ${teenPickup.pin} to your Operator after confirming the vehicle and Operator.`,
+          data: { screen: '/ride', rideId, tripNo: r.tripNo || '' } });
+        if (teenPickup.required && r.party?.guardianUid && r.party.guardianUid !== r.party.teenUid) {
+          await notify({ uid: r.party.guardianUid, kind: 'guardian_travel',
+            title: 'Teen Travel assigned', body: `${r.party.travelerName || 'Teen Traveler'}'s scheduled Travel has been assigned.`,
+            data: { screen: '/family', rideId, tripNo: r.tripNo || '' } });
+        }
+        await notify({ uid: assigned.body.matched.id, kind: 'travel_assigned',
+          title: 'Scheduled travel assigned', body: `${r.dep || 'Pickup'} to ${r.dest || 'destination'}. Open to accept.`,
+          data: { screen: '/operator', rideId, tripNo: r.tripNo || '' } });
+        await rideRef.set({ notifiedOperatorAt: Date.now() }, { merge: true });
+        await notify({ uid: r.travelerUid, kind: 'operator_assigned',
+          title: 'Your operator is on the way',
+          body: `${assigned.body.matched.name || 'An operator'} is ${assigned.body.matched.etaMin} minutes from ${r.dep || 'your pickup'}.`,
+          data: { screen: '/ride', rideId, tripNo: r.tripNo || '' } });
+      } catch (e) {
+        report.failed.push({ id, reason: `assigned, but notification/PIN needs attention: ${e.message}` });
+      }
     } catch (e) {
-      // MONEY HAS ALREADY LEFT THE TRAVELER'S CARD. This is the one branch that must never be
-      // quiet: the charge stands and no travel exists to earn it. Recorded on the reservation
-      // so it is visible and refundable rather than lost.
-      await touch(db, id, {
-        status: 'needs_attention',
-        claimedAt: null,
-        paymentIntentId: paid.paymentIntentId,
-        chargedCents: paid.chargedCents,
-        dispatchError: e.message,
-        dispatchErrorAt: now,
-      });
-      // AND OPEN A CASE OURSELVES. The traveler has been charged for a journey that does not
-      // exist; leaving it to them to notice and complain is not a refund process. The ticket
-      // carries the payment so a person can refund it without going hunting.
+      // The charge cannot vanish into a case alone: a durable ride was staged BEFORE charging.
+      // The webhook can attach its PI if this write failed; booking recovery then refunds.
+      await touch(db, id, { status: 'needs_attention', claimedAt: null, rideId,
+        paymentIntentId: paid.paymentIntentId, chargedCents: paid.chargedCents,
+        dispatchError: e.message, dispatchErrorAt: now });
       let caseNo = null;
       try {
-        const filed = await fileTicket({
-          uid: r.travelerUid,
-          email: r.travelerEmail || '',
-          kind: 'support',
-          reason: 'Scheduled travel charged but not dispatched',
-          trip: r.tripNo || '',
-          description:
-            `Scheduled travel ${r.tripNo || '(no travel number)'} was charged ` +
-            `${paid.chargedCents} cents (${paid.paymentIntentId}) and the travel record could ` +
-            `not be created: ${e.message}. Reservation ${id}. REFUND IS OWED.`,
-        });
+        const filed = await fileTicket({ uid: r.travelerUid, email: r.travelerEmail || '',
+          kind: 'support', reason: 'Scheduled travel charged but not dispatched',
+          trip: r.tripNo || '', description:
+            `Scheduled Travel ${r.tripNo || '(no number)'} charged ${paid.chargedCents} cents ` +
+            `(${paid.paymentIntentId}) but dispatch failed: ${e.message}. Ride ${rideId}. REFUND IS OWED.` });
         caseNo = filed?.caseNo || null;
         if (caseNo) await touch(db, id, { caseNo });
-      } catch {
-        /* the reservation already carries the whole story; a failed ticket must not hide it */
-      }
-      report.failed.push({
-        id,
-        reason: `charged but not dispatched: ${e.message}`,
-        paid: true,
-        caseNo,
-      });
+      } catch { /* the reservation and staged ride both retain the obligation */ }
+      report.failed.push({ id, reason: `charged but not dispatched: ${e.message}`, paid: true, caseNo });
     }
   }
 

@@ -57,6 +57,9 @@ async function assignPaidTravel({ db, uid, rideId, payment, candidate, now = Dat
     if (!rideSnap.exists) return deny(404, 'no_travel', 'No such Travel');
     const ride = rideSnap.data();
     if (String(ride.travelerUid) !== String(uid)) return deny(403, 'not_yours', 'This Travel belongs to another Traveler');
+    if (ride.party?.teen && (!ride.teenPickup?.required || !/^[0-9a-f]{64}$/.test(String(ride.teenPickup.hash || '')))) {
+      return deny(409, 'teen_pin_unavailable', 'Teen pickup code has not been securely prepared');
+    }
     if (ride.status === 'assigned' && ride.operatorId && !ride.releasedAt) {
       if (!paymentMatches(ride, payment, uid, rideId)) return deny(409, 'payment_unconfirmed', 'Payment is not confirmed for this Travel');
       return { status: 200, body: { rideId, tripNo: ride.tripNo, matched: operatorView(ride), reused: true } };

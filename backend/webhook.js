@@ -32,6 +32,24 @@ async function handleEvent(event) {
   const obj = event.data?.object || {};
 
   switch (event.type) {
+    case 'payment_intent.succeeded': {
+      const rideId = String(obj.metadata?.rideId || '');
+      if (!rideId) return { ok: true, action: 'no booking reference' };
+      const ref = db.collection('rides').doc(rideId);
+      const outcome = await db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists) return 'booking not found';
+        const ride = snap.data();
+        if (String(ride.travelerUid) !== String(obj.metadata?.uid) ||
+            Number(ride.costCents) !== Number(obj.amount_received) ||
+            String(obj.currency || '').toLowerCase() !== 'usd' ||
+            (ride.paymentIntentId && ride.paymentIntentId !== obj.id)) return 'booking mismatch';
+        tx.update(ref, { paymentIntentId: obj.id, paidAt: ride.paidAt || Date.now(),
+          ...(ride.status === 'cancelled' ? { refundPending: true } : {}) });
+        return 'booking reconciled';
+      });
+      return { ok: outcome === 'booking reconciled', action: outcome };
+    }
     // ---- The traveler's bank took the money back. -----------------------------------
     case 'charge.dispute.created': {
       const ride = await rideByPaymentIntent(db, obj.payment_intent);

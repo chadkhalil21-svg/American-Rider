@@ -23,6 +23,7 @@ const { monthlyRemittance } = require('./remittance');
 const { REQUIRED_DOCS, resolveDocument, setSuspension, assessAndRecord } = require('./qualification');
 const { disclosureStale } = require('./matching');
 const { applyIndependentConfirmation, continuingStatus } = require('./insurance-monitoring');
+const { codeFor, totpStep, sessionFor, verifySession } = require('./opssecurity');
 
 const COOKIE = 'ar_ops';
 
@@ -40,7 +41,7 @@ function opsAccounts() {
         const i = pair.indexOf(':');
         return i > 0 ? { name: pair.slice(0, i), pw: pair.slice(i + 1) } : null;
       })
-      .filter((x) => x && x.pw);
+      .filter((x) => x && x.pw && /^[A-Za-z0-9_-]{1,40}$/.test(x.name));
   }
   const pw = readKey('OPS_PASSWORD');
   const mode = sharedMode();
@@ -69,11 +70,20 @@ function sharedMode() {
   return readKey('OPS_ALLOW_SHARED_PASSWORD') === 'emergency' ? 'emergency' : 'off';
 }
 
-const configured = () => opsAccounts().length > 0;
+function mfaSecret(name) {
+  const entry=String(readKey('OPS_MFA_SECRETS')||'').split(',').find((part)=>part.startsWith(`${name}:`));
+  const key=entry?.slice(name.length+1)||'';
+  return codeFor(key,1) ? key : null;
+}
+const productionSecurityReady = () => !isProduction() ||
+  (String(readKey('OPS_SESSION_SECRET')||'').length>=32 &&
+    opsAccounts().length>0 && opsAccounts().every((acct)=>!!mfaSecret(acct.name)));
+const configured = () => opsAccounts().length > 0 && productionSecurityReady();
 const shared = () => !readKey('OPS_USERS') && configured();
 
 /** For /health: how /ops is signed in to. */
 function opsAuthMode() {
+  if (isProduction() && opsAccounts().length && !productionSecurityReady()) return 'off (Ops MFA/session secret required)';
   if (readKey('OPS_USERS') && opsAccounts().length) return 'named';
   if (!readKey('OPS_PASSWORD')) return 'off';
   const m = sharedMode();
@@ -88,7 +98,13 @@ function signedIn(req) {
   const raw = req.headers?.cookie || '';
   const got = raw.split(';').map((c) => c.trim()).find((c) => c.startsWith(`${COOKIE}=`));
   if (!got) return null;
-  const value = decodeURIComponent(got.slice(COOKIE.length + 1));
+  let value;
+  try { value = decodeURIComponent(got.slice(COOKIE.length + 1)); } catch { return null; }
+  if (isProduction()) {
+    if (!productionSecurityReady()) return null;
+    const acct=opsAccounts().find((x)=>x.name===value.split('.')[0]);
+    return acct && verifySession(value,acct,readKey('OPS_SESSION_SECRET')) ? acct.name : null;
+  }
   const dot = value.lastIndexOf('.');
   if (dot <= 0) return null;
   const name = value.slice(0, dot);
@@ -135,6 +151,9 @@ const LOGIN = `
     <input type="password" name="password" placeholder="Password" autofocus
       style="width:100%;padding:13px 14px;border:1px solid ${T.border};border-radius:13px;
              font-size:16px;background:#fff;color:${T.ink};box-sizing:border-box;">
+    <input type="text" name="otp" placeholder="Authenticator code (production)" inputmode="numeric" autocomplete="one-time-code"
+      maxlength="6" style="width:100%;padding:13px 14px;border:1px solid ${T.border};border-radius:13px;
+      font-size:16px;background:#fff;color:${T.ink};box-sizing:border-box;margin-top:10px;">
     <button type="submit" class="cta" style="border:0;cursor:pointer;">Sign in</button>
   </form>
 </section>`;
@@ -430,16 +449,33 @@ function mount(app, express, deps = {}) {
     }
   });
 
-  app.post('/ops/enter', express.urlencoded({ extended: false }), (req, res) => {
+  app.post('/ops/enter', express.urlencoded({ extended: false }), async (req, res) => {
     const name = shared() ? opsAccounts()[0].name : String(req.body?.name || '').trim();
     const got = String(req.body?.password || '');
     const acct = opsAccounts().find((x) => x.name === name);
     // Constant time again, and a deliberate pause on failure so the form cannot be run at
     // speed against a short password.
-    const ok =
+    let ok =
       acct &&
       got.length === acct.pw.length &&
       crypto.timingSafeEqual(Buffer.from(got), Buffer.from(acct.pw));
+    if (ok && isProduction()) {
+      const step = totpStep(mfaSecret(acct.name),req.body?.otp);
+      ok = step !== null && productionSecurityReady();
+      if (ok) {
+        const db=dbOf();
+        if (!db) return res.status(503).send('Operations authentication is temporarily unavailable.');
+        try {
+          ok=await db.runTransaction(async (tx)=>{
+            const ref=db.collection('ops_mfa').doc(acct.name);
+            const prior=await tx.get(ref);
+            if (Number(prior.exists ? prior.data().lastStep : -1)>=step) return false;
+            tx.set(ref,{lastStep:step,acceptedAt:Date.now()},{merge:true});
+            return true;
+          });
+        } catch {return res.status(503).send('Operations authentication is temporarily unavailable.');}
+      }
+    }
     if (!ok) {
       return setTimeout(
         () =>
@@ -452,7 +488,9 @@ function mount(app, express, deps = {}) {
     }
     res.setHeader(
       'Set-Cookie',
-      `${COOKIE}=${encodeURIComponent(`${acct.name}.${tokenFor(acct)}`)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${60 * 60 * 12}; Secure`,
+      `${COOKIE}=${encodeURIComponent(isProduction()
+        ? sessionFor(acct,readKey('OPS_SESSION_SECRET'))
+        : `${acct.name}.${tokenFor(acct)}`)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${60 * 60 * 12}; Secure`,
     );
     res.redirect('/ops');
   });

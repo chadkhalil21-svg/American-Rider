@@ -1,4 +1,5 @@
 const { cancelTravel } = require('./travelmoney');
+const { paymentMatches } = require('./booking');
 
 const PREPARED_TTL_MS = 15 * 60 * 1000;
 const PAID_UNMATCHED_TTL_MS = 2 * 60 * 1000;
@@ -24,9 +25,30 @@ async function sweepBookingRecovery({ db, deps, stripeConfigured, now = Date.now
     if (snap.docs.length >= BATCH_LIMIT) out.overCapacity = true;
     out.scanned += snap.docs.length;
     for (const doc of snap.docs) {
-      const ride = doc.data() || {};
+      let ride = doc.data() || {};
       if (group.field === 'refundPending' && ride.status !== 'cancelled') continue;
-      if (group.ttl && now - Number(ride.paidAt || ride.createdAt || now) < group.ttl) continue;
+      if (ride.reservationId && !ride.paymentIntentId) {
+        try {
+          const reservation = await db.collection('scheduled_rides').doc(String(ride.reservationId)).get();
+          const piId = reservation.exists ? reservation.data().paymentIntentId : null;
+          if (piId) {
+            const pi = await deps.verifiedTravelPayment(piId);
+            if (!paymentMatches({ ...ride, paymentIntentId: piId }, pi, ride.travelerUid, doc.id)) {
+              out.ok = false; out.pending.push(doc.id);
+              out.errors.push(`${doc.id}: scheduled payment ownership/amount unavailable`);
+              continue;
+            }
+            await db.collection('rides').doc(doc.id).set({ paymentIntentId: piId, paidAt: now }, { merge: true });
+            ride = { ...ride, paymentIntentId: piId, paidAt: now };
+          }
+        } catch (e) {
+          out.ok = false; out.pending.push(doc.id);
+          out.errors.push(`${doc.id}: scheduled payment reconciliation: ${String(e.message || e)}`);
+          continue;
+        }
+      }
+      const ttl = group.value === 'awaiting_payment' && ride.paidAt ? PAID_UNMATCHED_TTL_MS : group.ttl;
+      if (ttl && now - Number(ride.paidAt || ride.createdAt || now) < ttl) continue;
       try {
         const result = await cancelTravel({ db, uid: ride.travelerUid, rideId: doc.id,
           deps, stripeConfigured, now });

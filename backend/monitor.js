@@ -529,10 +529,12 @@ const ANSWER_WINDOW_SEC = 45;
 // have been sent journeys from weeks ago.
 const STALE_ASSIGNMENT_MS = 60 * 60 * 1000;
 
-async function sweepAssignments({ now = Date.now() } = {}) {
+async function sweepAssignments({ now = Date.now(), checkMarket } = {}) {
   const db = adminDb();
   if (!db) return { ok: false, reason: adminStatus().reason, pending: 0 };
   const out = { ok: true, pending: 0, notified: [], reoffered: [], stranded: [], expired: [], positionless: [] };
+  const liveMoney = String(readKey('DEPLOYMENT_MODE') || '').toLowerCase() === 'production' ||
+    /^(sk|rk)_live_/.test(readKey('STRIPE_SECRET_KEY') || '');
 
   let rows;
   try {
@@ -591,6 +593,15 @@ async function sweepAssignments({ now = Date.now() } = {}) {
     if (ride.paymentFailed || ride.chargeFailed || !ride.paymentIntentId) {
       out.stranded.push(ride.id);
       continue;
+    }
+
+    if (liveMoney) {
+      let active = false;
+      try {
+        active = typeof checkMarket === 'function' &&
+          (await checkMarket({ lat: Number(ride.pickupLat), lng: Number(ride.pickupLng) })) === 'active';
+      } catch { /* Market admission is not inferred from stale geography on provider failure. */ }
+      if (!active) { out.stranded.push(ride.id); continue; }
     }
 
     // RELEASED BY POST /travel/accept: the operator it was offered to is no longer eligible.
@@ -689,6 +700,7 @@ async function sweepAssignments({ now = Date.now() } = {}) {
       const result = await assignPaidTravel({ db, uid: ride.travelerUid, rideId: ride.id,
         payment, candidate: next, now, requireScreening: screeningReady() });
       if (result.status === 200 && !result.body.reused) out.reoffered.push({ rideId: ride.id, to: next.operator.name });
+      else if (result.status !== 200) out.stranded.push(ride.id);
     } catch {
       // Do not create another Travel or claim the offer succeeded after a provider/DB error.
       out.stranded.push(ride.id);

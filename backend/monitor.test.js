@@ -300,6 +300,16 @@ const check = (l, c, d) => results.push({ l, ok: !!c, d });
            disclosureVersion: DISCLOSURE_VERSION, commissioned: true },
   };
   {
+    const oldMode = process.env.DEPLOYMENT_MODE;
+    process.env.DEPLOYMENT_MODE = 'production';
+    const h = makeDb({ rides: { r1: assigned() }, operators: freeOperator });
+    const rep = await inject(h.db).sweepAssignments({ now, checkMarket: async () => 'waitlist' });
+    check('a paused production market strands and eventually refunds the paid offer rather than reoffering',
+      rep.stranded.includes('r1') && rep.reoffered.length === 0 && h.data.rides.r1.operatorId === 'op1');
+    if (oldMode === undefined) delete process.env.DEPLOYMENT_MODE;
+    else process.env.DEPLOYMENT_MODE = oldMode;
+  }
+  {
     const h = makeDb({ rides: { r1: assigned({ paymentIntentId: null }) }, operators: freeOperator });
     const rep = await inject(h.db).sweepAssignments({ now });
     check('an unpaid Travel is never reoffered', rep.stranded.includes('r1') && !rep.reoffered.length);

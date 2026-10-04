@@ -1,0 +1,23 @@
+const assert = require('node:assert/strict');
+const { marketChecklistPage } = require('./market-readiness-ui');
+const market = { id: 'fl-miami-dade', name: '<County & others>', state: 'FL' };
+const state = { status: 'waitlist', manifestVersion: 'abc123', readyToActivate: false,
+  missing: [{ id: 'company_insurance_bound', reason: 'Signed carrier binder absent' }] };
+const waiting = marketChecklistPage([{ market, state }], { production: true });
+assert.ok(waiting.includes('&lt;County &amp; others&gt;'));
+assert.equal(waiting.includes('<County & others>'), false);
+assert.match(waiting, /class="activate"[^>]*disabled/);
+assert.ok(waiting.includes('role="status" aria-live="polite"'));
+assert.ok(waiting.includes('Record independently reviewed evidence'));
+assert.ok(waiting.includes('x-ar-ops-action'));
+const intake = marketChecklistPage([{ market, state: { ...state, readyToOnboard: true } }], { production: true });
+assert.match(intake, /class="onboard"[^>]*data-version="abc123"[^>]*>Authorize prelaunch/);
+assert.match(intake, /class="activate"[^>]*disabled/);
+const duringIntake = marketChecklistPage([{ market, state: { ...state, status: 'onboarding', readyToOnboard: true } }], { production: true });
+assert.match(duringIntake, /Only approved Operator intake is allowed/);
+assert.match(duringIntake, /Pause intake and new offers/);
+const green = marketChecklistPage([{ market, state: { ...state, readyToActivate: true, missing: [] } }], { production: true });
+assert.match(green, /class="activate"[^>]*data-version="abc123"[^>]*>Activate/);
+const testOnly = marketChecklistPage([{ market, state: { ...state, readyToActivate: true, missing: [] } }], { production: false });
+assert.match(testOnly, /class="activate"[^>]*disabled/);
+console.log('PASS market Operations checklist: escape, accessible feedback and production-only one-action activation');

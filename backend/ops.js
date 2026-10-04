@@ -300,6 +300,7 @@ async function board() {
   return `
 <h1>Operations</h1>
 <p class="lede">${new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })}</p>
+<p><a href="/ops/markets">Market readiness, evidence and pause controls →</a></p>
 
 ${alarms.length
   ? `<div class="panel" style="background:#FFF4F4;border-color:#F3D8D8;margin-top:18px;">

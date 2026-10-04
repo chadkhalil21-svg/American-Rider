@@ -58,6 +58,8 @@ export default {
     operatingArea: 'Area Operativa',
     chooseOperatingArea: 'Scelga la contea in cui opererà.',
     marketNotActive: 'American Rider non opera ancora in %{name}. Il suo interesse è registrato. Scelga una contea attiva per continuare.',
+    marketPrelaunch: 'Le verifiche preliminari sono autorizzate nella contea di %{name}. È possibile esaminare i documenti, ma non accettare viaggi a pagamento né entrare in servizio.',
+    marketAdmissionRequired: 'Prima di iniziare scelga una contea attiva o autorizzata per le verifiche preliminari. Le aree non ammesse restano nella lista degli interessati.',
     ready: 'Pronto a Operare',
     readySub: "Il suo account è pronto. Quando entra in servizio, American Rider può iniziare a proporle Travel.",
     commence: 'Avviare le Operazioni',

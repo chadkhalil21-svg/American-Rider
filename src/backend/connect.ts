@@ -157,11 +157,11 @@ export async function submitForReview(): Promise<{ ok: boolean; error?: string }
 // ---- OPERATING MARKET --------------------------------------------------------------------
 //
 // The county an operator will work in. The server unlocks document reading, screening and
-// payouts only for an ACTIVE county; a waitlist county is recorded and unlocks nothing costly.
-export type Market = { id: string; name: string; status: 'active' | 'waitlist' };
-export type MarketState = { market: Market | null; active: Market[] };
+// prelaunch intake needs separate evidence; full activation alone permits paid duty.
+export type Market = { id: string; name: string; status: 'active' | 'onboarding' | 'waitlist' };
+export type MarketState = { market: Market | null; active: Market[]; onboarding: Market[] };
 
-const EMPTY_MARKETS: MarketState = { market: null, active: [] };
+const EMPTY_MARKETS: MarketState = { market: null, active: [], onboarding: [] };
 
 /** Never throws. */
 export async function getOperatingMarket(): Promise<MarketState> {
@@ -169,7 +169,8 @@ export async function getOperatingMarket(): Promise<MarketState> {
     const res = await fetch(`${PAYMENT_SERVER_URL}/operator/market`, { headers: await authHeaders() });
     if (!res.ok) return EMPTY_MARKETS;
     const d = await res.json();
-    return { market: d?.market ?? null, active: Array.isArray(d?.active) ? d.active : [] };
+    return { market: d?.market ?? null, active: Array.isArray(d?.active) ? d.active : [],
+      onboarding: Array.isArray(d?.onboarding) ? d.onboarding : [] };
   } catch {
     return EMPTY_MARKETS;
   }
@@ -187,7 +188,8 @@ export async function setOperatingMarket(
     });
     if (!res.ok) return EMPTY_MARKETS;
     const d = await res.json();
-    return { market: d?.market ?? null, active: Array.isArray(d?.active) ? d.active : [] };
+    return { market: d?.market ?? null, active: Array.isArray(d?.active) ? d.active : [],
+      onboarding: Array.isArray(d?.onboarding) ? d.onboarding : [] };
   } catch {
     return EMPTY_MARKETS;
   }

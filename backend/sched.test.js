@@ -146,6 +146,25 @@ const check = (label, cond, detail) => { results.push({ label, ok: !!cond, detai
 
   // A bounded unsorted status scan can hide the only due reservation behind 100 future ones.
   {
+    const oldMode = process.env.DEPLOYMENT_MODE;
+    process.env.DEPLOYMENT_MODE = 'production';
+    let charges = 0;
+    charge = async () => { charges++; return { ok: true, paymentIntentId: 'unreachable' }; };
+    const h = makeDb({ scheduled_rides: { r1: base(3) }, operators: FLEET,
+      users: { opA: QUALIFIED_USER('opA'), opB: QUALIFIED_USER('opB') } });
+    const worker = inject(h.db);
+    const missing = await worker.sweepScheduled();
+    const blocked = await worker.sweepScheduled({ checkMarket: async () => 'waitlist' });
+    check('a production reservation without admitted market never charges, even if callback is missing',
+      charges === 0 && !h.data.rides && h.data.scheduled_rides.r1.status === 'reserved' &&
+      missing.failed[0]?.reason?.includes('market admission') && blocked.failed[0]?.reason?.includes('market admission'));
+    if (oldMode === undefined) delete process.env.DEPLOYMENT_MODE;
+    else process.env.DEPLOYMENT_MODE = oldMode;
+    charge = async (opts) => ({ ok: true, paymentIntentId: `pi_${opts.reservationId}`, chargedCents: 2720 });
+  }
+
+  // A bounded unsorted status scan can hide the only due reservation behind 100 future ones.
+  {
     const many={};
     for(let i=0;i<100;i++) many[`future${i}`]=base(40);
     many.due=base(3);

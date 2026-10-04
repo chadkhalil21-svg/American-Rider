@@ -68,6 +68,8 @@ export default {
     operatingArea: 'Operating Area',
     chooseOperatingArea: 'Choose the county you will operate in.',
     marketNotActive: 'American Rider does not operate in %{name} yet. Your interest is recorded. Choose an active county to continue.',
+    marketPrelaunch: 'Prelaunch checks are authorized in %{name}. Document review is available; paid Travel and duty are not.',
+    marketAdmissionRequired: 'Choose an active or authorized prelaunch county before starting checks. Unsupported areas remain on the interest list.',
     ready: 'Ready to Operate',
     readySub: 'Your account is ready. When you enter service, American Rider can begin offering Travel to you.',
     commence: 'Commence Operations',

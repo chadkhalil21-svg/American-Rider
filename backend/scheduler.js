@@ -37,6 +37,7 @@ const { fileTicket } = require('./tickets');
 const { notify } = require('./push');
 const { activeFamilyLink } = require('./family');
 const { provisionTeenPin } = require('./teenpickup');
+const { readKey } = require('./env');
 
 // How far ahead a reservation enters consideration. Inside this window it is looked at on
 // every sweep; outside it, it is not read at all.
@@ -68,9 +69,18 @@ const CLAIM_STALE_MS = 3 * 60 * 1000;
  *
  * Never throws. A sweep that dies takes every later sweep with it when it runs on an interval.
  */
-async function sweepScheduled({ now = Date.now() } = {}) {
+async function sweepScheduled({ now = Date.now(), checkMarket } = {}) {
   const db = adminDb();
   if (!db) return { ok: false, reason: adminStatus().reason, considered: 0 };
+
+  const liveMoney = String(readKey('DEPLOYMENT_MODE') || '').toLowerCase() === 'production' ||
+    /^(sk|rk)_live_/.test(readKey('STRIPE_SECRET_KEY') || '');
+  const admitted = async (pickup) => {
+    if (!liveMoney) return true;
+    if (typeof checkMarket !== 'function') return false;
+    try { return (await checkMarket(pickup)) === 'active'; }
+    catch { return false; }
+  };
 
   const report = { ok: true, considered: 0, dispatched: [], waiting: 0, failed: [] };
   if (!await recoverStaleClaims(db, now, report)) return { ...report, ok: false };
@@ -114,6 +124,14 @@ async function sweepScheduled({ now = Date.now() } = {}) {
     if (!havePickup) {
       await close(db, id, 'unmatched', 'This reservation was made before automatic dispatch and has no pickup on it.');
       report.failed.push({ id, reason: 'no pickup coordinates' });
+      continue;
+    }
+
+    if (!await admitted(pickup)) {
+      // Keep the reservation visible and uncharged. Closure/refunds and already-running rides
+      // continue independently; a lapse must never be reported as "no Operator available".
+      await touch(db, id, { lastSweepAt: now, lastSweepResult: 'market admission unavailable' });
+      report.failed.push({ id, reason: 'market admission unavailable; no charge requested' });
       continue;
     }
 
@@ -275,10 +293,10 @@ async function sweepScheduled({ now = Date.now() } = {}) {
     }
 
     // ---- 3. Off-session charge with a stable provider idempotency key. ----------------
-    if (!await stillClaimed(db,id,claimed,r.party)) {
+    if (!await admitted(pickup) || !await stillClaimed(db,id,claimed,r.party)) {
       await touchClaimed(db,id,claimed,{status:'unmatched',claimedAt:null,claimNonce:null,
-        closedReason:'Reservation or Family authorization changed before charge.',closedAt:Date.now()});
-      report.failed.push({id,reason:'reservation or Family authorization changed; no charge requested'});
+        closedReason:'Reservation, Family authorization or market admission changed before charge.',closedAt:Date.now()});
+      report.failed.push({id,reason:'reservation, Family authorization or market admission changed; no charge requested'});
       continue;
     }
     const paid = await chargeScheduledTravel({
@@ -307,8 +325,8 @@ async function sweepScheduled({ now = Date.now() } = {}) {
       // If this write fails, Stripe's payment_intent.succeeded webhook uses rideId metadata to
       // attach the charge to this already-existing ride; booking recovery then refunds it.
       await rideRef.set({ paymentIntentId: paid.paymentIntentId }, { merge: true });
-      if (!await stillClaimed(db,id,claimed,r.party)) {
-        throw new Error('Reservation or Family authorization changed after charge; refund is owed');
+      if (!await admitted(pickup) || !await stillClaimed(db,id,claimed,r.party)) {
+        throw new Error('Reservation, Family authorization or market admission changed after charge; refund is owed');
       }
       const payment = await verifiedTravelPayment(paid.paymentIntentId);
       const assigned = await assignPaidTravel({ db, uid: r.travelerUid, rideId,

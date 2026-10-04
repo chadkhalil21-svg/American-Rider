@@ -38,8 +38,8 @@ export default function OperatorQualification() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // THE OPERATING AREA. The server reads documents, orders screening and opens payouts only for
-  // an operator whose county is active. Placed from the phone's last known position when there
+  // The server accepts qualification for an admitted prelaunch county, but paid duty only after
+  // full commercial activation. Placed from the phone's last known position when there
   // is one and nothing is declared yet; otherwise the operator chooses.
   const [area, setArea] = useState<MarketState | null>(null);
   const [areaBusy, setAreaBusy] = useState(false);
@@ -64,6 +64,7 @@ export default function OperatorQualification() {
     };
   }, []);
   const areaActive = area?.market?.status === 'active';
+  const areaAuthorized = areaActive || area?.market?.status === 'onboarding';
 
   return (
     <Screen>
@@ -106,13 +107,15 @@ export default function OperatorQualification() {
               <Text style={styles.rowSub}>
                 {areaActive
                   ? area.market!.name
+                  : area.market?.status === 'onboarding'
+                    ? t('operator.marketPrelaunch', { name: area.market.name })
                   : area.market
                     ? t('operator.marketNotActive', { name: area.market.name })
                     : t('operator.chooseOperatingArea')}
               </Text>
-              {!areaActive && (
+              {!areaAuthorized && (
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 8 }}>
-                  {area.active.map((m) => (
+                  {[...area.active, ...area.onboarding].map((m) => (
                     <Pressable
                       key={m.id}
                       hitSlop={6}
@@ -155,6 +158,10 @@ export default function OperatorQualification() {
               accessibilityRole="button"
               key={d.key}
               onPress={() => {
+                if (!areaAuthorized) {
+                  setAreaError(t('operator.marketAdmissionRequired'));
+                  return;
+                }
                 // THE FOUR DOCUMENT STEPS GO TO THE SCREEN THAT CAN READ ONE. They used to call
                 // verifyDoc, which ticked them after 900 milliseconds without ever seeing a
                 // document. verifyDoc now refuses those keys, so leaving this would have made
@@ -197,7 +204,7 @@ export default function OperatorQualification() {
       {submitError && <Text style={styles.footnote}>{submitError}</Text>}
       <PrimaryButton
         label={done ? t('traveler.qualSubmitReview') : t('traveler.qualVerifyAll', { total: QUAL_DOCS.length })}
-        disabled={!done || submitting}
+        disabled={!done || submitting || !areaAuthorized}
         onPress={async () => {
           setSubmitting(true);
           setSubmitError(null);

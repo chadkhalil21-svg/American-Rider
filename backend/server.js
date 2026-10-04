@@ -33,6 +33,8 @@ const { requireAuth, requireFreshAuth, attachAuth, requireVerifiedEmail } = requ
 const { perAccount, countOnly, perIp } = require('./ratelimit');
 const { marketFor, servesPoint, listMarkets, markets: allMarkets } = require('./markets');
 const { forMarket: insuranceForMarket, publicConfig: publicInsuranceConfig } = require('./insurance-jurisdictions');
+const { manifestFor, inspectMarket, recordEvidence, activateMarket, authorizeOnboarding, pauseMarket } = require('./market-readiness');
+const { marketChecklistPage } = require('./market-readiness-ui');
 
 // ——— WHAT A THROWAWAY ACCOUNT MAY DO, AND HOW OFTEN ————————————————————————————
 // Booking was never the exposure: a travel needs a payment method, and a card is far harder to
@@ -248,6 +250,39 @@ function requireOperationalReadiness(req, res, next) {
   return next();
 }
 
+// Every consequential new booking checks the durable market admission document. This is
+// intentionally NOT cached: a carrier lapse or Operations pause must prevent new money.
+// Existing emergency, cancellation, refund, settlement and already-running Travels stay open.
+async function admittedMarket(market) {
+  const region = market?.regionId ? REGIONS.find((r) => r.id === market.regionId) : null;
+  return inspectMarket({ db: adminDb(), market, region, providerMissing: productionReadiness().missing });
+}
+async function requireAdmittedPickup(req, res, next) {
+  if (!productionMode) return next();
+  const point = req.body?.pickup;
+  const market = marketFor(point);
+  if (!market || market.status !== 'active') return res.status(409).json({ code: 'market_waitlist', error: 'Travel is not available in this market yet.' });
+  const state = await admittedMarket(market);
+  if (state.status !== 'active') return res.status(409).json({ code: 'market_waitlist', error: 'Travel is not available in this market yet.', marketId: market.id });
+  return next();
+}
+async function requireAdmittedTravel(req, res, next) {
+  if (!productionMode) return next();
+  const db = adminDb();
+  if (!db) return res.status(503).json({ code: 'market_admission_unavailable' });
+  try {
+    const snap = await db.collection('rides').doc(String(req.body?.rideId || '')).get();
+    if (!snap.exists || String(snap.data().travelerUid || '') !== String(req.uid)) return res.status(404).json({ code: 'no_travel' });
+    const ride = snap.data();
+    const market = marketFor({ lat: ride.pickupLat, lng: ride.pickupLng });
+    const state = await admittedMarket(market);
+    if (state.status !== 'active') return res.status(409).json({ code: 'market_waitlist', error: 'New charges and offers are paused in this market.' });
+    return next();
+  } catch {
+    return res.status(503).json({ code: 'market_admission_unavailable' });
+  }
+}
+
 // Stripe, for signature verification only. The payment logic has its own client in
 // payments.js; this avoids importing that whole module's state to check one header.
 let _sigClient = null;
@@ -396,7 +431,7 @@ app.get('/health', async (req, res) => {
     // How /ops is signed in to: 'named' is the production answer.
     opsAuth: opsAuthMode(),
     // Where travel is sold and operators are onboarded (backend/markets.js).
-    markets: listMarkets(),
+    markets: await publicMarkets(),
     // Calling between a traveler and their operator over WiFi or data. Reported for the same
     // reason as everything else here: a call button that silently does nothing is worse than
     // no call button, and the only way to know is to ask the server.
@@ -434,8 +469,9 @@ app.get('/health', async (req, res) => {
 //
 // `mode` is what the app's payment copy reads, so no screen can claim payments are simulated
 // while real money is moving, or the reverse.
-app.get('/config', (req, res) => {
+app.get('/config', async (req, res) => {
   const readiness = productionReadiness();
+  const activeMarkets = (await publicMarkets()).some((m) => m.status === 'active');
   res.json({
     stripePublishableKey: readKey('STRIPE_PUBLISHABLE_KEY') || null,
     mode: keyMode,
@@ -445,7 +481,7 @@ app.get('/config', (req, res) => {
     // requireOperationalReadiness below.
     canManagePaymentMethods: keyMode !== 'no-key' && !!readKey('STRIPE_PUBLISHABLE_KEY'),
     // Charging/reserving remains fail-closed on the complete operational gate.
-    canTakePayment: readiness.ready && keyMode !== 'no-key' && !!readKey('STRIPE_PUBLISHABLE_KEY'),
+    canTakePayment: readiness.ready && activeMarkets && keyMode !== 'no-key' && !!readKey('STRIPE_PUBLISHABLE_KEY'),
     operationalReady: readiness.ready,
   });
 });
@@ -918,6 +954,15 @@ app.post('/operator/online', requireAuth, requireFreshAuth, requireOperationalRe
       return refuse({ code: 'account_disabled', error: 'This account cannot accept travel.' });
     }
     const rec = (await operatorRecord(req.uid)) || {};
+    if (productionMode) {
+      const point = { lat: Number(req.body?.lat), lng: Number(req.body?.lng) };
+      const selected = operatingMarketOf(rec) || marketFor(point);
+      const physical = marketFor(point);
+      const [selection, location] = await Promise.all([admittedMarket(selected), admittedMarket(physical)]);
+      if (selection.status !== 'active' || location.status !== 'active') {
+        return refuse({ code: 'market_waitlist', error: 'New Operator offers are paused in this market.' });
+      }
+    }
     const status = await connectAccountStatus(rec.stripeAccountId || null);
     if (!status.payoutsEnabled) {
       return refuse({
@@ -1461,7 +1506,7 @@ app.post('/quote', LIMITS.quoteIp, (req, res) => {
 // when the trip can't be routed — the app then keeps its straight-line fallback. Like
 // /fare-quote this is unauthenticated (it reveals nothing private), but it only answers inside
 // a served region (regions.js), so it can't be farmed as a free worldwide routing proxy.
-app.post('/route', LIMITS.routeIp, async (req, res) => {
+app.post('/route', LIMITS.routeIp, requireAdmittedPickup, async (req, res) => {
   // No routing for a pickup that is not in an active market: nothing can be booked from there.
   if (!servesPoint(req.body?.pickup)) return res.status(409).json({ error: outsideMarketMessage('pickup'), code: 'outside_market', where: 'pickup' });
   const route = await fetchRoute(req.body?.pickup, req.body?.dest);
@@ -1477,7 +1522,7 @@ app.post('/route', LIMITS.routeIp, async (req, res) => {
 //   503 { status: 'unavailable' }     the planner is not answering — the app says so
 // This used to 404 when rail "did not win", and the app read 404 as "do not show". That gate
 // is withdrawn: the server reports; the client decides emphasis.
-app.post('/smart-quote', LIMITS.routeIp, requireOperationalReadiness, async (req, res) => {
+app.post('/smart-quote', LIMITS.routeIp, requireOperationalReadiness, requireAdmittedPickup, async (req, res) => {
   // OLDER APPS GET THE OLDER ANSWER. TestFlight build 36 reads any 200 as a plan and would
   // render `{ status: 'none' }` as a card reading "Save $NaN", then crash on its legs. An app
   // that does not name the new contract (header X-AR-Smart: 2) is answered the way the old
@@ -1512,13 +1557,14 @@ app.post('/smart-revalidate', LIMITS.routeIp, requireOperationalReadiness, async
 // AN EMPTY LIST IS A CORRECT ANSWER. Outside every region the answer is nothing, and the
 // screen says we do not operate there yet — which is true, and better than five destinations
 // in a city the traveler is not in.
-app.get('/destinations', LIMITS.quoteIp, (req, res) => {
+app.get('/destinations', LIMITS.quoteIp, async (req, res) => {
   const lat = Number(req.query.lat);
   const lng = Number(req.query.lng);
   const limit = Math.min(20, Math.max(1, Number(req.query.limit) || 5));
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
     return res.status(400).json({ error: 'lat and lng are required' });
   }
+  if (productionMode && (await admittedMarket(marketFor({ lat, lng }))).status !== 'active') return res.json([]);
   res.json(destinationsNear({ lat, lng }, limit));
 });
 
@@ -1539,7 +1585,7 @@ app.get('/place-search', LIMITS.placeSearchIp, async (req, res) => {
 // any government fee inside that price (name, payee, cents) so a screen can say what it is;
 // `travelerPays` already contains it — nothing is added on top of the number shown.
 // No login needed: this only reveals pricing, and a traveler must see the price before booking.
-app.post('/fare-quote', attachAuth, LIMITS.quoteIp, requireOperationalReadiness, async (req, res) => {
+app.post('/fare-quote', attachAuth, LIMITS.quoteIp, requireOperationalReadiness, requireAdmittedPickup, async (req, res) => {
   const priced = await authoritativeFare({
     body: req.body, uid: req.uid, email: req.email, db: adminDb(), cardCountryFor: defaultCardCountry,
   });
@@ -1627,7 +1673,7 @@ app.delete('/payment-methods/:id', requireAuth, LIMITS.payments, async (req, res
   }
 });
 
-app.post('/create-payment-intent', requireAuth, LIMITS.payments, requireFreshAuth, requireOperationalReadiness, async (req, res) => {
+app.post('/create-payment-intent', requireAuth, LIMITS.payments, requireFreshAuth, requireOperationalReadiness, requireAdmittedTravel, async (req, res) => {
   if (keyMode === 'no-key') {
     return res.status(500).json({ error: 'No Stripe secret key configured. Add STRIPE_SECRET_KEY to backend/.env' });
   }
@@ -1775,10 +1821,17 @@ let lastSweep = { at: 0, report: null };
  * Promise.all.
  */
 async function runAllSweeps() {
+  const marketStatuses = new Map();
+  const checkMarket = async (pickup) => {
+    const market = marketFor(pickup);
+    if (!market) return 'waitlist';
+    if (!marketStatuses.has(market.id)) marketStatuses.set(market.id, admittedMarket(market).then((state) => state.status));
+    return marketStatuses.get(market.id);
+  };
   const [scheduled, monitor, assignments, screening, settlements, bookingRecovery, providerEvents, operatorFees, familyAgeOut, insuranceMonitoring, marketReference] = await Promise.allSettled([
-    sweepScheduled(),
+    sweepScheduled({ checkMarket }),
     sweepMonitor(),
-    sweepAssignments(),
+    sweepAssignments({ checkMarket }),
     sweepScreening(),
     sweepSettlements(),
     sweepBookingRecovery({ db: adminDb(), stripeConfigured: keyMode !== 'no-key',
@@ -1860,7 +1913,7 @@ async function runSweep(req, res) {
 // --- Private file storage. -----------------------------------------------------------------
 // The mobile app may request a five-minute upload URL only for its own namespace. R2 remains
 // private; credentials never leave this server. Object keys, not public URLs, are persisted.
-app.post('/storage/upload-url', requireAuth, LIMITS.document, requireFreshAuth, async (req, res) => {
+app.post('/storage/upload-url', requireAuth, LIMITS.document, requireFreshAuth, requireActiveOperatingMarket, async (req, res) => {
   if (!r2Ready()) return res.status(503).json({ error: 'Private storage is not configured.', code: 'storage_not_configured' });
   const purpose = String(req.body?.purpose || '');
   const kind = String(req.body?.kind || '');
@@ -1890,7 +1943,7 @@ app.get('/storage/object', requireAuth, LIMITS.document, requireFreshAuth, async
 // information about transactions or experiences between the consumer and the report-maker.
 // Nothing here is looked up about the person — see the header of backend/documents.js for the
 // other edge of that line, which is CFPB Circular 2024-06.
-app.post('/operator/document', requireAuth, LIMITS.document, requireFreshAuth, async (req, res) => {
+app.post('/operator/document', requireAuth, LIMITS.document, requireFreshAuth, requireActiveOperatingMarket, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
 
@@ -2045,6 +2098,39 @@ function operatingMarketGate(user) {
 
 const marketBody = (m) => (m ? { id: m.id, name: m.name, status: m.status, regionId: m.regionId } : null);
 
+// Public discovery may use a short cache; actual charges and offers always read durable state.
+let publicMarketCache = { until: 0, value: null, pending: null };
+async function publicMarkets() {
+  if (!productionMode) return listMarkets();
+  if (publicMarketCache.value && Date.now() < publicMarketCache.until) return publicMarketCache.value;
+  if (publicMarketCache.pending) return publicMarketCache.pending;
+  publicMarketCache.pending = (async () => {
+    const items = await Promise.all(allMarkets().filter((m) => m.regionId).map(async (m) => {
+      if (m.status !== 'active') return marketBody(m);
+      const state = await admittedMarket(m);
+      return { ...marketBody(m), status: state.status === 'active' ? 'active' : 'waitlist' };
+    }));
+    publicMarketCache = { until: Date.now() + 15_000, value: items, pending: null };
+    return items;
+  })();
+  try { return await publicMarketCache.pending; }
+  catch { publicMarketCache = { until: 0, value: null, pending: null }; return []; }
+}
+function invalidatePublicMarkets() { publicMarketCache = { until: 0, value: null, pending: null }; }
+function listedMarket(market, listed) {
+  if (!market) return null;
+  return listed.find((item) => item.id === market.id) ||
+    { ...marketBody(market), status: productionMode ? 'waitlist' : market.status };
+}
+async function operatorMarketOptions() {
+  if (!productionMode) return listMarkets();
+  return Promise.all(allMarkets().filter((m) => m.regionId).map(async (m) => {
+    if (m.status !== 'active') return marketBody(m);
+    const state = await admittedMarket(m);
+    return { ...marketBody(m), status: state.status };
+  }));
+}
+
 /** Express middleware: the signed-in operator's declared operating market must be ACTIVE. */
 async function requireActiveOperatingMarket(req, res, next) {
   const db = adminDb();
@@ -2053,20 +2139,98 @@ async function requireActiveOperatingMarket(req, res, next) {
     const snap = await db.collection('users').doc(String(req.uid)).get();
     const gate = operatingMarketGate(snap.exists ? snap.data() : null);
     if (gate) return res.status(409).json(gate);
+    if (productionMode) {
+      const market = operatingMarketOf(snap.data());
+      const admitted = await admittedMarket(market);
+      if (!['onboarding', 'active'].includes(admitted.status)) return res.status(409).json({ code: 'market_waitlist', error: 'Operator onboarding is not authorized in this market.', marketId: market.id });
+    }
     next();
   } catch (e) {
     res.status(502).json({ error: e.message });
   }
 }
 
-// Public: what is active, for the app's area chooser and the website.
-app.get('/markets', LIMITS.quoteIp, (req, res) => {
+// Public: one cached status per configured county, never evidence or confidential references.
+app.get('/markets', LIMITS.quoteIp, async (req, res) => {
   const lat = Number(req.query?.lat);
   const lng = Number(req.query?.lng);
+  const available = await publicMarkets();
+  const nearby = Number.isFinite(lat) && Number.isFinite(lng) ? marketFor({ lat, lng }) : null;
   res.json({
-    active: allMarkets().filter((m) => m.status === 'active').map(marketBody),
-    here: Number.isFinite(lat) && Number.isFinite(lng) ? marketBody(marketFor({ lat, lng })) : null,
+    active: available.filter((m) => m.status === 'active'),
+    here: listedMarket(nearby, available),
   });
+});
+
+function opsMarket(req, res) {
+  const m = allMarkets().find((item) => item.id === String(req.params.id || ''));
+  if (!m) res.status(404).json({ code: 'unknown_market' });
+  return m;
+}
+function requireOpsMutation(req, res, next) {
+  if (req.get('x-ar-ops-action') !== '1' || !req.is('application/json')) {
+    return res.status(403).json({ code: 'ops_action_header_required' });
+  }
+  return next();
+}
+app.get('/ops/markets', requireOps, async (req, res) => {
+  const markets = allMarkets().filter((m) => m.regionId);
+  const items = await Promise.all(markets.map(async (market) => ({ market, state: await admittedMarket(market) })));
+  res.type('html').send(marketChecklistPage(items, { production: DEPLOYMENT_MODE === 'production' && keyMode === 'live' }));
+});
+app.get('/ops/markets/:id/readiness', requireOps, async (req, res) => {
+  const market = opsMarket(req, res);
+  if (!market) return;
+  const region = REGIONS.find((r) => r.id === market.regionId);
+  return res.json({ ...await admittedMarket(market), manifest: manifestFor(market, region) });
+});
+app.post('/ops/markets/:id/evidence', requireOps, requireOpsMutation, async (req, res) => {
+  const market = opsMarket(req, res);
+  if (!market) return;
+  if (opsAuthMode() !== 'named') return res.status(403).json({ code: 'named_ops_required' });
+  try {
+    const out = await recordEvidence({ db: adminDb(), market, domain: req.body?.domain,
+      input: req.body, actor: req.opsUser });
+    if (out.ok) invalidatePublicMarkets();
+    return res.status(out.ok ? 200 : 400).json(out);
+  } catch { return res.status(503).json({ code: 'market_evidence_unavailable' }); }
+});
+app.post('/ops/markets/:id/onboard', requireOps, requireOpsMutation, async (req, res) => {
+  const market = opsMarket(req, res);
+  if (!market) return;
+  if (DEPLOYMENT_MODE !== 'production' || keyMode !== 'live' || opsAuthMode() !== 'named') {
+    return res.status(409).json({ code: 'production_authority_required' });
+  }
+  const region = REGIONS.find((r) => r.id === market.regionId);
+  try {
+    const out = await authorizeOnboarding({ db: adminDb(), market, region, actor: req.opsUser,
+      expectedVersion: req.body?.manifestVersion, providerMissing: productionReadiness().missing });
+    if (out.ok) invalidatePublicMarkets();
+    return res.status(out.ok ? 200 : 409).json(out);
+  } catch { return res.status(503).json({ code: 'market_onboarding_unavailable' }); }
+});
+app.post('/ops/markets/:id/activate', requireOps, requireOpsMutation, async (req, res) => {
+  const market = opsMarket(req, res);
+  if (!market) return;
+  if (DEPLOYMENT_MODE !== 'production' || keyMode !== 'live' || opsAuthMode() !== 'named') {
+    return res.status(409).json({ code: 'production_authority_required' });
+  }
+  const region = REGIONS.find((r) => r.id === market.regionId);
+  try {
+    const out = await activateMarket({ db: adminDb(), market, region, actor: req.opsUser,
+      expectedVersion: req.body?.manifestVersion, providerMissing: productionReadiness().missing });
+    if (out.ok) invalidatePublicMarkets();
+    return res.status(out.ok ? 200 : 409).json(out);
+  } catch { return res.status(503).json({ code: 'market_activation_unavailable' }); }
+});
+app.post('/ops/markets/:id/pause', requireOps, requireOpsMutation, async (req, res) => {
+  const market = opsMarket(req, res);
+  if (!market) return;
+  try {
+    const out = await pauseMarket({ db: adminDb(), market, actor: req.opsUser, reason: req.body?.reason });
+    if (out.ok) invalidatePublicMarkets();
+    return res.status(out.ok ? 200 : 409).json(out);
+  } catch { return res.status(503).json({ code: 'market_pause_unavailable' }); }
 });
 
 // The operator names the county they will operate in — or sends a position and it is derived.
@@ -2092,13 +2256,16 @@ app.post('/operator/market', requireAuth, LIMITS.market, async (req, res) => {
     if (m) {
       await db.collection('users').doc(String(req.uid)).set({ operatingMarket: { id: m.id, via, at: now } }, { merge: true });
     }
-    if (!m || m.status !== 'active') {
+    const available = await operatorMarketOptions();
+    const selected = listedMarket(m, available);
+    if (!selected || selected.status === 'waitlist') {
       await db.collection('waitlist').doc(String(req.uid)).set(
-        { role: 'operator', marketId: m?.id || null, at: now, ...(via === 'position' && !m ? { lat: Number(b.lat), lng: Number(b.lng) } : {}) },
+        { role: 'operator', marketId: m?.id || null, at: now },
         { merge: true },
       );
     }
-    res.json({ market: marketBody(m), active: allMarkets().filter((x) => x.status === 'active').map(marketBody) });
+    res.json({ market: selected, active: available.filter((x) => x.status === 'active'),
+      onboarding: available.filter((x) => x.status === 'onboarding') });
   } catch (e) {
     res.status(502).json({ error: e.message });
   }
@@ -2109,9 +2276,12 @@ app.get('/operator/market', requireAuth, async (req, res) => {
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   try {
     const snap = await db.collection('users').doc(String(req.uid)).get();
+    const market = operatingMarketOf(snap.exists ? snap.data() : null);
+    const available = await operatorMarketOptions();
     res.json({
-      market: marketBody(operatingMarketOf(snap.exists ? snap.data() : null)),
-      active: allMarkets().filter((x) => x.status === 'active').map(marketBody),
+      market: listedMarket(market, available),
+      active: available.filter((x) => x.status === 'active'),
+      onboarding: available.filter((x) => x.status === 'onboarding'),
     });
   } catch (e) {
     res.status(502).json({ error: e.message });
@@ -2638,7 +2808,7 @@ app.get('/operator/commission', requireAuth, LIMITS.qualification, async (req, r
 
 // The operator says they are done. Kept as the app's explicit moment, but it decides nothing a
 // document reading has not already decided: it assesses and reports.
-app.post('/operator/qualification/submit', requireAuth, LIMITS.qualification, async (req, res) => {
+app.post('/operator/qualification/submit', requireAuth, LIMITS.qualification, requireActiveOperatingMarket, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   try {
@@ -2923,7 +3093,7 @@ function travelNumberFor(documentId, pickup) {
 
 // The immutable, server-priced booking exists before Stripe's PaymentSheet is opened.
 // A duplicate device request returns the same ride id, not another PaymentIntent/travel.
-app.post('/travel/prepare', requireAuth, LIMITS.dispatch, requireFreshAuth, requireOperationalReadiness, async (req, res) => {
+app.post('/travel/prepare', requireAuth, LIMITS.dispatch, requireFreshAuth, requireOperationalReadiness, requireAdmittedPickup, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   const b = req.body || {};
@@ -3002,7 +3172,7 @@ app.post('/travel/prepare', requireAuth, LIMITS.dispatch, requireFreshAuth, requ
 
 // This endpoint no longer creates a fresh ride or trusts a client-provided fare, Operator or
 // payment assertion. It can only offer the existing, freshly provider-confirmed paid Travel.
-app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, requireFreshAuth, requireOperationalReadiness, async (req, res) => {
+app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, requireFreshAuth, requireOperationalReadiness, requireAdmittedTravel, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   const id = String(req.body?.rideId || '');
@@ -3073,7 +3243,7 @@ app.delete('/travel/schedule/:id', requireAuth, requireFreshAuth, async (req, re
 
 // Create a scheduled reservation with the same server authority as immediate dispatch.
 // The time and labels are traveler inputs. Fare, distance, fees and Travel Number are not.
-app.post('/travel/schedule', requireAuth, LIMITS.dispatch, requireFreshAuth, requireOperationalReadiness, async (req, res) => {
+app.post('/travel/schedule', requireAuth, LIMITS.dispatch, requireFreshAuth, requireOperationalReadiness, requireAdmittedPickup, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   const b = req.body || {};

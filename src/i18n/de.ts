@@ -59,6 +59,8 @@ export default {
     operatingArea: 'Einsatzgebiet',
     chooseOperatingArea: 'Wählen Sie das County, in dem Sie tätig sein werden.',
     marketNotActive: 'American Rider ist in %{name} noch nicht tätig. Ihr Interesse ist vermerkt. Wählen Sie ein aktives County, um fortzufahren.',
+    marketPrelaunch: 'Vorbereitende Prüfungen sind in %{name} freigegeben. Dokumente dürfen geprüft werden; bezahlte Fahrten und Dienstbeginn sind noch nicht zulässig.',
+    marketAdmissionRequired: 'Wählen Sie vor Beginn ein aktives County oder ein County mit freigegebenen Vorabprüfungen. Nicht zugelassene Gebiete bleiben auf der Interessentenliste.',
     ready: 'Betriebsbereit',
     readySub: "Ihr Konto ist bereit. Sobald Sie den Dienst aufnehmen, kann American Rider Ihnen Travel anbieten.",
     commence: 'Betrieb Aufnehmen',

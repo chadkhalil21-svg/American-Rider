@@ -61,6 +61,8 @@ export default {
     operatingArea: 'Zone d’Opération',
     chooseOperatingArea: 'Choisissez le comté dans lequel vous opérerez.',
     marketNotActive: 'American Rider n’opère pas encore dans %{name}. Votre intérêt est enregistré. Choisissez un comté actif pour continuer.',
+    marketPrelaunch: 'Les vérifications préalables au lancement sont autorisées dans %{name}. Les documents peuvent être examinés, mais ni les voyages payants ni la prise de service ne sont encore autorisés.',
+    marketAdmissionRequired: 'Choisissez un comté actif ou autorisé pour les vérifications préalables avant de commencer. Les zones non admises restent sur la liste d’intérêt.',
     ready: 'Prêt à Opérer',
     readySub: "Votre compte est prêt. Lorsque vous entrez en service, American Rider peut commencer à vous proposer des Travel.",
     commence: 'Commencer les Opérations',

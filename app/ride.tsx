@@ -540,15 +540,27 @@ export default function Status() {
               <Text style={styles.keepBtnText}>{t('traveler.keepTravel')}</Text>
             </Pressable>
             <Pressable
-              onPress={() => {
-                ride.cancelRide();
-                router.dismissTo('/');
+              accessibilityRole="button"
+              disabled={cancelBusy}
+              onPress={async () => {
+                if (cancelBusy) return;
+                setCancelBusy(true);
+                setCancelFailed(false);
+                try {
+                  if (await ride.cancelRide()) router.dismissTo('/');
+                  else setCancelFailed(true);
+                } catch {
+                  setCancelFailed(true);
+                } finally {
+                  setCancelBusy(false);
+                }
               }}
               style={styles.yesCancelBtn}
             >
-              <Text style={styles.yesCancelText}>{t('traveler.yesCancel')}</Text>
+              <Text style={styles.yesCancelText}>{cancelBusy ? t('traveler.familyWorking') : t('traveler.yesCancel')}</Text>
             </Pressable>
           </View>
+          {cancelFailed ? <Text style={styles.cancelNote}>{t('traveler.cancelFailed')}</Text> : null}
         </View>
       ) : complete ? (
         <PrimaryButton

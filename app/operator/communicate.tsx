@@ -17,7 +17,7 @@
 //
 // Both messages now carry both uids, the rule lets either party read and each write only as
 // themselves, and `from` is checked against the writer so neither side can forge the other.
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Text } from '../../src/components/AppText';
 import {
@@ -39,6 +39,8 @@ export default function OperatorCommunicate() {
   const [msgs, setMsgs] = useState<TravelMessage[]>([]);
   const [threadError, setThreadError] = useState<string | null>(null);
   const [unsent, setUnsent] = useState(false);
+  const [sending, setSending] = useState(false);
+  const sendingRef = useRef(false);
   const traveler = op.op?.traveler ?? t('traveler.yourTravelerLower');
   const initials = op.op?.tInit ?? 'AR';
   // `no` is the travel number on an active operation; `tripNo` is what it is called on
@@ -54,21 +56,28 @@ export default function OperatorCommunicate() {
   }, [tripNo]);
 
   const send = async () => {
-    const t = draft.trim();
-    if (!t || !tripNo) return;
+    const text = draft.trim();
+    if (!text || !tripNo || sendingRef.current) return;
+    sendingRef.current = true;
+    setSending(true);
     setUnsent(false);
-    const stored = await sendTravelMessage({
-      rideId: op.op?.rideId,
-      tripNo,
-      text: t,
-      from: 'operator',
-      travelerUid,
-    });
-    // NOT OPTIMISTIC ABOUT DELIVERY. The message appears because the live thread picks it up,
-    // so a write that failed shows nothing — and says so, rather than leaving an operator
-    // believing the traveler was told something they were not.
-    if (!stored) setUnsent(true);
-    else setDraft('');
+    try {
+      const stored = await sendTravelMessage({
+        rideId: op.op?.rideId,
+        tripNo,
+        text,
+        from: 'operator',
+        travelerUid,
+      });
+      // The live thread is the only proof of delivery. A failed write leaves the draft.
+      if (!stored) setUnsent(true);
+      else setDraft((current) => current.trim() === text ? '' : current);
+    } catch {
+      setUnsent(true);
+    } finally {
+      sendingRef.current = false;
+      setSending(false);
+    }
   };
 
   return (
@@ -115,6 +124,8 @@ export default function OperatorCommunicate() {
           returnKeyType="send"
         />
         <Pressable
+          accessibilityRole="button"
+          disabled={sending || !draft.trim() || !tripNo}
           onPress={send}
           style={({ pressed }) => [styles.sendBtn, pressed && { opacity: 0.86 }]}
         >

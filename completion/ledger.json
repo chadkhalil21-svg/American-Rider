@@ -2,8 +2,8 @@
   "schemaVersion": "1.0",
   "branch": "integrate/commercial-completion-2026-10-03",
   "baseSha": "f749644c862e1da128359ddf2693a95506b9b52a",
-  "candidateSha": "f749644c862e1da128359ddf2693a95506b9b52a",
-  "generatedAt": "2026-10-04T01:48:15.926772+00:00",
+  "candidateSha": "7bca3cc2cec25ed91403dd89c8585a9005943c80",
+  "generatedAt": "2026-10-04T01:58:33.344655+00:00",
   "allowedStatuses": [
     "FIXED",
     "VERIFIED ALREADY FIXED",
@@ -18,8 +18,8 @@
   ],
   "notes": [
     "Initial seed from inherited evidence, not an exhaustive control inventory or certification.",
-    "PR candidates have not been integrated or verified at this candidate SHA.",
-    "WS14 was absent at seed; required before security/DR release claim.",
+    "PR #56 candidate integrated at 7bca3cc2cec25ed91403dd89c8585a9005943c80 and locally checked; PR #57 transient patches and PR #58 inventory generator are under integration and are not yet a verified final release.",
+    "Targeted WS14 source/official-documentation review completed at architecture-review/lanes/WS14.md; security/DR code and deployed controls remain unverified.",
     "A feature is withheld only after reasonable completion/verification work and precise unresolved reason."
   ],
   "records": [
@@ -268,7 +268,7 @@
       "category": "institutional-domain",
       "title": "Provider procurement, exact contracts/SLA/quotas, privacy DPA, service credits, portability and exit",
       "status": "NOT TESTED",
-      "owner": "WS03–05",
+      "owner": "WS03\u201305",
       "source": "coverage-and-omissions.md",
       "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
       "evidence": [
@@ -346,7 +346,7 @@
     {
       "id": "A21",
       "category": "institutional-domain",
-      "title": "New in second pass: immutable operator network log-on/log-off timeline and prompt §627.748(8)(d) claims disclosure of 12h before/after accident",
+      "title": "New in second pass: immutable operator network log-on/log-off timeline and prompt \u00a7627.748(8)(d) claims disclosure of 12h before/after accident",
       "status": "LAUNCH BLOCKER",
       "owner": "WS01",
       "source": "coverage-and-omissions.md",
@@ -362,7 +362,7 @@
     {
       "id": "A22",
       "category": "institutional-domain",
-      "title": "New in second pass: §627.748(13) no off-app compensated ride/street hail and anti-evasion integrity of enforcement-facing digital-network view",
+      "title": "New in second pass: \u00a7627.748(13) no off-app compensated ride/street hail and anti-evasion integrity of enforcement-facing digital-network view",
       "status": "LAUNCH BLOCKER",
       "owner": "WS01",
       "source": "coverage-and-omissions.md",
@@ -488,7 +488,8 @@
       "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/app/reserve.tsx",
       "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
       "evidence": [
-        "Inherited source review; revalidate against integration head."
+        "Inherited source review; revalidate against integration head.",
+        "PR #56 initial quote invalidation/typecheck passes at 7bca3cc2cec25ed91403dd89c8585a9005943c80; PR #57 complete transient UI patch is in progress, no device evidence yet."
       ],
       "candidatePrs": [
         56,
@@ -586,7 +587,7 @@
       "id": "F013",
       "category": "source-finding",
       "title": "Withdrawn-original assistant reachable with Anthropic key",
-      "status": "LAUNCH BLOCKER",
+      "status": "FIXED",
       "owner": "integration",
       "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/backend/server.js",
       "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
@@ -594,9 +595,11 @@
         "Inherited source review; revalidate against integration head."
       ],
       "candidatePrs": [],
-      "implementingCommit": null,
-      "verification": [],
-      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+      "implementingCommit": "7bca3cc2cec25ed91403dd89c8585a9005943c80",
+      "verification": [
+        "backend/assistant.test.js and npm run check passed locally at 7bca3cc2cec25ed91403dd89c8585a9005943c80; both public and legacy alias return 410 without an Anthropic call"
+      ],
+      "releaseCondition": "Verify deployed backend SHA and routes return 410; no model call telemetry."
     },
     {
       "id": "F014",
@@ -719,7 +722,8 @@
       "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/backend/places.js",
       "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
       "evidence": [
-        "Inherited source review; revalidate against integration head."
+        "Inherited source review; revalidate against integration head.",
+        "PR #56 national HERE autocomplete integrated at 7bca3cc2cec25ed91403dd89c8585a9005943c80 and backend/place-search.test.js passes; live HERE and non-Miami journey NOT TESTED."
       ],
       "candidatePrs": [
         56
@@ -785,7 +789,8 @@
       "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/src/components/UI.tsx",
       "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
       "evidence": [
-        "Inherited source review; revalidate against integration head."
+        "Inherited source review; revalidate against integration head.",
+        "PR #56 static accessibility test backend/navigationstate.test.js passes; screen reader/large text NOT TESTED."
       ],
       "candidatePrs": [
         56,
@@ -836,7 +841,8 @@
       "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/app/_layout.tsx",
       "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
       "evidence": [
-        "Inherited source review; revalidate against integration head."
+        "Inherited source review; revalidate against integration head.",
+        "PR #58 inventory generator selectively ported; semantic reconciliation and runtime controls NOT TESTED."
       ],
       "candidatePrs": [
         58
@@ -965,7 +971,9 @@
       "linkedFinding": "F021",
       "objective": "Complete and verify if technically, economically, legally and operationally supportable.",
       "launchState": "UNDER_REVIEW",
-      "attemptedWork": [],
+      "attemptedWork": [
+        "Integrated PR #56 HERE place search and source tests at 7bca3cc2cec25ed91403dd89c8585a9005943c80; live provider/geographic test pending."
+      ],
       "withholdingReason": null,
       "releaseLaterRequirements": []
     },
@@ -974,7 +982,9 @@
       "linkedFinding": "F001",
       "objective": "Complete and verify if technically, economically, legally and operationally supportable.",
       "launchState": "UNDER_REVIEW",
-      "attemptedWork": [],
+      "attemptedWork": [
+        "PR #56 and PR #57 transient fixes integrated/under test; payment-before-offer and atomic assignment still blockers."
+      ],
       "withholdingReason": null,
       "releaseLaterRequirements": []
     }
@@ -983,7 +993,10 @@
     {
       "id": 0,
       "status": "NOT TESTED",
-      "evidence": []
+      "evidence": [
+        "Release baseline f749644c862e1da128359ddf2693a95506b9b52a and candidate PR heads #56/#57/#58 reconciled; PR #56 slice committed 7bca3cc2cec25ed91403dd89c8585a9005943c80",
+        "Draft PR #59 opened against release/current; not merged or deployed. PR #57 and PR #58 selective patches under validation."
+      ]
     },
     {
       "id": 1,
@@ -998,7 +1011,9 @@
     {
       "id": 3,
       "status": "NOT TESTED",
-      "evidence": []
+      "evidence": [
+        "WS14 source/primary guidance review completed in /home/ubuntu/architecture-review/lanes/WS14.md; controls and deployment evidence remain open."
+      ]
     },
     {
       "id": 4,

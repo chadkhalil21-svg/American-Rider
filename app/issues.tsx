@@ -83,6 +83,7 @@ export default function PatronSupport() {
   const ride = useRide();
   const { resetIssue } = ride;
   const [draft, setDraft] = useState('');
+  const [submissionFailed, setSubmissionFailed] = useState(false);
 
   // THE TRAVELER'S OWN RECORD OF WHAT THEY HAVE ASKED US (Chad, 15 Sept 2026): the cases the
   // server holds for this account, and the lost-item reports, newest first. What is shown is
@@ -133,6 +134,7 @@ export default function PatronSupport() {
     if (ride.issueState !== null) {
       resetIssue();
       setDraft('');
+      setSubmissionFailed(false);
       return;
     }
     goBack();
@@ -147,6 +149,7 @@ export default function PatronSupport() {
       return;
     }
     setDraft('');
+    setSubmissionFailed(false);
     ride.pickIssue(key);
   };
 
@@ -305,9 +308,17 @@ export default function PatronSupport() {
             // not have to wonder whether a machine is about to answer them.
             <Text style={styles.humanNote}>{t('traveler.alwaysReachesPerson')}</Text>
           )}
+          {submissionFailed && <Text style={styles.submissionError}>{t('traveler.messageNotDelivered')}</Text>}
           <PrimaryButton
             label={t('traveler.send')}
-            onPress={() => ride.submitDescription(draft)}
+            onPress={async () => {
+              setSubmissionFailed(false);
+              try {
+                if (!await ride.submitDescription(draft)) setSubmissionFailed(true);
+              } catch {
+                setSubmissionFailed(true);
+              }
+            }}
             disabled={!draft.trim()}
             style={{ marginTop: 'auto' }}
           />
@@ -430,6 +441,7 @@ const styles = StyleSheet.create({
   },
   tripLabel: { fontSize: 13.5, color: colors.ink2 },
   humanNote: { fontSize: 12.5, color: colors.muted, marginTop: 10, lineHeight: 18 },
+  submissionError: { fontSize: 13, color: colors.red, marginTop: 10, lineHeight: 19 },
   stateCard: { marginTop: 20, padding: 20 },
   resolvingHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   resolvingTitle: { fontSize: 14, fontWeight: '600', color: colors.blue },

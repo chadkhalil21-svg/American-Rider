@@ -790,6 +790,8 @@ export default function TravelConfirmation() {
                 <Text style={styles.totalState}>{t('traveler.calculating')}</Text>
               ) : priceFailed || unavailable ? (
                 <Text style={styles.totalState}>{t('traveler.unavailable')}</Text>
+              ) : !authoritativePriceReady ? (
+                <Text style={styles.totalState}>{t('traveler.calculating')}</Text>
               ) : (
                 <Num size={20} weight="600">
                   {fmt(ride.travelerTotal)}

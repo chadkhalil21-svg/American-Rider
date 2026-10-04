@@ -459,8 +459,26 @@ export default function Home() {
                 <Text style={styles.upcomingOpen}>{t('traveler.view')} ›</Text>
               </Pressable>
             ) : (
-              <Pressable onPress={ride.cancelScheduled} hitSlop={8}>
-                <Text style={styles.upcomingCancel}>{t('traveler.cancel2')}</Text>
+              <Pressable
+                accessibilityRole="button"
+                disabled={cancellingScheduled}
+                onPress={async () => {
+                  if (cancellingScheduled) return;
+                  setCancellingScheduled(true);
+                  setScheduledCancelError(null);
+                  try {
+                    if (!await ride.cancelScheduled()) setScheduledCancelError(t('traveler.cancelFailed'));
+                  } catch {
+                    setScheduledCancelError(t('traveler.cancelFailed'));
+                  } finally {
+                    setCancellingScheduled(false);
+                  }
+                }}
+                hitSlop={8}
+              >
+                <Text style={styles.upcomingCancel}>
+                  {cancellingScheduled ? t('traveler.familyWorking') : t('traveler.cancel2')}
+                </Text>
               </Pressable>
             )}
           </View>

@@ -145,10 +145,13 @@ service cloud.firestore {
       allow read: if ownsExisting();
       allow create: if ownsIncoming()
                     && request.resource.data.keys().hasOnly(['travelerUid', 'tripNo', 'candidateTripNos', 'notifiedOperatorIds', 'notifiedOperatorNames', 'description', 'photoUrl', 'photoObjectKey', 'status', 'createdAt', 'statusAt', 'return']);
+      // Once filed, lifecycle state is server-authoritative. The Traveler may correct the
+      // description, but cannot self-assert that an Operator was notified or that a return was
+      // arranged. Those are operational facts and require server evidence.
       allow update: if ownsExisting()
-                    && touchesOnly(['return', 'status', 'statusAt', 'description'])
-                    && (!changes('status')
-                        || request.resource.data.status in ['reported', 'operator-notified', 'return-arranged']);
+                    && touchesOnly(['description'])
+                    && !changes('status')
+                    && !changes('return');
       allow delete: if false;
     }
 

@@ -125,6 +125,19 @@ export default function PatronSupport() {
   const result = ride.issueResult;
   const done = () => router.dismissTo('/');
 
+  // This route contains its own hierarchy (categories → issue detail → outcome). Router back
+  // only knows that /issues was opened from another route; using it while a category is open
+  // skips the logical parent and can throw the Traveler to Home/Receipt. Retrace the in-route
+  // hierarchy first, then use the route stack only from the category list.
+  const supportBack = () => {
+    if (ride.issueState !== null) {
+      resetIssue();
+      setDraft('');
+      return;
+    }
+    goBack();
+  };
+
   const choose = (key: string) => {
     const iss = ISSUES[key];
     if (!iss) return;
@@ -139,7 +152,7 @@ export default function PatronSupport() {
 
   return (
     <Screen>
-      <LetterheadBar onBack={goBack} />
+      <LetterheadBar onBack={supportBack} />
       <Title>{t('traveler.patronSupport')}</Title>
       {/* The instruction belongs to the form. Once the outcome is on screen the card says it. */}
       {ride.issueState !== 'resolved' && <Sub>{t('traveler.supportSub')}</Sub>}

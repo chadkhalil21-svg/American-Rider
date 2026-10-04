@@ -1,4 +1,5 @@
 import type { SmartPlan } from '../backend/smart';
+import { DEFAULT_DEPARTURE } from '../location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { FeeLine } from '../data';
 import React, {
@@ -15,10 +16,8 @@ import {
   platformFee,
   DEP_PLACES,
   DepPlace,
-  HOME_PLACE,
   ISSUES,
   PAY_FRIENDLY,
-  PLACES,
   Place,
   Trip,
   coordinationFee,
@@ -92,9 +91,9 @@ export type DispatchState = 'idle' | 'searching' | 'matched' | 'none' | 'error';
 
 const DEFAULT_PREFS: Prefs = { quiet: true, charging: false, luggage: false, pet: false };
 
-const INITIAL_TRIP: Trip = {
-  arr: 'Miami International Airport', dep: 'Brickell', cost: 24.5, proc: 0, total: 26.0, opRev: 24.26,
-  pay: PAY_FRIENDLY.ach, no: 'AR-2047-MIA', date: 'July 6, 2:43 PM', subPrefix: 'July 6',
+const EMPTY_TRIP: Trip = {
+  arr: '', dep: '', cost: 0, proc: 0, total: 0, opRev: 0,
+  pay: '', no: '', date: '', subPrefix: '',
 };
 
 const nowLabel = () => {
@@ -105,12 +104,9 @@ const nowLabel = () => {
   return `${h}:${String(d.getMinutes()).padStart(2, '0')} ${ampm}`;
 };
 
-const rollWait = (): { pickupWait: number; demand: Demand } => {
-  const roll = Math.random();
-  if (roll < 0.25) return { pickupWait: 2, demand: 'quiet' };
-  if (roll < 0.75) return { pickupWait: 3 + Math.floor(Math.random() * 2), demand: 'normal' };
-  return { pickupWait: 6 + Math.floor(Math.random() * 3), demand: 'busy' };
-};
+// Pickup ETA and demand are facts, not decoration. Until authoritative dispatch evidence
+// exists, the traveler sees no invented wait time and demand remains neutral.
+const UNKNOWN_PICKUP_WAIT = 0;
 
 export type SmartStatus = 'idle' | 'checking' | 'ok' | 'none' | 'unavailable';
 
@@ -243,7 +239,7 @@ export type RideStore = {
   resetIssue: () => void;
   pickIssue: (key: string) => void;
   /** Send the traveler's own words to the server, which decides what happens. */
-  submitDescription: (text: string) => void;
+  submitDescription: (text: string) => Promise<boolean>;
   /** A refund Patron Support issued on a travel: which one, and how much. */
   credited: { no: string; cents: number } | null;
 
@@ -267,7 +263,7 @@ export type RideStore = {
   schedSaved: boolean | null;
   /** What the dispatcher has done with it: still waiting, operator sent, or why not. */
   schedState: ScheduledRide | null;
-  scheduleRide: (info: SchedInfo) => void;
+  scheduleRide: (info: SchedInfo) => Promise<boolean>;
   cancelScheduled: () => Promise<boolean>;
 
   // audio
@@ -370,7 +366,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   quotedFeeLinesRef.current = quotedFeeLines;
   const governmentFee = (lines: FeeLine[]) => lines.reduce((sum, l) => sum + l.cents, 0) / 100;
 
-  const [arrival, setArrival] = useState<Place>(PLACES[0]);
+  const [arrival, setArrival] = useState<Place>({ name: '', short: '', cost: 0, meta: '' });
 
   // ---- THE PRICE. ONE DERIVATION, USED BY EVERY SCREEN THAT SHOWS MONEY. ------------------
   //
@@ -395,11 +391,12 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   // Friendly and the rest are multipliers on top of it, exactly as options.tsx, review.tsx
   // and the booking path all do. Same three lines, one place.
   const travelerTotal = useMemo(() => {
-    const baseCents = quotedFareCents ?? Math.round(arrival.cost * 100);
+    if (quotedFareCents == null) return 0;
+    const baseCents = quotedFareCents;
     const fare = applyClassCents(baseCents, travelClass) / 100;
     return +(fare + feeFor(fare, smartJourney) + governmentFee(quotedFeeLines)).toFixed(2);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quotedFareCents, arrival.cost, travelClass, smartJourney, quotedFeeLines]);
+  }, [quotedFareCents, travelClass, smartJourney, quotedFeeLines]);
   const [tripCoords, setTripCoords] = useState<{ pickup: Coords; dest: Coords } | null>(null);
   const tripCoordsRef = useRef<{ pickup: Coords; dest: Coords } | null>(null);
   tripCoordsRef.current = tripCoords;
@@ -417,6 +414,9 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       (arrival.lat != null && arrival.lng != null ? { lat: arrival.lat, lng: arrival.lng } : null);
     if (!dest) return;
     const seq = ++repriceSeq.current;
+    // The old pickup's quote ceases to be true the instant the pickup changes.
+    setQuotedFareCents(null);
+    setQuotedFeeLines([]);
     setRepricing(true);
     fetchQuote({ pickup: pickupPin, dest, destination: arrival.short, travelClass })
       .then((q) => {
@@ -469,8 +469,8 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     };
   }, [tripCoords]);
 
-  const [departure, setDeparture] = useState<DepPlace>(DEP_PLACES[0]);
-  const [pickupWait, setPickupWait] = useState(3);
+  const [departure, setDeparture] = useState<DepPlace>(DEFAULT_DEPARTURE);
+  const [pickupWait, setPickupWait] = useState(UNKNOWN_PICKUP_WAIT);
   const [demand, setDemand] = useState<Demand>('normal');
   const [status, setStatus] = useState(0);
   const [rideActive, setRideActive] = useState(false);
@@ -497,9 +497,9 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   const [myRides, setMyRides] = useState<RideRecord[]>([]);
   const [payment, setPayment] = useState<PaymentState>({ status: 'idle' });
   const [tripSeq, setTripSeq] = useState(2047);
-  const [lastTrip, setLastTrip] = useState<Trip>(INITIAL_TRIP);
+  const [lastTrip, setLastTrip] = useState<Trip>(EMPTY_TRIP);
   // Every completed ride, newest first — keeps old receipts reachable.
-  // STARTS EMPTY. This began as [INITIAL_TRIP] — a fabricated $26.00 journey to Miami
+  // STARTS EMPTY. This began as [EMPTY_TRIP] — a fabricated $26.00 journey to Miami
   // International on July 6, travel number AR-2047-MIA — which every account carried as its
   // own completed travel, and which a receipt could be opened against.
   const [completedTrips, setCompletedTrips] = useState<Trip[]>([]);
@@ -531,6 +531,10 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   // The completed travel waiting to be settled, and the ones already settled.
   const settleRideRef = useRef<string | null>(null);
   const settledRides = useRef<Set<string>>(new Set());
+  // Prevent duplicate settlement while the same authoritative request is in flight.
+  const settlementInFlightRef = useRef<string | null>(null);
+  // Completion snapshots can replay after reconnect/foreground. Side effects run once per ride.
+  const finishedRideIdsRef = useRef<Set<string>>(new Set());
 
   /**
    * Release the operator's 99% — but only once BOTH halves exist.
@@ -549,20 +553,22 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   const trySettle = useCallback(() => {
     const rideId = settleRideRef.current;
     const paymentIntentId = paidIntentRef.current;
-    if (!rideId || !paymentIntentId || settledRides.current.has(rideId)) return;
-    settledRides.current.add(rideId);
-    settleTravel({ rideId, paymentIntentId });
+    if (!rideId || !paymentIntentId || settledRides.current.has(rideId) || settlementInFlightRef.current === rideId) return;
+    settlementInFlightRef.current = rideId;
+    settleTravel({ rideId, paymentIntentId }).then((result) => {
+      if (result.ok || result.owed) settledRides.current.add(rideId);
+    }).finally(() => {
+      if (settlementInFlightRef.current === rideId) settlementInFlightRef.current = null;
+    });
   }, []);
   const [viewTrip, setViewTrip] = useState<(Trip & { sub?: string }) | null>(null);
-  const [stats, setStats] = useState({ trips: 23, spent: 612.85 });
+  const [stats, setStats] = useState({ trips: 0, spent: 0 });
   // Threads keyed by Travel Number. The seed is the demo's opening line on the first trip.
-  const [threads, setThreads] = useState<Record<string, Msg[]>>({
-    [INITIAL_TRIP.no]: [{ me: false, text: tr('traveler.opOnMyWay') }],
-  });
+  const [threads, setThreads] = useState<Record<string, Msg[]>>({});
   const [issue, setIssue] = useState<string | null>(null);
   const [issueState, setIssueState] = useState<IssueState>(null);
   const [issueResult, setIssueResult] = useState<SupportOutcome | null>(null);
-  // NO TRAVEL UNTIL THERE IS ONE. This was seeded with INITIAL_TRIP's number, so Patron
+  // NO TRAVEL UNTIL THERE IS ONE. This was seeded with EMPTY_TRIP's number, so Patron
   // Support opened showing "Travel AR-2047-MIA" to a traveler who had never taken a journey —
   // the seeded demonstration one, printed as though it were theirs.
   //
@@ -607,8 +613,8 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   // cannot render over a later one.
   const issueGen = useRef(0);
   const msgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastTotalRef = useRef(26.25);
-  const lastTripRef = useRef<Trip>(INITIAL_TRIP);
+  const lastTotalRef = useRef(0);
+  const lastTripRef = useRef<Trip>(EMPTY_TRIP);
   // The live payment, readable from a callback without re-creating it whenever it changes.
   const paymentRef = useRef<PaymentState>({ status: 'idle' });
   // Mirrors `status` so the ride tick keeps side effects out of state updaters
@@ -645,9 +651,8 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       // src/state/cabinPrefs.ts is the saved set; this travel starts as a copy of it.
       const saved = getCabinPrefs();
       setTripPrefs({ ...defaultPrefs, quiet: saved.quiet, charging: saved.charging, luggage: saved.luggage });
-      const q = rollWait();
-      setPickupWait(q.pickupWait);
-      setDemand(q.demand);
+      setPickupWait(UNKNOWN_PICKUP_WAIT);
+      setDemand('normal');
       if (dest) setArrival(dest);
       setViewTrip(null);
       // Each booking starts with a clean slate. Without this, a pin dropped for LAST week's
@@ -661,7 +666,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       // departure coordinates, a traveler in Wynwood was collected from Brickell and priced
       // from Brickell. The stale-pin reset above is still right; the pickup is not stale
       // when the device just told us where it is.
-      setDeparture((prev) => (prev?.resolved ? prev : DEP_PLACES[0]));
+      setDeparture((prev) => (prev?.resolved ? prev : DEFAULT_DEPARTURE));
       setTripCoords(null);
       setTravelClass('standard');
       setQuotedFareCents(null);
@@ -674,6 +679,8 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     try {
       const rides = await fetchMyRides();
       setMyRides(rides);
+      const completed = rides.filter((r) => r.status === 'completed');
+      setStats({ trips: completed.length, spent: completed.reduce((sum, r) => sum + r.totalCents, 0) / 100 });
       // Continue this traveler's trip numbers past the rides they already have, so a
       // fresh launch doesn't hand out AR-2048 again on every first booking.
       setTripSeq((s) => Math.max(s, 2047 + rides.length));
@@ -685,7 +692,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       // Never over a session already in progress, and never for a travel this phone just
       // finished: only when the store is empty and the record says the travel is assigned.
       if (!rideActiveRef.current && !activeRideId.current) {
-        const live = rides.find((r) => r.status === 'assigned');
+        const live = rides.find((r) => ['assigned', 'accepted', 'arrived', 'onboard'].includes(r.status));
         if (live) {
           const total = live.totalCents / 100;
           const fare = fareFromTotal(+(total - (live.governmentFeeCents ?? 0) / 100).toFixed(2));
@@ -698,10 +705,21 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
             proc: 0,
             total,
             opRev: fare - coordinationFee(fare),
-            pay: PAY_FRIENDLY[payRef.current] ?? 'Bank account',
+            pay: (() => {
+              const p = live.paidWith;
+              if (!p) return '';
+              if (p.wallet === 'apple_pay') return p.last4 ? tr('traveler.cardEnding', { brand: 'Apple Pay', last4: p.last4 }) : 'Apple Pay';
+              if (p.wallet === 'google_pay') return p.last4 ? tr('traveler.cardEnding', { brand: 'Google Pay', last4: p.last4 }) : 'Google Pay';
+              if (p.type === 'us_bank_account') return p.last4 ? tr('traveler.bankEnding', { last4: p.last4 }) : tr('traveler.bankAccount');
+              if (p.last4) {
+                const brand = p.brand ? p.brand[0].toUpperCase() + p.brand.slice(1) : 'Card';
+                return tr('traveler.cardEnding', { brand, last4: p.last4 });
+              }
+              return p.type || '';
+            })(),
             no: live.tripNo || live.id,
-            date: `Today, ${nowLabel()}`,
-            subPrefix: 'Today',
+            date: Number.isFinite(when.getTime()) ? when.toLocaleString() : '',
+            subPrefix: Number.isFinite(when.getTime()) ? when.toLocaleDateString() : '',
             operator: live.operatorName || undefined,
             miles: live.miles,
             feeLines: live.feeLines,
@@ -710,7 +728,11 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
           setLastTrip(trip);
           // The operator's card is rebuilt from what dispatch recorded. A travel dispatched
           // before those fields existed restores without them rather than inventing a car.
-          if (live.operatorId && live.operatorCar && live.operatorPlate) {
+          if (
+            live.status !== 'assigned' &&
+            live.operatorId && live.operatorCar && live.operatorPlate &&
+            typeof live.operatorLat === 'number' && typeof live.operatorLng === 'number'
+          ) {
             setMatchedOp({
               id: live.operatorId,
               demo: live.operatorDemo ?? false,
@@ -720,14 +742,15 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
               etaMin: live.operatorEtaMin ?? 0,
               miles: live.operatorMiles ?? 0,
               rideId: live.id,
-              lat: live.operatorLat ?? 0,
-              lng: live.operatorLng ?? 0,
+              lat: live.operatorLat,
+              lng: live.operatorLng,
             });
+          } else {
+            setMatchedOp(null);
           }
-          // Onboard is the one step the operator's app stamps, so it is the only one that
-          // can be known here; anything earlier is reported as the operator being on the way.
-          statusRef.current = live.onboardAt ? 3 : 1;
-          setStatus(live.onboardAt ? 3 : 1);
+          const restoredStep = OPERATOR_STEP[live.status] ?? 0;
+          statusRef.current = restoredStep;
+          setStatus(restoredStep);
           setRideActive(true);
           activeRideId.current = live.id;
           settleRideRef.current = live.id;
@@ -747,6 +770,9 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   // "Free to cancel". At launch the fleet is empty until operators join, so that was not an
   // edge case; it was every booking. Nothing is charged now until somebody is actually coming.
   const pendingChargeRef = useRef<null | (() => void)>(null);
+  // One booking intent may have retries, but only its newest dispatch response may mutate UI.
+  const dispatchGenerationRef = useRef(0);
+  const confirmInFlightRef = useRef(false);
 
   // Operators who have already declined THIS travel. Cleared when a new booking starts.
   const declinedByRef = useRef<string[]>([]);
@@ -767,6 +793,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   // Tracks a real state so the live screen can show progress, a "none available" message,
   // or an error with a retry — instead of the old silent, endless "Finding your operator…".
   const runDispatch = useCallback(() => {
+    const generation = ++dispatchGenerationRef.current;
     const trip = lastTripRef.current;
     // WHERE THE TRAVELER ACTUALLY IS, in the order we can trust it: the pin they dropped on
     // the map, then this travel's geocoded pickup, then the departure's own coordinates.
@@ -813,6 +840,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       },
     })
       .then((res) => {
+        if (generation !== dispatchGenerationRef.current) return null;
         if (res) {
           if (res.tripNo) {
             const authoritativeTrip = { ...lastTripRef.current, no: res.tripNo };
@@ -831,6 +859,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
           activeRideId.current = res.rideId; // handle for writing the outcome back
           setWatchedRideId(res.rideId);
           setDispatchState('matched');
+          confirmInFlightRef.current = false;
           refreshMyRides();
           // TELL THE OPERATOR. The travel was written to Firestore from this phone, so the
           // server does not learn of it until its next sweep — and an operator whose app is
@@ -847,11 +876,14 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
           // No available operator nearby (or signed out) — surface it, don't hang. Nothing
           // has been charged, and the screen must not imply otherwise.
           setDispatchState('none');
+          confirmInFlightRef.current = false;
         }
         return res;
       })
       .catch(() => {
+        if (generation !== dispatchGenerationRef.current) return null;
         setDispatchState('error');
+        confirmInFlightRef.current = false;
         return null;
       });
   }, [arrival, departure, refreshMyRides]);
@@ -926,6 +958,11 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const confirmRide = useCallback(() => {
+    // Authority belongs at the action boundary, not merely in a disabled button. A second
+    // tap, stale screen, or alternate caller cannot create another Travel or use a placeholder
+    // fare. Exact coordinates and the current authoritative quote are prerequisites.
+    if (confirmInFlightRef.current || quotedFareCents == null || !tripCoordsRef.current) return;
+    confirmInFlightRef.current = true;
     // Clear AND null: the match-effect below only starts a timer when the ref is empty,
     // so a stale (already-cleared) id left in the ref would silently freeze the next ride.
     if (rideTimer.current) clearInterval(rideTimer.current);
@@ -974,7 +1011,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       smartJourneyRef.current = stamped;
       setSmartJourney(stamped);
     }
-    setThreads((t) => ({ ...t, [trip.no]: [{ me: false, text: tr('traveler.opOnMyWay') }] }));
+    // No seeded message: an operator message exists only after the server records one.
     // Real payment: the server prices the travel and creates the intent, then Stripe's own
     // PaymentSheet collects the card on the phone. The card never reaches our server, and the
     // app never sends an amount.
@@ -1053,12 +1090,17 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   // outcome — the record, the settlement, the Travel Log — has to be reachable from both.
   const finishTravelRef = useRef<() => void>(() => {});
   const finishTravel = useCallback(() => {
+    const terminalRideId = activeRideId.current;
+    if (terminalRideId && finishedRideIdsRef.current.has(terminalRideId)) return;
+    if (terminalRideId) finishedRideIdsRef.current.add(terminalRideId);
     if (rideTimer.current) {
       clearInterval(rideTimer.current);
       rideTimer.current = null;
     }
     setRideActive(false);
-    setStats((st) => ({ trips: st.trips + 1, spent: st.spent + lastTotalRef.current }));
+    // Account statistics are reconstructed from authoritative completed Travel records by
+    // refreshMyRides(). Do not optimistically increment them here: completion snapshots may
+    // replay after foreground/reconnect and would double-count the same Travel.
     // Boarding to completion, for the receipt. Unknown when nobody recorded boarding.
     const minutes = onboardAtRef.current
       ? Math.max(1, Math.round((Date.now() - onboardAtRef.current) / 60000))
@@ -1230,13 +1272,14 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   // "I'm in the car" — the trip proper begins.
   const boardRide = useCallback(() => {
     if (!rideActive || statusRef.current !== 2) return;
+    // Traveler input is not operational authority. For a real Travel, only the Operator's
+    // server-backed onboard transition may advance status. The button can only advance an
+    // explicit demo stand-in, where no real Operator exists to attest boarding.
+    if (matchedOpRef.current?.demo !== true) return;
     statusRef.current = 3;
     setStatus(3);
     onboardAtRef.current = Date.now();
-    // Only a stand-in's journey runs itself to the destination. On a real travel the operator
-    // reports arrival; restarting the clock here would complete the journey — and release the
-    // 99% — while the car was still pulling away from the kerb.
-    if (matchedOpRef.current?.demo !== false) startTicker();
+    startTicker();
   }, [rideActive, startTicker]);
 
   // Never let a DEMO ride stall forever at the curb: if the traveler doesn't tap
@@ -1364,9 +1407,9 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       //
       // NEVER THE SEEDED TRAVEL. Until 15 Sept 2026 a traveler with no live travel who opened
       // support from Safety or the travel screen had their case filed against AR-2047-MIA — a
-      // journey nobody took — because lastTrip still held INITIAL_TRIP.
+      // journey nobody took — because lastTrip still held EMPTY_TRIP.
       const chosen = tripNo ?? (rideActiveRef.current ? lastTrip.no : '');
-      setIssueTripNo(chosen === INITIAL_TRIP.no ? '' : chosen);
+      setIssueTripNo(chosen === EMPTY_TRIP.no ? '' : chosen);
     },
     [lastTrip.no, resetIssue],
   );
@@ -1387,15 +1430,15 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   const submitDescription = useCallback(
     (text: string) => {
       const description = text.trim();
-      if (!description || !issue) return;
+      if (!description || !issue) return Promise.resolve(false);
       const gen = ++issueGen.current;
       // THE TRAVEL THE CASE CONCERNS, from a record the app actually holds: this session's
       // travels first, then the account's stored records. Never a fallback to lastTrip — that
-      // sent the seeded INITIAL_TRIP's figures ($26.00 to the airport, July 6) to the server
+      // sent the seeded EMPTY_TRIP's figures ($26.00 to the airport, July 6) to the server
       // as "the real recorded figures" of a travel that never happened. With no matching
       // record the case goes without a travel, and the server reasons from the words alone.
       const sessionTrip = [lastTripRef.current, ...completedTrips].find(
-        (t) => t.no === issueTripNo && t.no !== INITIAL_TRIP.no,
+        (t) => t.no === issueTripNo && t.no !== EMPTY_TRIP.no,
       );
       const record = myRidesRef.current.find((r) => r.tripNo === issueTripNo);
       const paymentFor = (no: string) =>
@@ -1427,7 +1470,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
             }
           : null;
       setIssueState('resolving');
-      submitIssue({
+      return submitIssue({
         category: issue,
         description,
         trip,
@@ -1438,9 +1481,15 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
         if (outcome.action === 'credit' && outcome.refunded && trip) {
           setCredited({ no: trip.no, cents: outcome.creditCents });
         }
-        if (gen !== issueGen.current) return; // this case was abandoned
+        if (gen !== issueGen.current) return true; // this case was abandoned
         setIssueResult(outcome);
         setIssueState('resolved');
+        return true;
+      }).catch(() => {
+        // Network/server failure is not a resolution. Return to the editable state so the
+        // Traveler can retry instead of leaving the case in an endless “assessing” state.
+        if (gen === issueGen.current) setIssueState('describing');
+        return false;
       });
     },
     [issue, issueTripNo, completedTrips],
@@ -1465,12 +1514,10 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   // It shows immediately either way — losing the write must not lose what they chose — but
   // `schedSaved` records whether it will still be there tomorrow, and the screen says so.
   const scheduleRide = useCallback(
-    (info: SchedInfo) => {
-      setScheduled(true);
-      setSchedInfo(info);
-      setCustomTime('');
+    async (info: SchedInfo): Promise<boolean> => {
+      // A reservation is a server fact. Do not display "Scheduled" before the server has
+      // accepted the exact journey; a failed or stale write must never become local truth.
       setSchedSaved(null);
-      setSchedState(null);
 
       // THE WHOLE JOURNEY GOES ON THE RESERVATION, not just the appointment.
       //
@@ -1478,7 +1525,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       // derives and stores the authoritative fare and Travel Number; local quote state is
       // presentation only and cannot become reservation authority.
 
-      saveScheduledRide({
+      const saved = await saveScheduledRide({
         when: info.when,
         time: info.time,
         period: info.period === 'AM' ? 'AM' : 'PM',
@@ -1493,11 +1540,22 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
         destinationLng: tripCoords?.dest?.lng ?? arrival.lng,
         travelClass: operatorClassFor(travelClass),
         party: travelParty,
-      }).then((saved) => {
-        schedIdRef.current = saved?.id ?? null;
-        setSchedId(saved?.id ?? null);
-        setSchedSaved(!!saved);
       });
+      if (!saved) {
+        setSchedSaved(false);
+        return false;
+      }
+      schedIdRef.current = saved.id;
+      setSchedId(saved.id);
+      setSchedInfo({
+        ...info,
+        cost: saved.cost,
+      });
+      setCustomTime('');
+      setSchedState(saved);
+      setSchedSaved(true);
+      setScheduled(true);
+      return true;
     },
     [arrival, departure, travelClass, tripCoords, travelParty],
   );
@@ -1672,4 +1730,3 @@ export function useRide(): RideStore {
 }
 
 // Home place used by "ride again" when destination was Home.
-export { HOME_PLACE };

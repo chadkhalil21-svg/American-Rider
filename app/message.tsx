@@ -154,7 +154,7 @@ export default function Message() {
             style={styles.input}
             returnKeyType="send"
           />
-          <Pressable
+          <Pressable accessibilityRole="button"
             onPress={send}
             disabled={sending || !input.trim()}
             style={({ pressed }) => [styles.sendBtn, pressed && { backgroundColor: colors.ink2 }]}

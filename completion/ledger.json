@@ -1,0 +1,1029 @@
+{
+  "schemaVersion": "1.0",
+  "branch": "integrate/commercial-completion-2026-10-03",
+  "baseSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+  "candidateSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+  "generatedAt": "2026-10-04T01:48:15.926772+00:00",
+  "allowedStatuses": [
+    "FIXED",
+    "VERIFIED ALREADY FIXED",
+    "TESTED / PASS",
+    "DISPROVEN",
+    "INTENTIONALLY WITHHELD FROM LAUNCH",
+    "EXTERNAL DEPENDENCY",
+    "HUMAN / LEGAL / INSURER / OPERATIONS DECISION",
+    "INTENTIONAL POST-LAUNCH DEFERRAL",
+    "NOT TESTED",
+    "LAUNCH BLOCKER"
+  ],
+  "notes": [
+    "Initial seed from inherited evidence, not an exhaustive control inventory or certification.",
+    "PR candidates have not been integrated or verified at this candidate SHA.",
+    "WS14 was absent at seed; required before security/DR release claim.",
+    "A feature is withheld only after reasonable completion/verification work and precise unresolved reason."
+  ],
+  "records": [
+    {
+      "id": "O01",
+      "category": "institutional-domain",
+      "title": "Independent CPA biennial examination of Florida TNC driver/insurance compliance, evidence set and reporting calendar",
+      "status": "NOT TESTED",
+      "owner": "WS01",
+      "source": "coverage-and-omissions.md",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "External CPA/legal; no program proved"
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Record specific code, operational and external closure evidence before signoff."
+    },
+    {
+      "id": "O02",
+      "category": "institutional-domain",
+      "title": "Company first-dollar insurance-lapse backstop, defense/claims capital and allocation, not just Operator uploads",
+      "status": "EXTERNAL DEPENDENCY",
+      "owner": "WS01",
+      "source": "coverage-and-omissions.md",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "**Adult Florida launch gate**; policy unknown"
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Record specific code, operational and external closure evidence before signoff."
+    },
+    {
+      "id": "O03",
+      "category": "institutional-domain",
+      "title": "Airport/port facility permit, transponder, authorized curb/geofence/window, tariff and ledger-to-authority remittance",
+      "status": "NOT TESTED",
+      "owner": "WS01",
+      "source": "coverage-and-omissions.md",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Facilities denied; permits unknown"
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Record specific code, operational and external closure evidence before signoff."
+    },
+    {
+      "id": "O04",
+      "category": "institutional-domain",
+      "title": "Map/road/GTFS/market/toll data licence, attribution, entitlement, provenance and graph refresh",
+      "status": "NOT TESTED",
+      "owner": "WS04",
+      "source": "coverage-and-omissions.md",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Contract/version unknown"
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Record specific code, operational and external closure evidence before signoff."
+    },
+    {
+      "id": "O05",
+      "category": "institutional-domain",
+      "title": "Nationwide address/business/POI/entrance search with ambiguity/selection, not curated South Florida suggestions",
+      "status": "NOT TESTED",
+      "owner": "WS04",
+      "source": "coverage-and-omissions.md",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Future national claim blocker"
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Record specific code, operational and external closure evidence before signoff."
+    },
+    {
+      "id": "O06",
+      "category": "institutional-domain",
+      "title": "Position accuracy, source/timestamp/replay, spoofing and physical pickup/boarding/completion evidence",
+      "status": "NOT TESTED",
+      "owner": "WS04",
+      "source": "coverage-and-omissions.md",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Adult Travel integrity gate"
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Record specific code, operational and external closure evidence before signoff."
+    },
+    {
+      "id": "O07",
+      "category": "institutional-domain",
+      "title": "Transit static-vs-real-time freshness, feed permissions, timetables/graph expiry and disruption",
+      "status": "NOT TESTED",
+      "owner": "WS05",
+      "source": "coverage-and-omissions.md",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Smart Travel feature gate"
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Record specific code, operational and external closure evidence before signoff."
+    },
+    {
+      "id": "O08",
+      "category": "institutional-domain",
+      "title": "Liquidity/accessible supply, geocell saturation, Sybil/collusion/fake GPS and atomic offers",
+      "status": "LAUNCH BLOCKER",
+      "owner": "WS06",
+      "source": "coverage-and-omissions.md",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Assignment defect; operational metrics absent"
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Record specific code, operational and external closure evidence before signoff."
+    },
+    {
+      "id": "O09",
+      "category": "institutional-domain",
+      "title": "Fair deactivation and protected-characteristic low-rating reconsideration/appeal",
+      "status": "NOT TESTED",
+      "owner": "WS01",
+      "source": "coverage-and-omissions.md",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Human process unknown"
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Record specific code, operational and external closure evidence before signoff."
+    },
+    {
+      "id": "O10",
+      "category": "institutional-domain",
+      "title": "Merchant/settlement/tax-reporting entity, PCI scope, 1099, immutable treasury/journal, reserves, payout loss and financial close",
+      "status": "LAUNCH BLOCKER",
+      "owner": "WS01",
+      "source": "coverage-and-omissions.md",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Money/reconciliation gate"
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Record specific code, operational and external closure evidence before signoff."
+    },
+    {
+      "id": "O11",
+      "category": "institutional-domain",
+      "title": "Provider event inbox lag, poison/dead letters, backpressure, outbound email/push receipts and replay/reconciliation SLOs",
+      "status": "LAUNCH BLOCKER",
+      "owner": "WS10",
+      "source": "coverage-and-omissions.md",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Queue/outbox defects"
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Record specific code, operational and external closure evidence before signoff."
+    },
+    {
+      "id": "O12",
+      "category": "institutional-domain",
+      "title": "Record retention vs deletion/legal hold and backup/PITR restore, including rides/driver records and minor/geo/CRA data",
+      "status": "LAUNCH BLOCKER",
+      "owner": "WS01",
+      "source": "coverage-and-omissions.md",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Policy/restore unknown"
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Record specific code, operational and external closure evidence before signoff."
+    },
+    {
+      "id": "O13",
+      "category": "institutional-domain",
+      "title": "Staffed safety command, incident/near-miss taxonomy, insurer/regulator notifications and learning/training loop",
+      "status": "EXTERNAL DEPENDENCY",
+      "owner": "WS11",
+      "source": "coverage-and-omissions.md",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "**Adult Travel operations gate**"
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Record specific code, operational and external closure evidence before signoff."
+    },
+    {
+      "id": "O14",
+      "category": "institutional-domain",
+      "title": "Named Ops coverage, MFA/least privilege, dual approval, immutable privileged-action audit and workforce change control",
+      "status": "LAUNCH BLOCKER",
+      "owner": "WS02",
+      "source": "coverage-and-omissions.md",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Staffing/privilege unknown"
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Record specific code, operational and external closure evidence before signoff."
+    },
+    {
+      "id": "O15",
+      "category": "institutional-domain",
+      "title": "Dependency/SBOM/native entitlements, exact signed app/deploy provenance, compatibility/rollback and release assurance",
+      "status": "LAUNCH BLOCKER",
+      "owner": "WS02",
+      "source": "coverage-and-omissions.md",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "WS14 absent, build not attested"
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Record specific code, operational and external closure evidence before signoff."
+    },
+    {
+      "id": "O16",
+      "category": "institutional-domain",
+      "title": "Provider procurement, exact contracts/SLA/quotas, privacy DPA, service credits, portability and exit",
+      "status": "NOT TESTED",
+      "owner": "WS03–05",
+      "source": "coverage-and-omissions.md",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Terms/credentials unknown"
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Record specific code, operational and external closure evidence before signoff."
+    },
+    {
+      "id": "O17",
+      "category": "institutional-domain",
+      "title": "Child age/guardian/custody, Teen PIN, authority disputes, conditional under-13 COPPA/location governance",
+      "status": "LAUNCH BLOCKER",
+      "owner": "WS02",
+      "source": "coverage-and-omissions.md",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Teen withheld until repaired"
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Record specific code, operational and external closure evidence before signoff."
+    },
+    {
+      "id": "O18",
+      "category": "institutional-domain",
+      "title": "Physical disability-equivalent supply, service-animal/no-surcharge/refusal workflow and anti-discrimination operations",
+      "status": "EXTERNAL DEPENDENCY",
+      "owner": "WS01",
+      "source": "coverage-and-omissions.md",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "**Adult Travel service gate**"
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Record specific code, operational and external closure evidence before signoff."
+    },
+    {
+      "id": "O19",
+      "category": "institutional-domain",
+      "title": "Public-fare data representativeness, field semantics/licence, consumer pricing fairness and source version",
+      "status": "NOT TESTED",
+      "owner": "WS05",
+      "source": "coverage-and-omissions.md",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Chicago cannot certify Florida fare"
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Record specific code, operational and external closure evidence before signoff."
+    },
+    {
+      "id": "O20",
+      "category": "institutional-domain",
+      "title": "DR/SLO, backup restoration, provider outage/case recovery, measured concurrent 10k/100k/1m workload and costs, liquidity/working capital",
+      "status": "LAUNCH BLOCKER",
+      "owner": "WS06",
+      "source": "coverage-and-omissions.md",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "**NOT TESTED**; scenarios incompatible"
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Record specific code, operational and external closure evidence before signoff."
+    },
+    {
+      "id": "A21",
+      "category": "institutional-domain",
+      "title": "New in second pass: immutable operator network log-on/log-off timeline and prompt §627.748(8)(d) claims disclosure of 12h before/after accident",
+      "status": "LAUNCH BLOCKER",
+      "owner": "WS01",
+      "source": "coverage-and-omissions.md",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Historical session-edge proof unknown"
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Record specific code, operational and external closure evidence before signoff."
+    },
+    {
+      "id": "A22",
+      "category": "institutional-domain",
+      "title": "New in second pass: §627.748(13) no off-app compensated ride/street hail and anti-evasion integrity of enforcement-facing digital-network view",
+      "status": "LAUNCH BLOCKER",
+      "owner": "WS01",
+      "source": "coverage-and-omissions.md",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Training/enforcement integrity unknown"
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Record specific code, operational and external closure evidence before signoff."
+    },
+    {
+      "id": "F001",
+      "category": "source-finding",
+      "title": "Payment success before Operator offer",
+      "status": "LAUNCH BLOCKER",
+      "owner": "integration",
+      "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/backend/travelmoney.js",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Inherited source review; revalidate against integration head."
+      ],
+      "candidatePrs": [
+        56
+      ],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+    },
+    {
+      "id": "F002",
+      "category": "source-finding",
+      "title": "Transactional Operator capacity and acceptance race",
+      "status": "LAUNCH BLOCKER",
+      "owner": "integration",
+      "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/backend/matching.js",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Inherited source review; revalidate against integration head."
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+    },
+    {
+      "id": "F003",
+      "category": "source-finding",
+      "title": "Decline and reoffer on same paid Travel",
+      "status": "LAUNCH BLOCKER",
+      "owner": "integration",
+      "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/src/state/RideContext.tsx",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Inherited source review; revalidate against integration head."
+      ],
+      "candidatePrs": [
+        56,
+        57
+      ],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+    },
+    {
+      "id": "F004",
+      "category": "source-finding",
+      "title": "Durable booking intent and retry idempotency",
+      "status": "LAUNCH BLOCKER",
+      "owner": "integration",
+      "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/backend/server.js",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Inherited source review; revalidate against integration head."
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+    },
+    {
+      "id": "F005",
+      "category": "source-finding",
+      "title": "Pending refund, partial refund, event and financial reconciliation",
+      "status": "LAUNCH BLOCKER",
+      "owner": "integration",
+      "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/backend/payments.js",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Inherited source review; revalidate against integration head."
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+    },
+    {
+      "id": "F006",
+      "category": "source-finding",
+      "title": "Scheduled queue due-order, duplicate creation and server-only cancellation",
+      "status": "LAUNCH BLOCKER",
+      "owner": "integration",
+      "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/backend/scheduler.js",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Inherited source review; revalidate against integration head."
+      ],
+      "candidatePrs": [
+        56,
+        57
+      ],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+    },
+    {
+      "id": "F007",
+      "category": "source-finding",
+      "title": "Authoritative quote invalidation and transient UI recovery",
+      "status": "LAUNCH BLOCKER",
+      "owner": "integration",
+      "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/app/reserve.tsx",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Inherited source review; revalidate against integration head."
+      ],
+      "candidatePrs": [
+        56,
+        57
+      ],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+    },
+    {
+      "id": "F008",
+      "category": "source-finding",
+      "title": "Teen confirmation, Operator PIN, revocation and guardian authority",
+      "status": "LAUNCH BLOCKER",
+      "owner": "integration",
+      "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/app/reserve.tsx",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Inherited source review; revalidate against integration head."
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+    },
+    {
+      "id": "F009",
+      "category": "source-finding",
+      "title": "Emergency deep link, acknowledgement and staffed command",
+      "status": "LAUNCH BLOCKER",
+      "owner": "integration",
+      "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/app/_layout.tsx",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Inherited source review; revalidate against integration head."
+      ],
+      "candidatePrs": [
+        56
+      ],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+    },
+    {
+      "id": "F010",
+      "category": "source-finding",
+      "title": "Lost property object ownership and closed return",
+      "status": "LAUNCH BLOCKER",
+      "owner": "integration",
+      "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/backend/lostitem.js",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Inherited source review; revalidate against integration head."
+      ],
+      "candidatePrs": [
+        56
+      ],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+    },
+    {
+      "id": "F011",
+      "category": "source-finding",
+      "title": "Service-animal no-surcharge and accessible physical service",
+      "status": "LAUNCH BLOCKER",
+      "owner": "integration",
+      "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/src/data.ts",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Inherited source review; revalidate against integration head."
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+    },
+    {
+      "id": "F012",
+      "category": "source-finding",
+      "title": "Twilio native/server dependency and verified two-party call",
+      "status": "NOT TESTED",
+      "owner": "integration",
+      "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/backend/voice.js",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Inherited source review; revalidate against integration head."
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+    },
+    {
+      "id": "F013",
+      "category": "source-finding",
+      "title": "Withdrawn-original assistant reachable with Anthropic key",
+      "status": "LAUNCH BLOCKER",
+      "owner": "integration",
+      "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/backend/server.js",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Inherited source review; revalidate against integration head."
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+    },
+    {
+      "id": "F014",
+      "category": "source-finding",
+      "title": "Operator position provenance and payout evidence",
+      "status": "LAUNCH BLOCKER",
+      "owner": "integration",
+      "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/backend/travelprogress.js",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Inherited source review; revalidate against integration head."
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+    },
+    {
+      "id": "F015",
+      "category": "source-finding",
+      "title": "Provider queue ordering, dead letters and replay",
+      "status": "LAUNCH BLOCKER",
+      "owner": "integration",
+      "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/backend/providerqueue.js",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Inherited source review; revalidate against integration head."
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+    },
+    {
+      "id": "F016",
+      "category": "source-finding",
+      "title": "Firebase disabled/revoked account checking and privileged Ops IAM",
+      "status": "LAUNCH BLOCKER",
+      "owner": "integration",
+      "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/backend/auth.js",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Inherited source review; revalidate against integration head."
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+    },
+    {
+      "id": "F017",
+      "category": "source-finding",
+      "title": "Sensitive document validation, retention and restore",
+      "status": "LAUNCH BLOCKER",
+      "owner": "integration",
+      "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/backend/r2.js",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Inherited source review; revalidate against integration head."
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+    },
+    {
+      "id": "F018",
+      "category": "source-finding",
+      "title": "Checkr adapter registration and approved CRA authority",
+      "status": "EXTERNAL DEPENDENCY",
+      "owner": "integration",
+      "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/backend/checkr.js",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Inherited source review; revalidate against integration head."
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+    },
+    {
+      "id": "F019",
+      "category": "source-finding",
+      "title": "Insurer contact spoofing and company policy backstop",
+      "status": "EXTERNAL DEPENDENCY",
+      "owner": "integration",
+      "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/backend/insurance-monitoring.js",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Inherited source review; revalidate against integration head."
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+    },
+    {
+      "id": "F020",
+      "category": "source-finding",
+      "title": "Resend/Expo delivery receipts, retry, bounce and in-app fallback",
+      "status": "LAUNCH BLOCKER",
+      "owner": "integration",
+      "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/backend/push.js",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Inherited source review; revalidate against integration head."
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+    },
+    {
+      "id": "F021",
+      "category": "source-finding",
+      "title": "National address/POI search and jurisdiction validation",
+      "status": "NOT TESTED",
+      "owner": "integration",
+      "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/backend/places.js",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Inherited source review; revalidate against integration head."
+      ],
+      "candidatePrs": [
+        56
+      ],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+    },
+    {
+      "id": "F022",
+      "category": "source-finding",
+      "title": "Toll amount versus route class and tariff provenance",
+      "status": "EXTERNAL DEPENDENCY",
+      "owner": "integration",
+      "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/backend/tolls.js",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Inherited source review; revalidate against integration head."
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+    },
+    {
+      "id": "F023",
+      "category": "source-finding",
+      "title": "Smart Travel two-leg price and interruption recovery",
+      "status": "LAUNCH BLOCKER",
+      "owner": "integration",
+      "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/backend/smart.js",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Inherited source review; revalidate against integration head."
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+    },
+    {
+      "id": "F024",
+      "category": "source-finding",
+      "title": "Courier custody, delivery, return, claims and insurer",
+      "status": "LAUNCH BLOCKER",
+      "owner": "integration",
+      "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/docs/PRODUCT-SPEC.md",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Inherited source review; revalidate against integration head."
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+    },
+    {
+      "id": "F025",
+      "category": "source-finding",
+      "title": "Accessible shared controls, text scaling and localization",
+      "status": "LAUNCH BLOCKER",
+      "owner": "integration",
+      "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/src/components/UI.tsx",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Inherited source review; revalidate against integration head."
+      ],
+      "candidatePrs": [
+        56,
+        58
+      ],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+    },
+    {
+      "id": "F026",
+      "category": "source-finding",
+      "title": "Physical-device and exact deployed-build release evidence",
+      "status": "NOT TESTED",
+      "owner": "integration",
+      "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/docs/LAUNCH-DEVICE-PROVIDER-VALIDATION.md",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Inherited source review; revalidate against integration head."
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+    },
+    {
+      "id": "F027",
+      "category": "source-finding",
+      "title": "Backup/PITR restore and retention/legal-hold reconciliation",
+      "status": "NOT TESTED",
+      "owner": "integration",
+      "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/backend/accountclosure.js",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Inherited source review; revalidate against integration head."
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+    },
+    {
+      "id": "F028",
+      "category": "source-finding",
+      "title": "Screen/control/state inventory reconciliation",
+      "status": "NOT TESTED",
+      "owner": "integration",
+      "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/app/_layout.tsx",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Inherited source review; revalidate against integration head."
+      ],
+      "candidatePrs": [
+        58
+      ],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+    },
+    {
+      "id": "F029",
+      "category": "source-finding",
+      "title": "Issuer-verified insurer login/logout claims disclosure timeline",
+      "status": "EXTERNAL DEPENDENCY",
+      "owner": "integration",
+      "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/backend/server.js",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Inherited source review; revalidate against integration head."
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+    },
+    {
+      "id": "F030",
+      "category": "source-finding",
+      "title": "Off-network hail and enforcement-view integrity controls",
+      "status": "HUMAN / LEGAL / INSURER / OPERATIONS DECISION",
+      "owner": "integration",
+      "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/backend/server.js",
+      "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
+      "evidence": [
+        "Inherited source review; revalidate against integration head."
+      ],
+      "candidatePrs": [],
+      "implementingCommit": null,
+      "verification": [],
+      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+    }
+  ],
+  "features": [
+    {
+      "name": "Family/Teen",
+      "linkedFinding": "F008",
+      "objective": "Complete and verify if technically, economically, legally and operationally supportable.",
+      "launchState": "UNDER_REVIEW",
+      "attemptedWork": [],
+      "withholdingReason": null,
+      "releaseLaterRequirements": []
+    },
+    {
+      "name": "Smart Travel",
+      "linkedFinding": "F023",
+      "objective": "Complete and verify if technically, economically, legally and operationally supportable.",
+      "launchState": "UNDER_REVIEW",
+      "attemptedWork": [],
+      "withholdingReason": null,
+      "releaseLaterRequirements": []
+    },
+    {
+      "name": "Courier/Packages",
+      "linkedFinding": "F024",
+      "objective": "Complete and verify if technically, economically, legally and operationally supportable.",
+      "launchState": "UNDER_REVIEW",
+      "attemptedWork": [],
+      "withholdingReason": null,
+      "releaseLaterRequirements": []
+    },
+    {
+      "name": "Scheduled Travel",
+      "linkedFinding": "F006",
+      "objective": "Complete and verify if technically, economically, legally and operationally supportable.",
+      "launchState": "UNDER_REVIEW",
+      "attemptedWork": [],
+      "withholdingReason": null,
+      "releaseLaterRequirements": []
+    },
+    {
+      "name": "Recurring Travel",
+      "linkedFinding": "F006",
+      "objective": "Complete and verify if technically, economically, legally and operationally supportable.",
+      "launchState": "UNDER_REVIEW",
+      "attemptedWork": [],
+      "withholdingReason": null,
+      "releaseLaterRequirements": []
+    },
+    {
+      "name": "Return Travel",
+      "linkedFinding": "F006",
+      "objective": "Complete and verify if technically, economically, legally and operationally supportable.",
+      "launchState": "UNDER_REVIEW",
+      "attemptedWork": [],
+      "withholdingReason": null,
+      "releaseLaterRequirements": []
+    },
+    {
+      "name": "Android",
+      "linkedFinding": "F026",
+      "objective": "Complete and verify if technically, economically, legally and operationally supportable.",
+      "launchState": "UNDER_REVIEW",
+      "attemptedWork": [],
+      "withholdingReason": null,
+      "releaseLaterRequirements": []
+    },
+    {
+      "name": "Native calling",
+      "linkedFinding": "F012",
+      "objective": "Complete and verify if technically, economically, legally and operationally supportable.",
+      "launchState": "UNDER_REVIEW",
+      "attemptedWork": [],
+      "withholdingReason": null,
+      "releaseLaterRequirements": []
+    },
+    {
+      "name": "Airports/ports",
+      "linkedFinding": "O03",
+      "objective": "Complete and verify if technically, economically, legally and operationally supportable.",
+      "launchState": "UNDER_REVIEW",
+      "attemptedWork": [],
+      "withholdingReason": null,
+      "releaseLaterRequirements": []
+    },
+    {
+      "name": "National search",
+      "linkedFinding": "F021",
+      "objective": "Complete and verify if technically, economically, legally and operationally supportable.",
+      "launchState": "UNDER_REVIEW",
+      "attemptedWork": [],
+      "withholdingReason": null,
+      "releaseLaterRequirements": []
+    },
+    {
+      "name": "Adult on-demand Travel",
+      "linkedFinding": "F001",
+      "objective": "Complete and verify if technically, economically, legally and operationally supportable.",
+      "launchState": "UNDER_REVIEW",
+      "attemptedWork": [],
+      "withholdingReason": null,
+      "releaseLaterRequirements": []
+    }
+  ],
+  "phases": [
+    {
+      "id": 0,
+      "status": "NOT TESTED",
+      "evidence": []
+    },
+    {
+      "id": 1,
+      "status": "NOT TESTED",
+      "evidence": []
+    },
+    {
+      "id": 2,
+      "status": "NOT TESTED",
+      "evidence": []
+    },
+    {
+      "id": 3,
+      "status": "NOT TESTED",
+      "evidence": []
+    },
+    {
+      "id": 4,
+      "status": "NOT TESTED",
+      "evidence": []
+    },
+    {
+      "id": 5,
+      "status": "NOT TESTED",
+      "evidence": []
+    },
+    {
+      "id": 6,
+      "status": "NOT TESTED",
+      "evidence": []
+    },
+    {
+      "id": 7,
+      "status": "NOT TESTED",
+      "evidence": []
+    },
+    {
+      "id": 8,
+      "status": "NOT TESTED",
+      "evidence": []
+    }
+  ]
+}

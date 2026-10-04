@@ -59,10 +59,10 @@ function ConfirmationButtons({ busy, enabled = true, onCancel, onDelete, t }: {
     <View style={styles.confirmBlock}>
       <Text style={styles.confirmAsk}>{t('traveler.deleteConfirm')}</Text>
       <View style={styles.confirmRow}>
-        <Pressable onPress={onCancel} style={({ pressed }) => [styles.keepBtn, pressed && { opacity: 0.86 }]}>
+        <Pressable accessibilityRole="button" onPress={onCancel} style={({ pressed }) => [styles.keepBtn, pressed && { opacity: 0.86 }]}>
           <Text style={styles.keepBtnText}>{t('traveler.keepMyAccount')}</Text>
         </Pressable>
-        <Pressable
+        <Pressable accessibilityRole="button"
           onPress={onDelete}
           disabled={busy || !enabled}
           style={({ pressed }) => [styles.redBtnHalf, (!enabled || busy) && styles.disabled, pressed && enabled && !busy && { opacity: 0.86 }]}
@@ -187,10 +187,9 @@ export default function DeleteAccount() {
 
       {!confirming ? (
         <>
-          <Pressable
+          <Pressable accessibilityRole="button"
             onPress={() => setConfirming(true)}
             disabled={deleteDisabled}
-            accessibilityRole="button"
             accessibilityState={{ disabled: deleteDisabled }}
             style={({ pressed }) => [
               styles.redBtn,

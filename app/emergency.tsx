@@ -265,10 +265,14 @@ export default function Emergency() {
     }
   }, [withPhones, contactMessage]);
 
-  const call911 = () => {
-    Linking.openURL('tel:911').catch(() => {
+  const [callBusy, setCallBusy] = useState(false);
+  const call911 = async () => {
+    if (callBusy) return;
+    setCallBusy(true);
+    await Linking.openURL('tel:911').catch(() => {
       setContactStatus(t('traveler.emgNoCalls'));
     });
+    setCallBusy(false);
   };
 
   return (
@@ -279,6 +283,9 @@ export default function Emergency() {
 
       <Pressable
         onPress={call911}
+        disabled={callBusy}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: callBusy }}
         style={({ pressed }) => [styles.callBtn, pressed && { opacity: 0.86 }]}
       >
         <Text style={styles.callBtnText}>{t('traveler.call911')}</Text>
@@ -381,6 +388,7 @@ export default function Emergency() {
         )}
         <Pressable
           onPress={alertContacts}
+          accessibilityRole="button"
           style={({ pressed }) => [styles.sendBtn, pressed && { opacity: 0.86 }]}
         >
           <Text style={styles.sendBtnText}>

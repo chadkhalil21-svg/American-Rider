@@ -20,6 +20,7 @@ import { t } from '../i18n';
 const UNKNOWN: PaymentConfig = {
   stripePublishableKey: null,
   mode: 'no-key',
+  canManagePaymentMethods: false,
   canTakePayment: false,
 };
 

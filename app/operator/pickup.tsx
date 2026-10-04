@@ -2,7 +2,7 @@
 // drawn navigation map, the traveler card with Contact, the Travel Notes card
 // ("You retain final discretion"), Confirm Arrival → Commence Travel.
 import { useRouter } from 'expo-router';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../../src/components/AppText';
 import { OperatorMap } from '../../src/components/operator';
@@ -18,6 +18,8 @@ export default function OperatorPickup() {
   const router = useRouter();
   const op = useOperator();
   const active = op.op;
+  const [transitioning, setTransitioning] = useState(false);
+  const [transitionError, setTransitionError] = useState<string | null>(null);
 
   // Cold-open guard only: cancelling clears `op` while its own navigation runs —
   // don't race it.
@@ -33,14 +35,11 @@ export default function OperatorPickup() {
   return (
     <Screen>
       <Pressable
-        onPress={() => {
-          op.cancelOp();
-          router.dismissTo('/operator');
-        }}
+        onPress={() => router.dismissTo('/operator')}
         hitSlop={10}
         style={styles.back}
       >
-        <Text style={styles.backText}>{t('traveler.cancelChev')}</Text>
+        <Text style={styles.backText}>{t('traveler.backLabel')}</Text>
       </Pressable>
 
       <View style={styles.headRow}>
@@ -151,15 +150,20 @@ export default function OperatorPickup() {
       ) : null}
 
       <View style={{ flex: 1 }} />
+      {transitionError ? <Text style={styles.error}>{transitionError}</Text> : null}
       {!arrived ? (
-        <PrimaryButton label={t('operator.confirmArrival')} onPress={op.confirmArrival} style={{ marginTop: 24 }} />
+        <PrimaryButton label={transitioning ? t('traveler.pleaseWait') : t('operator.confirmArrival')} disabled={transitioning} onPress={async () => { setTransitioning(true); setTransitionError(null); const ok = await op.confirmArrival(); setTransitioning(false); if (!ok) setTransitionError(t('traveler.errGeneric')); }} style={{ marginTop: 24 }} />
       ) : (
         <PrimaryButton
           label={t('operator.commenceTravel')}
           color={colors.green}
+          disabled={transitioning}
           onPress={async () => {
-            // Navigate only after the authoritative Travel accepted the onboard transition.
-            if (await op.beginTrip()) router.replace('/operator/trip');
+            setTransitioning(true); setTransitionError(null);
+            const ok = await op.beginTrip();
+            setTransitioning(false);
+            if (ok) router.replace('/operator/trip');
+            else setTransitionError(t('traveler.errGeneric'));
           }}
           style={{ marginTop: 24 }}
         />
@@ -171,6 +175,7 @@ export default function OperatorPickup() {
 const styles = StyleSheet.create({
   back: { alignSelf: 'flex-start', paddingVertical: 6 },
   backText: { fontSize: 15, fontWeight: '500', color: colors.ink },
+  error: { fontSize: 13.5, color: colors.red, marginTop: 10 },
   headRow: { flexDirection: 'row', alignItems: 'flex-start', marginTop: 6, gap: 12 },
   title: { fontSize: 20, fontWeight: '600', letterSpacing: -0.44, color: colors.ink },
   sub: { fontSize: 14, color: colors.muted, marginTop: 8, lineHeight: 21 },

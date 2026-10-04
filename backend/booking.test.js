@@ -36,6 +36,17 @@ function provider(rideId, uid, amount = 2350) {
     metadata: { uid, rideId } };
 }
 async function main() {
+  const closing=store();closing.data.set('account_closures/departing',{closingAt:now});
+  const closingKey='closing-booking-key-0001';
+  const denied=await prepareBooking({db:closing,uid:'departing',key:closingKey,fingerprint:'route',record:quote,now});
+  assert.equal(denied.body.code,'account_closing');
+  const closingId=bookingId('departing',closingKey);
+  assert.equal(closing.data.has(`rides/${closingId}`),false,'no new chargeable booking after account closure begins');
+  closing.data.set(`rides/${closingId}`,{...quote,status:'awaiting_assignment',travelerUid:'departing',paymentIntentId:`pi_${closingId}`});
+  const blockedPaid=await assignPaidTravel({db:closing,uid:'departing',rideId:closingId,
+    payment:provider(closingId,'departing'),candidate:null,now});
+  assert.equal(blockedPaid.body.code,'account_closing');
+  assert.equal(closing.data.get(`rides/${closingId}`).status,'awaiting_assignment');
   const db = store(); const key = 'booking-uuid-00000001';
   const first = await prepareBooking({ db, uid: 'traveler-1', key, fingerprint: 'route-a', record: quote, now });
   assert.equal(first.status, 201);

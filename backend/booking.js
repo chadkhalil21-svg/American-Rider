@@ -18,6 +18,9 @@ async function prepareBooking({ db, uid, key, fingerprint, record, now = Date.no
   const id = bookingId(uid, key);
   const ref = db.collection('rides').doc(id);
   return db.runTransaction(async (tx) => {
+    const account = await tx.get(db.collection('account_closures').doc(String(uid)));
+    if(account.exists&&account.data()?.closingAt)
+      return deny(409,'account_closing','Account closure is in progress');
     const snap = await tx.get(ref);
     if (snap.exists) {
       const previous = snap.data();
@@ -58,6 +61,9 @@ async function assignPaidTravel({ db, uid, rideId, payment, candidate, now = Dat
   const ref = db.collection('rides').doc(String(rideId));
   const opRef = candidate ? db.collection('operators').doc(String(candidate.operator.id)) : null;
   return db.runTransaction(async (tx) => {
+    const account = await tx.get(db.collection('account_closures').doc(String(uid)));
+    if(account.exists&&account.data()?.closingAt)
+      return deny(409,'account_closing','Account closure is in progress');
     const rideSnap = await tx.get(ref);
     if (!rideSnap.exists) return deny(404, 'no_travel', 'No such Travel');
     const ride = rideSnap.data();

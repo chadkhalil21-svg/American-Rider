@@ -37,6 +37,7 @@ const { manifestFor, inspectMarket, recordEvidence, activateMarket, authorizeOnb
 const { setAdmittedFleetOnline, deactivateMarketFleet, sweepPausedMarketFleet } = require('./market-fleet');
 const { marketChecklistPage } = require('./market-readiness-ui');
 const { disputePage } = require('./disputeevidence-ui');
+const { pointFromWaitlist, coarseAreaFor } = require('./waitlistgeo');
 const { listOpsCases, actOnCase } = require('./opscases');
 const { casesPage } = require('./opscases-ui');
 
@@ -2118,6 +2119,25 @@ const marketBody = (m) => (m ? { id: m.id, name: m.name, status: m.status, regio
 
 // Public discovery may use a short cache; actual charges and offers always read durable state.
 let publicMarketCache = { until: 0, value: null, pending: null };
+const pickupMarketCache = new Map();
+async function publicPickupStatus(market) {
+  if (!productionMode || market.status !== 'active') return marketBody(market);
+  const previous=pickupMarketCache.get(market.id);
+  if(previous?.value&&Date.now()<previous.until)return previous.value;
+  if(previous?.pending)return previous.pending;
+  const pending=admittedMarket(market).then((state)=>{
+    const value={...marketBody(market),status:state.missing?.includes('database')?'unavailable':
+      state.status==='active'?'active':'waitlist'};
+    if(pickupMarketCache.get(market.id)?.pending===pending)
+      pickupMarketCache.set(market.id,{until:Date.now()+15_000,value,pending:null});
+    return value;
+  }).catch(()=>{
+    if(pickupMarketCache.get(market.id)?.pending===pending)pickupMarketCache.delete(market.id);
+    return {...marketBody(market),status:'unavailable'};
+  });
+  pickupMarketCache.set(market.id,{until:0,value:null,pending});
+  return pending;
+}
 async function publicMarkets() {
   if (!productionMode) return listMarkets();
   if (publicMarketCache.value && Date.now() < publicMarketCache.until) return publicMarketCache.value;
@@ -2126,15 +2146,16 @@ async function publicMarkets() {
     const items = await Promise.all(allMarkets().filter((m) => m.regionId).map(async (m) => {
       if (m.status !== 'active') return marketBody(m);
       const state = await admittedMarket(m);
-      return { ...marketBody(m), status: state.status === 'active' ? 'active' : 'waitlist' };
+      return { ...marketBody(m), status: state.missing?.includes('database') ? 'unavailable' :
+        state.status === 'active' ? 'active' : 'waitlist' };
     }));
     publicMarketCache = { until: Date.now() + 15_000, value: items, pending: null };
     return items;
   })();
   try { return await publicMarketCache.pending; }
-  catch { publicMarketCache = { until: 0, value: null, pending: null }; return []; }
+  catch { publicMarketCache = { until: 0, value: null, pending: null }; throw new Error('public_market_status_unavailable'); }
 }
-function invalidatePublicMarkets() { publicMarketCache = { until: 0, value: null, pending: null }; }
+function invalidatePublicMarkets() { publicMarketCache = { until: 0, value: null, pending: null }; pickupMarketCache.clear(); }
 function listedMarket(market, listed) {
   if (!market) return null;
   return listed.find((item) => item.id === market.id) ||
@@ -2169,16 +2190,23 @@ async function requireActiveOperatingMarket(req, res, next) {
 }
 
 // Public: one cached status per configured county, never evidence or confidential references.
-app.get('/markets', LIMITS.quoteIp, async (req, res) => {
-  const lat = Number(req.query?.lat);
-  const lng = Number(req.query?.lng);
-  const available = await publicMarkets();
-  const nearby = Number.isFinite(lat) && Number.isFinite(lng) ? marketFor({ lat, lng }) : null;
-  res.json({
-    active: available.filter((m) => m.status === 'active'),
-    here: listedMarket(nearby, available),
-  });
-});
+async function publicMarketResponse(req, res) {
+  try {
+    const point = req.method === 'POST' ? req.body : req.query;
+    const lat = Number(point?.lat);
+    const lng = Number(point?.lng);
+    if(point?.lat!=null&&point?.lng!=null&&Number.isFinite(lat)&&Number.isFinite(lng)) {
+      const market=marketFor({lat,lng});
+      const here=market?await publicPickupStatus(market):null;
+      return res.json({active:here?.status==='active'?[here]:[],here});
+    }
+    const available = await publicMarkets();
+    const nearby = Number.isFinite(lat) && Number.isFinite(lng) ? marketFor({ lat, lng }) : null;
+    res.json({ active: available.filter((m) => m.status === 'active'), here: listedMarket(nearby, available) });
+  } catch { res.status(503).json({code:'market_status_unavailable'}); }
+}
+app.get('/markets', LIMITS.quoteIp, publicMarketResponse);
+app.post('/markets/at', LIMITS.quoteIp, publicMarketResponse);
 
 function opsMarket(req, res) {
   const m = allMarkets().find((item) => item.id === String(req.params.id || ''));
@@ -2365,13 +2393,15 @@ app.post('/waitlist', requireAuth, LIMITS.waitlist, async (req, res) => {
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   const b = req.body || {};
   const role = b.role === 'operator' ? 'operator' : 'traveler';
+  const point = pointFromWaitlist(b);
   const m = b.marketId
     ? allMarkets().find((x) => x.id === String(b.marketId)) || null
-    : Number.isFinite(Number(b.lat)) && Number.isFinite(Number(b.lng))
-      ? marketFor({ lat: Number(b.lat), lng: Number(b.lng) })
-      : null;
+    : point ? marketFor(point) : null;
+  // Outside known counties, retain only a coarse half-degree cell for interest routing; precise
+  // device coordinates are neither persisted nor sent to a geocoding vendor on this path.
+  const coarseArea=!m?coarseAreaFor(point):null;
   try {
-    await db.collection('waitlist').doc(String(req.uid)).set({ role, marketId: m?.id || null, at: Date.now() }, { merge: true });
+    await db.collection('waitlist').doc(String(req.uid)).set({ role, marketId: m?.id || null, coarseArea, at: Date.now() }, { merge: true });
     res.json({ ok: true, market: marketBody(m) });
   } catch (e) {
     res.status(502).json({ error: e.message });
@@ -3365,7 +3395,12 @@ app.post('/travel/schedule', requireAuth, LIMITS.dispatch, requireFreshAuth, req
       feeLines: priced.feeLines, cardCountry: priced.cardCountry, tripNo,
       status: 'reserved', createdAt: Date.now(),
     };
-    await ref.create(record);
+    const created=await db.runTransaction(async(tx)=>{
+      const account=await tx.get(db.collection('account_closures').doc(String(req.uid)));
+      if(account.exists&&account.data()?.closingAt)return false;
+      tx.create(ref,record);return true;
+    });
+    if(!created)return res.status(409).json({code:'account_closing',error:'Account closure is in progress.'});
     res.json({ id: ref.id, ...record });
   } catch (e) {
     res.status(502).json({ error: e.message });

@@ -6,6 +6,8 @@ import { Text } from '../src/components/AppText';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { accountName } from '../src/account';
 import { destinationsNear, type Destination } from '../src/backend/destinations';
+import { publicPickupMarket, type PickupMarket } from '../src/backend/markets';
+import { joinWaitlist } from '../src/backend/connect';
 import { loadSavedPlaces, type SavedPlace, type SavedPlaces } from '../src/savedPlaces';
 import { RideRecord } from '../src/backend/dispatch';
 import { travelDateShort } from '../src/dates';
@@ -120,14 +122,34 @@ export default function Home() {
   const [nearby, setNearby] = useState<Destination[]>([]);
   const depLat = ride.departure.lat;
   const depLng = ride.departure.lng;
+  const [pickupMarket, setPickupMarket] = useState<PickupMarket | null>(null);
+  const [marketAt, setMarketAt] = useState<string|null>(null);
+  const [marketChecking, setMarketChecking] = useState(false);
+  const [marketRetry, setMarketRetry] = useState(0);
+  const [waitlistState, setWaitlistState] = useState<'idle'|'saving'|'recorded'|'failed'>('idle');
+  const pickupKnown = depLat != null && depLng != null && Number.isFinite(depLat) && Number.isFinite(depLng);
+  const marketKey=pickupKnown?`${depLat!.toFixed(3)},${depLng!.toFixed(3)}`:null;
+  const latestMarketKey=useRef(marketKey);
+  latestMarketKey.current=marketKey;
+  const canOfferNewTravel = !pickupKnown || (!marketChecking && marketAt===marketKey && pickupMarket?.status === 'active');
+  useEffect(() => {
+    let live=true;
+    setWaitlistState('idle');
+    if(!pickupKnown){setPickupMarket(null);setMarketAt(null);setMarketChecking(false);return ()=>{live=false;};}
+    setPickupMarket(null);setMarketAt(null);setMarketChecking(true);
+    publicPickupMarket(depLat!,depLng!).then((m)=>{if(live){setPickupMarket(m);setMarketAt(marketKey);}})
+      .catch(()=>{if(live){setPickupMarket({status:'unavailable',name:null});setMarketAt(marketKey);}})
+      .finally(()=>{if(live)setMarketChecking(false);});
+    return ()=>{live=false;};
+  },[depLat,depLng,pickupKnown,marketKey,marketRetry]);
   useEffect(() => {
     let live = true;
-    if (depLat == null || depLng == null) { setNearby([]); return () => { live = false; }; }
+    if (depLat == null || depLng == null || !canOfferNewTravel) { setNearby([]); return () => { live = false; }; }
     destinationsNear({ lat: depLat, lng: depLng }, 5).then((r) => {
       if (live) setNearby(r.destinations);
     });
     return () => { live = false; };
-  }, [depLat, depLng]);
+  }, [depLat, depLng, canOfferNewTravel]);
 
   // The most recent travel this traveler ACTUALLY took, for Patron Support to open against.
   // This read pastTrips[0], which — until the fabricated journeys were removed — was a
@@ -520,7 +542,40 @@ export default function Home() {
         </Text>
       </View>
 
-      <Pressable
+      {pickupKnown && !canOfferNewTravel && (
+        <View style={styles.marketCard} accessibilityRole="alert">
+          <Text style={styles.marketTitle}>{t('traveler.marketServiceStatus')}</Text>
+          <Text style={styles.marketBody}>
+            {marketChecking || marketAt!==marketKey ? t('traveler.marketChecking') :
+             pickupMarket?.status==='unavailable' ? t('traveler.marketStatusUnavailable') :
+             t('traveler.marketNotServing',{name:pickupMarket?.name||t('traveler.marketArea')})}
+          </Text>
+          {!marketChecking && marketAt===marketKey && pickupMarket?.status==='unavailable' && (
+            <Pressable accessibilityRole="button" style={styles.marketAction} onPress={()=>setMarketRetry((n)=>n+1)}>
+              <Text style={styles.marketActionText}>{t('traveler.marketCheckAgain')}</Text>
+            </Pressable>
+          )}
+          {!marketChecking && marketAt===marketKey && pickupMarket?.status!=='unavailable' && (
+            waitlistState==='recorded'?<Text style={styles.marketBody}>{t('traveler.waitlistRecorded')}</Text>:
+            <>
+              <Text style={styles.marketBody}>{t('traveler.marketInterestPrivacy')}</Text>
+              <Pressable accessibilityRole="button" style={styles.marketAction}
+                disabled={waitlistState==='saving'} accessibilityState={{disabled:waitlistState==='saving'}}
+                onPress={async()=>{
+                  if(depLat==null||depLng==null||waitlistState==='saving')return;
+                  const key=marketKey;setWaitlistState('saving');
+                  const saved=await joinWaitlist({lat:depLat,lng:depLng},'traveler');
+                  if(latestMarketKey.current===key)setWaitlistState(saved?'recorded':'failed');
+                }}>
+                <Text style={styles.marketActionText}>{t('traveler.waitlistJoin')}</Text>
+              </Pressable>
+              {waitlistState==='failed'&&<Text style={styles.marketBody}>{t('traveler.waitlistFailed')}</Text>}
+            </>
+          )}
+        </View>
+      )}
+
+      {canOfferNewTravel && <Pressable
         onPress={() => {
           ride.startBooking();
           router.navigate({ pathname: '/reserve', params: { search: '1' } });
@@ -530,7 +585,7 @@ export default function Home() {
           <Magnifier />
           <Text style={styles.searchPlaceholder}>{t('traveler.destinationEntry')}</Text>
         </View>
-      </Pressable>
+      </Pressable>}
 
       {/* THE AI PLANNER IS WITHDRAWN, 4 Sept 2026, on the founders' decision — not shipping at
           launch, and possibly refined and reintroduced later.
@@ -548,7 +603,7 @@ export default function Home() {
 
       {/* SAVED PLACES: shown only once the traveler has saved one; each opens the sheet with
           the place already quoted from its saved coordinates. */}
-      {savedRows.length > 0 && (
+      {canOfferNewTravel && savedRows.length > 0 && (
         <>
           <SectionLabel style={styles.labelSuggested}>{t('traveler.savedPlaces')}</SectionLabel>
           <View style={styles.listCard}>
@@ -584,7 +639,7 @@ export default function Home() {
       )}
 
       {/* Earned, never furniture: no trips, no section. */}
-      {suggestion && (
+      {canOfferNewTravel && suggestion && (
         <>
           <SectionLabel style={styles.labelSuggested}>{t('traveler.suggestedTravel')}</SectionLabel>
           <Pressable accessibilityRole="button" onPress={() => {
@@ -642,7 +697,7 @@ export default function Home() {
       {/* .spring — pushes the CTA to the bottom of a short screen. */}
       <View style={{ flex: 1 }} />
 
-      <Pressable
+      {canOfferNewTravel && <Pressable
         onPress={() => {
           ride.startBooking();
           router.navigate({ pathname: '/reserve', params: { search: '1' } });
@@ -656,12 +711,12 @@ export default function Home() {
         <View style={styles.reserveBtn}>
           <Text style={styles.reserveBtnText}>{t('traveler.reserveTravel')}</Text>
         </View>
-      </Pressable>
+      </Pressable>}
 
       {/* SCHEDULE SITS BESIDE THE PRIMARY ACTION (Chad, 13 Sept 2026). The screen existed and
           was reachable only after a destination had been chosen, which is the wrong moment
           for a traveler who already knows they are arranging next Tuesday. */}
-      <Pressable
+      {canOfferNewTravel && <Pressable
         onPress={() => {
           ride.startBooking();
           router.navigate('/schedule');
@@ -669,7 +724,7 @@ export default function Home() {
         hitSlop={8}
       >
         <Text style={styles.scheduleLink}>{t('traveler.scheduleForLater')}</Text>
-      </Pressable>
+      </Pressable>}
 
       {/* The demo's drawer: scrim + sliding left panel, hairline-topped rows, no spring.
           THE HEAD IS THE ACCOUNT'S NAME, NOT A HANDLE AND NOT A BUBBLE (Chad, 14 Sept 2026).
@@ -716,6 +771,12 @@ const styles = StyleSheet.create({
     lineHeight: 33,
     letterSpacing: -0.52,
   },
+  marketCard:{marginTop:16,paddingVertical:16,paddingHorizontal:18,borderWidth:1,
+    borderColor:colors.blueBorder,backgroundColor:colors.blueTint,borderRadius:radii.card},
+  marketTitle:{fontSize:14,fontWeight:'700',color:colors.ink,marginBottom:6},
+  marketBody:{fontSize:14,lineHeight:21,color:colors.ink2,marginTop:3},
+  marketAction:{marginTop:12,minHeight:46,justifyContent:'center',alignSelf:'flex-start'},
+  marketActionText:{fontSize:15,fontWeight:'700',color:colors.blue},
   ongoingCard: {
     marginTop: 18,
     backgroundColor: colors.ink,

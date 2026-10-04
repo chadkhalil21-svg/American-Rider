@@ -3,7 +3,7 @@
   "branch": "integrate/commercial-completion-2026-10-03",
   "baseSha": "f749644c862e1da128359ddf2693a95506b9b52a",
   "candidateSha": "551b72db40db360029b90864febd443430ddb1f8",
-  "generatedAt": "2026-10-04T21:52:53.966527+00:00",
+  "generatedAt": "2026-10-04T21:57:20.418898+00:00",
   "allowedStatuses": [
     "FIXED",
     "VERIFIED ALREADY FIXED",
@@ -37,7 +37,9 @@
     "Ledger normalization: three feature attemptedWork lists were accidentally appended character-wise before this checkpoint; adjacent single-character entries were deterministically rejoined without changing their text or chronology.",
     "Candidate full-suite pass after Home/closure changes: completion/evidence/home-closure-candidate-check.log.gz (sha256 eea9ac21405dff724ff7d7f57654ec55dd70604637e19a5c3eb56126d022aea6). This is working-tree source evidence, not exact-commit/deployed evidence.",
     "One bounded final adversarial source pass confirmed F081 and F082; both were repaired and locally regression-tested. Do not upgrade source fixes to commercial readiness without the external device/Auth evidence in F080.",
-    "Final deletion/P1 source-candidate suite PASS: completion/evidence/account-deletion-final-candidate-check.log.gz (sha256 401bb4935312a2d2a2f23c5e28cf984a5030839d08836b9c8e0a51725cc27b17); no real account deletion or production external gate was executed."
+    "Final deletion/P1 source-candidate suite PASS: completion/evidence/account-deletion-final-candidate-check.log.gz (sha256 401bb4935312a2d2a2f23c5e28cf984a5030839d08836b9c8e0a51725cc27b17); no real account deletion or production external gate was executed.",
+    "Focused final-source follow-up found F083: Operator presence could restore availability after a closing fence. Both commercial and nonproduction writes now read the marker transactionally; source regression passes, live race remains external.",
+    "Final source working-tree suite PASS with F083 pre-provider closure check: completion/evidence/operator-closure-final-candidate-check.log.gz (sha256 9c5fce024907b3ec284de33e5d3694106fe53c74c666c59cca30f8a344f07f02); exact-SHA CI and live Firebase/device tests remain separate."
   ],
   "records": [
     {
@@ -1515,7 +1517,8 @@
       "sourceSha": "b5e40021ac73f03e28b7d1ea7cacaf7a33c665be",
       "evidence": [
         "Source fixes: block `awaiting_payment`/`awaiting_assignment`/dispatching deletion; transactionally cancel only reserved schedules; write account_closures server-only tombstone and take Operator offline atomically. New booking, dispatch and scheduled-create transactions read the same tombstone; profile deletion cannot bypass it. Voluntary waitlist record is deleted.",
-        "New `/account/delete` verifies recent Firebase Admin auth_time, fences bookings, deletes Auth before profile, retries failed Auth deletion without erasing profile, and leases due-indexed cleanup only after getUser reports not found. Old `/account/close` returns 426 in production. Source tests exercise provider failure, retry, orphan profile and live-account refusal; final adversarial push/storage regressions were repaired in client."
+        "New `/account/delete` verifies recent Firebase Admin auth_time, fences bookings, deletes Auth before profile, retries failed Auth deletion without erasing profile, and leases due-indexed cleanup only after getUser reports not found. Old `/account/close` returns 426 in production. Source tests exercise provider failure, retry, orphan profile and live-account refusal; final adversarial push/storage regressions were repaired in client.",
+        "Account closure now conflicts atomically with Operator go-on-duty in both commercial and test modes; after a closing tombstone, a phone cannot write fleet available=true. Fake Firestore retries the concurrent closure/renewal race in backend/market-fleet.test.js."
       ],
       "candidatePrs": [
         59
@@ -1524,7 +1527,8 @@
       "verification": [
         "Focused source/fake tests PASS; exact final-SHA CI, emulator, native, deployed rules and live process NOT TESTED.",
         "Full candidate working-tree npm run check PASS, log sha256 eea9ac21405dff724ff7d7f57654ec55dd70604637e19a5c3eb56126d022aea6; exact committed SHA/CI, Firebase emulator, native devices and live authority NOT TESTED.",
-        "Final source working-tree npm run check PASS after the two confirmed P1 repairs; compressed log sha256 401bb4935312a2d2a2f23c5e28cf984a5030839d08836b9c8e0a51725cc27b17. Exact-commit CI, live Firebase and native devices remain separate."
+        "Final source working-tree npm run check PASS after the two confirmed P1 repairs; compressed log sha256 401bb4935312a2d2a2f23c5e28cf984a5030839d08836b9c8e0a51725cc27b17. Exact-commit CI, live Firebase and native devices remain separate.",
+        "Final working-tree npm run check PASS after Operator closing preflight and transactional renewal fence; candidate log sha256 9c5fce024907b3ec284de33e5d3694106fe53c74c666c59cca30f8a344f07f02. Live Firebase and real devices still untested."
       ],
       "releaseCondition": "Provision/deploy Firebase Admin deleteUser/getUser permissions and server-only Firestore rules; rehearse recent-sign-in, active Travel 409 preserving push, provider failure preserving profile and local data, lost response, double delete, profile orphan cleanup and scheduled-charge race on real Auth/Firestore and iOS/Android at the exact deployed SHA. Adopt named retention/erasure, exception ownership and legal policy for retained transportation/dispute records; these external requirements remain launch blocking."
     },
@@ -1569,6 +1573,28 @@
         "Final source working-tree npm run check PASS after the two confirmed P1 repairs; compressed log sha256 401bb4935312a2d2a2f23c5e28cf984a5030839d08836b9c8e0a51725cc27b17. Exact-commit CI, live Firebase and native devices remain separate."
       ],
       "releaseCondition": "Exercise HTTP response loss plus Firebase token refresh outage on physical devices; confirm no local data loss on surviving accounts and confirm prompt private-device cleanup after a verified successful deletion."
+    },
+    {
+      "id": "F083",
+      "category": "implementation-confirmed-P1",
+      "title": "An Operator could come back on duty after account shutdown fenced new paid bookings",
+      "status": "FIXED",
+      "owner": "Engineering + safety operations",
+      "source": "backend/market-fleet.js; backend/server.js; backend/market-fleet.test.js",
+      "sourceSha": "4336d3c3b464da22bb64ba1bcfdf83cda3416965",
+      "evidence": [
+        "The final paid Operator on-duty transaction now reads `account_closures/{uid}` alongside market admission before writing available=true; the development path uses the same protected transaction. A before-commit fake writes a closing tombstone and forces a retry/refusal.",
+        "The Operator online endpoint cheaply checks the account_closures marker before the external Connect status request, then rechecks it inside the final production or test-mode Firestore duty transaction."
+      ],
+      "candidatePrs": [
+        59
+      ],
+      "implementingCommit": null,
+      "verification": [
+        "Targeted fake-Firestore concurrency, backend lint and syntax pass; exact-commit CI and live Firestore/device are pending.",
+        "Final working-tree npm run check PASS after Operator closing preflight and transactional renewal fence; candidate log sha256 9c5fce024907b3ec284de33e5d3694106fe53c74c666c59cca30f8a344f07f02. Live Firebase and real devices still untested."
+      ],
+      "releaseCondition": "Deploy the server and rules atomically; rehearse closing-vs-on-duty-renewal with real Firestore transactions and iOS/Android Operator background presence. Confirm no assigned Travel, safety push or new offered duty after account deletion begins."
     }
   ],
   "features": [

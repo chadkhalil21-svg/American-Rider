@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const admission = require('./market-readiness');
 const fleet = require('./market-fleet');
 const { markets, marketFor } = require('./markets');
@@ -66,5 +67,22 @@ function fakeDb() {
  assert.equal((await admission.inspectMarket({db,market,region,now})).readyToActivate,true);
  assert.equal(await fleet.setAdmittedFleetOnline({db,operatorId:'op1',fleetUpdate:{available:true},markets:[market],now}),false,
    'after cleanup, the paused admission record still blocks renewals');
+ db.set(key,{status:'active',manifestVersion:version,evidence,fleetCleanupPending:false});
+ db.set('account_closures/op1',{closingAt:now,state:'closing'});
+ assert.equal(await fleet.setAdmittedFleetOnline({db,operatorId:'op1',fleetUpdate:{available:true},markets:[market],now}),false,
+   'a closing Operator cannot reactivate in a commercially active market');
+ assert.equal(await fleet.setFleetOnlineIfOpen({db,operatorId:'op1',fleetUpdate:{available:true}}),false,
+   'test/development duty cannot bypass the same closing tombstone');
+ assert.equal(db.rows.get('operators/op1').available,false);
+ const onlineRoute=fs.readFileSync(require.resolve('./server.js'),'utf8').split("app.post('/operator/online'")[1]?.split("app.post('/operator/offline'")[0];
+ assert.ok(onlineRoute,'Operator online route must be present');
+ assert.ok(onlineRoute.indexOf("db.collection('account_closures')")>=0 &&
+   onlineRoute.indexOf("db.collection('account_closures')")<onlineRoute.indexOf('connectAccountStatus('),
+   'the inexpensive closing-account preflight must precede the external Stripe readiness check');
+ db.set('account_closures/op1',{closingAt:0,state:'open'});
+ db.setBeforeCommit(()=>db.set('account_closures/op1',{closingAt:now,state:'closing'}));
+ assert.equal(await fleet.setAdmittedFleetOnline({db,operatorId:'op1',fleetUpdate:{available:true},markets:[market],now}),false,
+   'a concurrently written closing fence forces the duty transaction to retry and refuse');
+ assert.equal(db.rows.get('operators/op1').available,false);
  console.log('PASS market pause and renewal serialize; bounded fleet cleanup clears current and legacy availability');
 })().catch(e=>{console.error(e);process.exitCode=1;});

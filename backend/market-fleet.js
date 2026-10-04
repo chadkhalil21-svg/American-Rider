@@ -10,6 +10,8 @@ async function setAdmittedFleetOnline({ db, operatorId, fleetUpdate, markets, pr
   if (!db || !operatorId || !fleetUpdate || !markets?.length || markets.some((m) => !m)) return false;
   const selected = [...new Map(markets.map((m) => [m.id, m])).values()];
   return db.runTransaction(async (tx) => {
+    const closure=await tx.get(db.collection('account_closures').doc(String(operatorId)));
+    if(closure.exists&&closure.data()?.closingAt)return false;
     for (const market of selected) {
       const snap = await tx.get(db.collection('market_admission').doc(market.id));
       const state = readinessFor({ market, region: regionById(market.regionId),
@@ -17,6 +19,16 @@ async function setAdmittedFleetOnline({ db, operatorId, fleetUpdate, markets, pr
       if (state.status !== 'active') return false;
     }
     tx.set(db.collection('operators').doc(String(operatorId)), fleetUpdate, { merge: true });
+    return true;
+  });
+}
+
+async function setFleetOnlineIfOpen({db,operatorId,fleetUpdate}) {
+  if(!db||!operatorId||!fleetUpdate)return false;
+  return db.runTransaction(async(tx)=>{
+    const closure=await tx.get(db.collection('account_closures').doc(String(operatorId)));
+    if(closure.exists&&closure.data()?.closingAt)return false;
+    tx.set(db.collection('operators').doc(String(operatorId)),fleetUpdate,{merge:true});
     return true;
   });
 }
@@ -80,4 +92,5 @@ async function sweepPausedMarketFleet({ db, marketById, limit = 4 } = {}) {
   return { ok: results.every((r) => r.ok), considered: snap.docs.length, results,
     saturated: snap.docs.length >= 4 };
 }
-module.exports = { PAGE_SIZE, MAX_PAGES, setAdmittedFleetOnline, deactivateMarketFleet, sweepPausedMarketFleet };
+module.exports = { PAGE_SIZE, MAX_PAGES, setAdmittedFleetOnline, setFleetOnlineIfOpen,
+  deactivateMarketFleet, sweepPausedMarketFleet };

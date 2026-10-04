@@ -34,7 +34,7 @@ const { perAccount, countOnly, perIp } = require('./ratelimit');
 const { marketFor, servesPoint, listMarkets, markets: allMarkets } = require('./markets');
 const { forMarket: insuranceForMarket, publicConfig: publicInsuranceConfig } = require('./insurance-jurisdictions');
 const { manifestFor, inspectMarket, recordEvidence, activateMarket, authorizeOnboarding, pauseMarket } = require('./market-readiness');
-const { setAdmittedFleetOnline, deactivateMarketFleet, sweepPausedMarketFleet } = require('./market-fleet');
+const { setAdmittedFleetOnline, setFleetOnlineIfOpen, deactivateMarketFleet, sweepPausedMarketFleet } = require('./market-fleet');
 const { marketChecklistPage } = require('./market-readiness-ui');
 const { disputePage } = require('./disputeevidence-ui');
 const { pointFromWaitlist, coarseAreaFor } = require('./waitlistgeo');
@@ -980,6 +980,9 @@ app.post('/operator/online', requireAuth, requireFreshAuth, requireOperationalRe
   };
 
   try {
+    const closing = await db.collection('account_closures').doc(String(req.uid)).get();
+    if (closing.exists && closing.data()?.closingAt)
+      return refuse({ code: 'account_closing', error: 'Complete account deletion before returning to duty.' });
     // A DISABLED ACCOUNT KEEPS A VALID SIGN-IN FOR UP TO AN HOUR (requireAuth checks the token
     // locally), so Firebase is asked directly. "Cannot tell" is not "enabled".
     if ((await accountDisabled(req.uid)) !== false) {
@@ -1128,7 +1131,6 @@ app.post('/operator/online', requireAuth, requireFreshAuth, requireOperationalRe
     if (b.plate !== undefined) identity.plate = String(b.plate).slice(0, 16);
     if (Array.isArray(b.classes) && b.classes.length) identity.classes = b.classes.slice(0, 6);
 
-    const fleetRef = db.collection('operators').doc(String(req.uid));
     const fleetUpdate = {
         uid: String(req.uid),
         ...identity,
@@ -1169,7 +1171,8 @@ app.post('/operator/online', requireAuth, requireFreshAuth, requireOperationalRe
         markets: [physical, selected], providerMissing: productionReadiness().missing });
       if (!saved) return refuse({ code: 'market_waitlist', error: 'Operator duty was paused in this market.' });
     } else {
-      await fleetRef.set(fleetUpdate, { merge: true });
+      const saved=await setFleetOnlineIfOpen({db,operatorId:req.uid,fleetUpdate});
+      if(!saved)return refuse({code:'account_closing',error:'Complete account deletion before returning to duty.'});
     }
     res.json({ ok: true, operatorId: String(req.uid), available: b.available !== false });
   } catch (e) {

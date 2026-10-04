@@ -79,6 +79,7 @@ const { destinationsNear } = require('./places');
 const { searchPlaces } = require('./place-search');
 const { ready: voiceReady, reason: voiceReason, accessToken: voiceToken,
   connectTwiml, callerForRide, verifiedTwilioWebhook } = require('./voice');
+const { resolvePickupWall } = require('./scheduleclock');
 const { REGIONS, defaultRegion } = require('./regions');
 const { presenceStale, coverageLapsed, matchOperator, etaMinutes } = require('./matching');
 const { encodeGeohash, nearbyOperatorCandidates } = require('./geooperators');
@@ -2148,7 +2149,8 @@ function operatingMarketGate(user) {
   };
 }
 
-const marketBody = (m) => (m ? { id: m.id, name: m.name, status: m.status, regionId: m.regionId } : null);
+const marketBody = (m) => (m ? { id: m.id, name: m.name, status: m.status, regionId: m.regionId,
+  timeZone: REGIONS.find((r) => r.id === m.regionId)?.timezone || null } : null);
 
 // Public discovery may use a short cache; actual charges and offers always read durable state.
 let publicMarketCache = { until: 0, value: null, pending: null };
@@ -3389,6 +3391,14 @@ app.post('/travel/schedule', requireAuth, LIMITS.dispatch, requireFreshAuth, req
       !Number.isFinite(atMs)) {
     return res.status(400).json({ error: 'Pickup, destination and scheduled time require verified positions', code: 'route_geometry_required' });
   }
+  const timeZone = REGIONS.find((r) => r.id === marketFor(pickup)?.regionId)?.timezone;
+  if (!timeZone || b.pickupTimeZone !== timeZone) {
+    return res.status(409).json({ error: 'Pickup market time zone is unavailable or changed.', code: 'pickup_zone_required' });
+  }
+  const resolved = resolvePickupWall(String(b.pickupDate || ''), String(b.time || ''), b.period, timeZone);
+  if (!resolved.ok || resolved.atMs !== atMs) {
+    return res.status(400).json({ error: 'Pickup date and time do not match the pickup market.', code:resolved.code || 'pickup_time_mismatch' });
+  }
   if (atMs <= Date.now()) {
     return res.status(400).json({ error: 'Scheduled Travel must be set for a future time.', code: 'scheduled_time_required' });
   }
@@ -3421,7 +3431,7 @@ app.post('/travel/schedule', requireAuth, LIMITS.dispatch, requireFreshAuth, req
       dest: String(b.dest || '').slice(0, 60), pickupLat: pickup.lat, pickupLng: pickup.lng,
       destinationLat: Number.isFinite(destinationPoint.lat) ? destinationPoint.lat : null,
       destinationLng: Number.isFinite(destinationPoint.lng) ? destinationPoint.lng : null,
-      travelClass: String(b.travelClass || 'Standard'), atMs,
+      travelClass: String(b.travelClass || 'Standard'), atMs, pickupDate: b.pickupDate, pickupTimeZone: timeZone,
       travelCostCents: priced.travelCostCents, costCents: priced.travelerPays,
       miles: priced.miles, governmentFeeCents: priced.governmentFeeCents,
       tollCents: Math.max(0, Number(priced.tollCents) || 0),

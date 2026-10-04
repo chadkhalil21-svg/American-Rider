@@ -15,12 +15,14 @@ import {
   Title,
 } from '../src/components/UI';
 import { platformFee } from '../src/data';
+import { publicPickupMarket } from '../src/backend/markets';
+import { pickupDate, pickupMinutes, nextDate, resolvePickupWall } from '../backend/scheduleclock';
 import { SchedInfo, useRide } from '../src/state/RideContext';
 import { useLanguage } from '../src/state/LanguageContext';
 import { colors, fmt, radii } from '../src/theme';
 
-const dayLabel = (d: Date) =>
-  d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+const dayLabel = (d: Date, locale: string) =>
+  d.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
 
 const slotsFor = (p: 'AM' | 'PM') =>
   p === 'AM' ? ['5:30', '6:00', '6:30', '7:00'] : ['4:30', '5:30', '6:30', '7:30'];
@@ -32,11 +34,11 @@ const toMinutes = (time: string, period: 'AM' | 'PM') => {
   return hh * 60 + m;
 };
 
-const nowClockLabel = (now: Date) => {
-  let h = now.getHours();
+const nowClockLabel = (minutes: number) => {
+  let h = Math.floor(minutes/60);
   const ampm = h >= 12 ? 'PM' : 'AM';
   h = h % 12 || 12;
-  return `${h}:${String(now.getMinutes()).padStart(2, '0')} ${ampm}`;
+  return `${h}:${String(minutes%60).padStart(2, '0')} ${ampm}`;
 };
 
 // The demo's Travel Scheduled splash: 58px green calendar-check, centered.
@@ -56,7 +58,7 @@ function CalendarCheck() {
 }
 
 export default function Schedule() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const router = useRouter();
   const goBack = useGoBack();
   const ride = useRide();
@@ -64,32 +66,48 @@ export default function Schedule() {
   // Once scheduled, the demo shows its Travel Scheduled splash before returning home.
   const [doneInfo, setDoneInfo] = useState<SchedInfo | null>(null);
   const [saving, setSaving] = useState(false);
+  const [pickupZone, setPickupZone] = useState<string | null>(null);
+  const [pickedDate, setPickedDate] = useState<string | null>(null);
+  const lat = ride.departure.lat;
+  const lng = ride.departure.lng;
+  useEffect(() => {
+    let current = true;
+    setPickupZone(null);
+    setPickedDate(null);
+    if (typeof lat !== 'number' || typeof lng !== 'number') return () => { current = false; };
+    publicPickupMarket(lat,lng).then((market) => {
+      if (current) setPickupZone(market.status==='active' ? market.timeZone || null : null);
+    }).catch(() => { if (current) setPickupZone(null); });
+    return () => { current = false; };
+  },[lat,lng]);
 
   const now = new Date();
-  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const marketToday = pickupZone ? pickupDate(now.getTime(),pickupZone) : null;
+  const nowMin = pickupZone ? pickupMinutes(now.getTime(),pickupZone) : 24*60;
 
   // Calendar month being shown (current month + offset, handles year rollover).
-  const calBase = new Date(now.getFullYear(), now.getMonth() + calOffset, 1);
-  const calTitle = calBase.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-  const firstDow = calBase.getDay();
-  const daysInM = new Date(calBase.getFullYear(), calBase.getMonth() + 1, 0).getDate();
+  const calBase = new Date(Date.UTC(Number(marketToday?.slice(0,4) || 2026),
+    Number(marketToday?.slice(5,7) || 1)-1 + calOffset, 1));
+  const calTitle = calBase.toLocaleDateString(language, { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  const firstDow = calBase.getUTCDay();
+  const daysInM = new Date(Date.UTC(calBase.getUTCFullYear(), calBase.getUTCMonth() + 1, 0)).getUTCDate();
   // "Pick a day" starts the day after tomorrow — Today/Tomorrow have their own buttons.
-  const minPick = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2);
+  const minPick = marketToday ? new Date(`${nextDate(marketToday,2)}T00:00:00Z`) : new Date(8640000000000000);
 
   const calCells = useMemo(() => {
     const cells: { label: string; day?: Date; selectable?: boolean }[] = [];
     for (let i = 0; i < firstDow; i++) cells.push({ label: '' });
     for (let d = 1; d <= daysInM; d++) {
-      const dt = new Date(calBase.getFullYear(), calBase.getMonth(), d);
+      const dt = new Date(Date.UTC(calBase.getUTCFullYear(), calBase.getUTCMonth(), d));
       cells.push({ label: String(d), day: dt, selectable: dt >= minPick });
     }
     return cells;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [calOffset, daysInM, firstDow]);
+    // The pickup-zone date is included even when two different months share the same grid shape.
+  }, [calOffset, daysInM, firstDow, marketToday]);
 
   const timeSlots = slotsFor(ride.schedPeriod);
   const isToday = ride.schedDate === 'today';
-  const slotPassed = (t: string) => isToday && toMinutes(t, ride.schedPeriod) <= nowMin;
+  const slotPassed = (t: string) => !!pickupZone && isToday && toMinutes(t, ride.schedPeriod) <= nowMin;
   const allSlotsPassed = timeSlots.every(slotPassed);
 
   // Custom time: quarter-hour slots are open; others suggest the nearest one.
@@ -105,7 +123,7 @@ export default function Schedule() {
       const mins = m[2] ? Number(m[2]) : 0;
       customLabel = `${h}:${String(mins).padStart(2, '0')}`;
       if (mins % 15 === 0) {
-        const past = isToday && toMinutes(customLabel, ride.schedPeriod) <= nowMin;
+        const past = !!pickupZone && isToday && toMinutes(customLabel, ride.schedPeriod) <= nowMin;
         customState = past ? 'past' : 'ok';
       } else {
         customState = 'suggest';
@@ -128,33 +146,23 @@ export default function Schedule() {
 
   const chosenTime = customState === 'ok' ? customLabel : ride.schedTime;
 
-  // The chosen day and time as a real instant. The reservation is stored against this, which
-  // is how the app knows on the next launch whether it is still upcoming — the labels alone
-  // ("Tomorrow", "6:00") mean something different every day they are read.
-  const scheduledAt = () => {
-    const at = new Date(now);
-    if (ride.schedDate === 'tomorrow') at.setDate(at.getDate() + 1);
-    if (ride.schedDate === 'pick') {
-      // schedDay is a label like 'Wed, Jul 8'; parse it against the coming twelve months.
-      const parsed = new Date(`${ride.schedDay} ${at.getFullYear()}`);
-      if (!Number.isNaN(parsed.getTime())) {
-        at.setFullYear(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
-        if (at.getTime() < now.getTime()) at.setFullYear(at.getFullYear() + 1);
-      }
-    }
-    const mins = toMinutes(chosenTime, ride.schedPeriod);
-    at.setHours(Math.floor(mins / 60), mins % 60, 0, 0);
-    return at.getTime();
-  };
+  const selectedPickupDate = marketToday
+    ? ride.schedDate === 'today' ? marketToday
+      : ride.schedDate === 'tomorrow' ? nextDate(marketToday) : pickedDate
+    : null;
+  const resolved = pickupZone && selectedPickupDate
+    ? resolvePickupWall(selectedPickupDate, chosenTime, ride.schedPeriod, pickupZone)
+    : {ok:false as const, code:'pickup_zone_required'};
 
   const whenLabels: Record<string, string> = {
-    today: 'Today',
-    tomorrow: 'Tomorrow',
+    today: t('traveler.schedToday'),
+    tomorrow: t('traveler.schedTomorrow'),
     pick: ride.schedDay,
   };
   // Only fully blocked when EVERY slot in this period has passed; if just the
   // selected slot passed, the effect below moves the selection forward.
-  const schedInvalid = isToday && customState !== 'ok' && allSlotsPassed;
+  const schedInvalid = !resolved.ok || resolved.atMs <= Date.now() ||
+    (isToday && customState !== 'ok' && allSlotsPassed);
 
   useEffect(() => {
     if (isToday && !allSlotsPassed && slotPassed(ride.schedTime)) {
@@ -165,9 +173,9 @@ export default function Schedule() {
   }, [isToday, allSlotsPassed, ride.schedTime, ride.schedPeriod]);
 
   const dateOpts: { key: 'today' | 'tomorrow' | 'pick'; label: string }[] = [
-    { key: 'today', label: 'Today' },
-    { key: 'tomorrow', label: 'Tomorrow' },
-    { key: 'pick', label: 'Pick a day' },
+    { key: 'today', label: t('traveler.schedToday') },
+    { key: 'tomorrow', label: t('traveler.schedTomorrow') },
+    { key: 'pick', label: t('traveler.schedPickDay') },
   ];
 
   // ---- The demo's Travel Scheduled splash. ----
@@ -191,8 +199,7 @@ export default function Schedule() {
             <Text style={{ fontWeight: '600', color: colors.ink }}>
               {doneInfo.when} · {doneInfo.time} {doneInfo.period}
             </Text>
-            . An operator is assigned ahead of that time and the card on file is charged then.
-            The assignment appears on your home screen.
+            {t('traveler.schedBookingNotice')}
           </Text>
           {ride.schedSaved === false && (
             <Text style={styles.splashWarn}>
@@ -271,12 +278,16 @@ export default function Schedule() {
           </View>
           <View style={styles.calGrid}>
             {calCells.map((c, i) => {
-              const on = c.day && ride.schedDay === dayLabel(c.day);
+              const on = c.day && pickedDate === c.day.toISOString().slice(0,10);
               return (
                 <Pressable
                   key={i}
                   disabled={!c.selectable}
-                  onPress={() => c.day && ride.setSchedDay(dayLabel(c.day))}
+                  onPress={() => {
+                    if (!c.day) return;
+                    ride.setSchedDay(dayLabel(c.day,language));
+                    setPickedDate(c.day.toISOString().slice(0,10));
+                  }}
                   style={[styles.calCell, on && { backgroundColor: colors.ink }]}
                 >
                   <Text
@@ -367,7 +378,7 @@ export default function Schedule() {
         />
         {customState === 'ok' && (
           <Text style={styles.customOk}>
-            {customLabel} {ride.schedPeriod} confirmed.
+            {t('traveler.schedTimeChosen', { time: `${customLabel} ${ride.schedPeriod}` })}
           </Text>
         )}
         {customState === 'suggest' && (
@@ -394,7 +405,7 @@ export default function Schedule() {
         )}
         {customState === 'past' && (
           <Text style={styles.customPast}>
-            {t('traveler.schedAlreadyPassed', { time: nowClockLabel(now) })}
+            {t('traveler.schedAlreadyPassed', { time: nowClockLabel(nowMin) })}
           </Text>
         )}
       </Card>
@@ -403,12 +414,16 @@ export default function Schedule() {
         <View style={styles.invalidBanner}>
           <Text style={styles.invalidText}>
             {t('traveler.schedTimesPassed', {
-              time: nowClockLabel(now),
+              time: nowClockLabel(nowMin),
               alt: ride.schedPeriod === 'AM' ? 'PM' : t('traveler.schedAltLater'),
             })}
           </Text>
         </View>
       )}
+      <Text style={styles.summaryNote}>{pickupZone
+        ? t('traveler.schedPickupZone', { zone: pickupZone })
+        : t('traveler.schedZoneUnavailable')}</Text>
+      {pickupZone && !resolved.ok ? <Text style={styles.customPast}>{t('traveler.schedTimeInvalid')}</Text> : null}
 
       <Card style={styles.summaryCard}>
         <View style={styles.summaryRow}>
@@ -440,13 +455,16 @@ export default function Schedule() {
         label={t('traveler.scheduleTravel')}
         disabled={schedInvalid || saving}
         onPress={async () => {
+          if (!resolved.ok || !pickupZone || !selectedPickupDate) return;
           const info: SchedInfo = {
             when: whenLabels[ride.schedDate],
             time: chosenTime,
             period: ride.schedPeriod,
             arr: ride.arrival.name, // the demo's splash names the destination in full
             cost: ride.travelerTotal, // the same price the traveler was shown — see travelerTotal
-            atMs: scheduledAt(),
+            atMs: resolved.atMs,
+            pickupDate: selectedPickupDate,
+            pickupTimeZone: pickupZone,
           };
           setSaving(true);
           const saved = await ride.scheduleRide(info);

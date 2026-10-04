@@ -3,7 +3,7 @@
   "branch": "integrate/commercial-completion-2026-10-03",
   "baseSha": "f749644c862e1da128359ddf2693a95506b9b52a",
   "candidateSha": "551b72db40db360029b90864febd443430ddb1f8",
-  "generatedAt": "2026-10-04T22:52:43.354733+00:00",
+  "generatedAt": "2026-10-04T22:59:34.709385+00:00",
   "allowedStatuses": [
     "FIXED",
     "VERIFIED ALREADY FIXED",
@@ -1665,6 +1665,26 @@
         "Targeted signed-callback and old/new assignment behavioral tests passed with synthetic Twilio tokens."
       ],
       "releaseCondition": "Production Twilio callback URL/signature, signer config, short-lifetime reoffer and device denial tests required before feature flag can turn on."
+    },
+    {
+      "id": "F087",
+      "category": "scheduled travel / national expansion",
+      "title": "Scheduled pickup used the phone timezone and could book the wrong instant, including daylight-saving gaps and repeated hours",
+      "status": "FIXED",
+      "owner": "engineering / Operations",
+      "source": "backend/scheduleclock.js; backend/server.js; app/schedule.tsx; src/backend/markets.ts; backend/scheduleclock.test.js",
+      "sourceSha": "bec2e1ed7185cad5dafd186099aaaaffa6736092",
+      "evidence": [
+        "Market bootstrap now supplies configured region IANA timezone; one shared wall-clock resolver returns exactly one valid instant or refuses DST gap/overlap. Server compares the submitted date/time/zone and atMs before route/fare provider lookup; app uses pickup date, not device date; five-language booking/outage copy."
+      ],
+      "candidatePrs": [
+        59
+      ],
+      "implementingCommit": null,
+      "verification": [
+        "Targeted scheduleclock DST/cross-zone test PASS; existing scheduled-worker and Home-market tests PASS; npm run typecheck, i18n (1,131 keys in five languages), backend:lint and git diff --check PASS on working tree. Native device timezone/proxy, real GTFS/payment and final exact-SHA CI not yet tested."
+      ],
+      "releaseCondition": "Deploy indexed market bootstrap and scheduler; test signed iOS/Android calendar/pickup-timezone behavior, DST transitions, old-client refusal, charged scheduled delivery, refunds and consent. Recurring standing authorization remains a separate legal/payment/operations gate."
     }
   ],
   "features": [
@@ -1724,7 +1744,8 @@
         "Deterministic staged ride, saved-fare verification, scheduled charge metadata, atomic offer and unattended orphan reconciliation implemented; local 23-case scheduler suite passes. Index deployment and provider/device proof open.",
         "Repaired due-ordered scan and index, impossible route predicate, staged deterministic pre-charge Travel, Stripe amount/owner binding, transactional offer and unattended orphan/refund recovery; local scheduler and webhook tests pass.",
         "Pre-charge county admission and same-document atomic Operator assignment added locally; live off-session payment/Firestore and staffing proof remain outstanding.",
-        "Account closure now serializes its reserved-trip cancellation with the scheduler’s claim and blocks closure during dispatching or a charge/refund obligation; actual off-session testing remains necessary."
+        "Account closure now serializes its reserved-trip cancellation with the scheduler’s claim and blocks closure during dispatching or a charge/refund obligation; actual off-session testing remains necessary.",
+        "Client and server now validate each chosen pickup-local IANA date/time as exactly one unambiguous UTC instant and store zone/date. DST gaps and repeated hours refuse scheduling; targeted tests pass. Real device/proxy/provider drills remain external."
       ],
       "withholdingReason": "Future off-session charge authority, provider credential/mandate evidence, live scheduled fare/toll repricing, index deployment and staffed charge/failed-offer recovery are unverified.",
       "releaseLaterRequirements": [
@@ -1739,7 +1760,8 @@
       "objective": "Complete and verify if technically, economically, legally and operationally supportable.",
       "launchState": "INTENTIONALLY WITHHELD FROM LAUNCH",
       "attemptedWork": [
-        "Traced reservation API, scheduled due sweep and user controls; no recurrence-series object, occurrence idempotency, bounded horizon/holiday handling or series-level pause/cancel/refund control exists. Did not disguise a one-off schedule as recurring."
+        "Traced reservation API, scheduled due sweep and user controls; no recurrence-series object, occurrence idempotency, bounded horizon/holiday handling or series-level pause/cancel/refund control exists. Did not disguise a one-off schedule as recurring.",
+        "Audited existing scheduled single-occurrence payment authorization and local-time implementation. Automatic standing variable off-session charges are not enabled without a separately approved recurring mandate; only a separately confirmed scheduled Travel is currently source-supported."
       ],
       "withholdingReason": "A standing mandate for repeated off-session variable charges, approved notice/price-change terms, series cancellation/entitlement semantics and operational capacity are unresolved human/legal/payment-provider decisions. Creating indefinite charges without these would be disproportionate financial and consumer risk.",
       "releaseLaterRequirements": [

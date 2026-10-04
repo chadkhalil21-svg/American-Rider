@@ -76,6 +76,8 @@ export type SchedInfo = {
   /** The instant the travel is due. Without it a reservation cannot be read back as
    *  upcoming, which is why a scheduled travel used to vanish on the next launch. */
   atMs: number;
+  pickupDate: string; // YYYY-MM-DD in the pickup market, not on the device
+  pickupTimeZone: string; // IANA timezone confirmed by server market bootstrap
 };
 export type PaymentState = {
   status: 'idle' | 'processing' | 'paid' | 'failed';
@@ -1528,6 +1530,8 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
         arr: info.arr,
         cost: info.cost,
         atMs: info.atMs,
+        pickupDate: info.pickupDate,
+        pickupTimeZone: info.pickupTimeZone,
         dep: departure.short,
         dest: arrival.short,
         pickupLat: tripCoords?.pickup?.lat ?? departure.lat,
@@ -1585,7 +1589,8 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       schedIdRef.current = r.id;
       setSchedId(r.id);
       setSchedState(r);
-      setSchedInfo({ when: r.when, time: r.time, period: r.period, arr: r.arr, cost: r.cost, atMs: r.atMs });
+      setSchedInfo({ when: r.when, time: r.time, period: r.period, arr: r.arr, cost: r.cost,
+        atMs: r.atMs, pickupDate: r.pickupDate || '', pickupTimeZone: r.pickupTimeZone || '' });
       setScheduled(true);
       setSchedSaved(true);
     });

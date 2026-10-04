@@ -1,6 +1,6 @@
 import { PAYMENT_SERVER_URL } from '../config';
 
-export type PickupMarket = {status:'active'|'onboarding'|'waitlist'|'unavailable';name:string|null};
+export type PickupMarket = {status:'active'|'onboarding'|'waitlist'|'unavailable';name:string|null;timeZone?:string|null};
 let cached:{key:string;until:number;value:PickupMarket}|null=null;
 let inflight:{key:string;promise:Promise<PickupMarket>}|null=null;
 /** Location is transmitted only to our backend for a county lookup; never stored in this cache beyond a 15-second key. */
@@ -25,7 +25,8 @@ export function publicPickupMarket(lat:number,lng:number):Promise<PickupMarket>{
       if(here?.status==='active'&&!body.active.some((m:{id:string;status:string})=>m.id===here.id&&m.status==='active'))
         throw new Error('market_active_inconsistent');
       const state:PickupMarket=here?
-        {status:here.status,name:typeof here.name==='string'?here.name.slice(0,100):null}:
+        {status:here.status,name:typeof here.name==='string'?here.name.slice(0,100):null,
+          timeZone:typeof here.timeZone==='string'&&here.timeZone.length<100?here.timeZone:null}:
         {status:'waitlist',name:null};
       cached={key,until:Date.now()+15_000,value:state};
       return state;

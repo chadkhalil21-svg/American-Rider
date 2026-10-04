@@ -3,7 +3,7 @@
   "branch": "integrate/commercial-completion-2026-10-03",
   "baseSha": "f749644c862e1da128359ddf2693a95506b9b52a",
   "candidateSha": "551b72db40db360029b90864febd443430ddb1f8",
-  "generatedAt": "2026-10-04T23:02:24.870104+00:00",
+  "generatedAt": "2026-10-04T23:09:56.965617+00:00",
   "allowedStatuses": [
     "FIXED",
     "VERIFIED ALREADY FIXED",
@@ -1705,6 +1705,29 @@
         "Targeted scheduledidentity.test.js, scheduleclock.test.js, sched.test.js 27/27, TypeScript, 1,132-key five-language i18n, backend lint, diff whitespace passed on candidate tree. Provider charge/retry and exact final SHA tests not yet performed."
       ],
       "releaseCondition": "Verify real user-consented quote versus reroute, lost response and duplicate request on devices with a test/live provider; align scheduled failed-charge, delivery and refund operations before launch."
+    },
+    {
+      "id": "F089",
+      "category": "Operator onboarding / insurance / product identity",
+      "title": "Operator insurance status and renewal were buried after dense procurement copy; market script conflated statutory coverage and platform policy",
+      "status": "FIXED",
+      "owner": "engineering / Operator Relations",
+      "source": "app/operator/economics.tsx; app/operator/qualify.tsx; app/operator/insurance.tsx; app/operator/commissioned.tsx; backend/insurance-jurisdictions.js; backend/transientstate.test.js; src/i18n/*.ts",
+      "sourceSha": "49b4a6713506eec82567885ed5d969818f813699",
+      "evidence": [
+        "Actual screen puts canonical 99%/1% Travel Fare arithmetic, separate Traveler Platform Fee, $1,000/$5,000 derived examples and optional Operator-entered weekly/monthly/annual Travel Fare retained before qualification spend; no net-income or demand promise.",
+        "Qualification previews third-party insurance/screening/vehicle costs and review/payout sequence. Insurance presents live document/continuing-status/expiry and exact refusal or process exception first; renewal upload remains available within 30 days. Four authorities (Florida law, platform procurement policy, licensed broker/carrier, American Rider verification) are distinct. Own-broker/carrier path precedes optional source list; broker script can be shared; continuing-status source type is explicitly selected.",
+        "Existing independent rideshare research did not supply a specific production-verified matching rider-payment/driver-receipt versus Travel-Fare denominator in this bounded pass; therefore no comparative percentage or annual competitive advantage is asserted.",
+        "Commissioned state remains server-gated and leads to vehicle, payouts, disclosure and operational readiness rather than premature dispatch."
+      ],
+      "candidatePrs": [
+        59
+      ],
+      "implementingCommit": null,
+      "verification": [
+        "Focused economics 77 tests, insurance monitoring, navigation state and transient Operator source invariants passed; TypeScript, five-language 1,149-key i18n, backend lint and diff whitespace passed. No signed-device screen/VoiceOver/TalkBack or live insurer/provider proof."
+      ],
+      "releaseCondition": "Founder with Florida counsel and licensed broker/carrier must approve actual insurance architecture, policy wording, market-specific procurement and corporate first-dollar backstop; verify live policy, broker-source availability, renewal/decline and confirmation emails; sign/device-check English plus translations and accessibility; verify payout economics with real provider terms before commercial activation."
     }
   ],
   "features": [
@@ -1886,6 +1909,22 @@
         "Bind company/operator insurance and qualified fleet under approved legal entity/market",
         "Deploy rules/indexes/keys and establish 24/7 safety/financial exception owners",
         "Run low-value live full journey, cancelled/no-Operator refund, chargeback and device/restore drills on exact deployed SHA"
+      ]
+    },
+    {
+      "name": "Operator onboarding / qualification / insurance",
+      "linkedFinding": "F085 / F089",
+      "objective": "Present the economics, costs, qualification, insurance, continuing verification and commissioning sequence as a coherent, safe Operator journey.",
+      "launchState": "INTENTIONALLY WITHHELD FROM LAUNCH",
+      "attemptedWork": [
+        "Canonical fare economics and derived examples precede spend; five-language qualification preview, status-first insurance, own-broker route, renewal/remediation and provenance-specific independent status confirmation implemented with targeted tests. Commissioned badge remains server-gated.",
+        "Specific independent industry take/annual-difference claim omitted: the existing bounded evidence did not establish an exact matching denominator and verified market/date sample. Source-tested user interface is not signed-device or insurer approval."
+      ],
+      "withholdingReason": "External broker/carrier and counsel decision on statutory and American Rider insurance architecture, actual coverage/corporate backstop and carrier eligibility, provider credentials/screening/payout evidence, market activation, signed iOS/Android + accessibility/device checks and real Operator physical-world drill remain open.",
+      "releaseLaterRequirements": [
+        "Written market-specific legal and insurance/broker/carrier decision and actual policy; confirm corporate first-dollar backstop and operator disclosures.",
+        "Live screening, accepted and declined policy, renewal and monitoring drills with retained source/delivery evidence, actual payouts and operator account terms.",
+        "Signed iOS/Android multilingual and accessibility/onboarding checks with trained Operator and verified market activation."
       ]
     }
   ],

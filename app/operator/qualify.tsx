@@ -1,8 +1,4 @@
-// Operator Qualification — the web demo shell's checklist screen, exactly: the
-// wordmark line, "{n} of N verified", the progress segments, the 99% banner, and the
-// Add › → Checking… → ✓ Verified theater. The founders' 10 Aug compliance spec adds a
-// seventh step (Background Check); Commercial Insurance and Background Check open
-// guidance screens, the rest verify inline.
+// Economics precede compliance spend; server review, not a checklist, commissions duty.
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -47,22 +43,26 @@ export default function OperatorQualification() {
   useEffect(() => {
     let live = true;
     (async () => {
-      let st = await getOperatingMarket();
-      if (!st.market) {
-        try {
-          const perm = await Location.getForegroundPermissionsAsync();
-          const pos = perm.granted ? await Location.getLastKnownPositionAsync() : null;
-          if (pos) st = await setOperatingMarket({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        } catch {
-          /* no position: the operator chooses below */
+      try {
+        let st = await getOperatingMarket();
+        if (!st.market) {
+          try {
+            const perm = await Location.getForegroundPermissionsAsync();
+            const pos = perm.granted ? await Location.getLastKnownPositionAsync() : null;
+            if (pos) st = await setOperatingMarket({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          } catch {
+            /* no position: the operator chooses below */
+          }
         }
+        if (live) setArea(st);
+      } catch {
+        if (live) setAreaError(t('traveler.couldNotSaveConn'));
       }
-      if (live) setArea(st);
     })();
     return () => {
       live = false;
     };
-  }, []);
+  }, [t]);
   const areaActive = area?.market?.status === 'active';
   const areaAuthorized = areaActive || area?.market?.status === 'onboarding';
 
@@ -99,9 +99,15 @@ export default function OperatorQualification() {
         </Pressable>
       </View>
 
+      <Card style={styles.prepCard}>
+        <Text style={styles.rowTitle}>{t('operator.qualPreparation')}</Text>
+        <Text style={styles.prepBody}>{t('operator.qualCostPreview')}</Text>
+        <Text style={styles.prepBody}>{t('operator.qualNext')}</Text>
+      </Card>
+
       {area && (
         <>
-        {areaError ? <Text style={styles.footnote}>{areaError}</Text> : null}
+        {areaError ? <Text accessibilityRole="alert" style={styles.footnote}>{areaError}</Text> : null}
 
       <Card style={styles.listCard}>
           <View style={styles.row}>
@@ -139,7 +145,7 @@ export default function OperatorQualification() {
                           setAreaBusy(false);
                         }
                       }}
-                      style={{ marginRight: 14, marginTop: 4 }}
+                      style={{ marginRight: 14, marginTop: 4, minHeight: 44, justifyContent: 'center' }}
                     >
                       <Text style={styles.rowTitle}>{m.name} ›</Text>
                     </Pressable>
@@ -152,6 +158,9 @@ export default function OperatorQualification() {
         </Card>
         </>
       )}
+      {!area && <Text accessibilityRole={areaError ? 'alert' : undefined} style={styles.footnote}>
+        {areaError || t('operator.checking')}
+      </Text>}
 
       <Card style={styles.listCard}>
         {QUAL_DOCS.map((d, i) => {
@@ -204,7 +213,7 @@ export default function OperatorQualification() {
           reverse — it is just the flattering direction to be wrong in. */}
 
       <View style={{ flex: 1 }} />
-      {submitError && <Text style={styles.footnote}>{submitError}</Text>}
+      {submitError && <Text accessibilityRole="alert" style={styles.footnote}>{submitError}</Text>}
       <PrimaryButton
         label={done ? t('traveler.qualSubmitReview') : t('traveler.qualVerifyAll', { total: QUAL_DOCS.length })}
         disabled={!done || submitting || !areaAuthorized}
@@ -249,11 +258,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   bannerText: { fontSize: 13, color: colors.ink2, lineHeight: 18.85 },
+  prepCard: { marginTop: 16, padding: 18 },
+  prepBody: { fontSize: 13.5, lineHeight: 20, color: colors.ink2, marginTop: 8 },
   listCard: { marginTop: 16, paddingVertical: 2, paddingHorizontal: 20 },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    minHeight: 48,
     paddingVertical: 15,
     gap: 10,
   },

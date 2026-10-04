@@ -64,6 +64,7 @@ export default function OperatorEconomics() {
         )}
         {retained != null && (
           <>
+            <Text style={styles.illustrationTitle}>{t('operator.econRetainedIllustration')}</Text>
             <View style={styles.row}><Text style={styles.detail}>{t('operator.econWeek')}</Text><Text style={styles.amount}>{fmt(retained)}</Text></View>
             <View style={styles.row}><Text style={styles.detail}>{t('operator.econMonth')}</Text><Text style={styles.amount}>{fmt(retained * WEEKS_PER_YEAR / 12)}</Text></View>
             <View style={styles.row}><Text style={styles.detail}>{t('operator.econYear')}</Text><Text style={styles.amount}>{fmt(retained * WEEKS_PER_YEAR)}</Text></View>
@@ -90,6 +91,7 @@ const styles = StyleSheet.create({
   section: { marginTop: 26 },
   example: { marginTop: 10, padding: 18 },
   exampleTitle: { fontSize: 15, fontWeight: '600', color: colors.ink, marginBottom: 10 },
+  illustrationTitle: { fontSize: 14, fontWeight: '600', color: colors.ink, marginTop: 20, marginBottom: 6 },
   row: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, paddingVertical: 6 },
   amount: { fontSize: 15, fontWeight: '600', color: colors.ink, textAlign: 'right' },
   input: { minHeight: 48, marginTop: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 14, fontSize: 17, color: colors.ink },

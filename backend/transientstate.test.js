@@ -46,6 +46,31 @@ assert.match(operatorHome, /if \(acceptingRef\.current\) return/);
 const commissioned = read('app/operator/commissioned.tsx');
 assert.match(commissioned, /if \(!op\.ready \|\| op\.verification !== 'commissioned'\)/,
   'the commissioned title is unreachable until server qualification resolves');
+const economics = read('app/operator/economics.tsx');
+assert.match(economics, /EXAMPLE_FARES = \[1000, 5000\]/);
+assert.match(economics, /const commission = coordinationFee\(example\)/);
+assert.match(economics, /const retained = fare == null \? null : fare - coordinationFee\(fare\)/);
+assert.match(economics, /operator\.econRetainedIllustration/);
+const qualification = read('app/operator/qualify.tsx');
+assert.ok(qualification.indexOf('operator.econYourScenario') < qualification.indexOf('operator.qualCostPreview')
+  && qualification.indexOf('operator.qualCostPreview') < qualification.indexOf('QUAL_DOCS.map((d, i)'),
+  'economics and third-party costs precede the qualification checklist');
+const insurance = read('app/operator/insurance.tsx');
+assert.match(insurance, /const current = st === 'ok' && liveStatus\?\.ok === true/,
+  'a document alone cannot display current verified coverage');
+assert.match(insurance, /const expiring = op\.coverageDaysLeft != null && op\.coverageDaysLeft <= 30/);
+assert.match(insurance, /const canUpload = st !== 'ok' \|\| expiring/,
+  'renewal and replacement must be possible before an approved policy expires');
+assert.ok(insurance.indexOf('operator.coverageOnFile') < insurance.indexOf('operator.insWhoDecides')
+  && insurance.indexOf('operator.insOwnBroker') < insurance.indexOf('operator.compareProviders'),
+  'status and an own-broker path precede optional source lists');
+for (const authority of ['insFloridaLawBody', 'insARPolicyBody', 'insBrokerDecisionBody', 'insARVerificationBody']) {
+  assert.ok(insurance.includes(authority), `${authority} must remain distinct`);
+}
+const florida = require('./insurance-jurisdictions').forState('FL');
+assert.match(florida.script, /American Rider's current onboarding policy/);
+assert.match(florida.script, /the driver, the company, or both/);
+assert.doesNotMatch(florida.script, /lowest-cost policy/);
 const emergency = read('app/emergency.tsx');
 assert.match(emergency, /try \{\s*const result = await alertEmergency/);
 assert.match(emergency, /catch \{[\s\S]*?state: 'failed'[\s\S]*?finally \{\s*alertBusy\.current = false/,

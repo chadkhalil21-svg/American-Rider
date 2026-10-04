@@ -3,7 +3,7 @@
   "branch": "integrate/commercial-completion-2026-10-03",
   "baseSha": "f749644c862e1da128359ddf2693a95506b9b52a",
   "candidateSha": "551b72db40db360029b90864febd443430ddb1f8",
-  "generatedAt": "2026-10-04T23:09:56.965617+00:00",
+  "generatedAt": "2026-10-04T23:10:49.747697+00:00",
   "allowedStatuses": [
     "FIXED",
     "VERIFIED ALREADY FIXED",
@@ -1481,14 +1481,14 @@
       "status": "NOT TESTED",
       "owner": "Engineering + staffed Safety/Support",
       "source": "backend/opscases.js; backend/opscases-ui.js; backend/opscases.test.js; backend/ops.js; backend/server.js; firestore.indexes.json",
-      "sourceSha": "51d1680ca18192284b614ecac07d206ca59db210",
+      "sourceSha": "b5e40021ac73f03e28b7d1ea7cacaf7a33c665be",
       "evidence": [
         "Named MFA Operations now sees 40 oldest-open cases per page, with explicit safety/deadline labels. A case requires named, noted, transactional acknowledgement before separately noted closure. 85 synthetic urgent cases paginated and two audit records verified locally; 360px phone mock had no overflow and 46px action button."
       ],
       "candidatePrs": [
         59
       ],
-      "implementingCommit": null,
+      "implementingCommit": "b5e40021ac73f03e28b7d1ea7cacaf7a33c665be",
       "verification": [
         "Source tests PASS; exact final SHA CI, deployed index, named MFA login, case escalation and physical-world staffing NOT TESTED.",
         "Candidate npm run check PASS on working tree before commit (completion/evidence/ops-cases-candidate-check.log.gz); exact final-SHA CI, live devices/providers, indexes, staffing and load remain NOT TESTED."
@@ -1502,14 +1502,14 @@
       "status": "EXTERNAL DEPENDENCY",
       "owner": "Engineering + market Operations",
       "source": "app/index.tsx; src/backend/markets.ts; backend/server.js; backend/waitlistgeo.js; backend/home-market.test.js; backend/waitlistgeo.test.js",
-      "sourceSha": "b5e40021ac73f03e28b7d1ea7cacaf7a33c665be",
+      "sourceSha": "458e2ca28001fbb94d810b6683236b66a21a17c0",
       "evidence": [
         "Source/client fake verifies active, prelaunch, outside-market, malformed and outage states; known unsupported pickup hides immediate and scheduled sales and offers consent-based interest. `/markets/at` reads at most one county per short cache interval and sends GPS in body, not URL. Five locales and account closure’s voluntary waitlist deletion are locally validated."
       ],
       "candidatePrs": [
         59
       ],
-      "implementingCommit": null,
+      "implementingCommit": "458e2ca28001fbb94d810b6683236b66a21a17c0",
       "verification": [
         "Focused source/fake tests PASS; exact final-SHA CI, emulator, native, deployed rules and live process NOT TESTED.",
         "Full candidate working-tree npm run check PASS, log sha256 eea9ac21405dff724ff7d7f57654ec55dd70604637e19a5c3eb56126d022aea6; exact committed SHA/CI, Firebase emulator, native devices and live authority NOT TESTED.",
@@ -1524,7 +1524,7 @@
       "status": "EXTERNAL DEPENDENCY",
       "owner": "Engineering + privacy/legal + mobile",
       "source": "backend/accountclosure.js; backend/booking.js; backend/server.js; firestore.rules; backend/accountclosure.test.js; backend/booking.test.js",
-      "sourceSha": "b5e40021ac73f03e28b7d1ea7cacaf7a33c665be",
+      "sourceSha": "4336d3c3b464da22bb64ba1bcfdf83cda3416965",
       "evidence": [
         "Source fixes: block `awaiting_payment`/`awaiting_assignment`/dispatching deletion; transactionally cancel only reserved schedules; write account_closures server-only tombstone and take Operator offline atomically. New booking, dispatch and scheduled-create transactions read the same tombstone; profile deletion cannot bypass it. Voluntary waitlist record is deleted.",
         "New `/account/delete` verifies recent Firebase Admin auth_time, fences bookings, deletes Auth before profile, retries failed Auth deletion without erasing profile, and leases due-indexed cleanup only after getUser reports not found. Old `/account/close` returns 426 in production. Source tests exercise provider failure, retry, orphan profile and live-account refusal; final adversarial push/storage regressions were repaired in client.",
@@ -1533,7 +1533,7 @@
       "candidatePrs": [
         59
       ],
-      "implementingCommit": null,
+      "implementingCommit": "4336d3c3b464da22bb64ba1bcfdf83cda3416965",
       "verification": [
         "Focused source/fake tests PASS; exact final-SHA CI, emulator, native, deployed rules and live process NOT TESTED.",
         "Full candidate working-tree npm run check PASS, log sha256 eea9ac21405dff724ff7d7f57654ec55dd70604637e19a5c3eb56126d022aea6; exact committed SHA/CI, Firebase emulator, native devices and live authority NOT TESTED.",
@@ -1549,14 +1549,14 @@
       "status": "FIXED",
       "owner": "Engineering + privacy operations",
       "source": "src/state/AuthContext.tsx; backend/accountdeletion.js; backend/accountdeletion.test.js",
-      "sourceSha": "458e2ca28001fbb94d810b6683236b66a21a17c0",
+      "sourceSha": "4336d3c3b464da22bb64ba1bcfdf83cda3416965",
       "evidence": [
         "Deleting account with active Travel formerly called clearPushToken before the server 409, stranding the ongoing journey without device alerts. The new client calls server deletion first and never clears push on failure; backend/accountdeletion.test.js now asserts the ordering."
       ],
       "candidatePrs": [
         59
       ],
-      "implementingCommit": null,
+      "implementingCommit": "4336d3c3b464da22bb64ba1bcfdf83cda3416965",
       "verification": [
         "Focused source/Firebase fake regression PASS; final exact SHA and physical devices pending.",
         "Final source working-tree npm run check PASS after the two confirmed P1 repairs; compressed log sha256 401bb4935312a2d2a2f23c5e28cf984a5030839d08836b9c8e0a51725cc27b17. Exact-commit CI, live Firebase and native devices remain separate."
@@ -1570,14 +1570,14 @@
       "status": "FIXED",
       "owner": "Engineering + privacy operations",
       "source": "src/state/AuthContext.tsx; backend/accountdeletion.js; backend/accountdeletion.test.js",
-      "sourceSha": "458e2ca28001fbb94d810b6683236b66a21a17c0",
+      "sourceSha": "4336d3c3b464da22bb64ba1bcfdf83cda3416965",
       "evidence": [
         "After a backend 503, the client formerly attempted getIdToken(true) and unconditionally erased storage/sign-out on any refresh failure, including an ordinary network outage. It now preserves local data and Auth on any unconfirmed result, clearing only after a successful server deletion response; backend/accountdeletion.test.js pins the ordering."
       ],
       "candidatePrs": [
         59
       ],
-      "implementingCommit": null,
+      "implementingCommit": "4336d3c3b464da22bb64ba1bcfdf83cda3416965",
       "verification": [
         "Focused source/Firebase fake regression PASS; final exact SHA and physical devices pending.",
         "Final source working-tree npm run check PASS after the two confirmed P1 repairs; compressed log sha256 401bb4935312a2d2a2f23c5e28cf984a5030839d08836b9c8e0a51725cc27b17. Exact-commit CI, live Firebase and native devices remain separate."
@@ -1591,7 +1591,7 @@
       "status": "FIXED",
       "owner": "Engineering + safety operations",
       "source": "backend/market-fleet.js; backend/server.js; backend/market-fleet.test.js",
-      "sourceSha": "4336d3c3b464da22bb64ba1bcfdf83cda3416965",
+      "sourceSha": "0477d2d2d1ccb1afa745a4d3ee3ccd844e6efff1",
       "evidence": [
         "The final paid Operator on-duty transaction now reads `account_closures/{uid}` alongside market admission before writing available=true; the development path uses the same protected transaction. A before-commit fake writes a closing tombstone and forces a retry/refusal.",
         "The Operator online endpoint cheaply checks the account_closures marker before the external Connect status request, then rechecks it inside the final production or test-mode Firestore duty transaction."
@@ -1599,7 +1599,7 @@
       "candidatePrs": [
         59
       ],
-      "implementingCommit": null,
+      "implementingCommit": "0477d2d2d1ccb1afa745a4d3ee3ccd844e6efff1",
       "verification": [
         "Targeted fake-Firestore concurrency, backend lint and syntax pass; exact-commit CI and live Firestore/device are pending.",
         "Final working-tree npm run check PASS after Operator closing preflight and transactional renewal fence; candidate log sha256 9c5fce024907b3ec284de33e5d3694106fe53c74c666c59cca30f8a344f07f02. Live Firebase and real devices still untested."
@@ -1613,14 +1613,14 @@
       "status": "FIXED",
       "owner": "engineering / Operations",
       "source": "app/operator/index.tsx; src/state/OperatorContext.tsx; backend/eligibility.js; backend/acceptance.test.js",
-      "sourceSha": "0477d2d2d1ccb1afa745a4d3ee3ccd844e6efff1",
+      "sourceSha": "bec2e1ed7185cad5dafd186099aaaaffa6736092",
       "evidence": [
         "app/operator/index.tsx; src/state/OperatorContext.tsx; backend/eligibility.js; backend/acceptance.test.js"
       ],
       "candidatePrs": [
         59
       ],
-      "implementingCommit": null,
+      "implementingCommit": "bec2e1ed7185cad5dafd186099aaaaffa6736092",
       "verification": [
         "Operator server-first acceptance and paid same-Operator replay targeted tests passed."
       ],
@@ -1633,14 +1633,14 @@
       "status": "FIXED",
       "owner": "engineering / Operations",
       "source": "app/operator/commissioned.tsx; app/operator/economics.tsx; app/operator/insurance.tsx; src/i18n/*.ts",
-      "sourceSha": "0477d2d2d1ccb1afa745a4d3ee3ccd844e6efff1",
+      "sourceSha": "bec2e1ed7185cad5dafd186099aaaaffa6736092",
       "evidence": [
         "app/operator/commissioned.tsx; app/operator/economics.tsx; app/operator/insurance.tsx; src/i18n/*.ts"
       ],
       "candidatePrs": [
         59
       ],
-      "implementingCommit": null,
+      "implementingCommit": "bec2e1ed7185cad5dafd186099aaaaffa6736092",
       "verification": [
         "TypeScript, five-language i18n and targeted UI source invariants passed; no signed-device usability study."
       ],
@@ -1653,14 +1653,14 @@
       "status": "FIXED",
       "owner": "engineering / Operations",
       "source": "backend/voice.js; backend/server.js; backend/voice.test.js; src/state/VoiceContext.tsx",
-      "sourceSha": "0477d2d2d1ccb1afa745a4d3ee3ccd844e6efff1",
+      "sourceSha": "bec2e1ed7185cad5dafd186099aaaaffa6736092",
       "evidence": [
         "backend/voice.js; backend/server.js; backend/voice.test.js; src/state/VoiceContext.tsx"
       ],
       "candidatePrs": [
         59
       ],
-      "implementingCommit": null,
+      "implementingCommit": "bec2e1ed7185cad5dafd186099aaaaffa6736092",
       "verification": [
         "Targeted signed-callback and old/new assignment behavioral tests passed with synthetic Twilio tokens."
       ],
@@ -1673,14 +1673,14 @@
       "status": "FIXED",
       "owner": "engineering / Operations",
       "source": "backend/scheduleclock.js; backend/server.js; app/schedule.tsx; src/backend/markets.ts; backend/scheduleclock.test.js",
-      "sourceSha": "bec2e1ed7185cad5dafd186099aaaaffa6736092",
+      "sourceSha": "f4c1420491252cf5e0626a9b4d4c259073e06090",
       "evidence": [
         "Market bootstrap now supplies configured region IANA timezone; one shared wall-clock resolver returns exactly one valid instant or refuses DST gap/overlap. Server compares the submitted date/time/zone and atMs before route/fare provider lookup; app uses pickup date, not device date; five-language booking/outage copy."
       ],
       "candidatePrs": [
         59
       ],
-      "implementingCommit": null,
+      "implementingCommit": "f4c1420491252cf5e0626a9b4d4c259073e06090",
       "verification": [
         "Targeted scheduleclock DST/cross-zone test PASS; existing scheduled-worker and Home-market tests PASS; npm run typecheck, i18n (1,131 keys in five languages), backend:lint and git diff --check PASS on working tree. Native device timezone/proxy, real GTFS/payment and final exact-SHA CI not yet tested."
       ],
@@ -1693,14 +1693,14 @@
       "status": "FIXED",
       "owner": "engineering / payments",
       "source": "backend/server.js; backend/scheduledidentity.js; src/backend/scheduled.ts; app/schedule.tsx; backend/scheduledidentity.test.js",
-      "sourceSha": "f4c1420491252cf5e0626a9b4d4c259073e06090",
+      "sourceSha": "49b4a6713506eec82567885ed5d969818f813699",
       "evidence": [
         "Server now requires positive displayed all-in cents exactly equal to its fresh authoritative fare before saving; deterministic owner/instant/route/class/party ID returns the existing saved record before provider pricing on a retry. The creation transaction rechecks prior identity and account shutdown. Mobile disables $0 quotes, sends the displayed amount, and shows reservation-not-confirmed instead of silent success."
       ],
       "candidatePrs": [
         59
       ],
-      "implementingCommit": null,
+      "implementingCommit": "49b4a6713506eec82567885ed5d969818f813699",
       "verification": [
         "Targeted scheduledidentity.test.js, scheduleclock.test.js, sched.test.js 27/27, TypeScript, 1,132-key five-language i18n, backend lint, diff whitespace passed on candidate tree. Provider charge/retry and exact final SHA tests not yet performed."
       ],
@@ -1713,7 +1713,7 @@
       "status": "FIXED",
       "owner": "engineering / Operator Relations",
       "source": "app/operator/economics.tsx; app/operator/qualify.tsx; app/operator/insurance.tsx; app/operator/commissioned.tsx; backend/insurance-jurisdictions.js; backend/transientstate.test.js; src/i18n/*.ts",
-      "sourceSha": "49b4a6713506eec82567885ed5d969818f813699",
+      "sourceSha": "646a8c577593f513e4b183d12131831438a9e3f3",
       "evidence": [
         "Actual screen puts canonical 99%/1% Travel Fare arithmetic, separate Traveler Platform Fee, $1,000/$5,000 derived examples and optional Operator-entered weekly/monthly/annual Travel Fare retained before qualification spend; no net-income or demand promise.",
         "Qualification previews third-party insurance/screening/vehicle costs and review/payout sequence. Insurance presents live document/continuing-status/expiry and exact refusal or process exception first; renewal upload remains available within 30 days. Four authorities (Florida law, platform procurement policy, licensed broker/carrier, American Rider verification) are distinct. Own-broker/carrier path precedes optional source list; broker script can be shared; continuing-status source type is explicitly selected.",
@@ -1723,7 +1723,7 @@
       "candidatePrs": [
         59
       ],
-      "implementingCommit": null,
+      "implementingCommit": "646a8c577593f513e4b183d12131831438a9e3f3",
       "verification": [
         "Focused economics 77 tests, insurance monitoring, navigation state and transient Operator source invariants passed; TypeScript, five-language 1,149-key i18n, backend lint and diff whitespace passed. No signed-device screen/VoiceOver/TalkBack or live insurer/provider proof."
       ],

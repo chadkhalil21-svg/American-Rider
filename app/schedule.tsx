@@ -66,6 +66,7 @@ export default function Schedule() {
   // Once scheduled, the demo shows its Travel Scheduled splash before returning home.
   const [doneInfo, setDoneInfo] = useState<SchedInfo | null>(null);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(false);
   const [pickupZone, setPickupZone] = useState<string | null>(null);
   const [pickedDate, setPickedDate] = useState<string | null>(null);
   const lat = ride.departure.lat;
@@ -161,7 +162,7 @@ export default function Schedule() {
   };
   // Only fully blocked when EVERY slot in this period has passed; if just the
   // selected slot passed, the effect below moves the selection forward.
-  const schedInvalid = !resolved.ok || resolved.atMs <= Date.now() ||
+  const schedInvalid = !resolved.ok || resolved.atMs <= Date.now() || ride.travelerTotal <= 0 ||
     (isToday && customState !== 'ok' && allSlotsPassed);
 
   useEffect(() => {
@@ -451,6 +452,7 @@ export default function Schedule() {
             somewhere permanent, not a reassurance beside the amount. */}
       </Card>
 
+      {saveError ? <Text style={styles.splashWarn}>{t('traveler.schedSaveReview')}</Text> : null}
       <PrimaryButton
         label={t('traveler.scheduleTravel')}
         disabled={schedInvalid || saving}
@@ -467,9 +469,11 @@ export default function Schedule() {
             pickupTimeZone: pickupZone,
           };
           setSaving(true);
+          setSaveError(false);
           const saved = await ride.scheduleRide(info);
           setSaving(false);
           if (saved) setDoneInfo(info);
+          else setSaveError(true);
         }}
         style={{ marginTop: 'auto' }}
       />

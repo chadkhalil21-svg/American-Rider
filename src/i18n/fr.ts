@@ -982,6 +982,7 @@ export default {
     day: 'Jour',
     pickupTime: 'Heure de Prise en Charge',
     enterATime: 'Saisissez une heure, par exemple 6:45.',
+    schedSaveReview: 'La réservation n’est pas confirmée. Le prix ou le service a peut-être changé. Revenez à la confirmation du trajet pour obtenir un nouveau prix, puis réessayez.',
     schedToday: 'Aujourd’hui',
     schedTomorrow: 'Demain',
     schedPickDay: 'Choisir un jour',

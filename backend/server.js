@@ -80,6 +80,7 @@ const { searchPlaces } = require('./place-search');
 const { ready: voiceReady, reason: voiceReason, accessToken: voiceToken,
   connectTwiml, callerForRide, verifiedTwilioWebhook } = require('./voice');
 const { resolvePickupWall } = require('./scheduleclock');
+const { scheduledIdentity } = require('./scheduledidentity');
 const { REGIONS, defaultRegion } = require('./regions');
 const { presenceStale, coverageLapsed, matchOperator, etaMinutes } = require('./matching');
 const { encodeGeohash, nearbyOperatorCandidates } = require('./geooperators');
@@ -3402,6 +3403,26 @@ app.post('/travel/schedule', requireAuth, LIMITS.dispatch, requireFreshAuth, req
   if (atMs <= Date.now()) {
     return res.status(400).json({ error: 'Scheduled Travel must be set for a future time.', code: 'scheduled_time_required' });
   }
+  const partyResult = await normalizeParty(b, { uid: req.uid, name: req.name || b.bookerName || b.travelerName || '' });
+  if (!partyResult.ok) return res.status(400).json({ error: partyResult.error, code: partyResult.code });
+  const party = partyResult.party;
+  const clientAmount = Number(b.costCents);
+  if (!Number.isSafeInteger(clientAmount) || clientAmount <= 0) {
+    return res.status(400).json({error:'A displayed all-in quote is required.',code:'quote_required'});
+  }
+  const identity = scheduledIdentity({uid:req.uid,atMs,pickup,destination:destinationPoint,
+    travelClass:b.travelClass,party});
+  const reservation = db.collection('scheduled_rides').doc(identity.id);
+  try {
+    const prior = await reservation.get();
+    if (prior.exists) {
+      const existing = prior.data();
+      if (existing.travelerUid !== req.uid || existing.requestFingerprint !== identity.fingerprint ||
+          existing.consentCents !== clientAmount) return res.status(409).json({code:'reservation_conflict'});
+      if (existing.status === 'cancelled') return res.status(409).json({code:'reservation_cancelled'});
+      return res.json({id:reservation.id,...existing});
+    }
+  } catch { return res.status(503).json({code:'reservation_check_unavailable'}); }
   const priced = await authoritativeFare({
     body: { pickup, dest: destinationPoint, destination: b.dest, travelClass: b.travelClass },
     uid: req.uid, email: req.email, db, cardCountryFor: defaultCardCountry,
@@ -3417,11 +3438,11 @@ app.post('/travel/schedule', requireAuth, LIMITS.dispatch, requireFreshAuth, req
   if (priced.tollStatus === 'unknown') {
     return res.status(503).json({ error: 'Toll cost could not be verified for this route.', code: 'toll_unavailable' });
   }
-  const partyResult = await normalizeParty(b, { uid: req.uid, name: req.name || b.bookerName || b.travelerName || '' });
-  if (!partyResult.ok) return res.status(400).json({ error: partyResult.error, code: partyResult.code });
-  const party = partyResult.party;
+  if (priced.travelerPays !== clientAmount) return res.status(409).json({
+    error:'The price changed. Review the current quote before making a reservation.',code:'quote_changed',
+  });
   try {
-    const ref = db.collection('scheduled_rides').doc();
+    const ref = reservation;
     const tripNo = travelNumberFor(ref.id, pickup);
     const record = {
       travelerUid: String(req.uid), travelerName: party.travelerName.slice(0, 60), party,
@@ -3433,6 +3454,7 @@ app.post('/travel/schedule', requireAuth, LIMITS.dispatch, requireFreshAuth, req
       destinationLng: Number.isFinite(destinationPoint.lng) ? destinationPoint.lng : null,
       travelClass: String(b.travelClass || 'Standard'), atMs, pickupDate: b.pickupDate, pickupTimeZone: timeZone,
       travelCostCents: priced.travelCostCents, costCents: priced.travelerPays,
+      consentCents: clientAmount, requestFingerprint: identity.fingerprint,
       miles: priced.miles, governmentFeeCents: priced.governmentFeeCents,
       tollCents: Math.max(0, Number(priced.tollCents) || 0),
       feeLines: priced.feeLines, cardCountry: priced.cardCountry, tripNo,
@@ -3440,11 +3462,15 @@ app.post('/travel/schedule', requireAuth, LIMITS.dispatch, requireFreshAuth, req
     };
     const created=await db.runTransaction(async(tx)=>{
       const account=await tx.get(db.collection('account_closures').doc(String(req.uid)));
+      const previous=await tx.get(ref);
       if(account.exists&&account.data()?.closingAt)return false;
+      if(previous.exists) return previous.data();
       tx.create(ref,record);return true;
     });
     if(!created)return res.status(409).json({code:'account_closing',error:'Account closure is in progress.'});
-    res.json({ id: ref.id, ...record });
+    if(created!==true&&(created.travelerUid!==req.uid || created.requestFingerprint!==identity.fingerprint ||
+        created.consentCents!==clientAmount || created.status==='cancelled')) return res.status(409).json({code:'reservation_conflict'});
+    res.json({ id: ref.id, ...(created===true?record:created) });
   } catch (e) {
     res.status(502).json({ error: e.message });
   }

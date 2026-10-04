@@ -975,6 +975,7 @@ export default {
     day: 'Giorno',
     pickupTime: 'Orario di Ritiro',
     enterATime: 'Inserisca un orario, per esempio 6:45.',
+    schedSaveReview: 'La prenotazione non è confermata. Il prezzo o il servizio potrebbero essere cambiati. Torna alla conferma del viaggio per un nuovo preventivo, poi riprova.',
     schedToday: 'Oggi',
     schedTomorrow: 'Domani',
     schedPickDay: 'Scegli un giorno',

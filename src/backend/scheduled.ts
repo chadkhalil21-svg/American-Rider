@@ -91,6 +91,7 @@ export async function saveScheduledRide(
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({
         ...clean,
+        costCents: Math.round(info.cost * 100),
         travelerName: info.party?.travelerName || auth.currentUser?.displayName || '',
         bookerName: auth.currentUser?.displayName || '',
         partyMode: info.party?.mode || 'self',

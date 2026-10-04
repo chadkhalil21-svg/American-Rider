@@ -3,7 +3,7 @@
   "branch": "integrate/commercial-completion-2026-10-03",
   "baseSha": "f749644c862e1da128359ddf2693a95506b9b52a",
   "candidateSha": "551b72db40db360029b90864febd443430ddb1f8",
-  "generatedAt": "2026-10-04T22:59:34.709385+00:00",
+  "generatedAt": "2026-10-04T23:02:24.870104+00:00",
   "allowedStatuses": [
     "FIXED",
     "VERIFIED ALREADY FIXED",
@@ -1685,6 +1685,26 @@
         "Targeted scheduleclock DST/cross-zone test PASS; existing scheduled-worker and Home-market tests PASS; npm run typecheck, i18n (1,131 keys in five languages), backend:lint and git diff --check PASS on working tree. Native device timezone/proxy, real GTFS/payment and final exact-SHA CI not yet tested."
       ],
       "releaseCondition": "Deploy indexed market bootstrap and scheduler; test signed iOS/Android calendar/pickup-timezone behavior, DST transitions, old-client refusal, charged scheduled delivery, refunds and consent. Recurring standing authorization remains a separate legal/payment/operations gate."
+    },
+    {
+      "id": "F088",
+      "category": "scheduled travel / money authority",
+      "title": "Scheduled reservation could exceed the displayed fare and a lost HTTP response could create a second off-session charge candidate",
+      "status": "FIXED",
+      "owner": "engineering / payments",
+      "source": "backend/server.js; backend/scheduledidentity.js; src/backend/scheduled.ts; app/schedule.tsx; backend/scheduledidentity.test.js",
+      "sourceSha": "f4c1420491252cf5e0626a9b4d4c259073e06090",
+      "evidence": [
+        "Server now requires positive displayed all-in cents exactly equal to its fresh authoritative fare before saving; deterministic owner/instant/route/class/party ID returns the existing saved record before provider pricing on a retry. The creation transaction rechecks prior identity and account shutdown. Mobile disables $0 quotes, sends the displayed amount, and shows reservation-not-confirmed instead of silent success."
+      ],
+      "candidatePrs": [
+        59
+      ],
+      "implementingCommit": null,
+      "verification": [
+        "Targeted scheduledidentity.test.js, scheduleclock.test.js, sched.test.js 27/27, TypeScript, 1,132-key five-language i18n, backend lint, diff whitespace passed on candidate tree. Provider charge/retry and exact final SHA tests not yet performed."
+      ],
+      "releaseCondition": "Verify real user-consented quote versus reroute, lost response and duplicate request on devices with a test/live provider; align scheduled failed-charge, delivery and refund operations before launch."
     }
   ],
   "features": [
@@ -1724,11 +1744,12 @@
       "name": "Courier/Packages",
       "linkedFinding": "F024",
       "objective": "Complete and verify if technically, economically, legally and operationally supportable.",
-      "launchState": "INTENTIONALLY WITHHELD FROM LAUNCH",
+      "launchState": "INTENTIONAL POST-LAUNCH DEFERRAL",
       "attemptedWork": [
-        "Reviewed mobile/server source and provider inventory: no parcel booking, chain of custody, prohibited-goods taxonomy, proof of pickup/delivery, item limits or parcel insurance route exists; no unsupported courier control was opened."
+        "Reviewed mobile/server source and provider inventory: no parcel booking, chain of custody, prohibited-goods taxonomy, proof of pickup/delivery, item limits or parcel insurance route exists; no unsupported courier control was opened.",
+        "Founder explicitly deferred Courier/Packages on 2026-10-04; no delivery or custody subsystem was introduced or exposed. Existing passenger Travel must not be relabeled or used for packages."
       ],
-      "withholdingReason": "Launching a parcel service without insured custody, restricted-goods and identity controls, package pricing, recipient handoff/claims and physical chain-of-custody drills is disproportionate safety and operational risk; carrier and business policy decisions are external.",
+      "withholdingReason": "Explicitly deferred by founder for this commission because the remaining execution capacity cannot responsibly build and verify a distinct custody/delivery subsystem. Parcel insurance, restricted goods, price/tax authority, recipient verification, tamper-evident chain-of-custody, loss claims and physical handoff drills remain unresolved. No Courier sale, route, assignment or collection is enabled.",
       "releaseLaterRequirements": [
         "Carrier/broker parcel and custody coverage plus prohibited-item/legal policy",
         "Build separate quoted courier lifecycle, recipient identity and tamper-evident custody/claim records",
@@ -1745,7 +1766,8 @@
         "Repaired due-ordered scan and index, impossible route predicate, staged deterministic pre-charge Travel, Stripe amount/owner binding, transactional offer and unattended orphan/refund recovery; local scheduler and webhook tests pass.",
         "Pre-charge county admission and same-document atomic Operator assignment added locally; live off-session payment/Firestore and staffing proof remain outstanding.",
         "Account closure now serializes its reserved-trip cancellation with the scheduler’s claim and blocks closure during dispatching or a charge/refund obligation; actual off-session testing remains necessary.",
-        "Client and server now validate each chosen pickup-local IANA date/time as exactly one unambiguous UTC instant and store zone/date. DST gaps and repeated hours refuse scheduling; targeted tests pass. Real device/proxy/provider drills remain external."
+        "Client and server now validate each chosen pickup-local IANA date/time as exactly one unambiguous UTC instant and store zone/date. DST gaps and repeated hours refuse scheduling; targeted tests pass. Real device/proxy/provider drills remain external.",
+        "Server now enforces exact displayed all-in cents and deterministic one-reservation identity before future off-session charge. Lost-response retries return the same saved reservation; a failed/changed fare stays unconfirmed. Targeted tests pass."
       ],
       "withholdingReason": "Future off-session charge authority, provider credential/mandate evidence, live scheduled fare/toll repricing, index deployment and staffed charge/failed-offer recovery are unverified.",
       "releaseLaterRequirements": [
@@ -1763,7 +1785,7 @@
         "Traced reservation API, scheduled due sweep and user controls; no recurrence-series object, occurrence idempotency, bounded horizon/holiday handling or series-level pause/cancel/refund control exists. Did not disguise a one-off schedule as recurring.",
         "Audited existing scheduled single-occurrence payment authorization and local-time implementation. Automatic standing variable off-session charges are not enabled without a separately approved recurring mandate; only a separately confirmed scheduled Travel is currently source-supported."
       ],
-      "withholdingReason": "A standing mandate for repeated off-session variable charges, approved notice/price-change terms, series cancellation/entitlement semantics and operational capacity are unresolved human/legal/payment-provider decisions. Creating indefinite charges without these would be disproportionate financial and consumer risk.",
+      "withholdingReason": "Deliberate post-launch capability: a recurring standing authorization for repeated off-session charges and variable fares, notice/change limits, cancellations and support remains a material human/legal/payment-provider decision. Existing single-occurrence scheduled Travel does not imply consent to an indefinite series.",
       "releaseLaterRequirements": [
         "Approve explicit series consent, recurrence frequency/horizon and per-occurrence pricing/change notice",
         "Build and test bounded series plus per-occurrence idempotent reservations and cancel/pause/refund controls",

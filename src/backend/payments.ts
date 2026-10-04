@@ -192,8 +192,9 @@ export async function payForRide(opts: {
     paymentIntentClientSecret: intent.clientSecret,
     customerId: intent.customerId,
     customerEphemeralKeySecret: intent.ephemeralKeySecret,
-    // Remember the card for the next travel.
-    allowsDelayedPaymentMethods: true,
+    // An Operator cannot be offered a Travel until Stripe confirms success. ACH and other
+    // delayed methods need a separately designed authorization/scheduling policy.
+    allowsDelayedPaymentMethods: false,
     // Apple Pay is offered inside the sheet where the device and the merchant record allow it.
     ...(Platform.OS === 'ios'
       ? { applePay: { merchantCountryCode: 'US' } }

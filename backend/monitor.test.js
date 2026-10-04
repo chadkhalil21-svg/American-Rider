@@ -9,8 +9,10 @@ function makeDb(seed) {
     __data: data,
     collection: (col) => ({
       doc: (id) => ({
+        __col: col, __id: id,
         async get() { const d = data[col]?.[id]; return { exists: !!d, id, data: () => JSON.parse(JSON.stringify(d)) }; },
         async set(f, o) { data[col] = data[col] || {}; data[col][id] = o?.merge ? { ...(data[col][id] || {}), ...f } : { ...f }; },
+        async update(f) { data[col][id] = { ...data[col][id], ...f }; },
       }),
       where: (field, op, val) => {
         const rowsFor = () =>
@@ -32,6 +34,10 @@ function makeDb(seed) {
         return { docs: Object.entries(data[col] || {})
           .map(([id, r]) => ({ id, data: () => JSON.parse(JSON.stringify(r)) })) };
       },
+    }),
+    runTransaction: (fn) => fn({
+      get: (ref) => ref.get(),
+      update: (ref, fields) => { data[ref.__col][ref.__id] = { ...data[ref.__col][ref.__id], ...fields }; },
     }),
   };
   return { db, data };
@@ -281,6 +287,7 @@ const check = (l, c, d) => results.push({ l, ok: !!c, d });
     dep: 'Brickell', dest: 'Miami International Airport', status: 'assigned',
     travelClass: 'Standard', createdAt: now - 5 * MIN,
     notifiedOperatorAt: now - 5 * MIN,           // already asked, and did not answer
+    paymentIntentId: 'pi_r1', paidAt: now - 5 * MIN, costCents: 2350,
     pickupLat: P.lat, pickupLng: P.lng, ...o,
   });
   // THE FIXTURES CARRY A CURRENT DISCLOSURE. Dispatch has filtered on disclosureVersion since
@@ -292,6 +299,11 @@ const check = (l, c, d) => results.push({ l, ok: !!c, d });
            onlineAt: now, classes: ['Standard'], insuranceExpiry: '2099-01-01',
            disclosureVersion: DISCLOSURE_VERSION, commissioned: true },
   };
+  {
+    const h = makeDb({ rides: { r1: assigned({ paymentIntentId: null }) }, operators: freeOperator });
+    const rep = await inject(h.db).sweepAssignments({ now });
+    check('an unpaid Travel is never reoffered', rep.stranded.includes('r1') && !rep.reoffered.length);
+  }
 
   // 15. A fleet flag alone is not qualification. The replacement has no authoritative user
   // record in this fixture, so the hardened sweep must refuse it rather than re-offer blindly.

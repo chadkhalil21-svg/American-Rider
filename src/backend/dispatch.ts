@@ -15,6 +15,7 @@ import {
 } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { PAYMENT_SERVER_URL } from '../config';
+import { t } from '../i18n';
 import { fetchPaymentConfig } from './payments';
 
 export type Operator = {
@@ -173,92 +174,57 @@ export async function returnOperator(args: {
 //
 // The demonstration fleet lives on the server too (backend/server.js, /travel/dispatch), so
 // this file no longer holds operator records of any kind.
-export async function dispatchRide(opts: {
+export type PrepareOptions = {
+  bookingKey: string;
   pickup: { lat: number; lng: number };
-  destinationPoint?: { lat: number; lng: number } | null;
-  dep: string;
-  dest: string;
-  cls: string;
-  /** The travel's road distance in miles — routed when the map had a route, else the fare
-   *  model's estimate. Fla. Stat. 627.748(6) requires the receipt to state it. */
-  /** Government fees inside the price (fenced by the server from the same coordinates). */
+  destinationPoint: { lat: number; lng: number };
+  dep: string; dest: string; cls: string;
   journeyNo?: string | null;
-  /** Operators who have already declined this travel. Never offered it twice. */
-  excludeIds?: string[];
   party?: { mode: 'self' | 'other_adult' | 'teen'; travelerName?: string; familyLinkId?: string };
   cabinPreferences?: {
-    climate: 'Cool' | 'Moderate' | 'Warm';
-    music: 'None' | 'Traveler Choice';
-    quiet: boolean;
-    charging: boolean;
-    luggage: boolean;
+    climate: 'Cool' | 'Moderate' | 'Warm'; music: 'None' | 'Traveler Choice';
+    quiet: boolean; charging: boolean; luggage: boolean;
   };
-}): Promise<MatchedOp | null> {
-  // Never dispatch without a signed-in traveler: the server writes the travel against the
-  // authenticated uid, and an "anon" travel could not be read back by anyone.
-  const uid = auth.currentUser?.uid;
-  if (!uid) return null;
+};
 
+async function travelRequest(path: string, body: object): Promise<any> {
   const token = await auth.currentUser?.getIdToken().catch(() => null);
-  const res = await fetch(`${PAYMENT_SERVER_URL}/travel/dispatch`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify({
-      pickup: opts.pickup,
-      destinationPoint: opts.destinationPoint ?? null,
-      dep: opts.dep,
-      dest: opts.dest,
-      cls: opts.cls,
-      journeyNo: opts.journeyNo ?? null,
-      excludeIds: opts.excludeIds ?? [],
-      travelerName: opts.party?.travelerName || auth.currentUser?.displayName || '',
-      bookerName: auth.currentUser?.displayName || '',
-      partyMode: opts.party?.mode || 'self',
-      familyLinkId: opts.party?.familyLinkId,
-      cabinPreferences: opts.cabinPreferences ?? null,
-    }),
+  if (!token) throw new Error(t('traveler.errGeneric'));
+  const response = await fetch(`${PAYMENT_SERVER_URL}${path}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
   });
-
-  // A SERVER THAT CANNOT BE REACHED IS NOT AN EMPTY FLEET. The two must not render the same:
-  // the caller shows a retry for one and a wait for the other, which is the same distinction
-  // loadFleet draws with getDocsFromServer. Throwing is how runDispatch learns the difference.
-  if (!res.ok) {
-    let reason = `dispatch failed (${res.status})`;
-    try {
-      const body = await res.json();
-      if (body?.error) reason = String(body.error);
-    } catch {
-      /* the status is the whole message */
-    }
-    throw new Error(reason);
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(String(result?.error || `Travel request failed (${response.status})`)) as Error & { code?: string };
+    error.code = typeof result?.code === 'string' ? result.code : undefined;
+    throw error;
   }
+  return result;
+}
 
-  const out = (await res.json()) as {
-    rideId?: string;
-    tripNo?: string;
-    matched: {
-      id: string; name: string; car: string; plate: string;
-      lat: number; lng: number; etaMin: number; miles: number; demo?: boolean;
-    } | null;
-  };
-  // Nobody free. An ordinary answer with a screen of its own, not a failure.
-  if (!out.matched || !out.rideId) return null;
+/** One keyed, authoritative fare/party/geometry document, before PaymentSheet opens. */
+export async function prepareRide(opts: PrepareOptions): Promise<{
+  rideId: string; tripNo: string; amountCents: number; status: string;
+}> {
+  return travelRequest('/travel/prepare', {
+    ...opts, journeyNo: opts.journeyNo ?? null,
+    travelerName: opts.party?.travelerName || auth.currentUser?.displayName || '',
+    bookerName: auth.currentUser?.displayName || '',
+    partyMode: opts.party?.mode || 'self', familyLinkId: opts.party?.familyLinkId,
+  });
+}
 
+/** Retry only this exact already-paid Travel: never create another booking or charge here. */
+export async function dispatchRide(rideId: string): Promise<MatchedOp | null> {
+  const out = await travelRequest('/travel/dispatch', { rideId });
+  if (!out.matched) return null;
   return {
-    id: out.matched.id,
-    demo: !!out.matched.demo,
-    name: out.matched.name,
-    car: out.matched.car,
-    plate: out.matched.plate,
-    etaMin: out.matched.etaMin,
-    miles: +out.matched.miles.toFixed(2),
-    rideId: out.rideId,
-    tripNo: out.tripNo,
-    lat: out.matched.lat,
-    lng: out.matched.lng,
+    id: out.matched.id, demo: !!out.matched.demo,
+    name: out.matched.name, car: out.matched.car, plate: out.matched.plate,
+    etaMin: out.matched.etaMin, miles: Number(out.matched.miles) || 0,
+    rideId: out.rideId, tripNo: out.tripNo,
+    lat: out.matched.lat, lng: out.matched.lng,
   };
 }
 
@@ -298,6 +264,9 @@ export type RideRecord = {
   totalCents: number;
   status: string;
   createdAt: number;
+  paymentIntentId?: string;
+  paidAt?: number;
+  refundPending?: boolean;
   /** Road miles recorded at dispatch; absent on travels before 9 Sept 2026. */
   miles?: number;
   /** Stamped by the operator's app when the traveler boards and when the travel ends. */
@@ -343,6 +312,9 @@ export async function fetchMyRides(): Promise<RideRecord[]> {
         totalCents: x.costCents ?? 0,
         status: x.status ?? '',
         createdAt: x.createdAt ?? 0,
+        paymentIntentId: typeof x.paymentIntentId === 'string' ? x.paymentIntentId : undefined,
+        paidAt: typeof x.paidAt === 'number' ? x.paidAt : undefined,
+        refundPending: x.refundPending === true,
         miles: typeof x.miles === 'number' ? x.miles : undefined,
         onboardAt: typeof x.onboardAt === 'number' ? x.onboardAt : undefined,
         completedAt: typeof x.completedAt === 'number' ? x.completedAt : undefined,
@@ -418,13 +390,29 @@ export function watchRide(
   // Route monitoring's reading of this journey — a known delay it can explain, or a question
   // for the traveler. Optional so existing callers are unaffected.
   onMonitor?: (m: TravelMonitor | null) => void,
+  onAssignment?: (matched: MatchedOp | null) => void,
 ): () => void {
   if (!rideId) return () => {};
   try {
     return onSnapshot(
       doc(db, 'rides', rideId),
       (snap) => {
-        const data = snap.data() as { status?: unknown; monitor?: TravelMonitor } | undefined;
+        const data = snap.data() as {
+          status?: unknown; monitor?: TravelMonitor; releasedAt?: number;
+          operatorId?: string; operatorName?: string; operatorCar?: string; operatorPlate?: string;
+          operatorLat?: number; operatorLng?: number; operatorEtaMin?: number;
+          operatorMiles?: number; operatorDemo?: boolean; tripNo?: string;
+        } | undefined;
+        if (onAssignment) {
+          onAssignment(data?.operatorId && !data.releasedAt &&
+            ['assigned', 'accepted', 'arrived', 'onboard'].includes(String(data.status)) ? {
+            id: data.operatorId, demo: data.operatorDemo === true,
+            name: data.operatorName || '', car: data.operatorCar || '', plate: data.operatorPlate || '',
+            lat: Number(data.operatorLat), lng: Number(data.operatorLng),
+            etaMin: Number(data.operatorEtaMin) || 0, miles: Number(data.operatorMiles) || 0,
+            rideId, tripNo: data.tripNo,
+          } : null);
+        }
         const s = data?.status;
         if (typeof s === 'string' && s) onStatus(s);
         onMonitor?.(data?.monitor ?? null);

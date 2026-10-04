@@ -601,6 +601,7 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
       inboxRef.current.find(
         (x) =>
           x.status === 'assigned' &&
+          !x.releasedAt &&
           (lapsedRef.current.get(x.rideId) ?? 0) <= Date.now() - LAPSE_QUIET_MS,
       ),
     [],
@@ -641,7 +642,7 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
     // Nothing offerable now. Is anything merely waiting out its quiet period?
     const now = Date.now();
     const waking = inboxRef.current
-      .filter((x) => x.status === 'assigned' && lapsedRef.current.has(x.rideId))
+      .filter((x) => x.status === 'assigned' && !x.releasedAt && lapsedRef.current.has(x.rideId))
       .map((x) => (lapsedRef.current.get(x.rideId) as number) + LAPSE_QUIET_MS)
       .filter((at) => at > now);
     if (!waking.length) return;

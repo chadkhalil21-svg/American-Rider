@@ -785,6 +785,8 @@ export default {
     whereTo: 'Arrivée',
     cancelThisTravel: 'Annuler ce trajet ?',
     notCharged: 'Ce trajet ne vous a pas été facturé.',
+    chargedAwaitingOperator: 'Le paiement a été confirmé, mais aucun Operator n’est affecté. Vous pouvez réessayer ou annuler et demander un remboursement intégral.',
+    paymentStatusUnverified: 'Le statut du paiement n’est pas encore confirmé. Annulez le Voyage pour que le serveur vérifie le paiement avant votre départ.',
     keepTravel: 'Conserver le trajet',
     yesCancel: 'Oui, annuler',
     cancelTravel: 'Annuler le Trajet',

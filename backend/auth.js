@@ -93,6 +93,23 @@ async function requireAuth(req, res, next) {
  * A bad or expired token is treated as no token. This route reveals nothing, so there is
  * nothing to refuse; it simply falls back to the anonymous answer.
  */
+/** A valid local JWT does not prove the account remains enabled or its refresh tokens active.
+ * Only money/transport mutations use this extra provider round-trip; emergency access remains
+ * reachable without an Admin service dependency. */
+async function requireFreshAuth(req, res, next) {
+  const { adminStatus } = require('./firebase-admin');
+  if (!adminStatus().ok) return res.status(503).json({ error: 'Account verification unavailable', code: 'account_verification_unavailable' });
+  try {
+    const token = String(req.headers.authorization || '').replace(/^Bearer /, '');
+    const { getAuth } = require('firebase-admin/auth');
+    const decoded = await getAuth().verifyIdToken(token, true);
+    if (String(decoded.uid) !== String(req.uid)) throw new Error('identity mismatch');
+    next();
+  } catch {
+    return res.status(401).json({ error: 'Account sign-in was revoked or disabled', code: 'account_revoked' });
+  }
+}
+
 async function attachAuth(req, res, next) {
   try {
     const header = req.headers.authorization || '';
@@ -133,4 +150,4 @@ function requireVerifiedEmail(req, res, next) {
   });
 }
 
-module.exports = { verifyIdToken, requireAuth, attachAuth, requireVerifiedEmail };
+module.exports = { verifyIdToken, requireAuth, requireFreshAuth, attachAuth, requireVerifiedEmail };

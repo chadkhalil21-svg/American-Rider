@@ -779,6 +779,8 @@ export default {
     whereTo: 'Ankunft',
     cancelThisTravel: 'Diese Fahrt stornieren?',
     notCharged: 'Diese Fahrt wurde Ihnen nicht berechnet.',
+    chargedAwaitingOperator: 'Die Zahlung wurde bestätigt, aber es ist noch kein Operator zugewiesen. Sie können es erneut versuchen oder stornieren und eine vollständige Erstattung anfordern.',
+    paymentStatusUnverified: 'Der Zahlungsstatus ist noch nicht bestätigt. Stornieren Sie die Fahrt, damit der Server die Zahlung vor dem Verlassen klärt.',
     keepTravel: 'Fahrt behalten',
     yesCancel: 'Ja, stornieren',
     cancelTravel: 'Fahrt Stornieren',

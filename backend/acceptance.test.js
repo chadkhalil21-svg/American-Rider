@@ -179,7 +179,9 @@ const accept = (db, extra = {}) => acceptOffer({ db, uid: 'op', rideId: 'r1', ex
   const monitor = fs.readFileSync(path.join(__dirname, 'monitor.js'), 'utf8');
   check('the re-offer sweep does not wait out the window on a released travel',
     /since < ANSWER_WINDOW_SEC && !ride\.releasedAt/.test(monitor));
-  check('a re-offer clears the release', /releasedAt: null/.test(monitor));
+  const booking = fs.readFileSync(path.join(__dirname, 'booking.js'), 'utf8');
+  check('a re-offer clears the release in the paid transactional assignment',
+    /assignPaidTravel\(/.test(monitor) && /releasedAt: null/.test(booking) && /tx\.update\(ref, fields\)/.test(booking));
 
   const online = (server.match(/app\.post\('\/operator\/online'[\s\S]*?\n\}\);/) || [''])[0];
   check('/operator/online stamps screeningCheckedAt ONLY for a current screening',

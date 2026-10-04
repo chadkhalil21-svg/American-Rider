@@ -7,6 +7,7 @@
 // and both operator records and runs the SAME assessment every other gate runs
 // (backend/qualification.js assessOperator, context 'accept') before it writes 'accepted'.
 const { assessOperator } = require('./qualification');
+const { paymentMatches } = require('./booking');
 
 /**
  * @param externals { account: { disabled }, payouts: { enabled } } — the network half, checked by
@@ -27,6 +28,13 @@ async function acceptOffer({ db, uid, rideId, externals, liveMoney = false, now 
     if (ride.status !== 'assigned') {
       return { status: 409, body: { error: 'This travel is no longer open.', code: 'not_open' } };
     }
+    if (ride.bookingFingerprint && (ride.paymentFailed || ride.chargeFailed ||
+        !paymentMatches(ride, externals?.payment, ride.travelerUid, rideId))) {
+      return { status: 409, body: { error: 'Travel payment is not confirmed.', code: 'payment_unconfirmed' } };
+    }
+    if (ride.bookingFingerprint && (!opSnap.exists || String(opSnap.data().currentRideId || '') !== String(rideId))) {
+      return { status: 409, body: { error: 'This offer is not reserved for you.', code: 'reservation_missing' } };
+    }
     const at = now();
     const a = assessOperator({
       user: userSnap.exists ? userSnap.data() : null,
@@ -42,7 +50,9 @@ async function acceptOffer({ db, uid, rideId, externals, liveMoney = false, now 
       // Released for somebody else (monitor.js sweepAssignments reads releasedAt), and the
       // operator is out of service until /operator/online lets them back.
       tx.update(rideRef, { releasedAt: at, releasedReason: first.code, statusAt: at });
-      if (opSnap.exists) tx.set(opRef, { available: false, offDutyReason: first.code, offDutyAt: at }, { merge: true });
+      if (opSnap.exists) tx.set(opRef, { available: false, offDutyReason: first.code, offDutyAt: at,
+        ...(String(opSnap.data().currentRideId || '') === String(rideId) ? { currentRideId: null, reservedAt: null } : {}),
+      }, { merge: true });
       return { status: 409, body: { error: first.reason, code: first.code, released: true } };
     }
     tx.update(rideRef, { status: 'accepted', acceptedAt: at, statusAt: at });

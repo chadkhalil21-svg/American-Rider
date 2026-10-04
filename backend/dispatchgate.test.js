@@ -71,30 +71,31 @@ check('the /operator/online handler was found', online.length > 0);
 check('it is NOT stamped from DISCLOSURE_VERSION, which would record agreement never given',
   !/disclosureVersion: DISCLOSURE_VERSION/.test(online));
 
-// ——— POST /travel/dispatch: the server decides, the phone is told ————————————————
-//
-// The endpoint exists so that the operator on a travel is chosen by matchOperator above rather
-// than sent up by a phone. These assertions are about the one line that matters.
+// ——— POST /travel/prepare and /travel/dispatch: price, pay, reserve ———————————
+const booking = fs.readFileSync(path.join(ROOT, 'booking.js'), 'utf8');
+const prepare = (server.match(/app\.post\('\/travel\/prepare'[\s\S]*?\n\}\);/) || [''])[0];
 const route = (server.match(/app\.post\('\/travel\/dispatch'[\s\S]*?\n\}\);/) || [''])[0];
+check('POST /travel/prepare requires an authenticated Traveler', /app\.post\('\/travel\/prepare', requireAuth/.test(prepare));
+check('the server prices a real pickup and destination before a durable booking',
+  /authoritativeFare\(/.test(prepare) && /Number\.isFinite\(destinationPoint\.lat\)/.test(prepare) && /prepareBooking\(/.test(prepare));
+check('the prepared Traveler and pickup derive from authenticated server values',
+  /uid: req\.uid/.test(prepare) && /pickupLat: pickup\.lat/.test(prepare) && /travelerUid: String\(uid\)/.test(booking));
+check('no eligible Operator means no PaymentSheet is opened',
+  /code: 'no_operator'/.test(prepare) && /matchOperator\(/.test(prepare));
 check('POST /travel/dispatch exists', route.length > 0);
 check('it requires a signed-in traveler', /app\.post\('\/travel\/dispatch', requireAuth/.test(server));
-check('THE OPERATOR IS TAKEN FROM THE MATCH, never from the request body',
-  /operatorId: String\(op\.id\)/.test(route) && !/operatorId: .*b\.(operatorId|operator)/.test(route));
+check('the Operator comes from the server match, never from the request body',
+  /candidate = matchOperator\(fleet/.test(route) && /operatorId: opRef\.id/.test(booking) && !/req\.body\?\.(operatorId|operator)/.test(route));
 check('it runs the shared matchOperator, so a gate added there covers this path too',
   /matchOperator\(/.test(route));
 check('screening is required when a provider is live', /requireScreening: screeningReady\(\)/.test(route));
-check('the traveler on the record is the authenticated one, not a body field',
-  /travelerUid: String\(req\.uid\)/.test(route));
-check('the pickup is stored, so the re-offer sweep can search from it',
-  /pickupLat: pickup\.lat/.test(route));
-check('nobody free is an ordinary answer, not an error',
-  /if \(!best\) return res\.json\(\{ matched: null \}\);/.test(route));
-
-// The demonstration fleet moved here from the phone. It must never appear with live keys.
-check('stand-in operators are used only when the collection is empty',
-  /if \(!fleet\.length && !operationalMode\)/.test(route));
-check('stand-ins carry the CURRENT disclosure version, so they pass the same gate',
-  /disclosureVersion: DISCLOSURE_VERSION/.test(route));
+check('provider success, owner, amount and currency are verified before an offer',
+  route.indexOf('verifiedTravelPayment(') < route.indexOf('assignPaidTravel(') &&
+  /paymentMatches\(ride, payment, req\.uid, id\)/.test(route));
+check('the assignment is one transaction covering both the Travel and Operator',
+  /db\.runTransaction/.test(booking) && /tx\.update\(opRef, \{ currentRideId:/.test(booking) && /tx\.update\(ref, fields\)/.test(booking));
+check('a paid Travel with no remaining supply stays visible for refund, never fabricated',
+  /matched: null, paymentConfirmed: true/.test(booking) && !/operatorDemo: true/.test(booking));
 
 let bad = 0;
 for (const r of R) { if (!r.ok) bad++; console.log(`${r.ok ? 'PASS' : 'FAIL'}  ${r.l}${r.ok ? '' : '  — ' + (r.d || '')}`); }

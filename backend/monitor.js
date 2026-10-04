@@ -34,7 +34,8 @@ const { distanceMiles, matchOperator, coverageLapsed } = require('./matching');
 const { nearbyOperatorCandidates } = require('./geooperators');
 const { screeningReady } = require('./screening');
 const { assessOperator } = require('./qualification');
-const { connectAccountStatus } = require('./payments');
+const { connectAccountStatus, verifiedTravelPayment } = require('./payments');
+const { assignPaidTravel, paymentMatches } = require('./booking');
 const { adminDb, adminStatus } = require('./firebase-admin');
 const { fileTicket } = require('./tickets');
 const { readKey } = require('./env');
@@ -555,14 +556,37 @@ async function sweepAssignments({ now = Date.now() } = {}) {
     // and NOT deleted — a travel record is the traveler's, whatever became of it.
     if (age > STALE_ASSIGNMENT_MS) {
       if (!ride.staleAt) {
-        await write(db, ride.id, { status: 'expired', staleAt: now, unanswered: true });
-        out.expired.push(ride.id);
+        const ref = db.collection('rides').doc(ride.id);
+        const closed = await db.runTransaction(async (tx) => {
+          const snap = await tx.get(ref);
+          if (!snap.exists || snap.data().status !== 'assigned') return false;
+          const current = snap.data();
+          const opRef = current.operatorId ? db.collection('operators').doc(String(current.operatorId)) : null;
+          if (opRef) {
+            const opSnap = await tx.get(opRef);
+            if (opSnap.exists && String(opSnap.data().currentRideId || '') === ride.id) {
+              tx.update(opRef, { currentRideId: null, reservedAt: null });
+            }
+          }
+          tx.update(ref, { status: current.paymentIntentId ? 'cancelled' : 'expired',
+            cancelledFrom: current.status, staleAt: now, unanswered: true,
+            refundPending: !!current.paymentIntentId });
+          return true;
+        });
+        if (closed) out.expired.push(ride.id);
       }
       continue;
     }
 
-    const since = age / 1000;
+    const since = (now - (Number(ride.offeredAt) || Number(ride.createdAt) || now)) / 1000;
     out.pending++;
+
+    // Never reoffer a payment-less or reversed new booking. Legacy assigned records must be
+    // reconciled separately rather than treated as proof of a successful charge.
+    if (ride.paymentFailed || ride.chargeFailed || !ride.paymentIntentId) {
+      out.stranded.push(ride.id);
+      continue;
+    }
 
     // RELEASED BY POST /travel/accept: the operator it was offered to is no longer eligible.
     // Neither notified nor given the answer window — it goes straight to somebody else.
@@ -641,17 +665,29 @@ async function sweepAssignments({ now = Date.now() } = {}) {
       continue;
     }
 
-    await write(db, ride.id, {
-      operatorId: next.operator.id,
-      operatorName: next.operator.name || '',
-      declinedBy: [...declined, ride.operatorId],
-      createdAt: now, // restarts the answer window for the new operator
-      notifiedOperatorAt: null,
-      releasedAt: null,
-      releasedReason: null,
-      reofferedAt: now,
-    });
-    out.reoffered.push({ rideId: ride.id, to: next.operator.name });
+    try {
+      const payment = await verifiedTravelPayment(ride.paymentIntentId);
+      if (!paymentMatches(ride, payment, ride.travelerUid, ride.id)) {
+        out.stranded.push(ride.id);
+        continue;
+      }
+      // Mark unanswered offers released without overwriting an acceptance or cancellation.
+      const ref = db.collection('rides').doc(ride.id);
+      const marked = await db.runTransaction(async (tx) => {
+        const current = await tx.get(ref);
+        if (!current.exists || current.data().status !== 'assigned' ||
+            String(current.data().operatorId) !== String(ride.operatorId)) return false;
+        if (!current.data().releasedAt) tx.update(ref, { releasedAt: now, releasedReason: 'answer_timeout' });
+        return true;
+      });
+      if (!marked) continue;
+      const result = await assignPaidTravel({ db, uid: ride.travelerUid, rideId: ride.id,
+        payment, candidate: next, now, requireScreening: screeningReady() });
+      if (result.status === 200 && !result.body.reused) out.reoffered.push({ rideId: ride.id, to: next.operator.name });
+    } catch {
+      // Do not create another Travel or claim the offer succeeded after a provider/DB error.
+      out.stranded.push(ride.id);
+    }
   }
 
   return out;

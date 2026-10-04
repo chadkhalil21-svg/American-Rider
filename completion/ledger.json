@@ -3,7 +3,7 @@
   "branch": "integrate/commercial-completion-2026-10-03",
   "baseSha": "f749644c862e1da128359ddf2693a95506b9b52a",
   "candidateSha": "7bca3cc2cec25ed91403dd89c8585a9005943c80",
-  "generatedAt": "2026-10-04T01:58:33.344655+00:00",
+  "generatedAt": "2026-10-04T02:13:22.734165+00:00",
   "allowedStatuses": [
     "FIXED",
     "VERIFIED ALREADY FIXED",
@@ -268,7 +268,7 @@
       "category": "institutional-domain",
       "title": "Provider procurement, exact contracts/SLA/quotas, privacy DPA, service credits, portability and exit",
       "status": "NOT TESTED",
-      "owner": "WS03\u201305",
+      "owner": "WS03–05",
       "source": "coverage-and-omissions.md",
       "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
       "evidence": [
@@ -346,7 +346,7 @@
     {
       "id": "A21",
       "category": "institutional-domain",
-      "title": "New in second pass: immutable operator network log-on/log-off timeline and prompt \u00a7627.748(8)(d) claims disclosure of 12h before/after accident",
+      "title": "New in second pass: immutable operator network log-on/log-off timeline and prompt §627.748(8)(d) claims disclosure of 12h before/after accident",
       "status": "LAUNCH BLOCKER",
       "owner": "WS01",
       "source": "coverage-and-omissions.md",
@@ -362,7 +362,7 @@
     {
       "id": "A22",
       "category": "institutional-domain",
-      "title": "New in second pass: \u00a7627.748(13) no off-app compensated ride/street hail and anti-evasion integrity of enforcement-facing digital-network view",
+      "title": "New in second pass: §627.748(13) no off-app compensated ride/street hail and anti-evasion integrity of enforcement-facing digital-network view",
       "status": "LAUNCH BLOCKER",
       "owner": "WS01",
       "source": "coverage-and-omissions.md",
@@ -384,14 +384,17 @@
       "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/backend/travelmoney.js",
       "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
       "evidence": [
-        "Inherited source review; revalidate against integration head."
+        "Inherited source review; revalidate against integration head.",
+        "Prepared booking /travel/prepare, Stripe-verified success before transactional /travel/dispatch; manual PaymentSheet callback is not server proof."
       ],
       "candidatePrs": [
         56
       ],
       "implementingCommit": null,
-      "verification": [],
-      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+      "verification": [
+        "backend/booking.test.js; backend/dispatchgate.test.js; npm run check (local)"
+      ],
+      "releaseCondition": "Do not mark commercial PASS until exact-SHA CI plus credentialed provider, real Firestore concurrency, physical device and relevant operational evidence are captured; unresolved items remain launch blockers."
     },
     {
       "id": "F002",
@@ -402,12 +405,15 @@
       "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/backend/matching.js",
       "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
       "evidence": [
-        "Inherited source review; revalidate against integration head."
+        "Inherited source review; revalidate against integration head.",
+        "booking.js reserves a single currentRideId in the ride/Operator Firestore transaction; matching excludes busy slots; completion/decline/cancel/expiry release capacity."
       ],
       "candidatePrs": [],
       "implementingCommit": null,
-      "verification": [],
-      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+      "verification": [
+        "backend/booking.test.js; backend/travelprogress.test.js; backend/monitor.test.js; npm run check (local)"
+      ],
+      "releaseCondition": "Do not mark commercial PASS until exact-SHA CI plus credentialed provider, real Firestore concurrency, physical device and relevant operational evidence are captured; unresolved items remain launch blockers."
     },
     {
       "id": "F003",
@@ -418,15 +424,18 @@
       "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/src/state/RideContext.tsx",
       "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
       "evidence": [
-        "Inherited source review; revalidate against integration head."
+        "Inherited source review; revalidate against integration head.",
+        "Decline stays on the identical paid ride; monitor reoffers via assignPaidTravel; both mobile inboxes follow release/reoffer."
       ],
       "candidatePrs": [
         56,
         57
       ],
       "implementingCommit": null,
-      "verification": [],
-      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+      "verification": [
+        "backend/booking.test.js; backend/monitor.test.js; npm run check (local)"
+      ],
+      "releaseCondition": "Do not mark commercial PASS until exact-SHA CI plus credentialed provider, real Firestore concurrency, physical device and relevant operational evidence are captured; unresolved items remain launch blockers."
     },
     {
       "id": "F004",
@@ -437,12 +446,15 @@
       "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/backend/server.js",
       "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
       "evidence": [
-        "Inherited source review; revalidate against integration head."
+        "Inherited source review; revalidate against integration head.",
+        "Deterministic uid+bookingKey ride id and fingerprint, one prepared document and retry with same intent/Travel; restart recovers pending record."
       ],
       "candidatePrs": [],
       "implementingCommit": null,
-      "verification": [],
-      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+      "verification": [
+        "backend/booking.test.js; backend/travelmoney.test.js; npm run check (local)"
+      ],
+      "releaseCondition": "Do not mark commercial PASS until exact-SHA CI plus credentialed provider, real Firestore concurrency, physical device and relevant operational evidence are captured; unresolved items remain launch blockers."
     },
     {
       "id": "F005",
@@ -453,12 +465,15 @@
       "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/backend/payments.js",
       "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
       "evidence": [
-        "Inherited source review; revalidate against integration head."
+        "Inherited source review; revalidate against integration head.",
+        "Cancellation releases operator atomically; unpaid PI cancellation and bounded leased sweep retry pending refunds/paid unmatched booking; provider outage stays pending."
       ],
       "candidatePrs": [],
       "implementingCommit": null,
-      "verification": [],
-      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+      "verification": [
+        "backend/bookingrecovery.test.js; backend/travelmoney.test.js; npm run check (local)"
+      ],
+      "releaseCondition": "Do not mark commercial PASS until exact-SHA CI plus credentialed provider, real Firestore concurrency, physical device and relevant operational evidence are captured; unresolved items remain launch blockers."
     },
     {
       "id": "F006",
@@ -469,15 +484,18 @@
       "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/backend/scheduler.js",
       "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
       "evidence": [
-        "Inherited source review; revalidate against integration head."
+        "Inherited source review; revalidate against integration head.",
+        "Scheduled create pricing predicate repaired; off-session charge metadata extended to rideId (caller still to be integrated). Full scheduled transaction not yet repaired."
       ],
       "candidatePrs": [
         56,
         57
       ],
       "implementingCommit": null,
-      "verification": [],
-      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+      "verification": [
+        "backend/sched.test.js; npm run check (local)"
+      ],
+      "releaseCondition": "Do not mark commercial PASS until exact-SHA CI plus credentialed provider, real Firestore concurrency, physical device and relevant operational evidence are captured; unresolved items remain launch blockers."
     },
     {
       "id": "F007",
@@ -508,12 +526,15 @@
       "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/app/reserve.tsx",
       "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
       "evidence": [
-        "Inherited source review; revalidate against integration head."
+        "Inherited source review; revalidate against integration head.",
+        "Guardian paid-assignment alert restored; Teen PIN provisioning and retry still needs safety proof."
       ],
       "candidatePrs": [],
       "implementingCommit": null,
-      "verification": [],
-      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+      "verification": [
+        "backend/family.test.js; npm run check (local)"
+      ],
+      "releaseCondition": "Do not mark commercial PASS until exact-SHA CI plus credentialed provider, real Firestore concurrency, physical device and relevant operational evidence are captured; unresolved items remain launch blockers."
     },
     {
       "id": "F009",
@@ -642,12 +663,15 @@
       "source": "https://github.com/chadkhalil21-svg/American-Rider/blob/f749644c862e1da128359ddf2693a95506b9b52a/backend/auth.js",
       "sourceSha": "f749644c862e1da128359ddf2693a95506b9b52a",
       "evidence": [
-        "Inherited source review; revalidate against integration head."
+        "Inherited source review; revalidate against integration head.",
+        "Added Firebase Admin verifyIdToken(token,true) to sensitive money/transport mutations; privileged Ops IAM, revocation/latency at scale still open."
       ],
       "candidatePrs": [],
       "implementingCommit": null,
-      "verification": [],
-      "releaseCondition": "Close authoritative state and recovery path, add targeted regression evidence; external gates separate."
+      "verification": [
+        "backend/auth.js; backend/server.js; npm run check (local)"
+      ],
+      "releaseCondition": "Do not mark commercial PASS until exact-SHA CI plus credentialed provider, real Firestore concurrency, physical device and relevant operational evidence are captured; unresolved items remain launch blockers."
     },
     {
       "id": "F017",
@@ -995,13 +1019,16 @@
       "status": "NOT TESTED",
       "evidence": [
         "Release baseline f749644c862e1da128359ddf2693a95506b9b52a and candidate PR heads #56/#57/#58 reconciled; PR #56 slice committed 7bca3cc2cec25ed91403dd89c8585a9005943c80",
-        "Draft PR #59 opened against release/current; not merged or deployed. PR #57 and PR #58 selective patches under validation."
+        "Draft PR #59 opened against release/current; not merged or deployed. PR #57 and PR #58 selective patches under validation.",
+        "Selective PR #57/#58 reconciled and committed 19f82b08996b7e3a7884aa2de5e99df01f3acc2a; draft PR #59 remains open; release/current not changed."
       ]
     },
     {
       "id": 1,
       "status": "NOT TESTED",
-      "evidence": []
+      "evidence": [
+        "Local implementation candidate: keyed booking, provider-confirmed payment-before-offer, one-Operator transaction, same-Travel reoffer, bounded refund recovery; npm run check passed on working copy; no credentialed Stripe/Firestore or device tests. Phase remains NOT TESTED for commercial release."
+      ]
     },
     {
       "id": 2,

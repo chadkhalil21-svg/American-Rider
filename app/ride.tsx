@@ -191,6 +191,11 @@ export default function Status() {
                   ? t('traveler.noOperatorsNearby')
                   : t('traveler.dispatchUnavailable')}
               </Text>
+              {ride.payment.status === 'paid' ? (
+                <Text style={styles.searchSub}>{t('traveler.chargedAwaitingOperator')}</Text>
+              ) : ride.payment.status === 'processing' || ride.payment.status === 'failed' ? (
+                <Text style={styles.searchSub}>{t('traveler.paymentStatusUnverified')}</Text>
+              ) : null}
               {/* THREE WAYS OUT, NOT ONE (founders, 5 Sept 2026, from their own screenshot).
                   
                   This offered "Try again" and, at the bottom, "Cancel Travel". A traveler who
@@ -205,9 +210,11 @@ export default function Status() {
               <Pressable onPress={ride.retryDispatch} hitSlop={8}>
                 <Text style={styles.retryLink}>{t('traveler.tryAgain')}</Text>
               </Pressable>
-              <Pressable onPress={() => router.replace('/reserve')} hitSlop={8}>
-                <Text style={styles.retryLink}>{t('traveler.changeTravel')}</Text>
-              </Pressable>
+              {ride.payment.status === 'idle' ? (
+                <Pressable onPress={() => router.replace('/reserve')} hitSlop={8}>
+                  <Text style={styles.retryLink}>{t('traveler.changeTravel')}</Text>
+                </Pressable>
+              ) : null}
             </>
           )}
         </View>
@@ -232,7 +239,10 @@ export default function Status() {
                 logic as its reason, and was written when the card had already been charged
                 by this point. Nothing is charged until an operator is matched now, so this
                 states the money position instead of reassuring about it. */}
-            <Text style={styles.cancelNote}>{t('traveler.notCharged')}</Text>
+            <Text style={styles.cancelNote}>{t(ride.payment.status === 'paid'
+              ? 'traveler.chargedAwaitingOperator'
+              : ride.payment.status === 'processing' || ride.payment.status === 'failed'
+                ? 'traveler.paymentStatusUnverified' : 'traveler.notCharged')}</Text>
             <View style={styles.cancelBtns}>
               <Pressable onPress={() => setCancelAsk(false)} style={styles.keepBtn}>
                 <Text style={styles.keepBtnText}>{t('traveler.keepTravel')}</Text>

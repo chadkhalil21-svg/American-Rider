@@ -799,6 +799,8 @@ export default {
     whereTo: 'Arrival',
     cancelThisTravel: 'Cancel this travel?',
     notCharged: 'You have not been charged for this travel.',
+    chargedAwaitingOperator: 'Payment was confirmed, but no Operator is assigned. You can retry or cancel and request a full refund.',
+    paymentStatusUnverified: 'Payment status is not yet confirmed. Cancel Travel to have the server resolve the payment before you leave.',
     keepTravel: 'Keep travel',
     yesCancel: 'Yes, cancel',
     cancelTravel: 'Cancel Travel',

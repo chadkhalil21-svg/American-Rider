@@ -795,6 +795,8 @@ export default {
     whereTo: 'Llegada',
     cancelThisTravel: '¿Cancelar este viaje?',
     notCharged: 'No se le ha cobrado este viaje.',
+    chargedAwaitingOperator: 'Se confirmó el pago, pero aún no se ha asignado un Operator. Puede volver a intentarlo o cancelar y solicitar un reembolso completo.',
+    paymentStatusUnverified: 'El estado del pago aún no está confirmado. Cancele el Viaje para que el servidor resuelva el pago antes de salir.',
     keepTravel: 'Mantener el viaje',
     yesCancel: 'Sí, cancelar',
     cancelTravel: 'Cancelar Viaje',

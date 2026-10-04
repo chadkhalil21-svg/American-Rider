@@ -21,7 +21,7 @@ require('node:dns').setDefaultResultOrder('ipv4first');
 const express = require('express');
 const cors = require('cors');
 const {
-  quote, createPaymentIntent, resumePaymentIntent, chargeRide, refundTravel,
+  quote, createPaymentIntent, resumePaymentIntent, verifiedTravelPayment, cancelUnpaidIntent, chargeRide, refundTravel,
   connectAccountFor, connectOnboardingLink, connectAccountStatus,
   transferToOperator, refundableFor, connectDashboardLink, pingStripe, probeNetwork,
   transferFixed, operatorPayoutAccount,
@@ -29,7 +29,7 @@ const {
   defaultCardCountry, chargeOperatorAccountFee,
 } = require('./payments');
 const { readKey } = require('./env');
-const { requireAuth, attachAuth, requireVerifiedEmail } = require('./auth');
+const { requireAuth, requireFreshAuth, attachAuth, requireVerifiedEmail } = require('./auth');
 const { perAccount, countOnly, perIp } = require('./ratelimit');
 const { marketFor, servesPoint, listMarkets, markets: allMarkets } = require('./markets');
 const { forMarket: insuranceForMarket, publicConfig: publicInsuranceConfig } = require('./insurance-jurisdictions');
@@ -97,6 +97,7 @@ const { lostItemTicket, stampLostItemCase, notifyLostItemOperators, operatorLost
 const { adminDb, adminStatus, accountDisabled } = require('./firebase-admin');
 const { closeOperationalAccount } = require('./accountclosure');
 const { acceptOffer } = require('./eligibility');
+const { bookingId, prepareBooking, paymentMatches, assignPaidTravel } = require('./booking');
 const { progressTravel } = require('./travelprogress');
 const { payForTravel, cancelTravel: cancelTravelFor, settleTravel: settleTravelFor } = require('./travelmoney');
 const { authorizeVoiceTravel, lostItemTravel, authorizeAnnouncement, claimAnnouncement } = require('./trustboundaries');
@@ -107,6 +108,7 @@ const {
 const { smartQuote, revalidateTransit } = require('./smart');
 const { transitHealth } = require('./transit');
 const { sweepScheduled, sweepSettlements } = require('./scheduler');
+const { sweepBookingRecovery } = require('./bookingrecovery');
 const { sweepMonitor, sweepAssignments } = require('./monitor');
 const { notify } = require('./push');
 const { handleEvent, webhookReady } = require('./webhook');
@@ -873,7 +875,7 @@ app.get('/connect/done', (req, res) =>
 //
 // This is docs/OPEN-DECISIONS.md §4 answered for the payout case: operator identity is the
 // account, not the handset.
-app.post('/operator/online', requireAuth, requireOperationalReadiness, async (req, res) => {
+app.post('/operator/online', requireAuth, requireFreshAuth, requireOperationalReadiness, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
 
@@ -1188,7 +1190,7 @@ app.post('/operator/settle-pending', requireAuth, async (req, res) => {
 // arrived. The operator app does not report it. A fee we cannot substantiate is a fee we must
 // not take, so the claim is removed from the app and the Terms until arrival is a fact the
 // server holds. See docs/OPEN-DECISIONS.md.
-app.post('/travel/cancel', requireAuth, LIMITS.payments, async (req, res) => {
+app.post('/travel/cancel', requireAuth, LIMITS.payments, requireFreshAuth, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   // The refund comes from the travel's OWN payment (backend/travelmoney.js); a paymentIntentId in
@@ -1199,7 +1201,7 @@ app.post('/travel/cancel', requireAuth, LIMITS.payments, async (req, res) => {
       uid: req.uid,
       rideId: req.body?.rideId,
       stripeConfigured: keyMode !== 'no-key',
-      deps: { refundableFor, refundTravel, transferFixed, operatorPayoutAccount },
+      deps: { refundableFor, refundTravel, cancelUnpaidIntent, transferFixed, operatorPayoutAccount },
     });
     res.status(out.status).json(out.body);
   } catch (e) {
@@ -1264,7 +1266,7 @@ app.get('/operator/me', requireAuth, async (req, res) => {
 // Idempotent by the ride document: once `transferId` is written, a second call is a no-op.
 // Stripe's idempotency key covers the same-instant double tap; this covers next week.
 
-app.post('/travel/settle', requireAuth, async (req, res) => {
+app.post('/travel/settle', requireAuth, requireFreshAuth, async (req, res) => {
   if (keyMode === 'no-key') return res.status(500).json({ error: 'No Stripe key configured' });
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
@@ -1608,7 +1610,7 @@ app.delete('/payment-methods/:id', requireAuth, LIMITS.payments, async (req, res
   }
 });
 
-app.post('/create-payment-intent', requireAuth, LIMITS.payments, requireOperationalReadiness, async (req, res) => {
+app.post('/create-payment-intent', requireAuth, LIMITS.payments, requireFreshAuth, requireOperationalReadiness, async (req, res) => {
   if (keyMode === 'no-key') {
     return res.status(500).json({ error: 'No Stripe secret key configured. Add STRIPE_SECRET_KEY to backend/.env' });
   }
@@ -1756,12 +1758,14 @@ let lastSweep = { at: 0, report: null };
  * Promise.all.
  */
 async function runAllSweeps() {
-  const [scheduled, monitor, assignments, screening, settlements, providerEvents, operatorFees, familyAgeOut, insuranceMonitoring, marketReference] = await Promise.allSettled([
+  const [scheduled, monitor, assignments, screening, settlements, bookingRecovery, providerEvents, operatorFees, familyAgeOut, insuranceMonitoring, marketReference] = await Promise.allSettled([
     sweepScheduled(),
     sweepMonitor(),
     sweepAssignments(),
     sweepScreening(),
     sweepSettlements(),
+    sweepBookingRecovery({ db: adminDb(), stripeConfigured: keyMode !== 'no-key',
+      deps: { refundableFor, refundTravel, cancelUnpaidIntent, transferFixed, operatorPayoutAccount } }),
     sweepProviderEvents({ handlers: PROVIDER_HANDLERS, workerId: WORKER_ID }),
     sweepOperatorAccountFees({
       charge: ({ uid, email, month, amountCents }) =>
@@ -1779,6 +1783,7 @@ async function runAllSweeps() {
     assignments: unwrap(assignments),
     screening: unwrap(screening),
     settlements: unwrap(settlements),
+    bookingRecovery: unwrap(bookingRecovery),
     providerEvents: unwrap(providerEvents),
     operatorFees: unwrap(operatorFees),
     familyAgeOut: unwrap(familyAgeOut),
@@ -2898,186 +2903,133 @@ function travelNumberFor(documentId, pickup) {
   return 'AR-' + String(documentId).slice(0, 8).toUpperCase() + '-' + code;
 }
 
-app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, requireOperationalReadiness, async (req, res) => {
+// The immutable, server-priced booking exists before Stripe's PaymentSheet is opened.
+// A duplicate device request returns the same ride id, not another PaymentIntent/travel.
+app.post('/travel/prepare', requireAuth, LIMITS.dispatch, requireFreshAuth, requireOperationalReadiness, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
-
   const b = req.body || {};
+  const key = String(b.bookingKey || '');
+  if (!/^[\w-]{16,100}$/.test(key)) return res.status(400).json({ error: 'Booking key is required', code: 'booking_key_required' });
   const pickup = { lat: Number(b.pickup?.lat), lng: Number(b.pickup?.lng) };
-  if (!Number.isFinite(pickup.lat) || !Number.isFinite(pickup.lng)) {
-    return res.status(400).json({ error: 'A pickup position is required to dispatch.' });
+  const destinationPoint = { lat: Number(b.destinationPoint?.lat), lng: Number(b.destinationPoint?.lng) };
+  if (!Number.isFinite(pickup.lat) || !Number.isFinite(pickup.lng) ||
+      !Number.isFinite(destinationPoint.lat) || !Number.isFinite(destinationPoint.lng)) {
+    return res.status(400).json({ error: 'Both real pickup and destination coordinates are required', code: 'route_geometry_required' });
   }
-  // THE PICKUP MUST BE IN AN ACTIVE MARKET — checked here as well as at pricing, because this
-  // is where an operator is actually sent.
-  if (!servesPoint(pickup)) {
-    return res.status(409).json({ error: outsideMarketMessage('pickup'), code: 'outside_market', where: 'pickup' });
-  }
-
-  const priced = await authoritativeFare({
-    body: { pickup, dest: b.destinationPoint, destination: b.dest, travelClass: b.cls, journeyNo: b.journeyNo },
-    uid: req.uid, email: req.email, db, cardCountryFor: defaultCardCountry,
-  });
-  if (priced?.invalidJourney) return res.status(409).json({ error: priced.reason, code: 'invalid_smart_journey' });
-  if (priced?.outsideMarket) {
-    return res.status(409).json({ error: priced.reason, code: 'outside_market', where: priced.outsideMarket });
-  }
-  if (priced?.permitRequired) {
-    return res.status(409).json({ error: priced.reason, code: 'permit_required', where: priced.permitRequired.end });
-  }
-  if (!priced) {
-    return res.status(400).json({ error: 'A destination position or known destination is required to dispatch.' });
-  }
-  if (!['routed-distance', 'estimated-distance'].includes(priced.pricedBy)) {
-    return res.status(400).json({ error: 'A valid pickup and destination position are required to create Travel.', code: 'route_geometry_required' });
-  }
-  if (priced.tollStatus === 'unknown') {
-    return res.status(503).json({ error: 'Toll cost could not be verified for this route.', code: 'toll_unavailable' });
-  }
-
-  const partyResult = priced.journey?.party
-    ? { ok: true, party: priced.journey.party }
-    : await normalizeParty(b, { uid: req.uid, name: req.name || b.bookerName || b.travelerName || '' });
-  if (!partyResult.ok) return res.status(400).json({ error: partyResult.error, code: partyResult.code });
-  // Smart Travel leg 2 inherits the server-recorded first-leg party. The request may repeat
-  // party fields for presentation, but cannot change the Traveler/Teen/guardian envelope.
-  const party = partyResult.party;
-
-  const rawCabin = b.cabinPreferences && typeof b.cabinPreferences === 'object' ? b.cabinPreferences : {};
-  const cabinPreferences = {
-    climate: ['Cool', 'Moderate', 'Warm'].includes(String(rawCabin.climate)) ? String(rawCabin.climate) : 'Moderate',
-    music: ['None', 'Traveler Choice'].includes(String(rawCabin.music)) ? String(rawCabin.music) : 'None',
-    quiet: rawCabin.quiet !== false,
-    charging: rawCabin.charging === true,
-    luggage: rawCabin.luggage === true,
-  };
-
-  let fleet;
+  const fingerprint = crypto.createHash('sha256').update(JSON.stringify({
+    pickup, destinationPoint, dep: b.dep, dest: b.dest, cls: b.cls,
+    journeyNo: b.journeyNo, partyMode: b.partyMode, familyLinkId: b.familyLinkId,
+    travelerName: b.travelerName, cabinPreferences: b.cabinPreferences,
+  })).digest('hex');
+  const id = bookingId(req.uid, key);
   try {
-    fleet = await availableOperatorCandidates(db, pickup);
-  } catch (e) {
-    // "We could not read the fleet" and "nobody is on duty" are different answers and must not
-    // render the same — the client draws a retry for one and a wait for the other.
-    return res.status(502).json({ error: e.message, code: 'fleet_unreadable' });
-  }
-
-  // THE DEMONSTRATION FLEET LIVES HERE NOW, not on the phone.
-  //
-  // It used to be a constant in src/backend/dispatch.ts, handed out when the collection came
-  // back empty. That was the last reason the phone had to write a travel itself — and while
-  // any path writes travels from a phone, firestore.rules cannot be closed, and F-A stays
-  // open. Moving it here costs three records and closes the argument.
-  //
-  // EMPTY COLLECTION ONLY, AND NEVER WITH LIVE KEYS. A stand-in is for a database with nobody
-  // in it, which is a development environment and a founder demonstration. The moment real
-  // money is in play there is no such thing as a stand-in operator.
-  if (!fleet.length && !operationalMode) {
-    // An empty availability query is not the same as an empty fleet. Only synthesize the
-    // demonstration fleet when the collection itself has no Operator records at all.
-    const anyOperator = await db.collection('operators').limit(1).get();
-    if (!anyOperator.empty) return res.json({ matched: null });
-    const at = Date.now();
-    fleet = [
-      { id: 'op1', name: 'Miguel D.', lat: 25.768, lng: -80.1955, car: 'Gray Toyota Camry', plate: 'KTR 4821', classes: ['Standard', 'Pet Friendly'] },
-      { id: 'op2', name: 'Sofia R.', lat: 25.776, lng: -80.193, car: 'White Honda Accord', plate: 'LMN 3092', classes: ['Standard'] },
-      { id: 'op3', name: 'Nina P.', lat: 25.7654, lng: -80.2196, car: 'Blue Kia Telluride', plate: 'PQR 7741', classes: ['Standard', 'Large Vehicle'] },
-    ].map((o) => ({
-      ...o,
-      available: true,
-      // Stamped present, screened and current so they pass the same gates as anybody else.
-      // They are stand-ins for somebody on duty, so they have to look like somebody on duty —
-      // and only here, where a live key is already excluded.
-      onlineAt: at,
-      screeningCheckedAt: at,
-      disclosureVersion: DISCLOSURE_VERSION,
-      commissioned: true,
-      demo: true,
-    }));
-  }
-
-  // Operators who have already declined this travel are never offered it twice.
-  const excluded = new Set((Array.isArray(b.excludeIds) ? b.excludeIds : []).map(String));
-  const eligible = excluded.size ? fleet.filter((o) => !excluded.has(String(o.id))) : fleet;
-
-  const best = matchOperator(eligible, pickup, String(b.cls || 'Standard'), {
-    requireScreening: screeningReady(),
-  });
-  // NOT AN ERROR. Nobody being free is an ordinary answer and the app has a screen for it.
-  if (!best) return res.json({ matched: null });
-
-  const op = best.operator;
-  const now = Date.now();
-  const ref = db.collection('rides').doc();
-  const tripNo = travelNumberFor(ref.id, pickup);
-  const ride = {
-    travelerUid: String(req.uid),
-    travelerName: party.travelerName.slice(0, 60),
-    party,
-    tripNo,
-    // WRITTEN FROM THE SERVER'S OWN MATCH, never from the request. This is the line the whole
-    // endpoint exists for.
-    operatorId: String(op.id),
-    operatorName: op.name || '',
-    operatorCar: op.car || '',
-    operatorPlate: op.plate || '',
-    operatorLat: Number(op.lat),
-    operatorLng: Number(op.lng),
-    operatorEtaMin: etaMinutes(best.miles),
-    operatorMiles: best.miles,
-    operatorDemo: !!op.demo,
-    dep: String(b.dep || '').slice(0, 60),
-    dest: String(b.dest || '').slice(0, 60),
-    // The sweep that rescues an unanswered travel searches from here. Leaving it out silently
-    // disabled that path once before.
-    pickupLat: pickup.lat,
-    pickupLng: pickup.lng,
-    travelClass: String(b.cls || 'Standard'),
-    travelCostCents: priced.travelCostCents,
-    costCents: priced.travelerPays,
-    miles: priced.miles,
-    governmentFeeCents: priced.governmentFeeCents,
-    tollCents: Math.max(0, Number(priced.tollCents) || 0),
-    feeLines: priced.feeLines,
-    pricedBy: priced.pricedBy,
-    cardCountry: priced.cardCountry,
-    journey: priced.journey || null,
-    cabinPreferences,
-    destinationLat: Number.isFinite(Number(b.destinationPoint?.lat)) ? Number(b.destinationPoint.lat) : null,
-    destinationLng: Number.isFinite(Number(b.destinationPoint?.lng)) ? Number(b.destinationPoint.lng) : null,
-    status: 'assigned',
-    createdAt: now,
-    statusAt: now,
-  };
-
-  try {
-    await ref.create(ride);
-    const teenPickup = await provisionTeenPin({ rideRef: ref, rideId: ref.id, party });
-    if (teenPickup.required && party.teenUid) await notify({ uid: party.teenUid, kind: 'teen_pickup_code', title: 'Your pickup code', body: `Give ${teenPickup.pin} to your Operator after confirming the vehicle and Operator.`, data: { screen: '/ride', rideId: ref.id, tripNo } });
-    if (teenPickup.required && party.guardianUid && party.guardianUid !== party.teenUid) await notify({ uid: party.guardianUid, kind: 'guardian_travel', title: 'Teen Travel assigned', body: `${party.travelerName}'s Travel has been assigned. You can follow it in American Rider.`, data: { screen: '/family', rideId: ref.id, tripNo } });
-    res.json({
-      rideId: ref.id,
-      tripNo,
-      matched: {
-        id: String(op.id),
-        name: op.name || '',
-        car: op.car || '',
-        plate: op.plate || '',
-        lat: Number(op.lat),
-        lng: Number(op.lng),
-        etaMin: etaMinutes(best.miles),
-        miles: best.miles,
-        demo: !!op.demo,
-      },
-      party: operatorPartyView(party),
+    const existing = await db.collection('rides').doc(id).get();
+    if (existing.exists) {
+      const prior = existing.data();
+      if (prior.bookingFingerprint !== fingerprint || String(prior.travelerUid) !== String(req.uid)) {
+        return res.status(409).json({ error: 'This booking key belongs to a different Travel', code: 'booking_conflict' });
+      }
+      return res.json({ rideId: id, tripNo: prior.tripNo, status: prior.status, amountCents: prior.costCents, reused: true });
+    }
+    if (!servesPoint(pickup)) return res.status(409).json({ error: outsideMarketMessage('pickup'), code: 'outside_market' });
+    const priced = await authoritativeFare({
+      body: { pickup, dest: destinationPoint, destination: b.dest, travelClass: b.cls, journeyNo: b.journeyNo },
+      uid: req.uid, email: req.email, db, cardCountryFor: defaultCardCountry,
     });
-  } catch (e) {
-    res.status(502).json({ error: e.message });
-  }
+    if (!priced || priced.invalidJourney || priced.outsideMarket || priced.permitRequired) {
+      return res.status(409).json({ error: priced?.reason || 'The Travel cannot be priced', code: priced?.permitRequired ? 'permit_required' : 'quote_unavailable' });
+    }
+    if (!['routed-distance', 'estimated-distance'].includes(priced.pricedBy)) {
+      return res.status(409).json({ error: 'The road distance cannot be verified', code: 'route_geometry_required' });
+    }
+    if (priced.tollStatus === 'unknown') return res.status(503).json({ error: 'Toll price unavailable', code: 'toll_unavailable' });
+    const partyResult = priced.journey?.party
+      ? { ok: true, party: priced.journey.party }
+      : await normalizeParty(b, { uid: req.uid, name: req.name || b.bookerName || b.travelerName || '' });
+    if (!partyResult.ok) return res.status(400).json({ error: partyResult.error, code: partyResult.code });
+    const party = partyResult.party;
+    const raw = b.cabinPreferences && typeof b.cabinPreferences === 'object' ? b.cabinPreferences : {};
+    const cabinPreferences = {
+      climate: ['Cool', 'Moderate', 'Warm'].includes(String(raw.climate)) ? String(raw.climate) : 'Moderate',
+      music: ['None', 'Traveler Choice'].includes(String(raw.music)) ? String(raw.music) : 'None',
+      quiet: raw.quiet !== false, charging: raw.charging === true, luggage: raw.luggage === true,
+    };
+    // Availability is a pre-charge hint, not a reservation. The post-payment transaction is
+    // authoritative and can still find the fleet gone; then the paid Travel is refund-owed.
+    const fleet = await availableOperatorCandidates(db, pickup);
+    if (!matchOperator(fleet, pickup, String(b.cls || 'Standard'), { requireScreening: screeningReady() })) {
+      return res.status(409).json({ error: 'No eligible Operator is available; nothing was charged', code: 'no_operator' });
+    }
+    const tripNo = travelNumberFor(id, pickup);
+    const outcome = await prepareBooking({ db, uid: req.uid, key, fingerprint, record: {
+      tripNo, travelerName: party.travelerName.slice(0, 60), party,
+      dep: String(b.dep || '').slice(0, 60), dest: String(b.dest || '').slice(0, 60),
+      pickupLat: pickup.lat, pickupLng: pickup.lng,
+      destinationLat: destinationPoint.lat, destinationLng: destinationPoint.lng,
+      travelClass: String(b.cls || 'Standard'), travelCostCents: priced.travelCostCents,
+      costCents: priced.travelerPays, miles: priced.miles,
+      governmentFeeCents: priced.governmentFeeCents,
+      tollCents: Math.max(0, Number(priced.tollCents) || 0), feeLines: priced.feeLines,
+      pricedBy: priced.pricedBy, cardCountry: priced.cardCountry,
+      journey: priced.journey || null, cabinPreferences,
+    } });
+    return res.status(outcome.status).json({ ...outcome.body, amountCents: priced.travelerPays });
+  } catch (e) { return res.status(502).json({ error: e.message, code: 'prepare_unavailable' }); }
+});
+
+// This endpoint no longer creates a fresh ride or trusts a client-provided fare, Operator or
+// payment assertion. It can only offer the existing, freshly provider-confirmed paid Travel.
+app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, requireFreshAuth, requireOperationalReadiness, async (req, res) => {
+  const db = adminDb();
+  if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
+  const id = String(req.body?.rideId || '');
+  if (!/^[a-f0-9]{40}$/.test(id)) return res.status(400).json({ error: 'Prepared Travel id is required', code: 'ride_required' });
+  try {
+    const ref = db.collection('rides').doc(id);
+    const snap = await ref.get();
+    if (!snap.exists) return res.status(404).json({ error: 'No such Travel', code: 'no_travel' });
+    const ride = snap.data();
+    if (String(ride.travelerUid) !== String(req.uid)) return res.status(403).json({ error: 'Not your Travel', code: 'not_yours' });
+    if (!['awaiting_payment', 'awaiting_assignment', 'assigned'].includes(ride.status)) {
+      return res.status(409).json({ error: 'Travel is no longer dispatchable', code: 'travel_not_dispatchable' });
+    }
+    const payment = await verifiedTravelPayment(ride.paymentIntentId);
+    if (!paymentMatches(ride, payment, req.uid, id)) {
+      return res.status(409).json({ error: 'Payment is not confirmed for this Travel', code: 'payment_unconfirmed' });
+    }
+    const pickup = { lat: Number(ride.pickupLat), lng: Number(ride.pickupLng) };
+    if (!servesPoint(pickup)) return res.status(409).json({ error: outsideMarketMessage('pickup'), code: 'outside_market' });
+    let candidate = null;
+    if (ride.status !== 'assigned') {
+      const fleet = await availableOperatorCandidates(db, pickup);
+      candidate = matchOperator(fleet, pickup, ride.travelClass, { requireScreening: screeningReady() });
+    }
+    const outcome = await assignPaidTravel({
+      db, uid: req.uid, rideId: id, payment, candidate, requireScreening: screeningReady(),
+    });
+    if (outcome.status !== 200) return res.status(outcome.status).json(outcome.body);
+    if (outcome.body.matched && !outcome.body.reused) {
+      // Non-delivery cannot roll back the money/assignment transaction. The assignment sweep
+      // retries missing notifications. Teen PIN errors must remain visible in Ops before launch.
+      const teen = await provisionTeenPin({ rideRef: ref, rideId: id, party: ride.party });
+      if (teen.required && ride.party?.teenUid) await notify({ uid: ride.party.teenUid, kind: 'teen_pickup_code', title: 'Your pickup code', body: `Give ${teen.pin} to your Operator after confirming the vehicle and Operator.`, data: { screen: '/ride', rideId: id, tripNo: ride.tripNo } });
+      if (teen.required && ride.party?.guardianUid && ride.party.guardianUid !== ride.party.teenUid) {
+        await notify({ uid: ride.party.guardianUid, kind: 'guardian_travel', title: 'Teen Travel assigned',
+          body: `${ride.party.travelerName || 'Teen Traveler'}'s Travel has been assigned. You can follow it in American Rider.`,
+          data: { screen: '/family', rideId: id, tripNo: ride.tripNo } });
+      }
+      await notify({ uid: outcome.body.matched.id, kind: 'travel_assigned', title: 'Travel assigned', body: `${ride.dep || 'Pickup'} to ${ride.dest || 'destination'}. Open to accept.`, data: { screen: '/operator', rideId: id, tripNo: ride.tripNo } });
+      await ref.update({ notifiedOperatorAt: Date.now() });
+    }
+    return res.json(outcome.body);
+  } catch (e) { return res.status(502).json({ error: e.message, code: 'dispatch_unavailable' }); }
 });
 
 // Cancel a scheduled reservation only while it is still a reservation. The transaction closes
 // the race with the scheduler: once dispatch has advanced it, the Traveler must cancel the
 // resulting Travel through the normal Travel cancellation/refund lifecycle.
-app.delete('/travel/schedule/:id', requireAuth, async (req, res) => {
+app.delete('/travel/schedule/:id', requireAuth, requireFreshAuth, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   const ref = db.collection('scheduled_rides').doc(String(req.params.id || ''));
@@ -3098,7 +3050,7 @@ app.delete('/travel/schedule/:id', requireAuth, async (req, res) => {
 
 // Create a scheduled reservation with the same server authority as immediate dispatch.
 // The time and labels are traveler inputs. Fare, distance, fees and Travel Number are not.
-app.post('/travel/schedule', requireAuth, LIMITS.dispatch, requireOperationalReadiness, async (req, res) => {
+app.post('/travel/schedule', requireAuth, LIMITS.dispatch, requireFreshAuth, requireOperationalReadiness, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   const b = req.body || {};
@@ -3120,7 +3072,7 @@ app.post('/travel/schedule', requireAuth, LIMITS.dispatch, requireOperationalRea
   if (!priced || priced.outsideMarket || priced.permitRequired) {
     return res.status(409).json({ error: priced?.reason || 'The scheduled travel cannot be priced' });
   }
-  if (priced.pricedBy !== 'distance') {
+  if (!['routed-distance', 'estimated-distance'].includes(priced.pricedBy)) {
     return res.status(400).json({ error: 'A valid pickup and destination position are required to create Travel.', code: 'route_geometry_required' });
   }
   if (priced.tollStatus === 'unknown') {
@@ -3250,7 +3202,7 @@ app.post('/travel/message', requireAuth, async (req,res)=>{
 // A REFUSAL RELEASES THE TRAVEL. It stays `assigned`, marked `releasedAt`, and the operator is
 // taken out of service; sweepAssignments re-offers it to somebody else on its next pass
 // without waiting out the answer window. The traveler's payment and travel number stand.
-app.post('/travel/accept', requireAuth, requireOperationalReadiness, async (req, res) => {
+app.post('/travel/accept', requireAuth, requireFreshAuth, requireOperationalReadiness, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   const rideId = String(req.body?.rideId || '');
@@ -3265,6 +3217,10 @@ app.post('/travel/accept', requireAuth, requireOperationalReadiness, async (req,
   try {
     const u = (await userRef.get()).data() || {};
     externals = await qualificationChecks(uid, u);
+    const offered = await db.collection('rides').doc(rideId).get();
+    if (offered.exists && offered.data()?.bookingFingerprint && String(offered.data().operatorId || '') === uid) {
+      externals.payment = await verifiedTravelPayment(offered.data().paymentIntentId);
+    }
   } catch (e) {
     return res.status(502).json({ error: e.message });
   }
@@ -3279,7 +3235,7 @@ app.post('/travel/accept', requireAuth, requireOperationalReadiness, async (req,
 
 // Operator progression is server-authoritative. Firestore rules no longer permit a phone to
 // manufacture arrived/onboard/completed states or the payout queue marker.
-app.post('/travel/progress', requireAuth, requireOperationalReadiness, async (req, res) => {
+app.post('/travel/progress', requireAuth, requireFreshAuth, requireOperationalReadiness, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   try {

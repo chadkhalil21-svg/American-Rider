@@ -1,6 +1,7 @@
 import type { SmartPlan } from '../backend/smart';
 import { DEFAULT_DEPARTURE } from '../location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Crypto from 'expo-crypto';
 import type { FeeLine } from '../data';
 import React, {
   createContext,
@@ -27,6 +28,7 @@ import {
 } from '../data';
 import {
   dispatchRide,
+  prepareRide,
   fetchMyRides,
   MatchedOp,
   recordTravelReview,
@@ -38,7 +40,7 @@ import {
 import { Coords, fetchQuote, isUnavailable } from '../backend/fares';
 import { sendTravelMessage } from '../backend/messages';
 import { cancelTravel, payForRide, settleTravel } from '../backend/payments';
-import { announceTravel, answerCheckIn } from '../backend/checkin';
+import { answerCheckIn } from '../backend/checkin';
 import {
   endTravelActivity,
   startTravelActivity,
@@ -626,7 +628,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   rideActiveRef.current = rideActive;
   // cancelRide is declared below confirmRide; the payment callback needs it when a traveler
   // closes the PaymentSheet, so it is reached through a ref rather than reordering the file.
-  const cancelRideRef = useRef<() => void>(() => {});
+  const cancelRideRef = useRef<() => Promise<boolean>>(async () => false);
   paymentRef.current = payment;
 
   useEffect(
@@ -692,7 +694,8 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       // Never over a session already in progress, and never for a travel this phone just
       // finished: only when the store is empty and the record says the travel is assigned.
       if (!rideActiveRef.current && !activeRideId.current) {
-        const live = rides.find((r) => ['assigned', 'accepted', 'arrived', 'onboard'].includes(r.status));
+        const live = rides.find((r) => ['assigned', 'accepted', 'arrived', 'onboard'].includes(r.status))
+          ?? rides.find((r) => ['awaiting_payment', 'awaiting_assignment'].includes(r.status));
         if (live) {
           const total = live.totalCents / 100;
           const fare = fareFromTotal(+(total - (live.governmentFeeCents ?? 0) / 100).toFixed(2));
@@ -753,6 +756,18 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
           setStatus(restoredStep);
           setRideActive(true);
           activeRideId.current = live.id;
+          preparedIdRef.current = live.id;
+          paidIntentRef.current = live.paymentIntentId || null;
+          if (live.paidAt || live.status === 'awaiting_assignment') {
+            const restoredPayment = { status: 'paid' as const, amountCents: live.totalCents,
+              paymentIntentId: live.paymentIntentId, tripNo: live.tripNo };
+            paymentRef.current = restoredPayment; setPayment(restoredPayment);
+          } else if (live.status === 'awaiting_payment') {
+            const uncertain = { status: 'failed' as const, tripNo: live.tripNo };
+            paymentRef.current = uncertain; setPayment(uncertain);
+          }
+          if (live.status === 'awaiting_assignment') setDispatchState('none');
+          if (live.status === 'awaiting_payment') setDispatchState('error');
           settleRideRef.current = live.id;
           setWatchedRideId(live.id); // resume following the operator's own reports
         }
@@ -762,20 +777,13 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // THE CHARGE THIS BOOKING IS WAITING TO MAKE.
-  //
-  // Payment used to start on the line after dispatch, in parallel with it. So a traveler was
-  // charged before anyone had been found — and when nobody was found, they sat on a "No
-  // operators available / Try again" screen having already paid, under a cancel box that said
-  // "Free to cancel". At launch the fleet is empty until operators join, so that was not an
-  // edge case; it was every booking. Nothing is charged now until somebody is actually coming.
-  const pendingChargeRef = useRef<null | (() => void)>(null);
+  // Retained across retries: no second booking or payment for one confirmation.
+  const bookingKeyRef = useRef<string | null>(null);
+  const preparedIdRef = useRef<string | null>(null);
+  const dispatchInFlightRef = useRef<Promise<MatchedOp | null> | null>(null);
   // One booking intent may have retries, but only its newest dispatch response may mutate UI.
   const dispatchGenerationRef = useRef(0);
   const confirmInFlightRef = useRef(false);
-
-  // Operators who have already declined THIS travel. Cleared when a new booking starts.
-  const declinedByRef = useRef<string[]>([]);
 
   // The class the current booking was sold under. Held in a ref because runDispatch is
   // memoised and retried from the ride screen — reading state directly would dispatch last
@@ -789,109 +797,119 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { travelPartyRef.current = travelParty; }, [travelParty]);
   useEffect(() => { tripPrefsRef.current = tripPrefs; }, [tripPrefs]);
 
-  // Match the nearest available operator for the ride already staged in lastTripRef.
-  // Tracks a real state so the live screen can show progress, a "none available" message,
-  // or an error with a retry — instead of the old silent, endless "Finding your operator…".
-  const runDispatch = useCallback(() => {
+  // The only on-demand sequence: one keyed booking -> PaymentSheet -> verified server offer.
+  // Retry dispatch reuses the paid Travel; it never pays again or manufactures a second ride.
+  const runDispatch = useCallback((): Promise<MatchedOp | null> => {
+    if (dispatchInFlightRef.current) return dispatchInFlightRef.current;
     const generation = ++dispatchGenerationRef.current;
-    const trip = lastTripRef.current;
-    // WHERE THE TRAVELER ACTUALLY IS, in the order we can trust it: the pin they dropped on
-    // the map, then this travel's geocoded pickup, then the departure's own coordinates.
-    const from =
-      pickupPinRef.current ??
-      tripCoordsRef.current?.pickup ??
-      (departure.lat != null && departure.lng != null
-        ? { lat: departure.lat, lng: departure.lng }
-        : null);
-    // NO INVENTED POSITION. The last resort was a hardcoded Brickell corner, so a traveler
-    // whose position we did not know was collected from a place they had never named. There
-    // is no safe guess for where a person is standing; dispatch stops and says so.
-    if (!from) {
-      setDispatchState('none');
-      return Promise.resolve(null);
-    }
-    setMatchedOp(null);
-    setDispatchState('searching');
-    return dispatchRide({
-      // WHERE THE TRAVELER ACTUALLY IS, in the order we can trust it: the pin they dropped
-      // on the map, then the geocoded endpoints of this travel, then the departure's own
-      // coordinates. The last resort used to be a hardcoded Brickell corner, which meant a
-      // traveler whose position we did not know was collected from a place they had never
-      // named — so dispatch now refuses instead, and the caller reports it.
-      pickup: from,
-      destinationPoint: tripCoords?.dest ?? null,
-      dep: departure.short,
-      dest: arrival.short,
-      // THE CLASS THE TRAVELER PAID FOR. This was hardcoded to 'Standard', so the class
-      // was priced, charged, and then thrown away on the way to dispatch: a $29.07 Large
-      // Vehicle booking matched a four-seat saloon, and an Accessible booking — sold as
-      // "Ramp or assistance equipped" — matched a car with neither. Selling one service and
-      // dispatching another is the same defect as taking a fare for a travel nobody drove.
-      cls: operatorClassFor(travelClassRef.current),
-      // Nobody is offered the same travel twice.
-      excludeIds: declinedByRef.current,
-      journeyNo: smartJourneyRef.current?.stage === 'leg2' ? smartJourneyRef.current.leg1No ?? null : null,
-      party: travelPartyRef.current,
-      cabinPreferences: {
-        ...getCabinPrefs(),
-        quiet: tripPrefsRef.current.quiet,
-        charging: tripPrefsRef.current.charging,
-        luggage: tripPrefsRef.current.luggage,
-      },
-    })
-      .then((res) => {
-        if (generation !== dispatchGenerationRef.current) return null;
-        if (res) {
-          if (res.tripNo) {
-            const authoritativeTrip = { ...lastTripRef.current, no: res.tripNo };
-            lastTripRef.current = authoritativeTrip;
-            setLastTrip(authoritativeTrip);
-            const journey = smartJourneyRef.current;
-            if (journey) {
-              const stamped = journey.stage === 'leg1'
-                ? { ...journey, leg1No: res.tripNo }
-                : { ...journey, leg2No: res.tripNo };
-              smartJourneyRef.current = stamped;
-              setSmartJourney(stamped);
-            }
+    const work = async (): Promise<MatchedOp | null> => {
+      const trip = lastTripRef.current;
+      const from = pickupPinRef.current ?? tripCoordsRef.current?.pickup ??
+        (departure.lat != null && departure.lng != null ? { lat: departure.lat, lng: departure.lng } : null);
+      const dest = tripCoordsRef.current?.dest;
+      if (!from || !dest) {
+        setDispatchState('error'); confirmInFlightRef.current = false; return null;
+      }
+      setMatchedOp(null); setDispatchState('searching');
+      try {
+        if (!preparedIdRef.current) {
+          bookingKeyRef.current ||= Crypto.randomUUID();
+          const prepared = await prepareRide({
+            bookingKey: bookingKeyRef.current, pickup: from, destinationPoint: dest,
+            dep: departure.short, dest: arrival.short,
+            cls: operatorClassFor(travelClassRef.current),
+            journeyNo: smartJourneyRef.current?.stage === 'leg2' ? smartJourneyRef.current.leg1No ?? null : null,
+            party: travelPartyRef.current,
+            cabinPreferences: {
+              ...getCabinPrefs(), quiet: tripPrefsRef.current.quiet,
+              charging: tripPrefsRef.current.charging, luggage: tripPrefsRef.current.luggage,
+            },
+          });
+          if (generation !== dispatchGenerationRef.current) return null;
+          preparedIdRef.current = prepared.rideId;
+          activeRideId.current = prepared.rideId;
+          const canonical = { ...trip, no: prepared.tripNo, total: prepared.amountCents / 100 };
+          lastTripRef.current = canonical; lastTotalRef.current = canonical.total;
+          setLastTrip(canonical);
+          const journey = smartJourneyRef.current;
+          if (journey) {
+            const stamped = journey.stage === 'leg1'
+              ? { ...journey, leg1No: prepared.tripNo }
+              : { ...journey, leg2No: prepared.tripNo };
+            smartJourneyRef.current = stamped; setSmartJourney(stamped);
           }
-          setMatchedOp(res);
-          activeRideId.current = res.rideId; // handle for writing the outcome back
-          setWatchedRideId(res.rideId);
-          setDispatchState('matched');
-          confirmInFlightRef.current = false;
-          refreshMyRides();
-          // TELL THE OPERATOR. The travel was written to Firestore from this phone, so the
-          // server does not learn of it until its next sweep — and an operator whose app is
-          // in their pocket has no other way to find out. This is the notification the whole
-          // operator loop rested on and did not have.
-          announceTravel(res.rideId, 'assigned');
-          // Somebody is coming — now take the money. Held in a ref rather than chained at the
-          // call site so a retry after "no operators available" charges too, without giving
-          // this callback a new identity on every render.
-          const charge = pendingChargeRef.current;
-          pendingChargeRef.current = null;
-          charge?.();
-        } else {
-          // No available operator nearby (or signed out) — surface it, don't hang. Nothing
-          // has been charged, and the screen must not imply otherwise.
-          setDispatchState('none');
-          confirmInFlightRef.current = false;
         }
-        return res;
-      })
-      .catch(() => {
+        const rideId = preparedIdRef.current;
+        if (!rideId) throw new Error(tr('traveler.errGeneric'));
+        let alreadyDispatched: MatchedOp | null | undefined;
+        if (paymentRef.current.status === 'failed') {
+          try {
+            alreadyDispatched = await dispatchRide(rideId);
+            const recovered = { status: 'paid' as const, amountCents: Math.round(lastTripRef.current.total * 100), tripNo: lastTripRef.current.no };
+            paymentRef.current = recovered; setPayment(recovered);
+          } catch (error) {
+            if ((error as Error & { code?: string }).code !== 'payment_unconfirmed') throw error;
+          }
+        }
+        if (paymentRef.current.status !== 'paid') {
+          setPayment({ status: 'processing', tripNo: lastTripRef.current.no });
+          const result = await payForRide({
+            rideId, tripNo: lastTripRef.current.no,
+            departure: departure.short, destination: arrival.short,
+            travelClass: travelClassRef.current,
+            pickup: from, dest,
+            journeyNo: smartJourneyRef.current?.stage === 'leg2' ? smartJourneyRef.current.leg1No ?? null : null,
+          });
+          if (generation !== dispatchGenerationRef.current) return null;
+          if (!result.ok) {
+            const failed = { status: result.canceled ? 'idle' as const : 'failed' as const,
+              error: result.error, tripNo: lastTripRef.current.no };
+            paymentRef.current = failed; setPayment(failed);
+            setDispatchState(result.canceled ? 'idle' : 'error');
+            confirmInFlightRef.current = false;
+            if (result.canceled && !await cancelRideRef.current()) {
+              const unresolved = { status: 'failed' as const, tripNo: lastTripRef.current.no };
+              paymentRef.current = unresolved; setPayment(unresolved);
+              setDispatchState('error');
+            }
+            return null;
+          }
+          paidIntentRef.current = result.paymentIntentId ?? null;
+          const paid = { status: 'paid' as const, amountCents: result.amountCents,
+            paymentIntentId: result.paymentIntentId, tripNo: lastTripRef.current.no };
+          paymentRef.current = paid; setPayment(paid);
+          if (result.methodLabel) {
+            lastTripRef.current = { ...lastTripRef.current, pay: result.methodLabel };
+            setLastTrip(lastTripRef.current);
+          }
+        }
+        const op = alreadyDispatched === undefined ? await dispatchRide(rideId) : alreadyDispatched;
         if (generation !== dispatchGenerationRef.current) return null;
-        setDispatchState('error');
-        confirmInFlightRef.current = false;
+        if (!op) {
+          // A confirmed charge with no remaining supply is NOT an uncharged wait.
+          // Keep its Travel id and explicit paid status for retry or authoritative refund.
+          setDispatchState('none'); confirmInFlightRef.current = false;
+          setWatchedRideId(rideId); refreshMyRides();
+          return null;
+        }
+        setMatchedOp(op);
+        activeRideId.current = rideId; setWatchedRideId(rideId);
+        setDispatchState('matched'); confirmInFlightRef.current = false;
+        refreshMyRides();
+        return op;
+      } catch {
+        if (generation === dispatchGenerationRef.current) {
+          setDispatchState('error'); confirmInFlightRef.current = false;
+        }
         return null;
-      });
+      }
+    };
+    const running = work().finally(() => {
+      if (dispatchInFlightRef.current === running) dispatchInFlightRef.current = null;
+    });
+    dispatchInFlightRef.current = running;
+    return running;
   }, [arrival, departure, refreshMyRides]);
-  // Reached from the travel watcher, which must not re-subscribe when runDispatch's identity
-  // changes. Same pattern as cancelRideRef and finishTravelRef.
-  const runDispatchRef = useRef<() => void>(() => {});
-  runDispatchRef.current = runDispatch;
-
   const beginSmartLeg = useCallback(
     (which: 1 | 2): boolean => {
       const plan = which === 1 ? smartPlan : smartJourneyRef.current?.plan ?? smartPlan;
@@ -985,7 +1003,6 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     statusRef.current = 0;
     setStatus(0);
     setRideActive(true);
-    declinedByRef.current = []; // a new travel, offered to everyone again
     onboardAtRef.current = null;
     const trip: Trip = {
       arr: arrival.short,
@@ -1011,71 +1028,11 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       smartJourneyRef.current = stamped;
       setSmartJourney(stamped);
     }
-    // No seeded message: an operator message exists only after the server records one.
-    // Real payment: the server prices the travel and creates the intent, then Stripe's own
-    // PaymentSheet collects the card on the phone. The card never reaches our server, and the
-    // app never sends an amount.
-    //
-    // NOT RUN YET. This is handed to dispatch and fires only once an operator has been
-    // matched — see pendingChargeRef. Charging in parallel with the search meant a traveler
-    // paid for a travel that might have nobody to drive it.
-    pendingChargeRef.current = () => {
-    setPayment({ status: 'processing', tripNo: trip.no });
-    payForRide({
-      destination: arrival.short,
-      departure: departure.short,
-      travelClass,
-      tripNo: trip.no,
-      // Present once the trip has been geocoded; absent on web, where the server prices from
-      // its named-destination table instead.
-      pickup: tripCoords?.pickup ?? null,
-      dest: tripCoords?.dest ?? null,
-      // The travel being paid for, so the SERVER can stamp the payment onto it. This app's
-      // own copy below is now the second route to settlement, not the only one.
-      rideId: settleRideRef.current ?? matchedOpRef.current?.rideId ?? null,
-      // Leg 2 of a Smart Travel journey names leg 1, so the server charges the journey's
-      // one platform fee across the two rather than a second one.
-      journeyNo:
-        smartJourneyRef.current?.stage === 'leg2' ? smartJourneyRef.current.leg1No ?? null : null,
-    })
-      .then((r) => {
-        if (r.ok) {
-          paidIntentRef.current = r.paymentIntentId ?? null;
-          // The travel may already have finished while the sheet was open.
-          trySettle();
-          setPayment({
-            status: 'paid',
-            amountCents: r.amountCents,
-            paymentIntentId: r.paymentIntentId,
-            tripNo: trip.no,
-          });
-          // The receipt names the method Stripe actually charged, not the one selected in
-          // Wallet — with the PaymentSheet those are different things, and a receipt must
-          // say what happened.
-          if (r.methodLabel) {
-            const paid = { ...lastTripRef.current, pay: r.methodLabel };
-            lastTripRef.current = paid;
-            setLastTrip((t) => (t.no === paid.no ? paid : t));
-            setCompletedTrips((prev) => prev.map((t) => (t.no === paid.no ? paid : t)));
-          }
-          return;
-        }
-        // Closing the sheet is a decision, not a fault. The travel is cancelled rather than
-        // left running unpaid, and nothing is reported as an error.
-        setPayment({
-          status: r.canceled ? 'idle' : 'failed',
-          error: r.canceled ? undefined : r.error,
-          tripNo: trip.no,
-        });
-        if (r.canceled) cancelRideRef.current();
-      })
-      .catch(() =>
-        setPayment({ status: 'failed', error: tr('traveler.paymentServerUnreachable'), tripNo: trip.no }),
-      );
-    };
-
-    // Find somebody first. The charge above runs the moment one is matched, and never if
-    // one is not.
+    // A fresh confirmation has a fresh idempotency key. Retries of this confirmation keep it.
+    bookingKeyRef.current = Crypto.randomUUID();
+    preparedIdRef.current = null;
+    paymentRef.current = { status: 'idle' };
+    setPayment({ status: 'idle' });
     runDispatch();
     // NOTE: the ride's progress timer does NOT start here — it starts when an operator is
     // actually matched (see the effect below). Starting it at confirm meant the demo could
@@ -1195,20 +1152,10 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     if (!rideId) return;
     return watchRide(rideId, (s) => {
       if (s === 'declined') {
-        // The operator said no. Look for another one rather than stranding a traveler who has
-        // already paid: they keep their travel number and their payment, and the operator who
-        // declined is not offered it again. When nobody is left, dispatchRide returns nothing
-        // and the screen says so — which is where this used to stop immediately.
-        const refused = matchedOpRef.current?.id;
-        if (refused && !declinedByRef.current.includes(refused)) {
-          declinedByRef.current = [...declinedByRef.current, refused];
-        }
+        // Legacy declined records are never a reason to create another charged Travel.
+        // Current server declines keep status assigned/released on this same document.
         setMatchedOp(null);
-        // Stop following the refused travel before asking for another. runDispatch sets the
-        // new one on success; on failure we watch nothing, which is what "No operator matched
-        // yet" honestly means.
-        setWatchedRideId(null);
-        runDispatchRef.current();
+        setDispatchState('searching');
         return;
       }
       // THE LOCK SCREEN FOLLOWS THE OPERATOR, not a timer. This is the same event stream the
@@ -1248,7 +1195,16 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     // ROUTE MONITORING'S READING OF THIS JOURNEY. Either something it can explain — the road
     // is stopped and other American Rider vehicles nearby are stopped in it — or, when it
     // cannot explain it and the operator has not answered, a question for the traveler.
-    setTravelMonitor);
+    setTravelMonitor,
+    (assignment) => {
+      if (assignment) {
+        setMatchedOp((current) => current?.id === assignment.id ? current : assignment);
+        setDispatchState('matched');
+      } else if (activeRideId.current === rideId) {
+        setMatchedOp(null);
+        setDispatchState((current) => current === 'none' ? current : 'searching');
+      }
+    });
     // Keyed on the TRAVEL. It used to be [matchedOp], which re-subscribed on every operator
     // change and unsubscribed entirely when there was none.
   }, [watchedRideId]);
@@ -1329,6 +1285,9 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     setStatus(0);
     paidIntentRef.current = null;
     settleRideRef.current = null;
+    preparedIdRef.current = null;
+    bookingKeyRef.current = null;
+    dispatchGenerationRef.current++;
     activeRideId.current = null;
     setWatchedRideId(null);
     refreshMyRides();

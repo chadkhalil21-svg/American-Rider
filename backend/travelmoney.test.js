@@ -140,7 +140,7 @@ const rides = (over = {}) => ({
     const db = fakeDb({ rides: { N: { ...fare, travelerUid: 'alice', operatorId: 'op1', tripNo: 'AR-9-MIA', status: 'assigned' } } });
     const s = stripe();
     const out = await payForTravel({ db, uid: 'alice', rideId: 'N', create: s.create, now: 7 });
-    check('the owner pays for their own live ride', out.status === 200 && db.data.rides.N.paymentIntentId === 'pi_new' && db.data.rides.N.paidAt === 7);
+    check('the owner prepares their own intent, without claiming payment success', out.status === 200 && db.data.rides.N.paymentIntentId === 'pi_new' && db.data.rides.N.paymentIntentCreatedAt === 7 && !db.data.rides.N.paidAt);
     check('Stripe gets the RIDE\'s Travel Number and id, not the request\'s', s.log.creates[0].tripNo === 'AR-9-MIA' && s.log.creates[0].rideId === 'N');
   }
   {

@@ -114,6 +114,9 @@ function presenceStale(o, now = Date.now()) {
 function matchOperator(operators, pickup, travelClass = 'Standard', { requireScreening = false, now = Date.now() } = {}) {
   const candidates = operators
     .filter(o => o.available)
+    // A duty flag means the Operator is online, not free to serve two concurrent Travelers.
+    // The final reservation is still enforced transactionally by booking.js.
+    .filter(o => !o.currentRideId)
     // 2. and still there. See PRESENCE_STALE_MS above — `available` alone is a flag nobody
     //    ever clears, and it put a paying traveler in a car that did not exist.
     .filter(o => !presenceStale(o, now))

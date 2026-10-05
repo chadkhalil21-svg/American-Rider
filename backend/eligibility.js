@@ -32,7 +32,7 @@ async function acceptOffer({ db, uid, rideId, externals, liveMoney = false, now 
         externals?.account?.disabled === false && externals?.payouts?.enabled === true &&
         (!ride.bookingFingerprint || (
           paymentMatches(ride, externals?.payment, ride.travelerUid, rideId) &&
-          opSnap.exists && String(opSnap.data().currentRideId || '') === String(rideId)
+          opSnap.exists && [opSnap.data().currentRideId, opSnap.data().nextRideId].map(String).includes(String(rideId))
         ))) {
       return { status: 200, body: { ok: true, acceptedAt: ride.acceptedAt, reused: true } };
     }
@@ -43,7 +43,7 @@ async function acceptOffer({ db, uid, rideId, externals, liveMoney = false, now 
         !paymentMatches(ride, externals?.payment, ride.travelerUid, rideId))) {
       return { status: 409, body: { error: 'Travel payment is not confirmed.', code: 'payment_unconfirmed' } };
     }
-    if (ride.bookingFingerprint && (!opSnap.exists || String(opSnap.data().currentRideId || '') !== String(rideId))) {
+    if (ride.bookingFingerprint && (!opSnap.exists || ![opSnap.data().currentRideId, opSnap.data().nextRideId].map(String).includes(String(rideId)))) {
       return { status: 409, body: { error: 'This offer is not reserved for you.', code: 'reservation_missing' } };
     }
     const at = now();
@@ -63,6 +63,7 @@ async function acceptOffer({ db, uid, rideId, externals, liveMoney = false, now 
       tx.update(rideRef, { releasedAt: at, releasedReason: first.code, statusAt: at });
       if (opSnap.exists) tx.set(opRef, { available: false, offDutyReason: first.code, offDutyAt: at,
         ...(String(opSnap.data().currentRideId || '') === String(rideId) ? { currentRideId: null, reservedAt: null } : {}),
+        ...(String(opSnap.data().nextRideId || '') === String(rideId) ? { nextRideId: null, nextReservedAt: null } : {}),
       }, { merge: true });
       return { status: 409, body: { error: first.reason, code: first.code, released: true } };
     }

@@ -67,8 +67,20 @@ async function progressTravel({ db, uid, rideId, status, now = Date.now() }) {
     if (next === 'declined' || next === 'completed') {
       const opRef = db.collection('operators').doc(String(uid));
       const opSnap = await tx.get(opRef);
-      if (opSnap.exists && String(opSnap.data().currentRideId || '') === id) {
-        tx.update(opRef, { currentRideId: null, reservedAt: null });
+      if (opSnap.exists) {
+        const fleet = opSnap.data() || {};
+        if (next === 'completed' && String(fleet.currentRideId || '') === id) {
+          // Promote the already-reserved next Travel atomically. There is never a moment where
+          // another dispatch can steal this Operator between passenger A completing and B becoming current.
+          tx.update(opRef, fleet.nextRideId
+            ? { currentRideId: String(fleet.nextRideId), reservedAt: fleet.nextReservedAt || now,
+                nextRideId: null, nextReservedAt: null }
+            : { currentRideId: null, reservedAt: null });
+        } else if (String(fleet.currentRideId || '') === id) {
+          tx.update(opRef, { currentRideId: null, reservedAt: null });
+        } else if (String(fleet.nextRideId || '') === id) {
+          tx.update(opRef, { nextRideId: null, nextReservedAt: null });
+        }
       }
     }
     const patch = { status: next === 'declined' ? 'assigned' : next, statusAt: now, [STAMP[next]]: now };

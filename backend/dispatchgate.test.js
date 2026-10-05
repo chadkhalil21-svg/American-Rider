@@ -93,7 +93,10 @@ check('provider success, owner, amount and currency are verified before an offer
   route.indexOf('verifiedTravelPayment(') < route.indexOf('assignPaidTravel(') &&
   /paymentMatches\(ride, payment, req\.uid, id\)/.test(route));
 check('the assignment is one transaction covering both the Travel and Operator',
-  /db\.runTransaction/.test(booking) && /tx\.update\(opRef, \{ currentRideId:/.test(booking) && /tx\.update\(ref, fields\)/.test(booking));
+  /db\.runTransaction/.test(booking) &&
+  /tx\.update\(opRef,[\s\S]*?currentRideId: String\(rideId\)/.test(booking) &&
+  /tx\.update\(opRef,[\s\S]*?nextRideId: String\(rideId\)/.test(booking) &&
+  /tx\.update\(ref, fields\)/.test(booking));
 check('a paid Travel with no remaining supply stays visible for refund, never fabricated',
   /matched: null, paymentConfirmed: true/.test(booking) && !/operatorDemo: true/.test(booking));
 

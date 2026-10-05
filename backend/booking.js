@@ -1,5 +1,5 @@
 const { createHash } = require('node:crypto');
-const { matchOperator } = require('./matching');
+const { matchOperator, distanceMiles } = require('./matching');
 const { ageOn, MIN_AGE, MAX_AGE } = require('./family');
 const { marketFor } = require('./markets');
 const { regionById } = require('./regions');
@@ -115,8 +115,23 @@ async function assignPaidTravel({ db, uid, rideId, payment, candidate, now = Dat
     const opSnap = await tx.get(opRef);
     const op = opSnap.exists ? opSnap.data() : null;
     const from = { lat: Number(ride.pickupLat), lng: Number(ride.pickupLng) };
-    const valid = op && !op.currentRideId && matchOperator(
-      [{ ...op, id: opRef.id }], from, ride.travelClass || 'Standard', { requireScreening, now },
+    let queueAfterRideId = null;
+    let queueEligible = false;
+    if (op?.currentRideId && !op.nextRideId) {
+      const activeRef = db.collection('rides').doc(String(op.currentRideId));
+      const activeSnap = await tx.get(activeRef);
+      const active = activeSnap.exists ? activeSnap.data() || {} : {};
+      const here = { lat: Number(op.lat), lng: Number(op.lng) };
+      const destination = { lat: Number(active.destinationLat), lng: Number(active.destinationLng) };
+      queueEligible = active.status === 'onboard' &&
+        Number.isFinite(here.lat) && Number.isFinite(here.lng) &&
+        Number.isFinite(destination.lat) && Number.isFinite(destination.lng) &&
+        distanceMiles(here, destination) <= 3;
+      if (queueEligible) queueAfterRideId = String(op.currentRideId);
+    }
+    const valid = op && matchOperator(
+      [{ ...op, id: opRef.id, queueEligible }], from, ride.travelClass || 'Standard',
+      { requireScreening, now, allowQueued: true },
     );
     if (!valid || String(valid.operator.id) !== String(candidate.operator.id)) {
       return deny(409, 'operator_unavailable', 'That Operator is no longer available');
@@ -127,16 +142,24 @@ async function assignPaidTravel({ db, uid, rideId, payment, candidate, now = Dat
       operatorPlate: op.plate || '', operatorLat: Number(op.lat), operatorLng: Number(op.lng),
       operatorEtaMin: valid.etaMin, operatorMiles: valid.miles, operatorDemo: false,
       offeredAt: now, notifiedOperatorAt: null, releasedAt: null, releasedReason: null,
+      ...(queueAfterRideId ? { queuedAfterRideId: queueAfterRideId } : {}),
       ...(released ? { declinedBy: [...new Set([...(Array.isArray(ride.declinedBy) ? ride.declinedBy : []), String(ride.operatorId)])] } : {}),
     };
     if (released && ride.operatorId && String(ride.operatorId) !== opRef.id) {
       const oldRef = db.collection('operators').doc(String(ride.operatorId));
       const oldSnap = await tx.get(oldRef);
-      if (oldSnap.exists && String(oldSnap.data().currentRideId || '') === String(rideId)) {
-        tx.update(oldRef, { currentRideId: null, reservedAt: null });
+      if (oldSnap.exists) {
+        const old = oldSnap.data() || {};
+        if (String(old.currentRideId || '') === String(rideId)) {
+          tx.update(oldRef, { currentRideId: null, reservedAt: null });
+        } else if (String(old.nextRideId || '') === String(rideId)) {
+          tx.update(oldRef, { nextRideId: null, nextReservedAt: null });
+        }
       }
     }
-    tx.update(opRef, { currentRideId: String(rideId), reservedAt: now });
+    tx.update(opRef, queueAfterRideId
+      ? { nextRideId: String(rideId), nextReservedAt: now }
+      : { currentRideId: String(rideId), reservedAt: now });
     tx.update(ref, fields);
     return { status: 200, body: { rideId, tripNo: ride.tripNo, matched: operatorView(fields) } };
   });

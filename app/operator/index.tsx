@@ -192,7 +192,7 @@ export default function OperatorHome() {
   // travel. With nobody booking, the screen says "Matching you with nearby travelers", which
   // is the truth.
   useEffect(() => {
-    if (op.online && !op.op && !request && op.incoming) openRequest(op.incoming);
+    if (op.online && !request && op.incoming && op.incoming.rideId !== op.op?.rideId) openRequest(op.incoming);
   }, [op.online, op.op, op.incoming, request, openRequest]);
 
   useFocusEffect(clearTimers);

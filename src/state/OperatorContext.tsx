@@ -354,6 +354,8 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
   // nothing ever looked again. The same trap the going-on-duty effect below was written for.
   const relookTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [op, setOp] = useState<ActiveOp | null>(null);
+  // One accepted next Travel may wait behind the passenger currently onboard.
+  const [queuedOp, setQueuedOp] = useState<ActiveOp | null>(null);
   // The travel underway, reachable from callbacks that must not re-create on every change.
   const opRef = useRef<ActiveOp | null>(null);
   const [arrived, setArrived] = useState(false);
@@ -691,9 +693,16 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
       // dispatched request (see SimRequest); rideId stays the fallback only for a record old
       // enough to predate it, and the scripted number for the test program.
       setIncoming(null);
-      setOp({ ...r, no: r.tripNo || r.rideId!, earn: earnOf(r.fare) });
-      setArrived(false);
-      setMsgs([]);
+      const accepted = { ...r, no: r.tripNo || r.rideId!, earn: earnOf(r.fare) };
+      if (opRef.current && opRef.current.rideId !== r.rideId) {
+        // The server only permits this when the current passenger is onboard and the vehicle
+        // is approaching that destination. Keep the current Travel on screen; B is merely lined up.
+        setQueuedOp(accepted);
+      } else {
+        setOp(accepted);
+        setArrived(false);
+        setMsgs([]);
+      }
       return true;
     },
     [commitRevenue],
@@ -953,10 +962,15 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
     };
     setLastCompleted(record);
     commitRevenue({ ...revRef.current, ops: [record, ...revRef.current.ops] });
-    setOp(null);
+    if (queuedOp) {
+      setOp(queuedOp);
+      setQueuedOp(null);
+    } else {
+      setOp(null);
+    }
     setArrived(false);
     return true;
-  }, [op, commitRevenue]);
+  }, [op, queuedOp, commitRevenue]);
 
   // Keep the Operator's conversation on the same Travel-scoped record the Traveler sees.
   useEffect(() => {

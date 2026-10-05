@@ -82,7 +82,7 @@ const { ready: voiceReady, reason: voiceReason, accessToken: voiceToken,
 const { resolvePickupWall } = require('./scheduleclock');
 const { scheduledIdentity } = require('./scheduledidentity');
 const { REGIONS, defaultRegion } = require('./regions');
-const { presenceStale, coverageLapsed, matchOperator, etaMinutes } = require('./matching');
+const { presenceStale, coverageLapsed, matchOperator, etaMinutes, distanceMiles } = require('./matching');
 const { encodeGeohash, nearbyOperatorCandidates } = require('./geooperators');
 // DISCLOSURE IS IMPORTED FOR .statute, and leaving it out is how the acknowledge route below
 // threw `DISCLOSURE is not defined` for a day — every operator who read the disclosure was
@@ -3216,8 +3216,28 @@ app.post('/scheduled/sweep', runSweep);
 // presence freshness, insurance, disclosure, screening, commissioning, documents, Travel
 // class and distance. Keeping those rules in one gate prevents query optimization from becoming
 // a second qualification system.
+const QUEUE_APPROACH_MI = 3;
 async function availableOperatorCandidates(db, pickup, excludeIds = new Set()) {
-  return nearbyOperatorCandidates(db, pickup, { excludeIds });
+  const fleet = await nearbyOperatorCandidates(db, pickup, { excludeIds });
+  // An Operator may line up exactly one next Travel only while carrying the current Traveler
+  // and already approaching that Travel's destination. Discovery marks the possibility; the
+  // assignment transaction independently re-reads both Travels before reserving the slot.
+  await Promise.all(fleet.map(async (op) => {
+    op.queueEligible = false;
+    if (!op.currentRideId || op.nextRideId) return;
+    try {
+      const snap = await db.collection('rides').doc(String(op.currentRideId)).get();
+      if (!snap.exists) return;
+      const active = snap.data() || {};
+      const here = { lat: Number(op.lat), lng: Number(op.lng) };
+      const destination = { lat: Number(active.destinationLat), lng: Number(active.destinationLng) };
+      op.queueEligible = active.status === 'onboard' &&
+        Number.isFinite(here.lat) && Number.isFinite(here.lng) &&
+        Number.isFinite(destination.lat) && Number.isFinite(destination.lng) &&
+        distanceMiles(here, destination) <= QUEUE_APPROACH_MI;
+    } catch { /* inability to verify capacity means no queued offer */ }
+  }));
+  return fleet;
 }
 
 // Human-facing Travel Numbers identify the authoritative pickup market, never a client label.
@@ -3284,7 +3304,7 @@ app.post('/travel/prepare', requireAuth, LIMITS.dispatch, requireFreshAuth, requ
     // Availability is a pre-charge hint, not a reservation. The post-payment transaction is
     // authoritative and can still find the fleet gone; then the paid Travel is refund-owed.
     const fleet = await availableOperatorCandidates(db, pickup);
-    if (!matchOperator(fleet, pickup, String(b.cls || 'Standard'), { requireScreening: screeningReady() })) {
+    if (!matchOperator(fleet, pickup, String(b.cls || 'Standard'), { requireScreening: screeningReady(), allowQueued: true })) {
       return res.status(409).json({ error: 'No eligible Operator is available; nothing was charged', code: 'no_operator' });
     }
     const tripNo = travelNumberFor(id, pickup);
@@ -3334,7 +3354,7 @@ app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, requireFreshAuth, req
     let candidate = null;
     if (ride.status !== 'assigned') {
       const fleet = await availableOperatorCandidates(db, pickup);
-      candidate = matchOperator(fleet, pickup, ride.travelClass, { requireScreening: screeningReady() });
+      candidate = matchOperator(fleet, pickup, ride.travelClass, { requireScreening: screeningReady(), allowQueued: true });
     }
     const outcome = await assignPaidTravel({
       db, uid: req.uid, rideId: id, payment, candidate, requireScreening: screeningReady(),

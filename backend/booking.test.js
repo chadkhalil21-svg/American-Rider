@@ -80,6 +80,29 @@ async function main() {
   assert.equal(matchOperator([{ ...db.data.get('operators/operator-1'), id: operator.id }],
     { lat: quote.pickupLat, lng: quote.pickupLng }, 'Standard', { now }), null);
   assert.equal(db.data.get(`rides/${secondId}`).status, 'awaiting_payment');
+  // Anticipatory capacity: one next Travel may be reserved only while the current passenger
+  // is onboard and the Operator is approaching that destination.
+  const qdb = store();
+  const activeId = 'active-current';
+  qdb.data.set(`rides/${activeId}`, { operatorId: operator.id, status: 'onboard',
+    destinationLat: operator.lat, destinationLng: operator.lng });
+  qdb.data.set('operators/operator-1', { ...operator, currentRideId: activeId });
+  const q = await prepareBooking({ db: qdb, uid: 'traveler-q', key: 'booking-queue-00000001',
+    fingerprint: 'route-q', record: quote, now });
+  const qid=q.body.rideId;
+  qdb.data.set(`rides/${qid}`, { ...qdb.data.get(`rides/${qid}`), paymentIntentId: `pi_${qid}` });
+  const queued = await assignPaidTravel({ db:qdb, uid:'traveler-q', rideId:qid,
+    payment:provider(qid,'traveler-q'), candidate:{operator:{...operator,currentRideId:activeId,queueEligible:true}}, now });
+  assert.equal(queued.status,200);
+  assert.equal(qdb.data.get('operators/operator-1').currentRideId,activeId,'current passenger remains authoritative');
+  assert.equal(qdb.data.get('operators/operator-1').nextRideId,qid,'next Travel occupies a separate one-deep slot');
+  assert.equal(qdb.data.get(`rides/${qid}`).queuedAfterRideId,activeId);
+  const q2=await prepareBooking({db:qdb,uid:'traveler-q2',key:'booking-queue-00000002',
+    fingerprint:'route-q2',record:quote,now});
+  const q2id=q2.body.rideId;qdb.data.set(`rides/${q2id}`,{...qdb.data.get(`rides/${q2id}`),paymentIntentId:`pi_${q2id}`});
+  const over=await assignPaidTravel({db:qdb,uid:'traveler-q2',rideId:q2id,payment:provider(q2id,'traveler-q2'),
+    candidate:{operator:{...operator,currentRideId:activeId,queueEligible:true}},now});
+  assert.equal(over.body.code,'operator_unavailable','queue depth is exactly one');
   const retry = await assignPaidTravel({ db, uid: 'traveler-1', rideId: id, payment: provider(id, 'traveler-1'), candidate, now });
   assert.equal(retry.status, 200); assert.equal(retry.body.reused, true);
   const secondOperator = { ...operator, id: 'operator-2', name: 'Operator Two' };

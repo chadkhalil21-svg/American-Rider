@@ -145,10 +145,13 @@ service cloud.firestore {
       allow read: if ownsExisting();
       allow create: if ownsIncoming()
                     && request.resource.data.keys().hasOnly(['travelerUid', 'tripNo', 'candidateTripNos', 'notifiedOperatorIds', 'notifiedOperatorNames', 'description', 'photoUrl', 'photoObjectKey', 'status', 'createdAt', 'statusAt', 'return']);
+      // Once filed, lifecycle state is server-authoritative. The Traveler may correct the
+      // description, but cannot self-assert that an Operator was notified or that a return was
+      // arranged. Those are operational facts and require server evidence.
       allow update: if ownsExisting()
-                    && touchesOnly(['return', 'status', 'statusAt', 'description'])
-                    && (!changes('status')
-                        || request.resource.data.status in ['reported', 'operator-notified', 'return-arranged']);
+                    && touchesOnly(['description'])
+                    && !changes('status')
+                    && !changes('return');
       allow delete: if false;
     }
 
@@ -295,6 +298,12 @@ service cloud.firestore {
       // A person may close their account. AuthContext.deleteAccount deletes this document as
       // part of that, and Apple requires the whole flow to work from inside the app.
       allow delete: if signedIn() && request.auth.uid == uid;
+    }
+
+    // Authenticated phones may delete their own user profile, but cannot remove the server's
+    // closing fence and resurrect a paid booking while Firebase Auth deletion is in progress.
+    match /account_closures/{uid} {
+      allow read, write: if false;
     }
 
     // ---- everything else ---------------------------------------------------

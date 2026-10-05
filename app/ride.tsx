@@ -10,6 +10,7 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Platform, Pressable, Share, StyleSheet, View } from 'react-native';
 import { Text } from '../src/components/AppText';
+import { useTravelVoice } from '../src/state/VoiceContext';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
 import { useNative } from '../src/components/anim';
 import { FindMiguel } from '../src/components/FindMiguel';
@@ -25,7 +26,7 @@ import {
   Screen,
   SectionLabel,
 } from '../src/components/UI';
-import { prettyPlace, STATUS_ETAS, STATUS_LABELS, VENUE_NOTES } from '../src/data';
+import { prettyPlace, STATUS_LABELS, VENUE_NOTES } from '../src/data';
 import { useRide } from '../src/state/RideContext';
 import { useLanguage } from '../src/state/LanguageContext';
 import { colors, fmt, radii } from '../src/theme';
@@ -120,7 +121,8 @@ function PinIcon() {
   );
 }
 
-export default function Status() {
+export default function RideScreen() {
+  const voice = useTravelVoice();
   const { t } = useLanguage();
   const router = useRouter();
   const ride = useRide();
@@ -141,14 +143,20 @@ export default function Status() {
   }, [ride.status]);
 
   const st = ride.status;
-  const etas = STATUS_ETAS(ride.pickupWait);
+  const arrivalFact = (() => {
+    if (st === 1 && ride.matchedOp && ride.matchedOp.etaMin > 0) return t('traveler.durMin', { n: ride.matchedOp.etaMin });
+    if (st === 2) return t('traveler.rideStepOutside');
+    // Total route duration is not remaining duration. Without live progress telemetry there is
+    // no defensible countdown after boarding, so display no invented arrival estimate.
+    return null;
+  })();
   const subs = STATUS_SUBS(t);
   const complete = st >= 5;
   const canCancel = st <= 2;
   const searching = !ride.matchedOp && ride.dispatchState === 'searching';
   const noOperator = !ride.matchedOp && (ride.dispatchState === 'none' || ride.dispatchState === 'error');
   const stepIdx = st <= 1 ? 0 : st === 2 ? 1 : st <= 4 ? 2 : 3;
-  const steps = ['En Route', 'Arrived', 'Onboard', 'Arrival'];
+  const steps = [t('traveler.phaseEnRoute'), t('traveler.phaseArrived'), t('traveler.phaseOnboard'), t('traveler.arrival')];
 
   useEffect(() => {
     if (!canCancel && cancelAsk) setCancelAsk(false);
@@ -185,6 +193,11 @@ export default function Status() {
                   ? t('traveler.noOperatorsNearby')
                   : t('traveler.dispatchUnavailable')}
               </Text>
+              {ride.payment.status === 'paid' ? (
+                <Text style={styles.searchSub}>{t('traveler.chargedAwaitingOperator')}</Text>
+              ) : ride.payment.status === 'processing' || ride.payment.status === 'failed' ? (
+                <Text style={styles.searchSub}>{t('traveler.paymentStatusUnverified')}</Text>
+              ) : null}
               {/* THREE WAYS OUT, NOT ONE (founders, 5 Sept 2026, from their own screenshot).
                   
                   This offered "Try again" and, at the bottom, "Cancel Travel". A traveler who
@@ -199,17 +212,11 @@ export default function Status() {
               <Pressable onPress={ride.retryDispatch} hitSlop={8}>
                 <Text style={styles.retryLink}>{t('traveler.tryAgain')}</Text>
               </Pressable>
-              <Pressable onPress={() => router.replace('/reserve')} hitSlop={8}>
-                <Text style={styles.retryLink}>{t('traveler.changeTravel')}</Text>
-              </Pressable>
-            </>
-          )}
-          {searching && (
-            <>
-              <SectionLabel style={{ marginTop: 22 }}>{t('traveler.estimatedSearchTime')}</SectionLabel>
-              <Mono size={20} style={{ marginTop: 6 }}>
-                ~ 00:12
-              </Mono>
+              {ride.payment.status === 'idle' ? (
+                <Pressable onPress={() => router.replace('/reserve')} hitSlop={8}>
+                  <Text style={styles.retryLink}>{t('traveler.changeTravel')}</Text>
+                </Pressable>
+              ) : null}
             </>
           )}
         </View>
@@ -234,7 +241,10 @@ export default function Status() {
                 logic as its reason, and was written when the card had already been charged
                 by this point. Nothing is charged until an operator is matched now, so this
                 states the money position instead of reassuring about it. */}
-            <Text style={styles.cancelNote}>{t('traveler.notCharged')}</Text>
+            <Text style={styles.cancelNote}>{t(ride.payment.status === 'paid'
+              ? 'traveler.chargedAwaitingOperator'
+              : ride.payment.status === 'processing' || ride.payment.status === 'failed'
+                ? 'traveler.paymentStatusUnverified' : 'traveler.notCharged')}</Text>
             <View style={styles.cancelBtns}>
               <Pressable onPress={() => setCancelAsk(false)} style={styles.keepBtn}>
                 <Text style={styles.keepBtnText}>{t('traveler.keepTravel')}</Text>
@@ -298,9 +308,7 @@ export default function Status() {
           <Num size={18} weight="600" style={{ marginTop: 3 }}>
             {/* While riding, show time left from the ACTUAL route rather than the canned
                 demo text — the real drive time scaled by how much trip remains. */}
-            {ride.route && st >= 3 && st < 5
-              ? t('traveler.durMin', { n: Math.max(1, Math.ceil((ride.route.durationSec * (5 - st)) / 3 / 60)) })
-              : etas[st]}
+            {arrivalFact ?? '—'}
           </Num>
         </View>
       </View>
@@ -544,15 +552,27 @@ export default function Status() {
               <Text style={styles.keepBtnText}>{t('traveler.keepTravel')}</Text>
             </Pressable>
             <Pressable
-              onPress={() => {
-                ride.cancelRide();
-                router.dismissTo('/');
+              accessibilityRole="button"
+              disabled={cancelBusy}
+              onPress={async () => {
+                if (cancelBusy) return;
+                setCancelBusy(true);
+                setCancelFailed(false);
+                try {
+                  if (await ride.cancelRide()) router.dismissTo('/');
+                  else setCancelFailed(true);
+                } catch {
+                  setCancelFailed(true);
+                } finally {
+                  setCancelBusy(false);
+                }
               }}
               style={styles.yesCancelBtn}
             >
-              <Text style={styles.yesCancelText}>{t('traveler.yesCancel')}</Text>
+              <Text style={styles.yesCancelText}>{cancelBusy ? t('traveler.familyWorking') : t('traveler.yesCancel')}</Text>
             </Pressable>
           </View>
+          {cancelFailed ? <Text style={styles.cancelNote}>{t('traveler.cancelFailed')}</Text> : null}
         </View>
       ) : complete ? (
         <PrimaryButton
@@ -577,6 +597,13 @@ export default function Status() {
               style={{ flex: 1 }}
             />
           </View>
+          {ride.matchedOp?.rideId && voice.available && voice.activeId === ride.matchedOp.rideId && (
+            <OutlineButton
+              label={t('common.voiceCallOperator')}
+              onPress={() => { void voice.start(ride.matchedOp!.rideId!); }}
+              style={{ marginTop: 12 }}
+            />
+          )}
           {canCancel && (
             <Pressable onPress={() => setCancelAsk(true)} hitSlop={10}>
               <Text style={styles.cancelLink}>{t('traveler.cancelTravel')}</Text>

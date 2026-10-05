@@ -62,7 +62,33 @@ async function progressTravel({ db, uid, rideId, status, now = Date.now() }) {
       }
     }
 
-    const patch = { status: next, statusAt: now, [STAMP[next]]: now };
+    // A decline releases the SAME paid Travel for the sweep; it must never prompt the phone
+    // to create or charge a second one. Completing also frees this Operator's one slot.
+    if (next === 'declined' || next === 'completed') {
+      const opRef = db.collection('operators').doc(String(uid));
+      const opSnap = await tx.get(opRef);
+      if (opSnap.exists) {
+        const fleet = opSnap.data() || {};
+        if (next === 'completed' && String(fleet.currentRideId || '') === id) {
+          // Promote the already-reserved next Travel atomically. There is never a moment where
+          // another dispatch can steal this Operator between passenger A completing and B becoming current.
+          tx.update(opRef, fleet.nextRideId
+            ? { currentRideId: String(fleet.nextRideId), reservedAt: fleet.nextReservedAt || now,
+                nextRideId: null, nextReservedAt: null }
+            : { currentRideId: null, reservedAt: null });
+        } else if (String(fleet.currentRideId || '') === id) {
+          tx.update(opRef, { currentRideId: null, reservedAt: null });
+        } else if (String(fleet.nextRideId || '') === id) {
+          tx.update(opRef, { nextRideId: null, nextReservedAt: null });
+        }
+      }
+    }
+    const patch = { status: next === 'declined' ? 'assigned' : next, statusAt: now, [STAMP[next]]: now };
+    if (next === 'declined') {
+      patch.releasedAt = now;
+      patch.releasedReason = 'operator_declined';
+      patch.declinedBy = [...new Set([...(Array.isArray(ride.declinedBy) ? ride.declinedBy : []), String(uid)])];
+    }
     if (next === 'completed') patch.needsPayout = true;
     tx.update(ref, patch);
     return { status: 200, body: { ok: true, status: next } };

@@ -11,6 +11,7 @@
 //   2. hand the client secret to Stripe's PaymentSheet, which collects the card ON THE PHONE
 //   3. report what actually happened — including the traveler simply cancelling the sheet
 import { initPaymentSheet, presentPaymentSheet, retrievePaymentIntent, isPlatformPaySupported } from '@stripe/stripe-react-native';
+import { Platform } from 'react-native';
 import { PAYMENT_SERVER_URL } from '../config';
 import { auth } from '../firebase';
 import { t } from '../i18n';
@@ -88,6 +89,9 @@ function travelerFacing(msg?: string | null): string {
 export type PaymentConfig = {
   stripePublishableKey: string | null;
   mode: 'live' | 'test' | 'no-key';
+  /** Stripe is configured enough to list/add/default/remove saved methods. */
+  canManagePaymentMethods: boolean;
+  /** The platform is operationally ready to create a Travel payment. */
   canTakePayment: boolean;
 };
 
@@ -106,10 +110,11 @@ export async function fetchPaymentConfig(): Promise<PaymentConfig> {
     return {
       stripePublishableKey: d?.stripePublishableKey ?? null,
       mode: d?.mode === 'live' ? 'live' : d?.mode === 'test' ? 'test' : 'no-key',
+      canManagePaymentMethods: d?.canManagePaymentMethods === true,
       canTakePayment: d?.canTakePayment === true,
     };
   } catch {
-    return { stripePublishableKey: null, mode: 'no-key', canTakePayment: false };
+    return { stripePublishableKey: null, mode: 'no-key', canManagePaymentMethods: false, canTakePayment: false };
   }
 }
 
@@ -178,15 +183,24 @@ export async function payForRide(opts: {
   if (!intent.clientSecret) return { ok: false, error: t('traveler.errPaymentNotStarted') };
 
   // ---- 2. Stripe's own sheet, on the phone ----
+  // Wallet environment must follow the same authoritative server mode as Stripe. A test
+  // backend must never initialize Google Pay as production, and a live backend must never
+  // silently remain in Google's test environment.
+  const walletTestEnv = (await fetchPaymentConfig()).mode !== 'live';
   const init = await initPaymentSheet({
     merchantDisplayName: 'American Rider',
     paymentIntentClientSecret: intent.clientSecret,
     customerId: intent.customerId,
     customerEphemeralKeySecret: intent.ephemeralKeySecret,
-    // Remember the card for the next travel.
-    allowsDelayedPaymentMethods: true,
+    // An Operator cannot be offered a Travel until Stripe confirms success. ACH and other
+    // delayed methods need a separately designed authorization/scheduling policy.
+    allowsDelayedPaymentMethods: false,
     // Apple Pay is offered inside the sheet where the device and the merchant record allow it.
-    applePay: { merchantCountryCode: 'US' },
+    ...(Platform.OS === 'ios'
+      ? { applePay: { merchantCountryCode: 'US' } }
+      : Platform.OS === 'android'
+        ? { googlePay: { merchantCountryCode: 'US', testEnv: walletTestEnv } }
+        : {}),
     returnURL: 'americanrider://stripe-redirect',
   });
   if (init.error) return { ok: false, error: travelerFacing(init.error.message) };
@@ -318,12 +332,17 @@ export async function addPaymentMethod(): Promise<{ ok: boolean; canceled?: bool
     return { ok: false, error: t('traveler.paymentServerUnreachable') };
   }
   if (!setup.clientSecret) return { ok: false, error: t('traveler.couldNotAddMethod') };
+  const walletTestEnv = (await fetchPaymentConfig()).mode !== 'live';
   const init = await initPaymentSheet({
     merchantDisplayName: 'American Rider',
     setupIntentClientSecret: setup.clientSecret,
     customerId: setup.customerId,
     customerEphemeralKeySecret: setup.ephemeralKeySecret,
-    applePay: { merchantCountryCode: 'US' },
+    ...(Platform.OS === 'ios'
+      ? { applePay: { merchantCountryCode: 'US' } }
+      : Platform.OS === 'android'
+        ? { googlePay: { merchantCountryCode: 'US', testEnv: walletTestEnv } }
+        : {}),
     returnURL: 'americanrider://stripe-redirect',
   });
   if (init.error) return { ok: false, error: travelerFacing(init.error.message) };

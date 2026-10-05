@@ -51,6 +51,8 @@ export type SmartStop = { id: string; name: string; lat: number; lng: number };
 
 export type SmartPlan = {
   status: 'ok';
+  /** A compatible continuation after the first car Travel was already paid. */
+  revision?: boolean;
   from: SmartStop;
   to: SmartStop;
   legs: SmartLeg[];
@@ -108,16 +110,16 @@ export async function fetchSmartQuote(
 
 
 export type SmartRevalidation =
-  | { status: 'ok'; changed: boolean; checkedAt: string; departAt: string | null; arriveAt: string | null; routeSignature: string }
+  | { status: 'ok'; changed: boolean; checkedAt: string; departAt: string | null; arriveAt: string | null; routeSignature: string; replacementPlan?: SmartPlan }
   | { status: 'none'; reason?: string }
   | { status: 'unavailable'; reason?: string };
 
-export async function revalidateSmartTransit(plan: SmartPlan): Promise<SmartRevalidation> {
+export async function revalidateSmartTransit(plan: SmartPlan, destination?: { lat: number; lng: number }): Promise<SmartRevalidation> {
   try {
     const res = await fetch(`${PAYMENT_SERVER_URL}/smart-revalidate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-AR-Smart': '2' },
-      body: JSON.stringify({ plan }),
+      body: JSON.stringify({ plan, destination }),
     });
     const body = await res.json().catch(() => null) as SmartRevalidation | null;
     if (!body || !['ok', 'none', 'unavailable'].includes(body.status)) return { status: 'unavailable', reason: 'malformed_response' };

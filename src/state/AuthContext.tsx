@@ -2,7 +2,6 @@
 // Tracks the signed-in user and exposes sign up / sign in / sign out.
 import { updateProfile,
   createUserWithEmailAndPassword,
-  deleteUser,
   onAuthStateChanged,
   sendEmailVerification,
   sendPasswordResetEmail,
@@ -11,12 +10,12 @@ import { updateProfile,
   verifyBeforeUpdateEmail,
   User,
 } from 'firebase/auth';
-import { deleteDoc, doc } from 'firebase/firestore';
+import { doc } from 'firebase/firestore';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { auth, db } from '../firebase';
 import { t } from '../i18n';
 import { clearAccountStorage, clearAllStorage } from './accountStorage';
-import { closeOperationalAccount } from '../backend/account';
+import { deleteAccountOnServer } from '../backend/account';
 import { clearPushToken } from '../backend/push';
 
 type AuthState = {
@@ -33,8 +32,9 @@ type AuthState = {
   signIn: (email: string, password: string) => Promise<void>;
   resetPassword: (email: string) => Promise<boolean>;
   /**
-   * Stops future operational work, deletes the profile and device data, and then deletes the
-   * login. Records that need a retention policy remain server-side.
+   * Reauthenticates, asks the server to stop operational work and delete the Firebase
+   * identity, and clears device data. The server deletes the profile synchronously or
+   * retries it through its leased worker; retained records still need a legal policy.
    * Requires a fresh credential from the account's linked Password, Apple, or Google
    * provider because Firebase refuses to delete an account whose sign-in is not recent.
    */
@@ -253,24 +253,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // failed credential both throw, so no operational or destructive step can follow.
         await reauthenticate();
         if (auth.currentUser?.uid !== u.uid) throw new Error(t('traveler.errNoAccountDelete'));
-        // 2. Stop future work before removing the login. Fail closed: deleting the login
-        // while a scheduled Travel or an on-duty Operator remains could dispatch or charge
-        // an account that can no longer control that work.
-        await closeOperationalAccount();
-        // Detach this device while the departing Firebase identity can still authorize the write.
-        await clearPushToken();
-        // 3. Their profile document (name, mobile, email). Transport, payment, safety and
-        // qualification records are not deleted from the phone; their retention needs a
-        // separate policy and privileged server handling.
-        // Fail closed. If the profile document cannot be removed, keep the login so the
-        // traveler can retry; deleting authentication while leaving profile PII behind would
-        // make the remaining record harder for its owner to control.
-        await deleteDoc(doc(db, 'users', u.uid));
-        // 4. Everything this app kept on the phone — role, operator qualification,
-        //    revenue, preferences, trusted contacts, the welcome flag.
-        await clearAllStorage();
-        // 5. The login itself. After this the app returns to the front door.
-        await deleteUser(u);
+        // The backend atomically fences new operational work, verifies the recent Firebase
+        // sign-in and deletes Auth BEFORE profile cleanup. A provider failure keeps the
+        // profile intact and leaves a retryable server-only closing fence. Keep push and
+        // local account data intact on a 409, 503, lost response or transient auth outage.
+        // A failed token refresh is NOT proof the account was deleted.
+        await deleteAccountOnServer();
+        // Remove locally retained role, preferences and contacts even if sign-out fails.
+        try { await clearAllStorage(); }
+        finally { await fbSignOut(auth); }
       }),
     // THE DEVICE IS CLEARED BEFORE THE SESSION ENDS. Firebase sign-out alone left every
     // `ar:` value on the phone for the next person who signed in — see accountStorage.ts.

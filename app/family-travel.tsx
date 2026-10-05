@@ -5,6 +5,7 @@ import {Text} from '../src/components/AppText';
 import {Card,LetterheadBar,Mono,PrimaryButton,Screen,SectionLabel,Title,useNote} from '../src/components/UI';
 import {useGoBack} from '../src/components/nav';
 import {sendTravelMessage,watchTravelThread,type TravelMessage} from '../src/backend/messages';
+import {fetchTeenPickupCode} from '../src/backend/family';
 import {useLanguage} from '../src/state/LanguageContext';
 import {colors} from '../src/theme';
 
@@ -13,11 +14,19 @@ export default function FamilyTravel(){
  const p=useLocalSearchParams<{rideId:string;tripNo:string;travelerName:string;operatorName:string;operatorId:string;travelerUid:string;followUrl?:string}>();
  const rideId=String(p.rideId||''),tripNo=String(p.tripNo||'');
  const [messages,setMessages]=useState<TravelMessage[]>([]),[text,setText]=useState(''),[sending,setSending]=useState(false);
+ const [pickupCode,setPickupCode]=useState<string|null>(null),[gettingCode,setGettingCode]=useState(false);
  useEffect(()=>watchTravelThread(tripNo,'guardian',setMessages,()=>showNote(t('traveler.errConversationLoad'))),[tripNo,showNote,t]);
  const send=async()=>{if(!text.trim()||sending)return;setSending(true);const value=text.trim();const ok=await sendTravelMessage({rideId,tripNo,text:value,from:'guardian'});if(ok)setText('');else showNote(t('traveler.familyMessageFailed'));setSending(false);};
  return <Screen note={note}><LetterheadBar onBack={back}/><Title size={24}>{t('traveler.familyTeenTravel')}</Title>
   <Card style={styles.card}><Text style={styles.name}>{String(p.travelerName||t('traveler.familyTeenTraveler'))}</Text><Text style={styles.meta}>{t('traveler.travelNumber')}</Text><Mono size={13}>{tripNo||'—'}</Mono><Text style={styles.meta}>{t('traveler.familyOperator',{name:String(p.operatorName||'—')})}</Text>
    {p.followUrl?<Pressable accessibilityRole="link" onPress={()=>Linking.openURL(String(p.followUrl))}><Text style={styles.link}>{t('traveler.familyFollowLive')}</Text></Pressable>:null}
+   <PrimaryButton label={gettingCode?t('traveler.familyWorking'):t('traveler.familyPickupCode')} disabled={gettingCode||!rideId} onPress={async()=>{
+     if(gettingCode||!rideId)return;setGettingCode(true);setPickupCode(null);
+     try{setPickupCode(await fetchTeenPickupCode(rideId));}
+     catch{showNote(t('traveler.familyPickupCodeFailed'));}
+     finally{setGettingCode(false);}
+   }}/>
+   {pickupCode?<><Mono size={28}>{pickupCode}</Mono><Text style={styles.meta}>{t('traveler.familyPickupCodeHelp')}</Text></>:null}
   </Card>
   <SectionLabel style={{marginTop:24}}>{t('traveler.familyConversation')}</SectionLabel>
   <Card style={styles.card}>{messages.length?messages.map(m=><View key={m.id} style={styles.message}><Text style={styles.messageWho}>{m.from==='guardian'?t('traveler.familyYou'):m.from==='operator'?t('traveler.operator'):t('traveler.familyTeenTraveler')}</Text><Text style={styles.messageText}>{m.text}</Text></View>):<Text style={styles.meta}>{t('traveler.familyNoMessages')}</Text>}

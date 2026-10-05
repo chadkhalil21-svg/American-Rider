@@ -12,3 +12,8 @@ export async function acceptFamilyInvite(id:string,inviteToken:string){return ca
 export async function revokeFamilyLink(id:string){return call(`/family/${encodeURIComponent(id)}/revoke`,{method:'POST'});}
 
 export async function fetchGuardianTravels():Promise<GuardianTravel[]>{const x=await call('/family/travels');return Array.isArray(x.travels)?x.travels:[];}
+export async function fetchTeenPickupCode(rideId:string):Promise<string>{
+ const x=await call(`/travel/teen-pickup/code?rideId=${encodeURIComponent(rideId)}`);
+ if(!/^\d{4}$/.test(String(x.pin||'')))throw new Error('Pickup code unavailable');
+ return x.pin;
+}

@@ -16,3 +16,19 @@ export async function closeOperationalAccount(): Promise<void> {
     throw error;
   }
 }
+
+/** The server serializes operational closure, Firebase Auth deletion, and eventual profile erasure. */
+export async function deleteAccountOnServer(): Promise<{ profileCleanupPending: boolean }> {
+  const token = await auth.currentUser?.getIdToken(true);
+  if (!token) throw new Error('account_required');
+  const res = await fetch(`${PAYMENT_SERVER_URL}/account/delete`, {
+    method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const error = new Error(String(body?.error || 'account_delete_failed')) as Error & { code?: string };
+    error.code = String(body?.code || 'account_delete_failed');
+    throw error;
+  }
+  return { profileCleanupPending: !!body.profileCleanupPending };
+}

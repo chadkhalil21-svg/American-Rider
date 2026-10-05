@@ -26,15 +26,9 @@
 // The criminal and driving history stay with a licensed CRA (backend/screening.js) because the
 // statute names them and the DPPA governs the driving record. This is the cheap half — the
 // half that needs no vendor, and the half a $47.49 report was never going to check anyway.
-const { readKey } = require('./env');
+const { recognize, extract, localReady } = require('./localocr');
+const MODEL = 'local-tesseract-7.0.0';
 
-// MODEL CHOICE IS A COST DECISION AND THEREFORE THE FOUNDERS'. This reads an identity document
-// and decides whether somebody may carry passengers, so it runs on the strongest model. At
-// roughly a cent per document it is the cheapest thing in the onboarding by two orders of
-// magnitude — the screening it sits beside is $47.49. If that ever changes, this is the line.
-const MODEL = 'claude-opus-5';
-
-/** What each document is, and what a valid one must show. */
 const KINDS = {
   license: {
     title: 'Driver licence',
@@ -81,201 +75,51 @@ const KINDS = {
 // THE READER'S VERSION. Stored with every reading; a reading from an older version is re-read
 // by infra/migrate-documents.js rather than trusted. Bump it when the schema or prompt changes
 // what is extracted.
-const READER_VERSION = 2;
-
-// The limits the document states for one period, as written. '' when not stated.
-const LIMITS = {
-  type: 'object',
-  properties: {
-    bodilyInjuryPerPerson: { type: 'string' },
-    bodilyInjuryPerIncident: { type: 'string' },
-    propertyDamage: { type: 'string' },
-    combinedSingleLimit: { type: 'string' },
-  },
-  required: ['bodilyInjuryPerPerson', 'bodilyInjuryPerIncident', 'propertyDamage', 'combinedSingleLimit'],
-  additionalProperties: false,
-};
-const SHOWN = { type: 'string', enum: ['yes', 'no', 'not_shown'] };
-
-// INSURANCE EVIDENCE. What the policy SAYS, field by field. No field here asks the model whether
-// the policy complies with anything: that is backend/qualification.js, in code, against
-// configured rules. Every field is required and '' / [] / 'not_shown' when absent, so absence
-// is recorded rather than guessed.
-const INSURANCE = {
-  type: 'object',
-  properties: {
-    insurer: { type: 'string' },
-    policyNumber: { type: 'string' },
-    namedInsureds: { type: 'array', items: { type: 'string' } },
-    listedDrivers: { type: 'array', items: { type: 'string' } },
-    effectiveDate: { type: 'string' }, // YYYY-MM-DD or ''
-    expirationDate: { type: 'string' }, // YYYY-MM-DD or ''
-    vehicles: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: { description: { type: 'string' }, vin: { type: 'string' }, plate: { type: 'string' } },
-        required: ['description', 'vin', 'plate'],
-        additionalProperties: false,
-      },
-    },
-    // Phrases the document uses about how the vehicle may be used, verbatim.
-    useStatements: { type: 'array', items: { type: 'string' } },
-    tncEndorsement: SHOWN, // a transportation network company / ride-hailing endorsement is stated
-    forHireUse: SHOWN, // for-hire, livery or carrying passengers for compensation is stated as covered
-    loggedOnLimits: LIMITS, // stated for "logged on, not engaged in a prearranged ride"
-    rideLimits: LIMITS, // stated for "engaged in a prearranged ride"
-    generalLimits: LIMITS, // stated without distinguishing the two periods
-    pip: { type: 'object', properties: { shown: SHOWN, amount: { type: 'string' } }, required: ['shown', 'amount'], additionalProperties: false },
-    uninsuredMotorist: {
-      type: 'object',
-      properties: { shown: { type: 'string', enum: ['yes', 'rejected', 'no', 'not_shown'] }, amount: { type: 'string' } },
-      required: ['shown', 'amount'],
-      additionalProperties: false,
-    },
-  },
-  required: [
-    'insurer', 'policyNumber', 'namedInsureds', 'listedDrivers', 'effectiveDate', 'expirationDate', 'vehicles',
-    'useStatements', 'tncEndorsement', 'forHireUse', 'loggedOnLimits', 'rideLimits', 'generalLimits', 'pip', 'uninsuredMotorist',
-  ],
-  additionalProperties: false,
-};
-
-const SCHEMA = {
-  type: 'object',
-  properties: {
-    // What the document actually is, in the model's judgement — NOT what we asked for. An
-    // operator who uploads their insurance card under "inspection" must be told, not passed.
-    documentType: { type: 'string' },
-    isTheRequestedDocument: { type: 'boolean' },
-    legible: { type: 'boolean' },
-    fields: {
-      type: 'object',
-      properties: {
-        name: { type: 'string' },
-        number: { type: 'string' },
-        expiry: { type: 'string' }, // YYYY-MM-DD, or '' when not shown
-        state: { type: 'string' },
-        vehicle: { type: 'string' },
-        vin: { type: 'string' },
-        plate: { type: 'string' },
-        commercialUse: { type: 'string' }, // 'yes' | 'no' | 'unclear' | ''
-        limits: { type: 'string' },
-      },
-      required: ['name', 'number', 'expiry', 'state', 'vehicle', 'vin', 'plate', 'commercialUse', 'limits'],
-      additionalProperties: false,
-    },
-    // Filled for an insurance document; for any other, every field empty / 'not_shown'.
-    insurance: INSURANCE,
-    concerns: { type: 'array', items: { type: 'string' } },
-    summary: { type: 'string' },
-  },
-  required: ['documentType', 'isTheRequestedDocument', 'legible', 'fields', 'insurance', 'concerns', 'summary'],
-  additionalProperties: false,
-};
-
-const SYSTEM = `You read documents an operator has submitted to American Rider, a Florida
-transportation network company, so their vehicle and licence can be checked before they carry
-passengers.
-
-Report what the document SHOWS. Do not infer, complete or improve it.
-
-- If a field is not visible, return "" for it. Never guess a value, a date or a number.
-- If the image is blurred, cropped, glared or partly obscured, set legible false and say which
-  part cannot be read.
-- If the document is not the kind that was asked for, set isTheRequestedDocument false and name
-  what it actually is.
-- Dates as YYYY-MM-DD. If only a month and year are shown, use the last day of that month.
-- "concerns" is for anything a person should look at: signs of alteration, a mismatch inside
-  the document, a name that differs between fields, an expiry that has passed, a photocopy of a
-  screen, handwriting on a printed form. One short sentence each. Empty when there are none.
-- "summary" is one plain sentence stating what the document is and its expiry. No reassurance,
-  no exclamation marks, no judgement of the person.
-
-- For an insurance document, fill "insurance" with what the policy states: every named insured
-  and listed driver, every vehicle with VIN and plate, the policy dates, the use statements
-  verbatim, and the limits for each period exactly as written ("$1,000,000 CSL",
-  "50,000/100,000/25,000"). Put limits under loggedOnLimits or rideLimits only when the document
-  names that period; otherwise under generalLimits. Do not decide whether the policy meets any
-  law or requirement — that is not your task. For any other document, leave "insurance" empty.
-
-You are reading an image, not verifying it against any authority. You cannot confirm a document
-is genuine — only that it is legible, internally consistent, and says what it appears to say.`;
+const READER_VERSION = 3;
 
 /**
- * Read one document.
- *
- * @param kind      one of KINDS
- * @param imageUrl  where the operator's upload lives
- * @param expect    { name, vehicle, plate } — what WE already believe, for cross-checking.
- *                  All first-party: the operator told us these themselves.
- *
- * Returns { ok, verdict: 'accept'|'refuse'|'review', reasons[], fields, summary }.
- * Never throws.
+ * Download only the authenticated R2-signed document, bound memory, and extract locally.
+ * OCR is never proof of identity, authenticity, insurance cover or continuing status. Until a
+ * labelled-document benchmark establishes a safe accept threshold, EVERY automated reading is
+ * a human exception. A trusted Ops reviewer can inspect the source and record structured facts.
  */
-async function readDocument({ kind, imageUrl, expect = {}, now = Date.now() }) {
+async function readDocument({ kind, imageUrl, expect = {}, now = Date.now(), ocr = recognize }) {
   const spec = KINDS[kind];
-  if (!spec) return { ok: false, error: `unknown document kind: ${kind}` };
-  const key = readKey('ANTHROPIC_API_KEY');
-  // NO KEY MEANS NO REVIEW — and 'review' is the safe direction, because nobody drives on it.
-  // It must never mean 'accept', which is what the 900ms timer effectively did.
-  if (!key) {
-    return {
-      ok: true,
-      verdict: 'review',
-      reasons: ['Automatic document reading is not configured.'],
-      fields: {},
-      summary: 'Waiting for a person to check this.',
-    };
-  }
-
-  let image;
+  if (!spec) return { ok:false, error:`unknown document kind: ${kind}` };
+  const review = (reason) => ({ ok:true, verdict:'review', reasons:[reason], fields:{},
+    summary:'Waiting for a qualified person to review the original document.', expiry:null,
+    evidence:{ documentType:'unidentified', isTheRequestedDocument:false, legible:false,
+      fields:{}, insurance:null, concerns:[reason] }, readerVersion:READER_VERSION });
+  let bytes;
   try {
     const res = await fetch(imageUrl);
-    if (!res.ok) throw new Error(`could not fetch the upload (${res.status})`);
-    const buf = Buffer.from(await res.arrayBuffer());
-    // 5 MB is well inside the API's limit and far above a photograph of a licence.
-    if (buf.length > 5 * 1024 * 1024) throw new Error('the image is too large to read');
-    image = {
-      media_type: res.headers.get('content-type')?.split(';')[0] || 'image/jpeg',
-      data: buf.toString('base64'),
-    };
-  } catch (e) {
-    return { ok: false, error: e.message };
+    if (!res.ok) return review('The private document could not be read; review the original upload.');
+    const advertised = Number(res.headers.get('content-length') || 0);
+    if (advertised > 5*1024*1024) return review('The upload exceeds the safe local reading limit.');
+    const chunks=[]; let total=0;
+    for await (const chunk of res.body) {
+      total += chunk.length;
+      if (total > 5*1024*1024) return review('The upload exceeds the safe local reading limit.');
+      chunks.push(Buffer.from(chunk));
+    }
+    bytes=Buffer.concat(chunks,total);
+  } catch {
+    return review('The private document is temporarily unavailable; human review is required.');
   }
-
-  let read;
+  const jpeg=bytes.length>=3 && bytes[0]===0xff && bytes[1]===0xd8 && bytes[2]===0xff;
+  const png=bytes.length>=8 && bytes.subarray(0,8).equals(Buffer.from('89504e470d0a1a0a','hex'));
+  const webp=bytes.length>=12 && bytes.toString('ascii',0,4)==='RIFF' && bytes.toString('ascii',8,12)==='WEBP';
+  if (!jpeg && !png && !webp) return review('This image format is not supported by local OCR; review the original upload.');
   try {
-    const AnthropicPkg = require('@anthropic-ai/sdk');
-    const Anthropic = AnthropicPkg.default ?? AnthropicPkg;
-    const client = new Anthropic({ apiKey: key });
-    const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: 2048,
-      system: SYSTEM,
-      output_config: { format: { type: 'json_schema', schema: SCHEMA } },
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: image.media_type, data: image.data } },
-            {
-              type: 'text',
-              text:
-                `This should be a ${spec.title}. Read it and report:\n` +
-                spec.wants.map((w) => `- ${w}`).join('\n'),
-            },
-          ],
-        },
-      ],
-    });
-    const text = (response.content.find((b) => b.type === 'text') || {}).text || '{}';
-    read = JSON.parse(text);
-  } catch (e) {
-    return { ok: false, error: e.message };
+    const found = await ocr(bytes);
+    const reading = extract({ kind, text:found.text, confidence:found.confidence });
+    const result = decide({ kind, spec, read:reading, expect, now });
+    const required = 'A qualified person must verify the original document and authoritative coverage/status before approval.';
+    return { ...result, verdict:'review', reasons:[...result.reasons, required],
+      summary:reading.summary, readerVersion:READER_VERSION };
+  } catch {
+    return review('Local text extraction was unavailable; human review is required.');
   }
-
-  return decide({ kind, spec, read, expect, now });
 }
 
 /**
@@ -376,7 +220,6 @@ function decide({ kind, spec, read, expect, now }) {
   };
 }
 
-/** Is document reading available? /health and /ops report it. */
-const documentsReady = () => !!readKey('ANTHROPIC_API_KEY');
-
-module.exports = { readDocument, decide, KINDS, documentsReady, MODEL, READER_VERSION, SCHEMA };
+/** Local installed OCR readiness; model API keys are not required. */
+const documentsReady = () => localReady();
+module.exports = { readDocument, decide, KINDS, documentsReady, MODEL, READER_VERSION };

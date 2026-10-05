@@ -65,19 +65,33 @@ export default function SavedPlace() {
       setError(t('traveler.placeNotFound'));
       return;
     }
-    if (key === 'favorite') await saveFavorite({ label: q, lat: coords.lat, lng: coords.lng });
-    else await saveSavedPlace(key, { label: q, lat: coords.lat, lng: coords.lng });
-    setBusy(false);
-    router.back();
+    try {
+      if (key === 'favorite') await saveFavorite({ label: q, lat: coords.lat, lng: coords.lng });
+      else await saveSavedPlace(key, { label: q, lat: coords.lat, lng: coords.lng });
+      router.back();
+    } catch {
+      setError(t('traveler.couldNotSaveConn'));
+    } finally {
+      setBusy(false);
+    }
   };
 
   const clear = async () => {
-    if (key === 'favorite') {
-      if (existing) await removeFavorite(existing);
-    } else {
-      await saveSavedPlace(key, null);
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      if (key === 'favorite') {
+        if (existing) await removeFavorite(existing);
+      } else {
+        await saveSavedPlace(key, null);
+      }
+      router.back();
+    } catch {
+      setError(t('traveler.couldNotSaveConn'));
+    } finally {
+      setBusy(false);
     }
-    router.back();
   };
 
   const title =
@@ -121,12 +135,12 @@ export default function SavedPlace() {
       <View style={{ flex: 1 }} />
       {busy ? <ActivityIndicator style={{ marginBottom: 14 }} /> : null}
       {editingFavorite ? (
-        <PrimaryButton label={t('traveler.removeSavedDestination')} onPress={clear} />
+        <PrimaryButton label={t('traveler.removeSavedDestination')} onPress={clear} disabled={busy} />
       ) : (
         <>
           <PrimaryButton label={key === 'favorite' ? t('traveler.saveDestination') : t('traveler.saveAddress')} onPress={save} disabled={busy || !text.trim()} />
           {existing ? (
-            <Pressable onPress={clear} hitSlop={8} style={{ marginTop: 14, alignSelf: 'center' }}>
+            <Pressable onPress={clear} disabled={busy} accessibilityRole="button" hitSlop={8} style={{ marginTop: 14, alignSelf: 'center' }}>
               <Text style={styles.clear}>{t('traveler.removeSavedPlace')}</Text>
             </Pressable>
           ) : null}

@@ -2,7 +2,7 @@
 // the Route Suggestion card ("your call"), the traveler card, and the Your Revenue
 // card carrying the 99% line.
 import { useRouter } from 'expo-router';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../../src/components/AppText';
 import { OperatorMap } from '../../src/components/operator';
@@ -17,6 +17,8 @@ export default function OperatorTrip() {
   const router = useRouter();
   const op = useOperator();
   const active = op.op;
+  const [completing, setCompleting] = useState(false);
+  const [completionError, setCompletionError] = useState<string | null>(null);
 
   // Cold-open guard only: once this screen has carried an operation, completing it
   // clears `op` while the Complete screen takes over — don't race that navigation.
@@ -139,11 +141,16 @@ export default function OperatorTrip() {
       </Card>
 
       <View style={{ flex: 1 }} />
+      {completionError ? <Text style={styles.error}>{completionError}</Text> : null}
       <PrimaryButton
-        label={t('operator.completeOperation')}
+        label={completing ? t('traveler.pleaseWait') : t('operator.completeOperation')}
+        disabled={completing}
         onPress={async () => {
-          // Completion drives settlement and revenue. Never show the completion receipt first.
-          if (await op.completeOp()) router.replace('/operator/complete');
+          setCompleting(true); setCompletionError(null);
+          const ok = await op.completeOp();
+          setCompleting(false);
+          if (ok) router.replace('/operator/complete');
+          else setCompletionError(t('traveler.errGeneric'));
         }}
         style={{ marginTop: 24 }}
       />
@@ -155,6 +162,7 @@ const styles = StyleSheet.create({
   headRow: { flexDirection: 'row', alignItems: 'flex-start', marginTop: 6, gap: 12 },
   title: { fontSize: 22, fontWeight: '600', letterSpacing: -0.44, color: colors.ink },
   sub: { fontSize: 14, color: colors.muted, marginTop: 8, lineHeight: 21 },
+  error: { fontSize: 13.5, color: colors.red, marginTop: 10 },
   arrivalLabel: { fontSize: 9.5, fontWeight: '600', letterSpacing: 1.43, color: colors.muted },
   arrivalFigure: {
     fontSize: 18,

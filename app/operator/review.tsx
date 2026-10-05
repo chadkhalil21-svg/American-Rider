@@ -112,7 +112,7 @@ export default function OperatorReview() {
             />
           )}
         </View>
-        <Pressable onPress={() => router.dismissTo('/')} hitSlop={10} style={{ marginTop: 16 }}>
+        <Pressable accessibilityRole="button" onPress={() => router.dismissTo('/')} hitSlop={10} style={{ marginTop: 16 }}>
           <Text style={styles.link}>{t('traveler.travelWhileWaiting')}</Text>
         </Pressable>
       </View>

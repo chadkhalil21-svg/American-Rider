@@ -21,7 +21,7 @@ require('node:dns').setDefaultResultOrder('ipv4first');
 const express = require('express');
 const cors = require('cors');
 const {
-  quote, createPaymentIntent, resumePaymentIntent, chargeRide, refundTravel,
+  quote, createPaymentIntent, resumePaymentIntent, verifiedTravelPayment, cancelUnpaidIntent, chargeRide, refundTravel,
   connectAccountFor, connectOnboardingLink, connectAccountStatus,
   transferToOperator, refundableFor, connectDashboardLink, pingStripe, probeNetwork,
   transferFixed, operatorPayoutAccount,
@@ -29,10 +29,17 @@ const {
   defaultCardCountry, chargeOperatorAccountFee,
 } = require('./payments');
 const { readKey } = require('./env');
-const { requireAuth, attachAuth, requireVerifiedEmail } = require('./auth');
+const { requireAuth, requireFreshAuth, attachAuth, requireVerifiedEmail } = require('./auth');
 const { perAccount, countOnly, perIp } = require('./ratelimit');
 const { marketFor, servesPoint, listMarkets, markets: allMarkets } = require('./markets');
 const { forMarket: insuranceForMarket, publicConfig: publicInsuranceConfig } = require('./insurance-jurisdictions');
+const { manifestFor, inspectMarket, recordEvidence, activateMarket, authorizeOnboarding, pauseMarket } = require('./market-readiness');
+const { setAdmittedFleetOnline, setFleetOnlineIfOpen, deactivateMarketFleet, sweepPausedMarketFleet } = require('./market-fleet');
+const { marketChecklistPage } = require('./market-readiness-ui');
+const { disputePage } = require('./disputeevidence-ui');
+const { pointFromWaitlist, coarseAreaFor } = require('./waitlistgeo');
+const { listOpsCases, actOnCase } = require('./opscases');
+const { casesPage } = require('./opscases-ui');
 
 // ——— WHAT A THROWAWAY ACCOUNT MAY DO, AND HOW OFTEN ————————————————————————————
 // Booking was never the exposure: a travel needs a payment method, and a card is far harder to
@@ -47,7 +54,7 @@ const LIMITS = {
   // somebody in trouble has failed at the one thing it must not fail at.
   emergency: countOnly({ name: 'emergency', limit: 6, windowMs: 60 * 60 * 1000 }),
   // COST CONTROLS (22 Sept 2026). Each of these calls something that costs money or reaches a
-  // third party: the document reader (a model call), screening support workflow, Stripe, push notifications,
+  // third party: screening support workflow, Stripe, push notifications; document OCR runs locally,
   // the routers. The client cannot be trusted to hold back, so the server does. Generous for a
   // real person — nobody photographs a licence 20 times an hour — and a hard stop for a loop.
   document: perAccount({ name: 'document', limit: 20, windowMs: 60 * 60 * 1000 }),
@@ -63,14 +70,19 @@ const LIMITS = {
   waitlist: perAccount({ name: 'waitlist', limit: 5, windowMs: 24 * 60 * 60 * 1000 }),
   quoteIp: perIp({ name: 'quote', limit: 300, windowMs: 60 * 60 * 1000 }),
   routeIp: perIp({ name: 'route', limit: 300, windowMs: 60 * 60 * 1000 }),
+  placeSearchIp: perIp({ name: 'place-search', limit: 600, windowMs: 60 * 60 * 1000 }),
 };
 const { authoritativeFare } = require('./fareauthority');
 const { outsideMarket, outsideMarketMessage } = require('./market');
 const { permitRequired, permitRequiredMessage } = require('./fees');
 const { destinationsNear } = require('./places');
-const { ready: voiceReady, reason: voiceReason, accessToken: voiceToken, connectTwiml } = require('./voice');
+const { searchPlaces } = require('./place-search');
+const { ready: voiceReady, reason: voiceReason, accessToken: voiceToken,
+  connectTwiml, callerForRide, verifiedTwilioWebhook } = require('./voice');
+const { resolvePickupWall } = require('./scheduleclock');
+const { scheduledIdentity } = require('./scheduledidentity');
 const { REGIONS, defaultRegion } = require('./regions');
-const { presenceStale, coverageLapsed, matchOperator, etaMinutes } = require('./matching');
+const { presenceStale, coverageLapsed, matchOperator, etaMinutes, distanceMiles } = require('./matching');
 const { encodeGeohash, nearbyOperatorCandidates } = require('./geooperators');
 // DISCLOSURE IS IMPORTED FOR .statute, and leaving it out is how the acknowledge route below
 // threw `DISCLOSURE is not defined` for a day — every operator who read the disclosure was
@@ -88,14 +100,15 @@ const { issueFollowToken, travelForToken, followPage } = require('./follow');
 // phishing page. PUBLIC_ORIGIN overrides it for local work.
 const PUBLIC_ORIGIN = (readKey('PUBLIC_ORIGIN') || 'https://americanrider.app').replace(/\/$/, '');
 const { fetchRoute } = require('./routes');
-const { planTrip } = require('./assistant');
 const { resolveIssue, supportMessage, replySender, MAX_OUT_OF_POCKET_CENTS } = require('./support');
 const { resolveOperatorIssue } = require('./operatorsupport');
 const { fileTicket, updateTicketLocation, listTickets, resolveTicket } = require('./tickets');
 const { lostItemTicket, stampLostItemCase, notifyLostItemOperators, operatorLostItem, respondLostItem } = require('./lostitem');
 const { adminDb, adminStatus, accountDisabled } = require('./firebase-admin');
 const { closeOperationalAccount } = require('./accountclosure');
+const { finalizeAccountDeletion, sweepAccountDeletion } = require('./accountdeletion');
 const { acceptOffer } = require('./eligibility');
+const { bookingId, prepareBooking, paymentMatches, assignPaidTravel } = require('./booking');
 const { progressTravel } = require('./travelprogress');
 const { payForTravel, cancelTravel: cancelTravelFor, settleTravel: settleTravelFor } = require('./travelmoney');
 const { authorizeVoiceTravel, lostItemTravel, authorizeAnnouncement, claimAnnouncement } = require('./trustboundaries');
@@ -106,10 +119,11 @@ const {
 const { smartQuote, revalidateTransit } = require('./smart');
 const { transitHealth } = require('./transit');
 const { sweepScheduled, sweepSettlements } = require('./scheduler');
+const { sweepBookingRecovery } = require('./bookingrecovery');
 const { sweepMonitor, sweepAssignments } = require('./monitor');
 const { notify } = require('./push');
 const { handleEvent, webhookReady } = require('./webhook');
-const { enqueueProviderEvent, processProviderEvent, sweepProviderEvents } = require('./providerqueue');
+const { enqueueProviderEvent, processProviderEvent, sweepProviderEvents, replayDeadEvent } = require('./providerqueue');
 const { acquireLease, renewLease, releaseLease, DEFAULT_LEASE_MS } = require('./schedulerlease');
 const { sweepOperatorAccountFees } = require('./operatorfees');
 const crypto = require('node:crypto');
@@ -126,7 +140,7 @@ const {
 } = require('./insurance-monitoring');
 const { normalizeParty, operatorPartyView } = require('./travelparty');
 const family = require('./family');
-const { provisionTeenPin, verifyTeenPin } = require('./teenpickup');
+const { provisionTeenPin, verifyTeenPin, teenPinReady, pinForRide } = require('./teenpickup');
 const { listPlatformMessages, markPlatformMessageRead } = require('./platforminbox');
 const { page } = require('./shell');
 const { screeningReady, screeningCurrent, sweepScreening } = require('./screening');
@@ -243,6 +257,39 @@ function requireOperationalReadiness(req, res, next) {
     missing: state.missing,
   });
   return next();
+}
+
+// Every consequential new booking checks the durable market admission document. This is
+// intentionally NOT cached: a carrier lapse or Operations pause must prevent new money.
+// Existing emergency, cancellation, refund, settlement and already-running Travels stay open.
+async function admittedMarket(market) {
+  const region = market?.regionId ? REGIONS.find((r) => r.id === market.regionId) : null;
+  return inspectMarket({ db: adminDb(), market, region, providerMissing: productionReadiness().missing });
+}
+async function requireAdmittedPickup(req, res, next) {
+  if (!productionMode) return next();
+  const point = req.body?.pickup;
+  const market = marketFor(point);
+  if (!market || market.status !== 'active') return res.status(409).json({ code: 'market_waitlist', error: 'Travel is not available in this market yet.' });
+  const state = await admittedMarket(market);
+  if (state.status !== 'active') return res.status(409).json({ code: 'market_waitlist', error: 'Travel is not available in this market yet.', marketId: market.id });
+  return next();
+}
+async function requireAdmittedTravel(req, res, next) {
+  if (!productionMode) return next();
+  const db = adminDb();
+  if (!db) return res.status(503).json({ code: 'market_admission_unavailable' });
+  try {
+    const snap = await db.collection('rides').doc(String(req.body?.rideId || '')).get();
+    if (!snap.exists || String(snap.data().travelerUid || '') !== String(req.uid)) return res.status(404).json({ code: 'no_travel' });
+    const ride = snap.data();
+    const market = marketFor({ lat: ride.pickupLat, lng: ride.pickupLng });
+    const state = await admittedMarket(market);
+    if (state.status !== 'active') return res.status(409).json({ code: 'market_waitlist', error: 'New charges and offers are paused in this market.' });
+    return next();
+  } catch {
+    return res.status(503).json({ code: 'market_admission_unavailable' });
+  }
 }
 
 // Stripe, for signature verification only. The payment logic has its own client in
@@ -393,7 +440,7 @@ app.get('/health', async (req, res) => {
     // How /ops is signed in to: 'named' is the production answer.
     opsAuth: opsAuthMode(),
     // Where travel is sold and operators are onboarded (backend/markets.js).
-    markets: listMarkets(),
+    markets: await publicMarkets(),
     // Calling between a traveler and their operator over WiFi or data. Reported for the same
     // reason as everything else here: a call button that silently does nothing is worse than
     // no call button, and the only way to know is to ask the server.
@@ -431,13 +478,19 @@ app.get('/health', async (req, res) => {
 //
 // `mode` is what the app's payment copy reads, so no screen can claim payments are simulated
 // while real money is moving, or the reverse.
-app.get('/config', (req, res) => {
+app.get('/config', async (req, res) => {
   const readiness = productionReadiness();
+  const activeMarkets = (await publicMarkets()).some((m) => m.status === 'active');
   res.json({
     stripePublishableKey: readKey('STRIPE_PUBLISHABLE_KEY') || null,
     mode: keyMode,
-    // false means the app must not offer to charge anybody.
-    canTakePayment: readiness.ready && keyMode !== 'no-key' && !!readKey('STRIPE_PUBLISHABLE_KEY'),
+    // Managing a saved method is a Stripe capability, not a whole-platform capability.
+    // Screening, HERE, scheduler, market-reference and Ops readiness must never disable Wallet.
+    // A Travel charge remains stricter: create-payment-intent is still protected by
+    // requireOperationalReadiness below.
+    canManagePaymentMethods: keyMode !== 'no-key' && !!readKey('STRIPE_PUBLISHABLE_KEY'),
+    // Charging/reserving remains fail-closed on the complete operational gate.
+    canTakePayment: readiness.ready && activeMarkets && keyMode !== 'no-key' && !!readKey('STRIPE_PUBLISHABLE_KEY'),
     operationalReady: readiness.ready,
   });
 });
@@ -447,6 +500,8 @@ app.get('/config', (req, res) => {
 // policy. It does cancel scheduled Travel and remove an Operator from service, so account
 // deletion cannot cause a later dispatch or charge under a login that no longer exists.
 app.post('/account/close', requireAuth, async (req, res) => {
+  if (productionMode) return res.status(426).json({ code: 'account_update_required',
+    error: 'Update American Rider to delete your account safely.' });
   try {
     const out = await closeOperationalAccount({ db: adminDb(), uid: req.uid });
     if (!out.ok) {
@@ -462,6 +517,30 @@ app.post('/account/close', requireAuth, async (req, res) => {
   } catch (e) {
     console.error('[account] close failed:', e.message);
     return res.status(503).json({ code: 'account_close_failed', error: 'Account closure is not available at this time.' });
+  }
+});
+
+// The device confirms this destructive action and reauthenticates with its linked provider.
+// A client timestamp is not proof of reauthentication; Firebase Admin verifies auth_time.
+app.post('/account/delete', requireAuth, requireFreshAuth, async (req, res) => {
+  try {
+    const { getAuth } = require('firebase-admin/auth');
+    const firebaseAuth = getAuth();
+    const token = String(req.headers.authorization || '').replace(/^Bearer /, '');
+    const verified = await firebaseAuth.verifyIdToken(token, true);
+    const age = Date.now() / 1000 - Number(verified.auth_time);
+    if (String(verified.uid) !== String(req.uid) || !Number.isFinite(age) || age < -60 || age > 300)
+      return res.status(401).json({ code: 'recent_sign_in_required', error: 'Reauthenticate to delete this account.' });
+    const out = await finalizeAccountDeletion({ db: adminDb(), auth: firebaseAuth, uid: req.uid });
+    if (!out.ok) return res.status(out.code === 'active_travel' || out.code === 'account_delete_in_progress' ? 409 : 503)
+      .json({ code: out.code, error: out.code === 'active_travel'
+        ? 'Complete or cancel the current Travel before deleting the account.'
+        : 'Account deletion could not be completed. Sign in again and retry.' });
+    return res.status(out.profileCleanupPending ? 202 : 200).json(out);
+  } catch (error) {
+    console.error('[account] delete failed:', error?.message || error);
+    return res.status(503).json({ code: 'account_delete_unavailable',
+      error: 'Account deletion could not be completed. Sign in again and retry.' });
   }
 });
 
@@ -708,6 +787,21 @@ app.post('/ops/support/cases/:caseNo/resolve', requireOps, async (req, res) => {
   return res.status(out.ok ? 200 : out.reason === 'not found' ? 404 : 400).json(out);
 });
 
+app.get('/ops/provider-events/dead', requireOps, async(req,res)=>{
+  const db=adminDb();if(!db)return res.status(503).json({error:adminStatus().reason});
+  try{
+    const snap=await db.collection('provider_events').where('status','==','dead').orderBy('deadAt','desc').limit(50).get();
+    return res.json({events:snap.docs.map((d)=>({id:d.id,provider:d.data().provider,
+      eventId:d.data().eventId,attempts:d.data().attempts,lastError:d.data().lastError,
+      receivedAt:d.data().receivedAt,deadAt:d.data().deadAt})),saturated:snap.docs.length===50});
+  }catch{return res.status(503).json({error:'Dead-letter inbox is unavailable'});}
+});
+app.post('/ops/provider-events/:id/replay',requireOps,async(req,res)=>{
+  try{const out=await replayDeadEvent({id:req.params.id,actor:req.opsUser});
+    return res.status(out.ok?200:409).json(out);
+  }catch{return res.status(503).json({error:'Provider event replay is unavailable'});}
+});
+
 // Family / Teen Travel: guardian-created relationship, accepted by the teen account.
 app.get('/family', requireAuth, async (req,res)=>{const out=await family.listFamilyLinks({uid:req.uid});return res.status(out.ok?200:503).json(out);});
 app.get('/family/travels', requireAuth, async (req,res)=>{
@@ -867,7 +961,7 @@ app.get('/connect/done', (req, res) =>
 //
 // This is docs/OPEN-DECISIONS.md §4 answered for the payout case: operator identity is the
 // account, not the handset.
-app.post('/operator/online', requireAuth, requireOperationalReadiness, async (req, res) => {
+app.post('/operator/online', requireAuth, requireFreshAuth, requireOperationalReadiness, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
 
@@ -889,12 +983,24 @@ app.post('/operator/online', requireAuth, requireOperationalReadiness, async (re
   };
 
   try {
+    const closing = await db.collection('account_closures').doc(String(req.uid)).get();
+    if (closing.exists && closing.data()?.closingAt)
+      return refuse({ code: 'account_closing', error: 'Complete account deletion before returning to duty.' });
     // A DISABLED ACCOUNT KEEPS A VALID SIGN-IN FOR UP TO AN HOUR (requireAuth checks the token
     // locally), so Firebase is asked directly. "Cannot tell" is not "enabled".
     if ((await accountDisabled(req.uid)) !== false) {
       return refuse({ code: 'account_disabled', error: 'This account cannot accept travel.' });
     }
     const rec = (await operatorRecord(req.uid)) || {};
+    if (productionMode) {
+      const point = { lat: Number(req.body?.lat), lng: Number(req.body?.lng) };
+      const selected = operatingMarketOf(rec) || marketFor(point);
+      const physical = marketFor(point);
+      const [selection, location] = await Promise.all([admittedMarket(selected), admittedMarket(physical)]);
+      if (selection.status !== 'active' || location.status !== 'active') {
+        return refuse({ code: 'market_waitlist', error: 'New Operator offers are paused in this market.' });
+      }
+    }
     const status = await connectAccountStatus(rec.stripeAccountId || null);
     if (!status.payoutsEnabled) {
       return refuse({
@@ -1028,8 +1134,7 @@ app.post('/operator/online', requireAuth, requireOperationalReadiness, async (re
     if (b.plate !== undefined) identity.plate = String(b.plate).slice(0, 16);
     if (Array.isArray(b.classes) && b.classes.length) identity.classes = b.classes.slice(0, 6);
 
-    await db.collection('operators').doc(String(req.uid)).set(
-      {
+    const fleetUpdate = {
         uid: String(req.uid),
         ...identity,
         // Stored on the fleet record so dispatch can drop an operator whose policy runs out
@@ -1057,11 +1162,21 @@ app.post('/operator/online', requireAuth, requireOperationalReadiness, async (re
         lat,
         lng,
         geohash: encodeGeohash(lat, lng),
+        marketId: marketFor({ lat, lng })?.id || null,
         available: b.available !== false,
         onlineAt: Date.now(),
-      },
-      { merge: true },
-    );
+    };
+    if (productionMode) {
+      const physical = marketFor({ lat, lng });
+      const selected = operatingMarketOf(rec) || physical;
+      if (!physical || !selected) return refuse({ code: 'market_waitlist', error: 'No admitted market at this position.' });
+      const saved = await setAdmittedFleetOnline({ db, operatorId: req.uid, fleetUpdate,
+        markets: [physical, selected], providerMissing: productionReadiness().missing });
+      if (!saved) return refuse({ code: 'market_waitlist', error: 'Operator duty was paused in this market.' });
+    } else {
+      const saved=await setFleetOnlineIfOpen({db,operatorId:req.uid,fleetUpdate});
+      if(!saved)return refuse({code:'account_closing',error:'Complete account deletion before returning to duty.'});
+    }
     res.json({ ok: true, operatorId: String(req.uid), available: b.available !== false });
   } catch (e) {
     res.status(502).json({ error: e.message });
@@ -1182,7 +1297,7 @@ app.post('/operator/settle-pending', requireAuth, async (req, res) => {
 // arrived. The operator app does not report it. A fee we cannot substantiate is a fee we must
 // not take, so the claim is removed from the app and the Terms until arrival is a fact the
 // server holds. See docs/OPEN-DECISIONS.md.
-app.post('/travel/cancel', requireAuth, LIMITS.payments, async (req, res) => {
+app.post('/travel/cancel', requireAuth, LIMITS.payments, requireFreshAuth, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   // The refund comes from the travel's OWN payment (backend/travelmoney.js); a paymentIntentId in
@@ -1193,7 +1308,7 @@ app.post('/travel/cancel', requireAuth, LIMITS.payments, async (req, res) => {
       uid: req.uid,
       rideId: req.body?.rideId,
       stripeConfigured: keyMode !== 'no-key',
-      deps: { refundableFor, refundTravel, transferFixed, operatorPayoutAccount },
+      deps: { refundableFor, refundTravel, cancelUnpaidIntent, transferFixed, operatorPayoutAccount },
     });
     res.status(out.status).json(out.body);
   } catch (e) {
@@ -1258,7 +1373,7 @@ app.get('/operator/me', requireAuth, async (req, res) => {
 // Idempotent by the ride document: once `transferId` is written, a second call is a no-op.
 // Stripe's idempotency key covers the same-instant double tap; this covers next week.
 
-app.post('/travel/settle', requireAuth, async (req, res) => {
+app.post('/travel/settle', requireAuth, requireFreshAuth, async (req, res) => {
   if (keyMode === 'no-key') return res.status(500).json({ error: 'No Stripe key configured' });
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
@@ -1377,6 +1492,7 @@ app.post('/emergency', requireAuth, LIMITS.emergency, async (req, res) => {
     uid: req.uid,
     email: req.email,
     kind: 'emergency',
+    idempotencyKey: String(b.requestId || ''),
     emergency,
     trip,
     reason: 'Traveler opened the emergency screen.',
@@ -1388,7 +1504,8 @@ app.post('/emergency', requireAuth, LIMITS.emergency, async (req, res) => {
       (emergency.coords ? ` (${emergency.coords.lat}, ${emergency.coords.lng})` : ''),
   });
 
-  res.json({ ok: filed.ok, caseNo: filed.caseNo, stored: filed.stored, emailed: filed.emailed });
+  res.json({ ok: filed.stored && filed.emailed, caseNo: filed.caseNo,
+    stored: filed.stored, emailed: filed.emailed, repeated: filed.repeated === true });
 });
 
 // --- Emergency: the vehicle has moved. ----------------------------------------------------
@@ -1416,18 +1533,8 @@ app.post('/emergency/location', requireAuth, async (req, res) => {
 app.post('/assistant', requireAuth, (req, res) => {
   res.status(410).json({ error: 'The trip planner has been withdrawn.' });
 });
-app.post('/assistant-withdrawn-original', requireAuth, async (req, res) => {
-  const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
-  if (!message) return res.status(400).json({ error: 'message is required' });
-  try {
-    const plan = await planTrip({ message });
-    res.json(plan);
-  } catch (e) {
-    if (String(e.message).includes('ANTHROPIC_API_KEY')) {
-      return res.status(503).json({ error: "The AI assistant isn't switched on yet." });
-    }
-    res.status(502).json({ error: e.message });
-  }
+app.post('/assistant-withdrawn-original', requireAuth, (req, res) => {
+  res.status(410).json({ error: 'The trip planner has been withdrawn.' });
 });
 
 // --- Quote: the money breakdown for a ride. Pure math, no Stripe call. --------------------
@@ -1446,7 +1553,7 @@ app.post('/quote', LIMITS.quoteIp, (req, res) => {
 // when the trip can't be routed — the app then keeps its straight-line fallback. Like
 // /fare-quote this is unauthenticated (it reveals nothing private), but it only answers inside
 // a served region (regions.js), so it can't be farmed as a free worldwide routing proxy.
-app.post('/route', LIMITS.routeIp, async (req, res) => {
+app.post('/route', LIMITS.routeIp, requireAdmittedPickup, async (req, res) => {
   // No routing for a pickup that is not in an active market: nothing can be booked from there.
   if (!servesPoint(req.body?.pickup)) return res.status(409).json({ error: outsideMarketMessage('pickup'), code: 'outside_market', where: 'pickup' });
   const route = await fetchRoute(req.body?.pickup, req.body?.dest);
@@ -1462,7 +1569,7 @@ app.post('/route', LIMITS.routeIp, async (req, res) => {
 //   503 { status: 'unavailable' }     the planner is not answering — the app says so
 // This used to 404 when rail "did not win", and the app read 404 as "do not show". That gate
 // is withdrawn: the server reports; the client decides emphasis.
-app.post('/smart-quote', LIMITS.routeIp, requireOperationalReadiness, async (req, res) => {
+app.post('/smart-quote', LIMITS.routeIp, requireOperationalReadiness, requireAdmittedPickup, async (req, res) => {
   // OLDER APPS GET THE OLDER ANSWER. TestFlight build 36 reads any 200 as a plan and would
   // render `{ status: 'none' }` as a card reading "Save $NaN", then crash on its legs. An app
   // that does not name the new contract (header X-AR-Smart: 2) is answered the way the old
@@ -1477,7 +1584,7 @@ app.post('/smart-quote', LIMITS.routeIp, requireOperationalReadiness, async (req
 
 app.post('/smart-revalidate', LIMITS.routeIp, requireOperationalReadiness, async (req, res) => {
   const plan = req.body?.plan;
-  const out = await revalidateTransit(plan);
+  const out = await revalidateTransit(plan, { destination: req.body?.destination });
   if (out.status === 'unavailable') return res.status(503).json(out);
   return res.json(out);
 });
@@ -1497,14 +1604,26 @@ app.post('/smart-revalidate', LIMITS.routeIp, requireOperationalReadiness, async
 // AN EMPTY LIST IS A CORRECT ANSWER. Outside every region the answer is nothing, and the
 // screen says we do not operate there yet — which is true, and better than five destinations
 // in a city the traveler is not in.
-app.get('/destinations', LIMITS.quoteIp, (req, res) => {
+app.get('/destinations', LIMITS.quoteIp, async (req, res) => {
   const lat = Number(req.query.lat);
   const lng = Number(req.query.lng);
   const limit = Math.min(20, Math.max(1, Number(req.query.limit) || 5));
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
     return res.status(400).json({ error: 'lat and lng are required' });
   }
+  if (productionMode && (await admittedMarket(marketFor({ lat, lng }))).status !== 'active') return res.json([]);
   res.json(destinationsNear({ lat, lng }, limit));
+});
+
+// --- National place discovery. Search is NOT a market gate. ------------------------------
+app.get('/place-search', LIMITS.placeSearchIp, async (req, res) => {
+  const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+  if (q.length < 2) return res.json({ suggestions: [] });
+  const lat = Number(req.query.lat); const lng = Number(req.query.lng);
+  const near = Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+  const limit = Math.min(8, Math.max(1, Number(req.query.limit) || 6));
+  const suggestions = await searchPlaces(q, near, limit);
+  res.json({ suggestions });
 });
 
 // --- What does THIS trip cost? The app asks; the server decides. --------------------------
@@ -1513,7 +1632,7 @@ app.get('/destinations', LIMITS.quoteIp, (req, res) => {
 // any government fee inside that price (name, payee, cents) so a screen can say what it is;
 // `travelerPays` already contains it — nothing is added on top of the number shown.
 // No login needed: this only reveals pricing, and a traveler must see the price before booking.
-app.post('/fare-quote', attachAuth, LIMITS.quoteIp, requireOperationalReadiness, async (req, res) => {
+app.post('/fare-quote', attachAuth, LIMITS.quoteIp, requireOperationalReadiness, requireAdmittedPickup, async (req, res) => {
   const priced = await authoritativeFare({
     body: req.body, uid: req.uid, email: req.email, db: adminDb(), cardCountryFor: defaultCardCountry,
   });
@@ -1601,7 +1720,7 @@ app.delete('/payment-methods/:id', requireAuth, LIMITS.payments, async (req, res
   }
 });
 
-app.post('/create-payment-intent', requireAuth, LIMITS.payments, requireOperationalReadiness, async (req, res) => {
+app.post('/create-payment-intent', requireAuth, LIMITS.payments, requireFreshAuth, requireOperationalReadiness, requireAdmittedTravel, async (req, res) => {
   if (keyMode === 'no-key') {
     return res.status(500).json({ error: 'No Stripe secret key configured. Add STRIPE_SECRET_KEY to backend/.env' });
   }
@@ -1749,12 +1868,25 @@ let lastSweep = { at: 0, report: null };
  * Promise.all.
  */
 async function runAllSweeps() {
-  const [scheduled, monitor, assignments, screening, settlements, providerEvents, operatorFees, familyAgeOut, insuranceMonitoring, marketReference] = await Promise.allSettled([
-    sweepScheduled(),
+  const marketStatuses = new Map();
+  const checkMarket = async (pickup) => {
+    const market = marketFor(pickup);
+    if (!market) return 'waitlist';
+    if (!marketStatuses.has(market.id)) marketStatuses.set(market.id, admittedMarket(market).then((state) => state.status));
+    return marketStatuses.get(market.id);
+  };
+  const [scheduled, monitor, assignments, screening, settlements, bookingRecovery, providerEvents, operatorFees, familyAgeOut, insuranceMonitoring, marketReference, marketFleet, accountDeletion] = await Promise.allSettled([
+    sweepScheduled({ checkMarket: async (pickup) => {
+      const market = marketFor(pickup);
+      return market ? (await admittedMarket(market)).status : 'waitlist';
+    } }),
     sweepMonitor(),
-    sweepAssignments(),
+    sweepAssignments({ checkMarket }),
     sweepScreening(),
     sweepSettlements(),
+    sweepBookingRecovery({ db: adminDb(), stripeConfigured: keyMode !== 'no-key',
+      deps: { refundableFor, refundTravel, cancelUnpaidIntent, verifiedTravelPayment,
+        transferFixed, operatorPayoutAccount } }),
     sweepProviderEvents({ handlers: PROVIDER_HANDLERS, workerId: WORKER_ID }),
     sweepOperatorAccountFees({
       charge: ({ uid, email, month, amountCents }) =>
@@ -1764,6 +1896,8 @@ async function runAllSweeps() {
     family.sweepFamilyAgeOut(),
     sweepInsuranceMonitoring({ db: adminDb(), requestConfirmation: issueInsuranceConfirmationRequest, notify }),
     runMarketReferenceSweep({ collectors: marketReferenceCollectors() }),
+    sweepPausedMarketFleet({ db: adminDb(), marketById: (id) => allMarkets().find((m) => m.id === id) }),
+    sweepAccountDeletion({ db: adminDb(), auth: adminStatus().ok ? require('firebase-admin/auth').getAuth() : null }),
   ]);
   const unwrap = (r) => (r.status === 'fulfilled' ? r.value : { ok: false, reason: String(r.reason) });
   return {
@@ -1772,11 +1906,14 @@ async function runAllSweeps() {
     assignments: unwrap(assignments),
     screening: unwrap(screening),
     settlements: unwrap(settlements),
+    bookingRecovery: unwrap(bookingRecovery),
     providerEvents: unwrap(providerEvents),
     operatorFees: unwrap(operatorFees),
     familyAgeOut: unwrap(familyAgeOut),
     insuranceMonitoring: unwrap(insuranceMonitoring),
     marketReference: unwrap(marketReference),
+    marketFleet: unwrap(marketFleet),
+    accountDeletion: unwrap(accountDeletion),
   };
 }
 
@@ -1830,7 +1967,7 @@ async function runSweep(req, res) {
 // --- Private file storage. -----------------------------------------------------------------
 // The mobile app may request a five-minute upload URL only for its own namespace. R2 remains
 // private; credentials never leave this server. Object keys, not public URLs, are persisted.
-app.post('/storage/upload-url', requireAuth, LIMITS.document, async (req, res) => {
+app.post('/storage/upload-url', requireAuth, LIMITS.document, requireFreshAuth, requireActiveOperatingMarket, async (req, res) => {
   if (!r2Ready()) return res.status(503).json({ error: 'Private storage is not configured.', code: 'storage_not_configured' });
   const purpose = String(req.body?.purpose || '');
   const kind = String(req.body?.kind || '');
@@ -1842,7 +1979,7 @@ app.post('/storage/upload-url', requireAuth, LIMITS.document, async (req, res) =
   } catch (e) { return res.status(502).json({ error: e.message, code: 'storage_sign_failed' }); }
 });
 
-app.get('/storage/object', requireAuth, LIMITS.document, async (req, res) => {
+app.get('/storage/object', requireAuth, LIMITS.document, requireFreshAuth, async (req, res) => {
   const key = String(req.query?.key || '');
   const purpose = String(req.query?.purpose || '');
   if (!r2Owns(key, req.uid, purpose)) return res.status(403).json({ error: 'That file belongs to another account' });
@@ -1860,7 +1997,7 @@ app.get('/storage/object', requireAuth, LIMITS.document, async (req, res) => {
 // information about transactions or experiences between the consumer and the report-maker.
 // Nothing here is looked up about the person — see the header of backend/documents.js for the
 // other edge of that line, which is CFPB Circular 2024-06.
-app.post('/operator/document', requireAuth, LIMITS.document, async (req, res) => {
+app.post('/operator/document', requireAuth, LIMITS.document, requireFreshAuth, requireActiveOperatingMarket, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
 
@@ -1885,14 +2022,14 @@ app.post('/operator/document', requireAuth, LIMITS.document, async (req, res) =>
     const u = userSnap.exists ? userSnap.data() : {};
     const o = opSnap.exists ? opSnap.data() : {};
 
-    // ONLY IN AN ACTIVE MARKET. Reading a document is a paid model call and the start of a
+    // ONLY IN AN ACTIVE MARKET. Reviewing a document starts a
     // regulated workflow; an operator whose declared operating market is on the waitlist gets
     // neither. See POST /operator/market.
     const gate = operatingMarketGate(u);
     if (gate) return res.status(409).json(gate);
 
     // THE SAME UPLOAD IS READ ONCE. A retry, a double tap or a loop that re-sends one file gets
-    // the stored reading back instead of another model call.
+    // the stored reading back instead of consuming another OCR/human-review slot.
     const prior = u.documents?.[kind];
     if (prior && prior.objectKey === objectKey && prior.evidence && prior.readerVersion === READER_VERSION) {
       return res.json({ verdict: prior.verdict, reasons: prior.reasons || [], summary: prior.summary || '', expiry: prior.expiry || null, repeated: true });
@@ -2013,7 +2150,61 @@ function operatingMarketGate(user) {
   };
 }
 
-const marketBody = (m) => (m ? { id: m.id, name: m.name, status: m.status, regionId: m.regionId } : null);
+const marketBody = (m) => (m ? { id: m.id, name: m.name, status: m.status, regionId: m.regionId,
+  timeZone: REGIONS.find((r) => r.id === m.regionId)?.timezone || null } : null);
+
+// Public discovery may use a short cache; actual charges and offers always read durable state.
+let publicMarketCache = { until: 0, value: null, pending: null };
+const pickupMarketCache = new Map();
+async function publicPickupStatus(market) {
+  if (!productionMode || market.status !== 'active') return marketBody(market);
+  const previous=pickupMarketCache.get(market.id);
+  if(previous?.value&&Date.now()<previous.until)return previous.value;
+  if(previous?.pending)return previous.pending;
+  const pending=admittedMarket(market).then((state)=>{
+    const value={...marketBody(market),status:state.missing?.includes('database')?'unavailable':
+      state.status==='active'?'active':'waitlist'};
+    if(pickupMarketCache.get(market.id)?.pending===pending)
+      pickupMarketCache.set(market.id,{until:Date.now()+15_000,value,pending:null});
+    return value;
+  }).catch(()=>{
+    if(pickupMarketCache.get(market.id)?.pending===pending)pickupMarketCache.delete(market.id);
+    return {...marketBody(market),status:'unavailable'};
+  });
+  pickupMarketCache.set(market.id,{until:0,value:null,pending});
+  return pending;
+}
+async function publicMarkets() {
+  if (!productionMode) return listMarkets();
+  if (publicMarketCache.value && Date.now() < publicMarketCache.until) return publicMarketCache.value;
+  if (publicMarketCache.pending) return publicMarketCache.pending;
+  publicMarketCache.pending = (async () => {
+    const items = await Promise.all(allMarkets().filter((m) => m.regionId).map(async (m) => {
+      if (m.status !== 'active') return marketBody(m);
+      const state = await admittedMarket(m);
+      return { ...marketBody(m), status: state.missing?.includes('database') ? 'unavailable' :
+        state.status === 'active' ? 'active' : 'waitlist' };
+    }));
+    publicMarketCache = { until: Date.now() + 15_000, value: items, pending: null };
+    return items;
+  })();
+  try { return await publicMarketCache.pending; }
+  catch { publicMarketCache = { until: 0, value: null, pending: null }; throw new Error('public_market_status_unavailable'); }
+}
+function invalidatePublicMarkets() { publicMarketCache = { until: 0, value: null, pending: null }; pickupMarketCache.clear(); }
+function listedMarket(market, listed) {
+  if (!market) return null;
+  return listed.find((item) => item.id === market.id) ||
+    { ...marketBody(market), status: productionMode ? 'waitlist' : market.status };
+}
+async function operatorMarketOptions() {
+  if (!productionMode) return listMarkets();
+  return Promise.all(allMarkets().filter((m) => m.regionId).map(async (m) => {
+    if (m.status !== 'active') return marketBody(m);
+    const state = await admittedMarket(m);
+    return { ...marketBody(m), status: state.status };
+  }));
+}
 
 /** Express middleware: the signed-in operator's declared operating market must be ACTIVE. */
 async function requireActiveOperatingMarket(req, res, next) {
@@ -2023,20 +2214,158 @@ async function requireActiveOperatingMarket(req, res, next) {
     const snap = await db.collection('users').doc(String(req.uid)).get();
     const gate = operatingMarketGate(snap.exists ? snap.data() : null);
     if (gate) return res.status(409).json(gate);
+    if (productionMode) {
+      const market = operatingMarketOf(snap.data());
+      const admitted = await admittedMarket(market);
+      if (!['onboarding', 'active'].includes(admitted.status)) return res.status(409).json({ code: 'market_waitlist', error: 'Operator onboarding is not authorized in this market.', marketId: market.id });
+    }
     next();
   } catch (e) {
     res.status(502).json({ error: e.message });
   }
 }
 
-// Public: what is active, for the app's area chooser and the website.
-app.get('/markets', LIMITS.quoteIp, (req, res) => {
-  const lat = Number(req.query?.lat);
-  const lng = Number(req.query?.lng);
-  res.json({
-    active: allMarkets().filter((m) => m.status === 'active').map(marketBody),
-    here: Number.isFinite(lat) && Number.isFinite(lng) ? marketBody(marketFor({ lat, lng })) : null,
-  });
+// Public: one cached status per configured county, never evidence or confidential references.
+async function publicMarketResponse(req, res) {
+  try {
+    const point = req.method === 'POST' ? req.body : req.query;
+    const lat = Number(point?.lat);
+    const lng = Number(point?.lng);
+    if(point?.lat!=null&&point?.lng!=null&&Number.isFinite(lat)&&Number.isFinite(lng)) {
+      const market=marketFor({lat,lng});
+      const here=market?await publicPickupStatus(market):null;
+      return res.json({active:here?.status==='active'?[here]:[],here});
+    }
+    const available = await publicMarkets();
+    const nearby = Number.isFinite(lat) && Number.isFinite(lng) ? marketFor({ lat, lng }) : null;
+    res.json({ active: available.filter((m) => m.status === 'active'), here: listedMarket(nearby, available) });
+  } catch { res.status(503).json({code:'market_status_unavailable'}); }
+}
+app.get('/markets', LIMITS.quoteIp, publicMarketResponse);
+app.post('/markets/at', LIMITS.quoteIp, publicMarketResponse);
+
+function opsMarket(req, res) {
+  const m = allMarkets().find((item) => item.id === String(req.params.id || ''));
+  if (!m) res.status(404).json({ code: 'unknown_market' });
+  return m;
+}
+function requireOpsMutation(req, res, next) {
+  if (req.get('x-ar-ops-action') !== '1' || !req.is('application/json')) {
+    return res.status(403).json({ code: 'ops_action_header_required' });
+  }
+  return next();
+}
+app.get('/ops/cases', requireOps, async (req, res) => {
+  if (opsAuthMode() !== 'named') return res.status(403).send('Named Operations account required.');
+  try {
+    const result=await listOpsCases({db:adminDb(),kind:String(req.query?.kind||'emergency'),
+      after:String(req.query?.after||'')});
+    return res.type('html').send(casesPage(result,String(req.query?.kind||'emergency')));
+  } catch(e) {
+    console.error('[ops] case queue unavailable',e?.message||e);
+    return res.status(503).send('Case queue cannot be loaded; verify the index and retry.');
+  }
+});
+app.post('/ops/cases/:id/action', requireOps, requireOpsMutation, async (req, res) => {
+  if (opsAuthMode() !== 'named') return res.status(403).json({ok:false,code:'named_ops_required'});
+  try {
+    const out=await actOnCase({db:adminDb(),caseNo:req.params.id,action:req.body?.action,
+      actor:req.opsUser,note:req.body?.note});
+    return res.status(out.ok?200:409).json(out);
+  } catch(e) {
+    console.error('[ops] case action unavailable',e?.message||e);
+    return res.status(503).json({ok:false,code:'case_action_unavailable'});
+  }
+});
+app.get('/ops/disputes', requireOps, async (req, res) => {
+  if (opsAuthMode() !== 'named') return res.status(403).send('Named Operations account required.');
+  const db = adminDb();
+  if (!db) return res.status(503).send('Dispute evidence storage is unavailable.');
+  const after = String(req.query?.after || '');
+  if (after && !/^dp_[A-Za-z0-9_]{1,96}$/.test(after)) return res.status(400).send('Invalid page cursor.');
+  try {
+    let query = db.collection('dispute_evidence').orderBy('capturedAt','desc').orderBy('__name__','desc');
+    if (after) {
+      const cursor = await db.collection('dispute_evidence').doc(after).get();
+      if (!cursor.exists) return res.status(404).send('Dispute page cursor not found.');
+      query = query.startAfter(cursor);
+    }
+    const snap = await query.limit(51).get();
+    const shown = snap.docs.slice(0,50);
+    return res.type('html').send(disputePage(shown.map((d)=>d.data()),
+      {next:snap.docs.length>50?shown.at(-1).id:null}));
+  } catch (e) {
+    console.error('[ops] dispute evidence unavailable',e?.message||e);
+    return res.status(503).send('Dispute evidence cannot be loaded; retry or check the index.');
+  }
+});
+app.get('/ops/markets', requireOps, async (req, res) => {
+  const markets = allMarkets().filter((m) => m.regionId);
+  const items = await Promise.all(markets.map(async (market) => ({ market, state: await admittedMarket(market) })));
+  res.type('html').send(marketChecklistPage(items, { production: DEPLOYMENT_MODE === 'production' && keyMode === 'live' }));
+});
+app.get('/ops/markets/:id/readiness', requireOps, async (req, res) => {
+  const market = opsMarket(req, res);
+  if (!market) return;
+  const region = REGIONS.find((r) => r.id === market.regionId);
+  return res.json({ ...await admittedMarket(market), manifest: manifestFor(market, region) });
+});
+app.post('/ops/markets/:id/evidence', requireOps, requireOpsMutation, async (req, res) => {
+  const market = opsMarket(req, res);
+  if (!market) return;
+  if (opsAuthMode() !== 'named') return res.status(403).json({ code: 'named_ops_required' });
+  try {
+    const region = REGIONS.find((r) => r.id === market.regionId);
+    const out = await recordEvidence({ db: adminDb(), market, region, domain: req.body?.domain,
+      input: req.body, actor: req.opsUser, expectedVersion: req.body?.manifestVersion });
+    if (!out.ok) return res.status(400).json(out);
+    invalidatePublicMarkets();
+    let fleetCleanup;
+    try { fleetCleanup = await deactivateMarketFleet({ db: adminDb(), market, maxPages: 2 }); }
+    catch (e) { fleetCleanup = { ok: false, reason: e.message, done: false }; }
+    return res.json({ ...out, fleetCleanup });
+  } catch { return res.status(503).json({ code: 'market_evidence_unavailable' }); }
+});
+app.post('/ops/markets/:id/onboard', requireOps, requireOpsMutation, async (req, res) => {
+  const market = opsMarket(req, res);
+  if (!market) return;
+  if (DEPLOYMENT_MODE !== 'production' || keyMode !== 'live' || opsAuthMode() !== 'named') {
+    return res.status(409).json({ code: 'production_authority_required' });
+  }
+  const region = REGIONS.find((r) => r.id === market.regionId);
+  try {
+    const out = await authorizeOnboarding({ db: adminDb(), market, region, actor: req.opsUser,
+      expectedVersion: req.body?.manifestVersion, providerMissing: productionReadiness().missing });
+    if (out.ok) invalidatePublicMarkets();
+    return res.status(out.ok ? 200 : 409).json(out);
+  } catch { return res.status(503).json({ code: 'market_onboarding_unavailable' }); }
+});
+app.post('/ops/markets/:id/activate', requireOps, requireOpsMutation, async (req, res) => {
+  const market = opsMarket(req, res);
+  if (!market) return;
+  if (DEPLOYMENT_MODE !== 'production' || keyMode !== 'live' || opsAuthMode() !== 'named') {
+    return res.status(409).json({ code: 'production_authority_required' });
+  }
+  const region = REGIONS.find((r) => r.id === market.regionId);
+  try {
+    const out = await activateMarket({ db: adminDb(), market, region, actor: req.opsUser,
+      expectedVersion: req.body?.manifestVersion, providerMissing: productionReadiness().missing });
+    if (out.ok) invalidatePublicMarkets();
+    return res.status(out.ok ? 200 : 409).json(out);
+  } catch { return res.status(503).json({ code: 'market_activation_unavailable' }); }
+});
+app.post('/ops/markets/:id/pause', requireOps, requireOpsMutation, async (req, res) => {
+  const market = opsMarket(req, res);
+  if (!market) return;
+  try {
+    const out = await pauseMarket({ db: adminDb(), market, actor: req.opsUser, reason: req.body?.reason });
+    if (!out.ok) return res.status(409).json(out);
+    invalidatePublicMarkets();
+    let fleetCleanup;
+    try { fleetCleanup = await deactivateMarketFleet({ db: adminDb(), market, maxPages: 2 }); }
+    catch (e) { fleetCleanup = { ok: false, reason: e.message, done: false }; }
+    return res.json({ ...out, fleetCleanup });
+  } catch { return res.status(503).json({ code: 'market_pause_unavailable' }); }
 });
 
 // The operator names the county they will operate in — or sends a position and it is derived.
@@ -2062,13 +2391,16 @@ app.post('/operator/market', requireAuth, LIMITS.market, async (req, res) => {
     if (m) {
       await db.collection('users').doc(String(req.uid)).set({ operatingMarket: { id: m.id, via, at: now } }, { merge: true });
     }
-    if (!m || m.status !== 'active') {
+    const available = await operatorMarketOptions();
+    const selected = listedMarket(m, available);
+    if (!selected || selected.status === 'waitlist') {
       await db.collection('waitlist').doc(String(req.uid)).set(
-        { role: 'operator', marketId: m?.id || null, at: now, ...(via === 'position' && !m ? { lat: Number(b.lat), lng: Number(b.lng) } : {}) },
+        { role: 'operator', marketId: m?.id || null, at: now },
         { merge: true },
       );
     }
-    res.json({ market: marketBody(m), active: allMarkets().filter((x) => x.status === 'active').map(marketBody) });
+    res.json({ market: selected, active: available.filter((x) => x.status === 'active'),
+      onboarding: available.filter((x) => x.status === 'onboarding') });
   } catch (e) {
     res.status(502).json({ error: e.message });
   }
@@ -2079,9 +2411,12 @@ app.get('/operator/market', requireAuth, async (req, res) => {
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   try {
     const snap = await db.collection('users').doc(String(req.uid)).get();
+    const market = operatingMarketOf(snap.exists ? snap.data() : null);
+    const available = await operatorMarketOptions();
     res.json({
-      market: marketBody(operatingMarketOf(snap.exists ? snap.data() : null)),
-      active: allMarkets().filter((x) => x.status === 'active').map(marketBody),
+      market: listedMarket(market, available),
+      active: available.filter((x) => x.status === 'active'),
+      onboarding: available.filter((x) => x.status === 'onboarding'),
     });
   } catch (e) {
     res.status(502).json({ error: e.message });
@@ -2094,13 +2429,15 @@ app.post('/waitlist', requireAuth, LIMITS.waitlist, async (req, res) => {
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   const b = req.body || {};
   const role = b.role === 'operator' ? 'operator' : 'traveler';
+  const point = pointFromWaitlist(b);
   const m = b.marketId
     ? allMarkets().find((x) => x.id === String(b.marketId)) || null
-    : Number.isFinite(Number(b.lat)) && Number.isFinite(Number(b.lng))
-      ? marketFor({ lat: Number(b.lat), lng: Number(b.lng) })
-      : null;
+    : point ? marketFor(point) : null;
+  // Outside known counties, retain only a coarse half-degree cell for interest routing; precise
+  // device coordinates are neither persisted nor sent to a geocoding vendor on this path.
+  const coarseArea=!m?coarseAreaFor(point):null;
   try {
-    await db.collection('waitlist').doc(String(req.uid)).set({ role, marketId: m?.id || null, at: Date.now() }, { merge: true });
+    await db.collection('waitlist').doc(String(req.uid)).set({ role, marketId: m?.id || null, coarseArea, at: Date.now() }, { merge: true });
     res.json({ ok: true, market: marketBody(m) });
   } catch (e) {
     res.status(502).json({ error: e.message });
@@ -2608,7 +2945,7 @@ app.get('/operator/commission', requireAuth, LIMITS.qualification, async (req, r
 
 // The operator says they are done. Kept as the app's explicit moment, but it decides nothing a
 // document reading has not already decided: it assesses and reports.
-app.post('/operator/qualification/submit', requireAuth, LIMITS.qualification, async (req, res) => {
+app.post('/operator/qualification/submit', requireAuth, LIMITS.qualification, requireActiveOperatingMarket, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   try {
@@ -2879,8 +3216,28 @@ app.post('/scheduled/sweep', runSweep);
 // presence freshness, insurance, disclosure, screening, commissioning, documents, Travel
 // class and distance. Keeping those rules in one gate prevents query optimization from becoming
 // a second qualification system.
+const QUEUE_APPROACH_MI = 3;
 async function availableOperatorCandidates(db, pickup, excludeIds = new Set()) {
-  return nearbyOperatorCandidates(db, pickup, { excludeIds });
+  const fleet = await nearbyOperatorCandidates(db, pickup, { excludeIds });
+  // An Operator may line up exactly one next Travel only while carrying the current Traveler
+  // and already approaching that Travel's destination. Discovery marks the possibility; the
+  // assignment transaction independently re-reads both Travels before reserving the slot.
+  await Promise.all(fleet.map(async (op) => {
+    op.queueEligible = false;
+    if (!op.currentRideId || op.nextRideId) return;
+    try {
+      const snap = await db.collection('rides').doc(String(op.currentRideId)).get();
+      if (!snap.exists) return;
+      const active = snap.data() || {};
+      const here = { lat: Number(op.lat), lng: Number(op.lng) };
+      const destination = { lat: Number(active.destinationLat), lng: Number(active.destinationLng) };
+      op.queueEligible = active.status === 'onboard' &&
+        Number.isFinite(here.lat) && Number.isFinite(here.lng) &&
+        Number.isFinite(destination.lat) && Number.isFinite(destination.lng) &&
+        distanceMiles(here, destination) <= QUEUE_APPROACH_MI;
+    } catch { /* inability to verify capacity means no queued offer */ }
+  }));
+  return fleet;
 }
 
 // Human-facing Travel Numbers identify the authoritative pickup market, never a client label.
@@ -2891,186 +3248,138 @@ function travelNumberFor(documentId, pickup) {
   return 'AR-' + String(documentId).slice(0, 8).toUpperCase() + '-' + code;
 }
 
-app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, requireOperationalReadiness, async (req, res) => {
+// The immutable, server-priced booking exists before Stripe's PaymentSheet is opened.
+// A duplicate device request returns the same ride id, not another PaymentIntent/travel.
+app.post('/travel/prepare', requireAuth, LIMITS.dispatch, requireFreshAuth, requireOperationalReadiness, requireAdmittedPickup, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
-
   const b = req.body || {};
+  const key = String(b.bookingKey || '');
+  if (!/^[\w-]{16,100}$/.test(key)) return res.status(400).json({ error: 'Booking key is required', code: 'booking_key_required' });
   const pickup = { lat: Number(b.pickup?.lat), lng: Number(b.pickup?.lng) };
-  if (!Number.isFinite(pickup.lat) || !Number.isFinite(pickup.lng)) {
-    return res.status(400).json({ error: 'A pickup position is required to dispatch.' });
+  const destinationPoint = { lat: Number(b.destinationPoint?.lat), lng: Number(b.destinationPoint?.lng) };
+  if (!Number.isFinite(pickup.lat) || !Number.isFinite(pickup.lng) ||
+      !Number.isFinite(destinationPoint.lat) || !Number.isFinite(destinationPoint.lng)) {
+    return res.status(400).json({ error: 'Both real pickup and destination coordinates are required', code: 'route_geometry_required' });
   }
-  // THE PICKUP MUST BE IN AN ACTIVE MARKET — checked here as well as at pricing, because this
-  // is where an operator is actually sent.
-  if (!servesPoint(pickup)) {
-    return res.status(409).json({ error: outsideMarketMessage('pickup'), code: 'outside_market', where: 'pickup' });
-  }
-
-  const priced = await authoritativeFare({
-    body: { pickup, dest: b.destinationPoint, destination: b.dest, travelClass: b.cls, journeyNo: b.journeyNo },
-    uid: req.uid, email: req.email, db, cardCountryFor: defaultCardCountry,
-  });
-  if (priced?.invalidJourney) return res.status(409).json({ error: priced.reason, code: 'invalid_smart_journey' });
-  if (priced?.outsideMarket) {
-    return res.status(409).json({ error: priced.reason, code: 'outside_market', where: priced.outsideMarket });
-  }
-  if (priced?.permitRequired) {
-    return res.status(409).json({ error: priced.reason, code: 'permit_required', where: priced.permitRequired.end });
-  }
-  if (!priced) {
-    return res.status(400).json({ error: 'A destination position or known destination is required to dispatch.' });
-  }
-  if (!['routed-distance', 'estimated-distance'].includes(priced.pricedBy)) {
-    return res.status(400).json({ error: 'A valid pickup and destination position are required to create Travel.', code: 'route_geometry_required' });
-  }
-  if (priced.tollStatus === 'unknown') {
-    return res.status(503).json({ error: 'Toll cost could not be verified for this route.', code: 'toll_unavailable' });
-  }
-
-  const partyResult = priced.journey?.party
-    ? { ok: true, party: priced.journey.party }
-    : await normalizeParty(b, { uid: req.uid, name: req.name || b.bookerName || b.travelerName || '' });
-  if (!partyResult.ok) return res.status(400).json({ error: partyResult.error, code: partyResult.code });
-  // Smart Travel leg 2 inherits the server-recorded first-leg party. The request may repeat
-  // party fields for presentation, but cannot change the Traveler/Teen/guardian envelope.
-  const party = partyResult.party;
-
-  const rawCabin = b.cabinPreferences && typeof b.cabinPreferences === 'object' ? b.cabinPreferences : {};
-  const cabinPreferences = {
-    climate: ['Cool', 'Moderate', 'Warm'].includes(String(rawCabin.climate)) ? String(rawCabin.climate) : 'Moderate',
-    music: ['None', 'Traveler Choice'].includes(String(rawCabin.music)) ? String(rawCabin.music) : 'None',
-    quiet: rawCabin.quiet !== false,
-    charging: rawCabin.charging === true,
-    luggage: rawCabin.luggage === true,
-  };
-
-  let fleet;
+  const fingerprint = crypto.createHash('sha256').update(JSON.stringify({
+    pickup, destinationPoint, dep: b.dep, dest: b.dest, cls: b.cls,
+    journeyNo: b.journeyNo, partyMode: b.partyMode, familyLinkId: b.familyLinkId,
+    travelerName: b.travelerName, cabinPreferences: b.cabinPreferences,
+  })).digest('hex');
+  const id = bookingId(req.uid, key);
   try {
-    fleet = await availableOperatorCandidates(db, pickup);
-  } catch (e) {
-    // "We could not read the fleet" and "nobody is on duty" are different answers and must not
-    // render the same — the client draws a retry for one and a wait for the other.
-    return res.status(502).json({ error: e.message, code: 'fleet_unreadable' });
-  }
-
-  // THE DEMONSTRATION FLEET LIVES HERE NOW, not on the phone.
-  //
-  // It used to be a constant in src/backend/dispatch.ts, handed out when the collection came
-  // back empty. That was the last reason the phone had to write a travel itself — and while
-  // any path writes travels from a phone, firestore.rules cannot be closed, and F-A stays
-  // open. Moving it here costs three records and closes the argument.
-  //
-  // EMPTY COLLECTION ONLY, AND NEVER WITH LIVE KEYS. A stand-in is for a database with nobody
-  // in it, which is a development environment and a founder demonstration. The moment real
-  // money is in play there is no such thing as a stand-in operator.
-  if (!fleet.length && !operationalMode) {
-    // An empty availability query is not the same as an empty fleet. Only synthesize the
-    // demonstration fleet when the collection itself has no Operator records at all.
-    const anyOperator = await db.collection('operators').limit(1).get();
-    if (!anyOperator.empty) return res.json({ matched: null });
-    const at = Date.now();
-    fleet = [
-      { id: 'op1', name: 'Miguel D.', lat: 25.768, lng: -80.1955, car: 'Gray Toyota Camry', plate: 'KTR 4821', classes: ['Standard', 'Pet Friendly'] },
-      { id: 'op2', name: 'Sofia R.', lat: 25.776, lng: -80.193, car: 'White Honda Accord', plate: 'LMN 3092', classes: ['Standard'] },
-      { id: 'op3', name: 'Nina P.', lat: 25.7654, lng: -80.2196, car: 'Blue Kia Telluride', plate: 'PQR 7741', classes: ['Standard', 'Large Vehicle'] },
-    ].map((o) => ({
-      ...o,
-      available: true,
-      // Stamped present, screened and current so they pass the same gates as anybody else.
-      // They are stand-ins for somebody on duty, so they have to look like somebody on duty —
-      // and only here, where a live key is already excluded.
-      onlineAt: at,
-      screeningCheckedAt: at,
-      disclosureVersion: DISCLOSURE_VERSION,
-      commissioned: true,
-      demo: true,
-    }));
-  }
-
-  // Operators who have already declined this travel are never offered it twice.
-  const excluded = new Set((Array.isArray(b.excludeIds) ? b.excludeIds : []).map(String));
-  const eligible = excluded.size ? fleet.filter((o) => !excluded.has(String(o.id))) : fleet;
-
-  const best = matchOperator(eligible, pickup, String(b.cls || 'Standard'), {
-    requireScreening: screeningReady(),
-  });
-  // NOT AN ERROR. Nobody being free is an ordinary answer and the app has a screen for it.
-  if (!best) return res.json({ matched: null });
-
-  const op = best.operator;
-  const now = Date.now();
-  const ref = db.collection('rides').doc();
-  const tripNo = travelNumberFor(ref.id, pickup);
-  const ride = {
-    travelerUid: String(req.uid),
-    travelerName: party.travelerName.slice(0, 60),
-    party,
-    tripNo,
-    // WRITTEN FROM THE SERVER'S OWN MATCH, never from the request. This is the line the whole
-    // endpoint exists for.
-    operatorId: String(op.id),
-    operatorName: op.name || '',
-    operatorCar: op.car || '',
-    operatorPlate: op.plate || '',
-    operatorLat: Number(op.lat),
-    operatorLng: Number(op.lng),
-    operatorEtaMin: etaMinutes(best.miles),
-    operatorMiles: best.miles,
-    operatorDemo: !!op.demo,
-    dep: String(b.dep || '').slice(0, 60),
-    dest: String(b.dest || '').slice(0, 60),
-    // The sweep that rescues an unanswered travel searches from here. Leaving it out silently
-    // disabled that path once before.
-    pickupLat: pickup.lat,
-    pickupLng: pickup.lng,
-    travelClass: String(b.cls || 'Standard'),
-    travelCostCents: priced.travelCostCents,
-    costCents: priced.travelerPays,
-    miles: priced.miles,
-    governmentFeeCents: priced.governmentFeeCents,
-    tollCents: Math.max(0, Number(priced.tollCents) || 0),
-    feeLines: priced.feeLines,
-    pricedBy: priced.pricedBy,
-    cardCountry: priced.cardCountry,
-    journey: priced.journey || null,
-    cabinPreferences,
-    destinationLat: Number.isFinite(Number(b.destinationPoint?.lat)) ? Number(b.destinationPoint.lat) : null,
-    destinationLng: Number.isFinite(Number(b.destinationPoint?.lng)) ? Number(b.destinationPoint.lng) : null,
-    status: 'assigned',
-    createdAt: now,
-    statusAt: now,
-  };
-
-  try {
-    await ref.create(ride);
-    const teenPickup = await provisionTeenPin({ rideRef: ref, rideId: ref.id, party });
-    if (teenPickup.required && party.teenUid) await notify({ uid: party.teenUid, kind: 'teen_pickup_code', title: 'Your pickup code', body: `Give ${teenPickup.pin} to your Operator after confirming the vehicle and Operator.`, data: { screen: '/ride', rideId: ref.id, tripNo } });
-    if (teenPickup.required && party.guardianUid && party.guardianUid !== party.teenUid) await notify({ uid: party.guardianUid, kind: 'guardian_travel', title: 'Teen Travel assigned', body: `${party.travelerName}'s Travel has been assigned. You can follow it in American Rider.`, data: { screen: '/family', rideId: ref.id, tripNo } });
-    res.json({
-      rideId: ref.id,
-      tripNo,
-      matched: {
-        id: String(op.id),
-        name: op.name || '',
-        car: op.car || '',
-        plate: op.plate || '',
-        lat: Number(op.lat),
-        lng: Number(op.lng),
-        etaMin: etaMinutes(best.miles),
-        miles: best.miles,
-        demo: !!op.demo,
-      },
-      party: operatorPartyView(party),
+    const existing = await db.collection('rides').doc(id).get();
+    if (existing.exists) {
+      const prior = existing.data();
+      if (prior.bookingFingerprint !== fingerprint || String(prior.travelerUid) !== String(req.uid)) {
+        return res.status(409).json({ error: 'This booking key belongs to a different Travel', code: 'booking_conflict' });
+      }
+      return res.json({ rideId: id, tripNo: prior.tripNo, status: prior.status, amountCents: prior.costCents, reused: true });
+    }
+    if (!servesPoint(pickup)) return res.status(409).json({ error: outsideMarketMessage('pickup'), code: 'outside_market' });
+    const priced = await authoritativeFare({
+      body: { pickup, dest: destinationPoint, destination: b.dest, travelClass: b.cls, journeyNo: b.journeyNo },
+      uid: req.uid, email: req.email, db, cardCountryFor: defaultCardCountry,
     });
-  } catch (e) {
-    res.status(502).json({ error: e.message });
-  }
+    if (!priced || priced.invalidJourney || priced.outsideMarket || priced.permitRequired) {
+      return res.status(409).json({ error: priced?.reason || 'The Travel cannot be priced', code: priced?.permitRequired ? 'permit_required' : 'quote_unavailable' });
+    }
+    if (!['routed-distance', 'estimated-distance'].includes(priced.pricedBy)) {
+      return res.status(409).json({ error: 'The road distance cannot be verified', code: 'route_geometry_required' });
+    }
+    if (priced.tollStatus === 'unknown') return res.status(503).json({ error: 'Toll price unavailable', code: 'toll_unavailable' });
+    const partyResult = priced.journey?.party
+      ? { ok: true, party: priced.journey.party }
+      : await normalizeParty(b, { uid: req.uid, name: req.name || b.bookerName || b.travelerName || '' });
+    if (!partyResult.ok) return res.status(400).json({ error: partyResult.error, code: partyResult.code });
+    const party = partyResult.party;
+    if (party.teen && !teenPinReady()) return res.status(503).json({ error: 'Teen pickup security is unavailable', code: 'teen_pin_unavailable' });
+    const raw = b.cabinPreferences && typeof b.cabinPreferences === 'object' ? b.cabinPreferences : {};
+    const cabinPreferences = {
+      climate: ['Cool', 'Moderate', 'Warm'].includes(String(raw.climate)) ? String(raw.climate) : 'Moderate',
+      music: ['None', 'Traveler Choice'].includes(String(raw.music)) ? String(raw.music) : 'None',
+      quiet: raw.quiet !== false, charging: raw.charging === true, luggage: raw.luggage === true,
+    };
+    // Availability is a pre-charge hint, not a reservation. The post-payment transaction is
+    // authoritative and can still find the fleet gone; then the paid Travel is refund-owed.
+    const fleet = await availableOperatorCandidates(db, pickup);
+    if (!matchOperator(fleet, pickup, String(b.cls || 'Standard'), { requireScreening: screeningReady(), allowQueued: true })) {
+      return res.status(409).json({ error: 'No eligible Operator is available; nothing was charged', code: 'no_operator' });
+    }
+    const tripNo = travelNumberFor(id, pickup);
+    const outcome = await prepareBooking({ db, uid: req.uid, key, fingerprint, record: {
+      tripNo, travelerName: party.travelerName.slice(0, 60), party,
+      dep: String(b.dep || '').slice(0, 60), dest: String(b.dest || '').slice(0, 60),
+      pickupLat: pickup.lat, pickupLng: pickup.lng,
+      destinationLat: destinationPoint.lat, destinationLng: destinationPoint.lng,
+      travelClass: String(b.cls || 'Standard'), travelCostCents: priced.travelCostCents,
+      costCents: priced.travelerPays, miles: priced.miles,
+      governmentFeeCents: priced.governmentFeeCents,
+      tollCents: Math.max(0, Number(priced.tollCents) || 0), feeLines: priced.feeLines,
+      pricedBy: priced.pricedBy, cardCountry: priced.cardCountry,
+      journey: priced.journey || null, cabinPreferences,
+    } });
+    if (party.teen && [200,201].includes(outcome.status)) {
+      await provisionTeenPin({ rideRef: db.collection('rides').doc(id), rideId: id, party });
+    }
+    return res.status(outcome.status).json({ ...outcome.body, amountCents: priced.travelerPays });
+  } catch (e) { return res.status(502).json({ error: e.message, code: 'prepare_unavailable' }); }
+});
+
+// This endpoint no longer creates a fresh ride or trusts a client-provided fare, Operator or
+// payment assertion. It can only offer the existing, freshly provider-confirmed paid Travel.
+app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, requireFreshAuth, requireOperationalReadiness, requireAdmittedTravel, async (req, res) => {
+  const db = adminDb();
+  if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
+  const id = String(req.body?.rideId || '');
+  if (!/^[a-f0-9]{40}$/.test(id)) return res.status(400).json({ error: 'Prepared Travel id is required', code: 'ride_required' });
+  try {
+    const ref = db.collection('rides').doc(id);
+    const snap = await ref.get();
+    if (!snap.exists) return res.status(404).json({ error: 'No such Travel', code: 'no_travel' });
+    const ride = snap.data();
+    if (String(ride.travelerUid) !== String(req.uid)) return res.status(403).json({ error: 'Not your Travel', code: 'not_yours' });
+    if (!['awaiting_payment', 'awaiting_assignment', 'assigned'].includes(ride.status)) {
+      return res.status(409).json({ error: 'Travel is no longer dispatchable', code: 'travel_not_dispatchable' });
+    }
+    const payment = await verifiedTravelPayment(ride.paymentIntentId);
+    if (!paymentMatches(ride, payment, req.uid, id)) {
+      return res.status(409).json({ error: 'Payment is not confirmed for this Travel', code: 'payment_unconfirmed' });
+    }
+    if (ride.party?.teen && !teenPinReady()) return res.status(503).json({ error: 'Teen pickup security is unavailable', code: 'teen_pin_unavailable' });
+    const teen = await provisionTeenPin({ rideRef: ref, rideId: id, party: ride.party });
+    const pickup = { lat: Number(ride.pickupLat), lng: Number(ride.pickupLng) };
+    if (!servesPoint(pickup)) return res.status(409).json({ error: outsideMarketMessage('pickup'), code: 'outside_market' });
+    let candidate = null;
+    if (ride.status !== 'assigned') {
+      const fleet = await availableOperatorCandidates(db, pickup);
+      candidate = matchOperator(fleet, pickup, ride.travelClass, { requireScreening: screeningReady(), allowQueued: true });
+    }
+    const outcome = await assignPaidTravel({
+      db, uid: req.uid, rideId: id, payment, candidate, requireScreening: screeningReady(),
+    });
+    if (outcome.status !== 200) return res.status(outcome.status).json(outcome.body);
+    if (outcome.body.matched && !outcome.body.reused) {
+      // Non-delivery cannot roll back the money/assignment transaction. The assignment sweep
+      // retries missing notifications. The Teen code was provisioned before the offer.
+      if (teen.required && ride.party?.teenUid) await notify({ uid: ride.party.teenUid, kind: 'teen_pickup_code', title: 'Your pickup code', body: `Give ${teen.pin} to your Operator after confirming the vehicle and Operator.`, data: { screen: '/ride', rideId: id, tripNo: ride.tripNo } });
+      if (teen.required && ride.party?.guardianUid && ride.party.guardianUid !== ride.party.teenUid) {
+        await notify({ uid: ride.party.guardianUid, kind: 'guardian_travel', title: 'Teen Travel assigned',
+          body: `${ride.party.travelerName || 'Teen Traveler'}'s Travel has been assigned. You can follow it in American Rider.`,
+          data: { screen: '/family', rideId: id, tripNo: ride.tripNo } });
+      }
+      await notify({ uid: outcome.body.matched.id, kind: 'travel_assigned', title: 'Travel assigned', body: `${ride.dep || 'Pickup'} to ${ride.dest || 'destination'}. Open to accept.`, data: { screen: '/operator', rideId: id, tripNo: ride.tripNo } });
+      await ref.update({ notifiedOperatorAt: Date.now() });
+    }
+    return res.json(outcome.body);
+  } catch (e) { return res.status(502).json({ error: e.message, code: 'dispatch_unavailable' }); }
 });
 
 // Cancel a scheduled reservation only while it is still a reservation. The transaction closes
 // the race with the scheduler: once dispatch has advanced it, the Traveler must cancel the
 // resulting Travel through the normal Travel cancellation/refund lifecycle.
-app.delete('/travel/schedule/:id', requireAuth, async (req, res) => {
+app.delete('/travel/schedule/:id', requireAuth, requireFreshAuth, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   const ref = db.collection('scheduled_rides').doc(String(req.params.id || ''));
@@ -3091,19 +3400,49 @@ app.delete('/travel/schedule/:id', requireAuth, async (req, res) => {
 
 // Create a scheduled reservation with the same server authority as immediate dispatch.
 // The time and labels are traveler inputs. Fare, distance, fees and Travel Number are not.
-app.post('/travel/schedule', requireAuth, LIMITS.dispatch, requireOperationalReadiness, async (req, res) => {
+app.post('/travel/schedule', requireAuth, LIMITS.dispatch, requireFreshAuth, requireOperationalReadiness, requireAdmittedPickup, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   const b = req.body || {};
   const pickup = { lat: Number(b.pickup?.lat), lng: Number(b.pickup?.lng) };
   const destinationPoint = { lat: Number(b.destinationPoint?.lat), lng: Number(b.destinationPoint?.lng) };
   const atMs = Number(b.atMs);
-  if (!Number.isFinite(pickup.lat) || !Number.isFinite(pickup.lng) || !Number.isFinite(atMs)) {
-    return res.status(400).json({ error: 'A pickup position and scheduled time are required' });
+  if (!Number.isFinite(pickup.lat) || !Number.isFinite(pickup.lng) ||
+      !Number.isFinite(destinationPoint.lat) || !Number.isFinite(destinationPoint.lng) ||
+      !Number.isFinite(atMs)) {
+    return res.status(400).json({ error: 'Pickup, destination and scheduled time require verified positions', code: 'route_geometry_required' });
+  }
+  const timeZone = REGIONS.find((r) => r.id === marketFor(pickup)?.regionId)?.timezone;
+  if (!timeZone || b.pickupTimeZone !== timeZone) {
+    return res.status(409).json({ error: 'Pickup market time zone is unavailable or changed.', code: 'pickup_zone_required' });
+  }
+  const resolved = resolvePickupWall(String(b.pickupDate || ''), String(b.time || ''), b.period, timeZone);
+  if (!resolved.ok || resolved.atMs !== atMs) {
+    return res.status(400).json({ error: 'Pickup date and time do not match the pickup market.', code:resolved.code || 'pickup_time_mismatch' });
   }
   if (atMs <= Date.now()) {
     return res.status(400).json({ error: 'Scheduled Travel must be set for a future time.', code: 'scheduled_time_required' });
   }
+  const partyResult = await normalizeParty(b, { uid: req.uid, name: req.name || b.bookerName || b.travelerName || '' });
+  if (!partyResult.ok) return res.status(400).json({ error: partyResult.error, code: partyResult.code });
+  const party = partyResult.party;
+  const clientAmount = Number(b.costCents);
+  if (!Number.isSafeInteger(clientAmount) || clientAmount <= 0) {
+    return res.status(400).json({error:'A displayed all-in quote is required.',code:'quote_required'});
+  }
+  const identity = scheduledIdentity({uid:req.uid,atMs,pickup,destination:destinationPoint,
+    travelClass:b.travelClass,party});
+  const reservation = db.collection('scheduled_rides').doc(identity.id);
+  try {
+    const prior = await reservation.get();
+    if (prior.exists) {
+      const existing = prior.data();
+      if (existing.travelerUid !== req.uid || existing.requestFingerprint !== identity.fingerprint ||
+          existing.consentCents !== clientAmount) return res.status(409).json({code:'reservation_conflict'});
+      if (existing.status === 'cancelled') return res.status(409).json({code:'reservation_cancelled'});
+      return res.json({id:reservation.id,...existing});
+    }
+  } catch { return res.status(503).json({code:'reservation_check_unavailable'}); }
   const priced = await authoritativeFare({
     body: { pickup, dest: destinationPoint, destination: b.dest, travelClass: b.travelClass },
     uid: req.uid, email: req.email, db, cardCountryFor: defaultCardCountry,
@@ -3113,17 +3452,17 @@ app.post('/travel/schedule', requireAuth, LIMITS.dispatch, requireOperationalRea
   if (!priced || priced.outsideMarket || priced.permitRequired) {
     return res.status(409).json({ error: priced?.reason || 'The scheduled travel cannot be priced' });
   }
-  if (priced.pricedBy !== 'distance') {
+  if (!['routed-distance', 'estimated-distance'].includes(priced.pricedBy)) {
     return res.status(400).json({ error: 'A valid pickup and destination position are required to create Travel.', code: 'route_geometry_required' });
   }
   if (priced.tollStatus === 'unknown') {
     return res.status(503).json({ error: 'Toll cost could not be verified for this route.', code: 'toll_unavailable' });
   }
-  const partyResult = await normalizeParty(b, { uid: req.uid, name: req.name || b.bookerName || b.travelerName || '' });
-  if (!partyResult.ok) return res.status(400).json({ error: partyResult.error, code: partyResult.code });
-  const party = partyResult.party;
+  if (priced.travelerPays !== clientAmount) return res.status(409).json({
+    error:'The price changed. Review the current quote before making a reservation.',code:'quote_changed',
+  });
   try {
-    const ref = db.collection('scheduled_rides').doc();
+    const ref = reservation;
     const tripNo = travelNumberFor(ref.id, pickup);
     const record = {
       travelerUid: String(req.uid), travelerName: party.travelerName.slice(0, 60), party,
@@ -3133,15 +3472,25 @@ app.post('/travel/schedule', requireAuth, LIMITS.dispatch, requireOperationalRea
       dest: String(b.dest || '').slice(0, 60), pickupLat: pickup.lat, pickupLng: pickup.lng,
       destinationLat: Number.isFinite(destinationPoint.lat) ? destinationPoint.lat : null,
       destinationLng: Number.isFinite(destinationPoint.lng) ? destinationPoint.lng : null,
-      travelClass: String(b.travelClass || 'Standard'), atMs,
+      travelClass: String(b.travelClass || 'Standard'), atMs, pickupDate: b.pickupDate, pickupTimeZone: timeZone,
       travelCostCents: priced.travelCostCents, costCents: priced.travelerPays,
+      consentCents: clientAmount, requestFingerprint: identity.fingerprint,
       miles: priced.miles, governmentFeeCents: priced.governmentFeeCents,
       tollCents: Math.max(0, Number(priced.tollCents) || 0),
       feeLines: priced.feeLines, cardCountry: priced.cardCountry, tripNo,
       status: 'reserved', createdAt: Date.now(),
     };
-    await ref.create(record);
-    res.json({ id: ref.id, ...record });
+    const created=await db.runTransaction(async(tx)=>{
+      const account=await tx.get(db.collection('account_closures').doc(String(req.uid)));
+      const previous=await tx.get(ref);
+      if(account.exists&&account.data()?.closingAt)return false;
+      if(previous.exists) return previous.data();
+      tx.create(ref,record);return true;
+    });
+    if(!created)return res.status(409).json({code:'account_closing',error:'Account closure is in progress.'});
+    if(created!==true&&(created.travelerUid!==req.uid || created.requestFingerprint!==identity.fingerprint ||
+        created.consentCents!==clientAmount || created.status==='cancelled')) return res.status(409).json({code:'reservation_conflict'});
+    res.json({ id: ref.id, ...(created===true?record:created) });
   } catch (e) {
     res.status(502).json({ error: e.message });
   }
@@ -3170,7 +3519,7 @@ app.post('/travel/schedule', requireAuth, LIMITS.dispatch, requireOperationalRea
 // other — the lost-item path is how somebody reaches an operator afterwards, and it goes
 // through us. A call channel that outlives the journey is a way to contact a stranger whose
 // car you once sat in, which is not a feature.
-app.post('/voice/token', requireAuth, LIMITS.voice, async (req, res) => {
+app.post('/voice/token', requireAuth, LIMITS.voice, requireFreshAuth, async (req, res) => {
   if (!voiceReady()) return res.status(503).json({ error: voiceReason(), code: 'voice_not_configured' });
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
@@ -3185,7 +3534,7 @@ app.post('/voice/token', requireAuth, LIMITS.voice, async (req, res) => {
     return res.status(502).json({ error: e.message, code: 'travel_unreadable' });
   }
   if (!authz.ok) return res.status(authz.status).json({ error: authz.error, code: authz.code });
-  const out = voiceToken({ rideId, side: authz.side });
+  const out = voiceToken({ rideId, side: authz.side, operatorUid: authz.ride.operatorId });
   if (!out.ok) return res.status(503).json({ error: out.error, code: out.code });
   return res.json({ token: out.token, identity: out.identity, side: authz.side, tripNo: authz.tripNo });
 });
@@ -3195,27 +3544,39 @@ app.post('/voice/token', requireAuth, LIMITS.voice, async (req, res) => {
 // TWILIO POSTS WHATEVER THE DEVICE DIALLED AND IT IS IGNORED. The destination is derived from
 // the travel and the caller's own identity, so a tampered app cannot dial an arbitrary number
 // through our account — which would be our telephone bill and somebody else's harassment.
-app.post('/voice/connect', async (req, res) => {
+app.post('/voice/connect', express.urlencoded({ extended: false, limit: '16kb' }), async (req, res) => {
+  const reject = () => res.type('text/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>');
+  if (!verifiedTwilioWebhook(req.headers['x-twilio-signature'], req.body)) return reject();
   const from = String(req.body?.From || '');
-  // 'ar_AR-2048-MIA_traveler' — the identity the token was minted with, which Twilio supplies
-  // and the device cannot choose.
-  const m = /^(?:client:)?ar_([^_]+)_(traveler|operator)$/.exec(from);
-  if (!m) return res.type('text/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>');
+  const m = /^(?:client:)?ar_([a-f0-9]{40})_[a-f0-9]{24}_(traveler|operator)$/.exec(from);
+  if (!m) return reject();
   const db = adminDb();
-  if (!db) return res.type('text/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>');
+  if (!db) return reject();
   try {
     const snap = await db.collection('rides').doc(m[1]).get();
     const ride = snap.exists ? snap.data() : null;
-    if (!ride || !['assigned', 'accepted', 'arrived', 'onboard'].includes(String(ride.status))) {
-      return res.type('text/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>');
-    }
-    return res.type('text/xml').send(connectTwiml({ rideId: m[1], side: m[2] }));
+    const caller = callerForRide(from, ride);
+    if (!caller) return reject();
+    return res.type('text/xml').send(connectTwiml({ ...caller, operatorUid: ride.operatorId }));
   } catch {
-    return res.type('text/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>');
+    return reject();
   }
 });
 
-app.post('/travel/teen-pickup/verify', requireAuth, async (req,res)=>{const out=await verifyTeenPin({rideId:req.body?.rideId,operatorUid:req.uid,pin:req.body?.pin});return res.status(out.status||500).json(out);});
+app.get('/travel/teen-pickup/code', requireAuth, LIMITS.document, requireFreshAuth, async (req,res)=>{
+  const id=String(req.query?.rideId||'');
+  if(!/^[a-f0-9]{40}$/.test(id))return res.status(400).json({error:'Travel id is required'});
+  if(!teenPinReady())return res.status(503).json({error:'Teen pickup security is unavailable',code:'teen_pin_unavailable'});
+  const db=adminDb();if(!db)return res.status(503).json({error:adminStatus().reason});
+  const snap=await db.collection('rides').doc(id).get();
+  if(!snap.exists)return res.status(404).json({error:'No such Travel'});
+  const ride=snap.data()||{},party=ride.party||{};
+  if(party.teen!==true||![String(party.teenUid),String(party.guardianUid)].includes(String(req.uid)))return res.status(403).json({error:'Not authorized for this Teen Travel'});
+  if(!['assigned','accepted','arrived'].includes(ride.status)||!ride.teenPickup?.required||ride.teenPickup.verifiedAt||Number(ride.teenPickup.failedAttempts||0)>=5)return res.status(409).json({error:'Pickup code is not available in this Travel state'});
+  try{return res.json({rideId:id,tripNo:ride.tripNo||'',pin:pinForRide(id,ride.teenPickup.hash)});}
+  catch{return res.status(503).json({error:'Pickup code needs secure assistance',code:'teen_pin_unavailable'});}
+});
+app.post('/travel/teen-pickup/verify', requireAuth, requireFreshAuth, async (req,res)=>{const out=await verifyTeenPin({rideId:req.body?.rideId,operatorUid:req.uid,pin:req.body?.pin});return res.status(out.status||500).json(out);});
 // One server-stamped three-party thread. The client supplies words and the Travel id; the
 // server derives every participant id from the Travel so nobody can forge a correspondent.
 app.post('/travel/message', requireAuth, async (req,res)=>{
@@ -3243,7 +3604,7 @@ app.post('/travel/message', requireAuth, async (req,res)=>{
 // A REFUSAL RELEASES THE TRAVEL. It stays `assigned`, marked `releasedAt`, and the operator is
 // taken out of service; sweepAssignments re-offers it to somebody else on its next pass
 // without waiting out the answer window. The traveler's payment and travel number stand.
-app.post('/travel/accept', requireAuth, requireOperationalReadiness, async (req, res) => {
+app.post('/travel/accept', requireAuth, requireFreshAuth, requireOperationalReadiness, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   const rideId = String(req.body?.rideId || '');
@@ -3258,6 +3619,10 @@ app.post('/travel/accept', requireAuth, requireOperationalReadiness, async (req,
   try {
     const u = (await userRef.get()).data() || {};
     externals = await qualificationChecks(uid, u);
+    const offered = await db.collection('rides').doc(rideId).get();
+    if (offered.exists && offered.data()?.bookingFingerprint && String(offered.data().operatorId || '') === uid) {
+      externals.payment = await verifiedTravelPayment(offered.data().paymentIntentId);
+    }
   } catch (e) {
     return res.status(502).json({ error: e.message });
   }
@@ -3272,7 +3637,7 @@ app.post('/travel/accept', requireAuth, requireOperationalReadiness, async (req,
 
 // Operator progression is server-authoritative. Firestore rules no longer permit a phone to
 // manufacture arrived/onboard/completed states or the payout queue marker.
-app.post('/travel/progress', requireAuth, requireOperationalReadiness, async (req, res) => {
+app.post('/travel/progress', requireAuth, requireFreshAuth, requireOperationalReadiness, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
   try {

@@ -103,6 +103,34 @@ const rides = (over = {}) => ({
       out.body.amountCents === 1644 && out.body.arrivalFeeCents === 300 && s.log.transfers.some((t) => t.kind === 'fee' && t.amountCents === 300));
   }
   {
+    const db = fakeDb(rides({ A: { status: 'accepted', paymentIntentId: null } }));
+    const collection = db.collection;
+    db.collection = (name) => {
+      const col = collection(name);
+      return { doc(id) {
+        const ref = col.doc(id);
+        if (name !== 'rides' || id !== 'A') return ref;
+        const get = ref.get; let first = true;
+        ref.get = async () => {
+          if (!first) return get();
+          first = false;
+          const stale = await get();
+          // Provider intent attaches and Operator reaches pickup before cancellation tx reads.
+          db.data.rides.A.paymentIntentId = 'pi_A';
+          db.data.rides.A.status = 'arrived';
+          return stale;
+        };
+        return ref;
+      } };
+    };
+    const s = stripe();
+    const out = await cancelTravel({ db, uid: 'alice', rideId: 'A', deps: s });
+    check('payment attached between cancel reads is refunded from the transactional Travel',
+      out.status === 200 && out.body.refunded === true && s.log.refunds[0]?.paymentIntentId === 'pi_A');
+    check('arrival between cancel reads retains the earned $3 Operator fee',
+      out.body.amountCents === 1644 && s.log.transfers[0]?.amountCents === 300);
+  }
+  {
     const db = fakeDb(rides({ A: { status: 'onboard' } }));
     const out = await cancelTravel({ db, uid: 'alice', rideId: 'A', deps: stripe() });
     check('onboard: cancellation refused (unchanged)', out.status === 409 && db.data.rides.A.status === 'onboard');
@@ -140,7 +168,7 @@ const rides = (over = {}) => ({
     const db = fakeDb({ rides: { N: { ...fare, travelerUid: 'alice', operatorId: 'op1', tripNo: 'AR-9-MIA', status: 'assigned' } } });
     const s = stripe();
     const out = await payForTravel({ db, uid: 'alice', rideId: 'N', create: s.create, now: 7 });
-    check('the owner pays for their own live ride', out.status === 200 && db.data.rides.N.paymentIntentId === 'pi_new' && db.data.rides.N.paidAt === 7);
+    check('the owner prepares their own intent, without claiming payment success', out.status === 200 && db.data.rides.N.paymentIntentId === 'pi_new' && db.data.rides.N.paymentIntentCreatedAt === 7 && !db.data.rides.N.paidAt);
     check('Stripe gets the RIDE\'s Travel Number and id, not the request\'s', s.log.creates[0].tripNo === 'AR-9-MIA' && s.log.creates[0].rideId === 'N');
   }
   {

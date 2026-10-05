@@ -137,7 +137,7 @@ export default function OperatorBackground() {
             )}
           </Card>
 
-          <Pressable onPress={() => setShowExisting((v) => !v)} accessibilityRole="button">
+          <Pressable accessibilityRole="button" onPress={() => setShowExisting((v) => !v)}>
             <Card style={styles.choiceCard}>
               <View style={styles.choiceRow}>
                 <View style={{ flex: 1 }}>
@@ -174,11 +174,11 @@ export default function OperatorBackground() {
                     placeholderTextColor={colors.faint}
                     style={styles.input}
                   />
-                  <Pressable style={styles.checkRow} onPress={() => setCriminalIncluded((v) => !v)}>
+                  <Pressable accessibilityRole="button" style={styles.checkRow} onPress={() => setCriminalIncluded((v) => !v)}>
                     <Text style={styles.check}>{criminalIncluded ? '✓' : '○'}</Text>
                     <Text style={styles.checkLabel}>{t('traveler.bgCriminalSex')}</Text>
                   </Pressable>
-                  <Pressable style={styles.checkRow} onPress={() => setDrivingIncluded((v) => !v)}>
+                  <Pressable accessibilityRole="button" style={styles.checkRow} onPress={() => setDrivingIncluded((v) => !v)}>
                     <Text style={styles.check}>{drivingIncluded ? '✓' : '○'}</Text>
                     <Text style={styles.checkLabel}>{t('traveler.bgDrivingHistory')}</Text>
                   </Pressable>
@@ -194,7 +194,7 @@ export default function OperatorBackground() {
             </Card>
           ) : null}
 
-          <Pressable onPress={() => setShowRequirements((v) => !v)} accessibilityRole="button">
+          <Pressable accessibilityRole="button" onPress={() => setShowRequirements((v) => !v)}>
             <View style={styles.disclosureRow}>
               <Text style={styles.disclosure}>{t('traveler.bgFloridaRequirementsTitle')}</Text>
               <Text style={styles.disclosure}>{showRequirements ? '−' : '+'}</Text>

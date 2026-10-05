@@ -136,9 +136,9 @@ export default function SmartTravel() {
   const checkTransit = useCallback(async () => {
     if (!journey?.plan || checkingTransit) return;
     setCheckingTransit(true);
-    try { setRevalidation(await revalidateSmartTransit(journey.plan)); }
+    try { setRevalidation(await revalidateSmartTransit(journey.plan, journey.destCoords)); }
     finally { setCheckingTransit(false); }
-  }, [journey?.plan, checkingTransit]);
+  }, [journey?.plan, journey?.destCoords, checkingTransit]);
 
   useEffect(() => {
     if (journey?.stage === 'leg1' && journey.leg1No && !ride.rideActive && !revalidation && !checkingTransit) void checkTransit();
@@ -166,6 +166,7 @@ export default function SmartTravel() {
   const arrive = clockTime(plan.arriveAt);
   const origin = journey ? prettyPlace(journey.pickup.name) : prettyPlace(ride.departure.name);
   const destination = journey ? prettyPlace(journey.destination.name) : prettyPlace(ride.arrival.name);
+  const afterFirstCar = !!journey?.leg1No && journey.stage === 'leg1' && !ride.rideActive;
 
   // Transit money belongs to the transit provider, regardless of market. The UI must not
   // encode a home agency: fare amount and agency identity come from the regional feed record.
@@ -239,7 +240,21 @@ export default function SmartTravel() {
                       ? t('traveler.transitNoLongerAvailable')
                       : t('traveler.transitVerificationUnavailable')}
                 </Text>
+                {revalidation?.status === 'ok' && revalidation.changed && revalidation.replacementPlan && (
+                  <PrimaryButton
+                    label={t('traveler.smartAdoptUpdated')}
+                    onPress={() => {
+                      if (ride.adoptSmartReplan(revalidation.replacementPlan!)) setRevalidation(null);
+                    }}
+                    style={{ marginBottom: 12 }}
+                  />
+                )}
                 <PrimaryButton label={t('traveler.checkTransitAgain')} onPress={() => { setRevalidation(null); void checkTransit(); }} />
+                <Text style={[styles.actionNote, { marginTop: 14 }]}>{t('traveler.smartDirectInsteadNote')}</Text>
+                <OutlineButton
+                  label={t('traveler.smartDirectInstead')}
+                  onPress={() => { ride.endSmartJourney(); router.dismissTo('/'); }}
+                />
               </>
             )}
           </>
@@ -280,17 +295,19 @@ export default function SmartTravel() {
           </Sub>
         </View>
       </View>
-      <Text style={styles.summary}>
-        {t('traveler.durMin', { n: plan.smartMin })} · {comparison(plan, t)}
-      </Text>
-      {depart && arrive ? (
+      {afterFirstCar ? (
+        <Text style={styles.summary}>{t('traveler.smartAfterFirstFare')}</Text>
+      ) : (
+        <Text style={styles.summary}>{t('traveler.durMin', { n: plan.smartMin })} · {comparison(plan, t)}</Text>
+      )}
+      {!afterFirstCar && depart && arrive ? (
         <Text style={styles.times}>{t('traveler.departArrive', { depart, arrive })}</Text>
       ) : null}
 
       <SectionLabel style={{ marginTop: 22, marginBottom: 12 }}>{t('traveler.journey')}</SectionLabel>
       <Card style={styles.journeyCard}>
         {plan.legs.map((l, i) => {
-          const amount = legAmount(l, t);
+          const amount = afterFirstCar && l.kind === 'car' ? null : legAmount(l, t);
           return (
             <View key={i} style={[styles.jRow, i > 0 && styles.jDivider]}>
               <LegIcon leg={l} />
@@ -311,7 +328,9 @@ export default function SmartTravel() {
       </Card>
 
       <SectionLabel style={{ marginTop: 22, marginBottom: 12 }}>{t('traveler.cost')}</SectionLabel>
-      <Card style={styles.costCard}>
+      {afterFirstCar ? (
+        <Card style={styles.costCard}><Text style={styles.costLabel}>{t('traveler.smartAfterFirstFare')}</Text></Card>
+      ) : <Card style={styles.costCard}>
         <View style={styles.costRow}>
           <Text style={styles.costLabel}>
             {cars.length === 1 ? t('traveler.oneCarTravel') : t('traveler.nCarTravels', { n: cars.length })}
@@ -338,7 +357,7 @@ export default function SmartTravel() {
           <Text style={styles.costMuted}>{t('traveler.directTravel')}</Text>
           <Num size={13} style={{ color: colors.muted }}>{fmt(plan.directCents / 100)}</Num>
         </View>
-      </Card>
+      </Card>}
       <Text style={styles.note}>{t('traveler.transitFareNote')}</Text>
       {cars.length > 1 ? <Text style={styles.note}>{t('traveler.eachCarTravelOwnNumber')}</Text> : null}
 

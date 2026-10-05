@@ -19,7 +19,7 @@ const { randomUUID } = require('crypto');
 // real decisions (travelmoney.test.js).
 
 /** The statuses in which a travel may be paid for: it exists, is this traveler's, and is live. */
-const PAYABLE = ['assigned', 'accepted', 'arrived', 'onboard'];
+const PAYABLE = ['awaiting_payment', 'assigned', 'accepted', 'arrived', 'onboard'];
 
 const fail = (status, error, code) => ({ status, body: { error, ...(code ? { code } : {}) } });
 
@@ -101,7 +101,7 @@ async function payForTravel({ db, uid, rideId, create, resume = null, now = Date
       if (current.paymentClaim !== claimId && !current.paymentIntentId) throw new Error('Payment claim was lost');
       tx.update(rideRef, {
         paymentIntentId: result.paymentIntentId,
-        paidAt: now,
+        paymentIntentCreatedAt: now,
         governmentFeeCents: result.breakdown?.governmentFeeCents ?? 0,
         feeLines: result.breakdown?.feeLines ?? [],
         paymentClaim: null,
@@ -146,22 +146,59 @@ async function cancelTravel({ db, uid, rideId, deps, stripeConfigured = true, no
 
   // Before arrival: full refund. After arrival: less a $3 arrival fee paid to the operator.
   // Onboard or completed: refused, and directed to Patron Support. (Unchanged.)
-  const stage = String(ride.status || '');
-  if (stage === 'onboard' || stage === 'completed') {
+  if (ride.status === 'onboard' || ride.status === 'completed') {
     return fail(409, 'This travel is already underway and cannot be cancelled. Patron Support can settle anything that went wrong with it.', 'travel_underway');
   }
   const ARRIVAL_FEE_CENTS = 300;
-  const arrivalFee = stage === 'arrived' ? ARRIVAL_FEE_CENTS : 0;
 
-  await rideRef.set({ status: 'cancelled', statusAt: now }, { merge: true });
+  // Close and release the one-Operator reservation together. A concurrent completion or
+  // payment claim cannot be raced by an out-of-date read above.
+  const closed = await db.runTransaction(async (tx) => {
+    const currentSnap = await tx.get(rideRef);
+    if (!currentSnap.exists) return fail(404, 'No such travel');
+    const current = currentSnap.data();
+    if (String(current.travelerUid) !== String(uid)) return fail(403, 'That travel belongs to another traveler');
+    if (current.paymentClaim) return fail(409, 'Payment is still being prepared; retry cancellation shortly', 'payment_in_progress');
+    if (['onboard', 'completed'].includes(current.status) || current.transferId) {
+      return fail(409, 'This travel is underway or settled', 'travel_underway');
+    }
+    if (current.status === 'cancelled' && current.refundId) {
+      return { status: 200, body: { ok: true, alreadyRefunded: true, refundId: current.refundId } };
+    }
+    const opRef = current.operatorId ? db.collection('operators').doc(String(current.operatorId)) : null;
+    if (opRef) {
+      const opSnap = await tx.get(opRef);
+      if (opSnap.exists && String(opSnap.data().currentRideId || '') === id) {
+        tx.update(opRef, { currentRideId: null, reservedAt: null });
+      }
+    }
+    tx.update(rideRef, { status: 'cancelled', statusAt: now,
+      cancelledFrom: current.cancelledFrom || current.status,
+      refundPending: !!current.paymentIntentId });
+    return { current };
+  });
+  if (closed.status) return closed;
+  const currentRide = closed.current;
+  const arrivalFee = String(currentRide.cancelledFrom || currentRide.status || '') === 'arrived'
+    ? ARRIVAL_FEE_CENTS : 0;
 
   // THE PAYMENT IS THE TRAVEL'S OWN. Never the request's: see the header.
-  const paymentIntentId = String(ride.paymentIntentId || '');
+  const paymentIntentId = String(currentRide.paymentIntentId || '');
   if (!paymentIntentId) return { status: 200, body: { ok: true, refunded: false, reason: 'no payment was taken' } };
   if (!stripeConfigured) return fail(500, 'No Stripe key configured');
 
   const { cents: refundable, reason } = await deps.refundableFor({ paymentIntentId, expectUid: String(uid) });
-  if (refundable <= 0) return { status: 200, body: { ok: true, refunded: false, reason } };
+  if (refundable <= 0) {
+    const canceled = deps.cancelUnpaidIntent
+      ? await deps.cancelUnpaidIntent({ paymentIntentId, uid: String(uid), rideId: id })
+      : { ok: false, reason: reason || 'Payment status requires reconciliation' };
+    if (canceled.ok) {
+      await rideRef.set({ refundPending: false, paymentIntentCancelledAt: now }, { merge: true });
+      return { status: 200, body: { ok: true, refunded: false, reason: 'No payment was taken' } };
+    }
+    await rideRef.set({ refundPending: true, refundBlockedReason: canceled.reason || reason }, { merge: true });
+    return { status: 202, body: { ok: true, pending: true, reason: canceled.reason || reason } };
+  }
 
   // The arrival fee is withheld from the refund, never charged separately.
   const withheld = Math.min(arrivalFee, refundable);
@@ -182,13 +219,13 @@ async function cancelTravel({ db, uid, rideId, deps, stripeConfigured = true, no
 
   // Pay the arrival fee to the operator who was standing there. Best effort, recorded if owed.
   if (withheld > 0) {
-    const { accountId } = await deps.operatorPayoutAccount(db, ride.operatorId);
+    const { accountId } = await deps.operatorPayoutAccount(db, currentRide.operatorId);
     if (accountId) {
       const paid = await deps.transferFixed({
         paymentIntentId,
         operatorStripeAccount: accountId,
         amountCents: withheld,
-        reference: `arrival fee ${ride.tripNo || id}`,
+        reference: `arrival fee ${currentRide.tripNo || id}`,
       });
       await rideRef.set(
         paid.ok

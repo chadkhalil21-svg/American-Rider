@@ -17,7 +17,7 @@ import {
   Sub,
   Title,
 } from '../src/components/UI';
-import { canonicalPlaceName, HOME_PLACE, PLACES, prettyPlace } from '../src/data';
+import { canonicalPlaceName, prettyPlace } from '../src/data';
 import { useRide } from '../src/state/RideContext';
 import { useLanguage } from '../src/state/LanguageContext';
 import { colors, fmt } from '../src/theme';
@@ -76,11 +76,15 @@ export default function Receipt() {
   // "Miami Airport" resolve to the place's current name first.
   const rideAgain = () => {
     const arr = canonicalPlaceName(view.arr);
-    const dest = arr === 'Home' ? HOME_PLACE : PLACES.find((p) => p.short === arr || p.name === arr);
-    ride.startBooking(dest);
-    router.dismissTo('/'); // viewTrip is released by the unmount cleanup above
-    router.navigate(dest ? '/reserve' : { pathname: '/reserve', params: { search: '1', q: arr } });
+    ride.startBooking();
+    router.dismissTo('/');
+    router.navigate({ pathname: '/reserve', params: { search: '1', q: arr } });
   };
+  const returnRecord = ride.myRides.find((r) => r.tripNo === view.no && r.status === 'completed');
+  const canReturn = !ride.rideActive && !(ride.smartJourney?.stage === 'leg1') &&
+    !!returnRecord?.dep && !!returnRecord.arr &&
+    Number.isFinite(returnRecord.pickupLat) && Number.isFinite(returnRecord.pickupLng) &&
+    Number.isFinite(returnRecord.destinationLat) && Number.isFinite(returnRecord.destinationLng);
 
   return (
     <Screen>
@@ -186,6 +190,17 @@ export default function Receipt() {
         {viewingOld && (
           <PrimaryButton label={t('traveler.rideToAgain', { place: prettyPlace(view.arr) })} onPress={rideAgain} />
         )}
+        {canReturn && (
+          <>
+            <OutlineButton label={t('traveler.bookReturnTravel')} onPress={() => {
+              if (ride.startReturnBooking(view.no)) {
+                router.dismissTo('/');
+                router.navigate('/reserve');
+              }
+            }} />
+            <Text style={styles.returnNote}>{t('traveler.returnPickupCheck')}</Text>
+          </>
+        )}
         <OutlineButton
           label={t('traveler.contactPatronSupport')}
           onPress={() => {
@@ -199,6 +214,7 @@ export default function Receipt() {
 }
 
 const styles = StyleSheet.create({
+  returnNote: { fontSize: 12.5, color: colors.muted, textAlign: 'center', lineHeight: 18 },
   totalCard: {
     marginTop: 20,
     paddingVertical: 18,

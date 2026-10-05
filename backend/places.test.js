@@ -8,6 +8,8 @@
 // service region — the market gate serves it. A traveler standing there was offered five
 // Miami-Dade destinations twenty-five miles away, each with a journey time measured from
 // Brickell, because the times were baked into the list beside the names.
+const fs = require('node:fs');
+const assert = require('node:assert/strict');
 const { destinationsNear, DESTINATIONS } = require('./places');
 const { permitRequired } = require('./fees');
 const { listRegions } = require('./regions');
@@ -80,4 +82,18 @@ check('and carries coordinates, or it can never be priced',
 for (const r of results) console.log(`${r.ok ? '✓' : '✗'} ${r.label}${r.ok || !r.detail ? '' : ` — ${r.detail}`}`);
 const failed = results.filter((r) => !r.ok);
 console.log(failed.length ? `\n${failed.length} FAILED of ${results.length}` : `\nall ${results.length} passed`);
+
+
+const dataSource = fs.readFileSync('src/data.ts','utf8');
+const locationSource = fs.readFileSync('src/location.ts','utf8');
+assert.equal(
+  /name:\s*['"]Current location\s+—\s+Brickell['"]/.test(dataSource),
+  false,
+  'Static pickup collections must never contain a fabricated Current location',
+);
+assert.match(locationSource, /accuracy:\s*Location\.Accuracy\.High/,
+  'device pickup must request high accuracy appropriate to curbside pickup');
+assert.match(locationSource, /if \(!label\) return null/,
+  'coordinates without a human-readable pickup must remain unresolved');
+console.log('PASS current pickup can only originate from resolved device location');
 process.exit(failed.length ? 1 : 0);

@@ -15,10 +15,11 @@ assert.ok(server.includes("const name = 'operations_sweep'") && server.includes(
 assert.ok(server.includes("scheduler: readKey('SCHEDULER_TOKEN') ? 'authenticated' : 'off'"), 'health exposes scheduler authorization readiness');
 assert.ok(server.includes("tolls: readKey('HERE_API_KEY') ? 'on' : 'off'"), 'health exposes toll authority readiness');
 assert.ok(server.includes("const declaredProduction = DEPLOYMENT_MODE === 'production'") && server.includes("const productionMode = declaredProduction || keyMode === 'live'"), 'server has explicit production posture and live money implies it');
-assert.ok(server.includes("if (!fleet.length && !operationalMode)"), 'demonstration fleet is impossible in production posture');
+assert.ok(!server.includes("if (!fleet.length && !operationalMode)"), 'paid dispatch never fabricates a demonstration fleet');
+assert.ok(read('backend/booking.js').includes('operatorDemo: false'), 'a paid Travel may only be assigned to a real database Operator');
 assert.ok(server.includes('function productionReadiness()'), 'production readiness is centralized');
 assert.ok(server.includes("code: 'production_not_ready'"), 'production operations fail closed when dependencies are incomplete');
-for (const route of ['/operator/online', '/fare-quote', '/create-payment-intent', '/travel/dispatch', '/travel/schedule', '/travel/accept']) {
+for (const route of ['/operator/online', '/fare-quote', '/create-payment-intent', '/travel/prepare', '/travel/dispatch', '/travel/schedule', '/travel/accept']) {
   const line = server.split('\\n').find((x) => x.includes(`app.post('${route}'`)) || '';
   assert.ok(line.includes('requireOperationalReadiness'), `${route} is gated by production readiness`);
 }
@@ -27,7 +28,7 @@ assert.ok(server.includes('nearbyOperatorCandidates(db, pickup'), 'dispatch retr
 const party=read('backend/travelparty.js');
 assert.ok(party.includes("['self','other_adult','teen']"), 'Teen Travel is an explicit server-authoritative party mode');
 assert.ok(party.includes('normalizeTeenParty'), 'Teen Travel delegates to the Family authorization authority');
-assert.ok(server.includes('party: operatorPartyView(party)'));
+assert.ok(server.includes('party: partyResult.party') || server.includes('const party = partyResult.party'));
 assert.ok(server.includes('travelerName: party.travelerName'));
 assert.ok((server.match(/travelerName: party\.travelerName/g)||[]).length >= 2, 'immediate and scheduled Travel use normalized Traveler identity');
 

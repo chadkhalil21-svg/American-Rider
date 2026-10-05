@@ -34,7 +34,8 @@ const { distanceMiles, matchOperator, coverageLapsed } = require('./matching');
 const { nearbyOperatorCandidates } = require('./geooperators');
 const { screeningReady } = require('./screening');
 const { assessOperator } = require('./qualification');
-const { connectAccountStatus } = require('./payments');
+const { connectAccountStatus, verifiedTravelPayment } = require('./payments');
+const { assignPaidTravel, paymentMatches } = require('./booking');
 const { adminDb, adminStatus } = require('./firebase-admin');
 const { fileTicket } = require('./tickets');
 const { readKey } = require('./env');
@@ -46,10 +47,10 @@ const { notify } = require('./push');
 // enough that a stuck queue cannot quietly spend a day's read budget before anyone notices.
 const ASSIGNED_SCAN_LIMIT = 50;
 
-// Travels underway that one monitoring tick will cover. Deliberately far above any plausible
-// concurrent load for a single market, because exceeding it means somebody is not being
-// watched — see the note at the query itself.
-const LIVE_SCAN_LIMIT = 500;
+// A page limits the size of each Firestore RPC; it is NOT a cap on Travels covered per tick.
+const LIVE_PAGE_SIZE = 200;
+const MONITOR_READ_WARNING_MS = 30_000;
+const FLEET_CELL_DEG = 0.01;
 
 const STILL_RADIUS_MI = 0.03; // ~48 metres
 
@@ -92,30 +93,26 @@ async function sweepMonitor({ now = Date.now() } = {}) {
 
   let live;
   try {
-    // Queried on status alone — one equality filter, no composite index. See scheduler.js for
-    // why that matters more than the extra rows.
-    // BOUNDED, BUT NEVER SILENTLY. This reads every travel underway, once a minute — so the
-    // cost is 1,440 x the number of journeys in progress, per day, and it is the one sweep
-    // whose size grows with real success rather than with a backlog.
-    //
-    // A CAP HERE IS NOT LIKE THE OTHERS. sweepAssignments can safely look at fifty unanswered
-    // travels and catch the rest next minute. This sweep is route monitoring: a travel it does
-    // not read is a vehicle nobody is watching, which is the one thing this file exists to
-    // prevent. So the limit is high, and when it is reached the overflow is REPORTED — it
-    // reaches /health and /ops rather than being quietly dropped. A safety sweep that silently
-    // stops covering everybody is worse than one that fails loudly.
-    const snap = await db
-      .collection('rides')
-      .where('status', 'in', ['accepted', 'arrived', 'onboard'])
-      .limit(LIVE_SCAN_LIMIT + 1)
-      .get();
-    live = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-    if (live.length > LIVE_SCAN_LIMIT) {
-      live = live.slice(0, LIVE_SCAN_LIMIT);
-      report.unwatched = true;
-      report.reason =
-        `More than ${LIVE_SCAN_LIMIT} travels are underway; only the first ${LIVE_SCAN_LIMIT} ` +
-        'were monitored this tick. Raise LIVE_SCAN_LIMIT — the fleet has outgrown it.';
+    // The same ordered query pages to exhaustion: 501 or 8,001 active Travels must not make
+    // the first 500 the only vehicles watched. A slow scan is loud in /health and Ops.
+    live=[];
+    let cursor=null;const started=Date.now();let pages=0;
+    for (;;) {
+      let query=db.collection('rides').where('status','in',['accepted','arrived','onboard'])
+        .orderBy('__name__');
+      if(cursor)query=query.startAfter(cursor);
+      const snap=await query.limit(LIVE_PAGE_SIZE).get();
+      pages++;
+      live.push(...snap.docs.map((d)=>({id:d.id,...d.data()})));
+      if(snap.docs.length<LIVE_PAGE_SIZE)break;
+      cursor=snap.docs.at(-1).id;
+    }
+    report.activeReadPages=pages;
+    report.activeReadMs=Date.now()-started;
+    report.activeTravelsRead=live.length;
+    if(report.activeReadMs>MONITOR_READ_WARNING_MS) {
+      report.slowScan=true;
+      report.reason=`Active Travel scan took ${report.activeReadMs}ms; add capacity before monitoring falls behind.`;
     }
   } catch (e) {
     return { ok: false, reason: `could not read travel underway: ${e.message}`, watching: 0 };
@@ -131,6 +128,12 @@ async function sweepMonitor({ now = Date.now() } = {}) {
       lng: r.opLng,
       stillMin: r.stillSince ? minutesSince(r.stillSince, now) : 0,
     }));
+  const grid=new Map();
+  for(const v of fleetNow) {
+    const key=`${Math.floor(v.lat/FLEET_CELL_DEG)}:${Math.floor(v.lng/FLEET_CELL_DEG)}`;
+    if(!grid.has(key))grid.set(key,[]);
+    grid.get(key).push(v);
+  }
 
   for (const ride of live) {
     // A vehicle waiting AT the pickup is doing its job by being stationary. Watching it would
@@ -187,9 +190,16 @@ async function sweepMonitor({ now = Date.now() } = {}) {
     }
 
     // ---- 1. Is it the road? -----------------------------------------------------------
-    const neighbours = fleetNow.filter(
-      (v) => v.id !== ride.id && distanceMiles(v, { lat: ride.opLat, lng: ride.opLng }) <= NEARBY_MI,
-    );
+    const latRadius=NEARBY_MI/68;
+    const lngRadius=NEARBY_MI/(68*Math.max(0.05,Math.cos(ride.opLat*Math.PI/180)));
+    const neighbours=[];
+    for(let y=Math.floor((ride.opLat-latRadius)/FLEET_CELL_DEG);y<=Math.floor((ride.opLat+latRadius)/FLEET_CELL_DEG);y++) {
+      for(let x=Math.floor((ride.opLng-lngRadius)/FLEET_CELL_DEG);x<=Math.floor((ride.opLng+lngRadius)/FLEET_CELL_DEG);x++) {
+        for(const v of grid.get(`${y}:${x}`)||[]) {
+          if(v.id!==ride.id&&distanceMiles(v,{lat:ride.opLat,lng:ride.opLng})<=NEARBY_MI)neighbours.push(v);
+        }
+      }
+    }
     const alsoStopped = neighbours.filter((v) => v.stillMin >= STILL_MIN / 2).length;
 
     if (alsoStopped >= CONGESTION_MIN_VEHICLES) {
@@ -362,6 +372,11 @@ async function readReply({ reply, stillMin, stage }) {
     return { resolved: false, urgent: false, note: `The operator's answer needs review: ${reply}` };
   };
 
+  // These words are an escalation floor, not a model suggestion. A paid classifier may
+  // contextualize ordinary traffic, but may never dismiss a reported injury or threat.
+  const deterministic = fallback();
+  if (deterministic.urgent) return deterministic;
+
   const key = readKey('ANTHROPIC_API_KEY');
   if (!key) return fallback();
 
@@ -523,10 +538,12 @@ const ANSWER_WINDOW_SEC = 45;
 // have been sent journeys from weeks ago.
 const STALE_ASSIGNMENT_MS = 60 * 60 * 1000;
 
-async function sweepAssignments({ now = Date.now() } = {}) {
+async function sweepAssignments({ now = Date.now(), checkMarket } = {}) {
   const db = adminDb();
   if (!db) return { ok: false, reason: adminStatus().reason, pending: 0 };
   const out = { ok: true, pending: 0, notified: [], reoffered: [], stranded: [], expired: [], positionless: [] };
+  const liveMoney = String(readKey('DEPLOYMENT_MODE') || '').toLowerCase() === 'production' ||
+    /^(sk|rk)_live_/.test(readKey('STRIPE_SECRET_KEY') || '');
 
   let rows;
   try {
@@ -555,14 +572,46 @@ async function sweepAssignments({ now = Date.now() } = {}) {
     // and NOT deleted — a travel record is the traveler's, whatever became of it.
     if (age > STALE_ASSIGNMENT_MS) {
       if (!ride.staleAt) {
-        await write(db, ride.id, { status: 'expired', staleAt: now, unanswered: true });
-        out.expired.push(ride.id);
+        const ref = db.collection('rides').doc(ride.id);
+        const closed = await db.runTransaction(async (tx) => {
+          const snap = await tx.get(ref);
+          if (!snap.exists || snap.data().status !== 'assigned') return false;
+          const current = snap.data();
+          const opRef = current.operatorId ? db.collection('operators').doc(String(current.operatorId)) : null;
+          if (opRef) {
+            const opSnap = await tx.get(opRef);
+            if (opSnap.exists && String(opSnap.data().currentRideId || '') === ride.id) {
+              tx.update(opRef, { currentRideId: null, reservedAt: null });
+            }
+          }
+          tx.update(ref, { status: current.paymentIntentId ? 'cancelled' : 'expired',
+            cancelledFrom: current.status, staleAt: now, unanswered: true,
+            refundPending: !!current.paymentIntentId });
+          return true;
+        });
+        if (closed) out.expired.push(ride.id);
       }
       continue;
     }
 
-    const since = age / 1000;
+    const since = (now - (Number(ride.offeredAt) || Number(ride.createdAt) || now)) / 1000;
     out.pending++;
+
+    // Never reoffer a payment-less or reversed new booking. Legacy assigned records must be
+    // reconciled separately rather than treated as proof of a successful charge.
+    if (ride.paymentFailed || ride.chargeFailed || !ride.paymentIntentId) {
+      out.stranded.push(ride.id);
+      continue;
+    }
+
+    if (liveMoney) {
+      let active = false;
+      try {
+        active = typeof checkMarket === 'function' &&
+          (await checkMarket({ lat: Number(ride.pickupLat), lng: Number(ride.pickupLng) })) === 'active';
+      } catch { /* Market admission is not inferred from stale geography on provider failure. */ }
+      if (!active) { out.stranded.push(ride.id); continue; }
+    }
 
     // RELEASED BY POST /travel/accept: the operator it was offered to is no longer eligible.
     // Neither notified nor given the answer window — it goes straight to somebody else.
@@ -641,17 +690,30 @@ async function sweepAssignments({ now = Date.now() } = {}) {
       continue;
     }
 
-    await write(db, ride.id, {
-      operatorId: next.operator.id,
-      operatorName: next.operator.name || '',
-      declinedBy: [...declined, ride.operatorId],
-      createdAt: now, // restarts the answer window for the new operator
-      notifiedOperatorAt: null,
-      releasedAt: null,
-      releasedReason: null,
-      reofferedAt: now,
-    });
-    out.reoffered.push({ rideId: ride.id, to: next.operator.name });
+    try {
+      const payment = await verifiedTravelPayment(ride.paymentIntentId);
+      if (!paymentMatches(ride, payment, ride.travelerUid, ride.id)) {
+        out.stranded.push(ride.id);
+        continue;
+      }
+      // Mark unanswered offers released without overwriting an acceptance or cancellation.
+      const ref = db.collection('rides').doc(ride.id);
+      const marked = await db.runTransaction(async (tx) => {
+        const current = await tx.get(ref);
+        if (!current.exists || current.data().status !== 'assigned' ||
+            String(current.data().operatorId) !== String(ride.operatorId)) return false;
+        if (!current.data().releasedAt) tx.update(ref, { releasedAt: now, releasedReason: 'answer_timeout' });
+        return true;
+      });
+      if (!marked) continue;
+      const result = await assignPaidTravel({ db, uid: ride.travelerUid, rideId: ride.id,
+        payment, candidate: next, now, requireScreening: screeningReady() });
+      if (result.status === 200 && !result.body.reused) out.reoffered.push({ rideId: ride.id, to: next.operator.name });
+      else if (result.status !== 200) out.stranded.push(ride.id);
+    } catch {
+      // Do not create another Travel or claim the offer succeeded after a provider/DB error.
+      out.stranded.push(ride.id);
+    }
   }
 
   return out;

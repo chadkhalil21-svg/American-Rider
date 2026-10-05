@@ -50,3 +50,12 @@ assert.match(layout, /\(!user \|\| onboarding\)/,
 assert.match(authContext, /onAuthStateChanged\(auth, \(u\) => \{[\s\S]*setUser\(u\)/,
   'Firebase auth-state listener must publish the user consumed by the app gate');
 console.log('PASS provider sessions converge on the Firebase auth-state application gate');
+
+
+const commissioning = fs.readFileSync('scripts/commission-live-firebase-auth.cjs','utf8');
+assert.match(
+  commissioning,
+  /sendOobCode'.*requestType:'PASSWORD_RESET'/s,
+  'live Firebase commissioning must exercise password-reset issuance, not only source presence',
+);
+console.log('PASS live Firebase commissioning includes password-reset issuance');

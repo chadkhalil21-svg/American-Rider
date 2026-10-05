@@ -67,7 +67,7 @@ function Segmented({
       {options.map((o) => {
         const on = o === value;
         return (
-          <Pressable key={o} onPress={() => onChange(o)} style={styles.segOpt}>
+          <Pressable accessibilityRole="button" key={o} onPress={() => onChange(o)} style={styles.segOpt}>
             <Text style={[styles.segText, on && styles.segTextOn]}>{labels?.[o] ?? o}</Text>
           </Pressable>
         );

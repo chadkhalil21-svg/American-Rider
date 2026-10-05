@@ -126,6 +126,8 @@ export async function fetchMyCases(): Promise<{ cases: SupportCase[]; unavailabl
 export type EmergencyReport = {
   ok: boolean;
   caseNo: string | null;
+  stored: boolean;
+  emailed: boolean;
 };
 
 /**
@@ -137,6 +139,7 @@ export type EmergencyReport = {
  * must not be told help is coming when it is not.
  */
 export async function alertEmergency(args: {
+  requestId: string;
   // NULL WHEN NO TRAVEL IS UNDERWAY. An emergency can be raised from the safety screen with
   // nothing booked, and until 19 Sept 2026 that case was filed against the seeded
   // demonstration journey because the screen read it out of `lastTrip`. A case describing a
@@ -156,10 +159,11 @@ export async function alertEmergency(args: {
       body: JSON.stringify(args),
     });
     const d = await res.json().catch(() => ({}));
-    if (!res.ok) return { ok: false, caseNo: null };
-    return { ok: d.ok === true, caseNo: d.caseNo ?? null };
+    if (!res.ok) return { ok: false, caseNo: null, stored: false, emailed: false };
+    return { ok: d.stored === true && d.emailed === true, caseNo: d.caseNo ?? null,
+      stored: d.stored === true, emailed: d.emailed === true };
   } catch {
-    return { ok: false, caseNo: null };
+    return { ok: false, caseNo: null, stored: false, emailed: false };
   }
 }
 

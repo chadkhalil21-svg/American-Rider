@@ -25,6 +25,7 @@ import {
 import { Text } from '../src/components/AppText';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { destinationsNear, type Destination } from '../src/backend/destinations';
+import { searchPlaces, type PlaceSuggestion } from '../src/backend/placeSearch';
 import { fetchQuote, geocodePlace, isUnavailable } from '../src/backend/fares';
 import { joinWaitlist } from '../src/backend/connect';
 import { fetchSmartQuote } from '../src/backend/smart';
@@ -46,9 +47,7 @@ import {
   applyClassCents,
   classNameKey,
   BOOKABLE_CLASSES,
-  DEP_PLACES,
   Place,
-  PLACES,
   platformFee,
 } from '../src/data';
 import { modeLine } from '../src/smartLegs';
@@ -56,6 +55,7 @@ import { useCabinPrefs } from '../src/state/cabinPrefs';
 import { useRide } from '../src/state/RideContext';
 import { paymentModeNote, usePaymentConfig } from '../src/state/PaymentConfigContext';
 import { useLanguage } from '../src/state/LanguageContext';
+import { useAuth } from '../src/state/AuthContext';
 import { colors, fmt } from '../src/theme';
 import { fetchFamily, type FamilyLink } from '../src/backend/family';
 
@@ -93,6 +93,7 @@ export default function TravelConfirmation() {
   const router = useRouter();
   const goBack = useGoBack();
   const ride = useRide();
+  const { user } = useAuth();
   const payConfig = usePaymentConfig();
   const cabin = useCabinPrefs();
   const params = useLocalSearchParams<{ search?: string; q?: string }>();
@@ -138,6 +139,12 @@ export default function TravelConfirmation() {
   const chooseDestination = React.useCallback(
     async (place: Place, opts?: { keepSearchOpen?: boolean }) => {
       const req = ++priceReq.current;
+      // A destination change invalidates every quote-derived fact immediately. Keeping the
+      // previous quote (or falling back to place.cost === 0) while the new server quote is in
+      // flight makes the platform-fee floor look like a complete Travel price.
+      ride.setQuotedFareCents(null);
+      ride.setQuotedFeeLines([]);
+      ride.setTripCoords(null);
       ride.setArrival(place);
       if (!opts?.keepSearchOpen) {
         setSearching(false);
@@ -212,7 +219,7 @@ export default function TravelConfirmation() {
     pricedOnOpen.current = true;
     // keepSearchOpen: this is background pricing, not a pick — if the traveler arrived
     // through the search card, their search box must stay open.
-    if (!ride.tripCoords) chooseDestination(ride.arrival, { keepSearchOpen: true });
+    if (!ride.tripCoords && ride.arrival.name.trim()) chooseDestination(ride.arrival, { keepSearchOpen: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -271,11 +278,16 @@ export default function TravelConfirmation() {
   // THE SAME SUM THE SERVER CHARGES, per class: the class fare, the platform fee on it, and
   // any government fee fenced for this trip. The chosen class's figure is ride.travelerTotal,
   // the one derivation every money screen reads; these rows use the same three lines.
-  const baseCents = ride.quotedFareCents ?? Math.round(ride.arrival.cost * 100);
+  const authoritativePriceReady = ride.quotedFareCents != null && !pricing && !ride.repricing && !priceFailed && !unavailable;
   const governmentFee = ride.quotedFeeLines.reduce((sum, l) => sum + l.cents, 0) / 100;
   const allIn = (key: string) => {
-    const fare = applyClassCents(baseCents, key) / 100;
+    if (!authoritativePriceReady || ride.quotedFareCents == null) return null;
+    const fare = applyClassCents(ride.quotedFareCents, key) / 100;
     return +(fare + platformFee(fare) + governmentFee).toFixed(2);
+  };
+  const displayClassPrice = (key: string) => {
+    const amount = allIn(key);
+    return amount == null ? '—' : fmt(amount);
   };
 
   // `meta` carries the server's measured distance as "18.7 mi" once a quote has landed; a
@@ -299,6 +311,21 @@ export default function TravelConfirmation() {
     return () => { live = false; };
   }, [depLat, depLng]);
 
+  const [placeSuggestions, setPlaceSuggestions] = useState<PlaceSuggestion[]>([]);
+  const [placeSearchBusy, setPlaceSearchBusy] = useState(false);
+  useEffect(() => {
+    if (!searching || query.trim().length < 2) { setPlaceSuggestions([]); setPlaceSearchBusy(false); return undefined; }
+    setPlaceSearchBusy(true);
+    const controller = new AbortController();
+    const anchor = ride.pickupPin ?? (depLat != null && depLng != null ? { lat: depLat, lng: depLng } : null);
+    const timer = setTimeout(() => {
+      searchPlaces(query, anchor, controller.signal).then((results) => {
+        if (!controller.signal.aborted) { setPlaceSuggestions(results); setPlaceSearchBusy(false); }
+      });
+    }, 180);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [query, searching, depLat, depLng, ride.pickupPin]);
+
   const q = query.trim().toLowerCase();
   // THE SHORTCUTS ARE THE SERVER'S, FOR THE REGION THE TRAVELER IS IN. They were a Miami-Dade
   // list compiled into the app: a traveler in Fort Lauderdale — inside our market — typed "b"
@@ -307,22 +334,35 @@ export default function TravelConfirmation() {
   //
   // Places we hold no permit for never appear, because the server does not list them.
   const matched = nearby.filter((p) => q === '' || p.name.toLowerCase().includes(q)).slice(0, 4);
+  const liveMatched = q.length >= 2 ? placeSuggestions.slice(0, 6) : [];
   // Anything the traveler types that isn't one of our shortcuts is still a real place —
   // offer to look it up rather than dead-ending with "no places found".
   const typedPlace: Place | null =
-    q !== '' && matched.length === 0
+    q !== '' && !placeSearchBusy && matched.length === 0 && liveMatched.length === 0
       ? { name: query.trim(), short: query.trim(), cost: 0, meta: 'Looking up…' }
       : null;
   // The demo capitalizes the typed place for display; the booked name stays as typed
   // so the geocoder sees exactly what the traveler wrote.
   const typedDisplay = query.trim().replace(/\b\w/g, (c) => c.toUpperCase());
   const qd = queryDep.trim().toLowerCase();
-  const depMatched = DEP_PLACES.filter(
-    (p) => qd === '' || p.name.toLowerCase().includes(qd),
-  ).slice(0, 4);
+  const [depSuggestions, setDepSuggestions] = useState<PlaceSuggestion[]>([]);
+  const [depSearchBusy, setDepSearchBusy] = useState(false);
+  useEffect(() => {
+    if (!searchingDep || qd.length < 2) { setDepSuggestions([]); setDepSearchBusy(false); return undefined; }
+    setDepSearchBusy(true);
+    const controller = new AbortController();
+    const anchor = ride.pickupPin ?? (depLat != null && depLng != null ? { lat: depLat, lng: depLng } : null);
+    const timer = setTimeout(() => {
+      searchPlaces(queryDep, anchor, controller.signal).then((results) => {
+        if (!controller.signal.aborted) { setDepSuggestions(results); setDepSearchBusy(false); }
+      });
+    }, 180);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [queryDep, searchingDep, qd, depLat, depLng, ride.pickupPin]);
+  const depMatched = depSuggestions.slice(0, 6);
 
   // One factual line, whatever the demand: what the operator's arrival is estimated at.
-  const waitNote = t('traveler.approxMinToPickup', { n: ride.pickupWait });
+  const waitNote = ride.pickupWait > 0 ? t('traveler.approxMinToPickup', { n: ride.pickupWait }) : null;
   // Reads the server's real key mode instead of a hardcoded "nothing is charged yet", which
   // would become a lie on the sheet a traveler reads before money moves. Null once the server
   // holds a live key; the Terms promise the app says which mode it is in at payment.
@@ -334,7 +374,7 @@ export default function TravelConfirmation() {
   // that cannot be charged, or that American Rider does not make, is not one to confirm.
   const busy = pricing || ride.repricing;
   const partyReady = ride.travelParty.mode === 'self' || (ride.travelParty.mode === 'other_adult' && ride.travelParty.travelerName.trim().length > 0);
-  const canReserve = payConfig.canTakePayment && partyReady && !busy && !priceFailed && !unavailable;
+  const canReserve = payConfig.canTakePayment && partyReady && authoritativePriceReady && !!ride.tripCoords && !busy && !priceFailed && !unavailable;
   const confirm = () => {
     if (!canReserve) return;
     ride.confirmRide();
@@ -378,7 +418,7 @@ export default function TravelConfirmation() {
                     <View style={{ flex: 1 }}>
                       <Text style={styles.slotLabel}>{t('traveler.whoIsTraveling')}</Text>
                       <Text style={styles.slotValue}>
-                        {ride.travelParty.mode === 'self' ? t('traveler.me') : ride.travelParty.travelerName || t('traveler.anotherAdult')}
+                        {ride.travelParty.mode === 'self' ? (user?.displayName?.trim() || t('traveler.me')) : ride.travelParty.travelerName || t('traveler.anotherAdult')}
                       </Text>
                     </View>
                     <Chev />
@@ -485,9 +525,21 @@ export default function TravelConfirmation() {
           </Card>
 
           {/* The demo's results card: pin rows with the estimated travel time. */}
-          {searching && (matched.length > 0 || typedPlace) && (
+          {searching && (liveMatched.length > 0 || matched.length > 0 || typedPlace) && (
             <Card style={styles.resultsCard}>
-              {matched.map((p, i) => (
+              {liveMatched.map((p, i) => (
+                <Pressable key={p.id} accessibilityRole="button" onPress={() => chooseDestination({ name: p.title, short: p.title, cost: 0, meta: '', lat: p.lat, lng: p.lng })}>
+                  <View style={[styles.resultRow, i > 0 && styles.hair]}>
+                    <View style={[styles.pin, { backgroundColor: colors.ink }]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.resultName}>{p.title}</Text>
+                      {!!p.subtitle && <Text style={styles.resultMeta}>{p.subtitle}</Text>}
+                    </View>
+                    <Chev />
+                  </View>
+                </Pressable>
+              ))}
+              {matched.filter((p) => !liveMatched.some((s) => Math.abs(s.lat-p.lat) < 0.00001 && Math.abs(s.lng-p.lng) < 0.00001)).map((p, i) => (
                 <Pressable
                   key={p.name}
                   accessibilityRole="button"
@@ -533,10 +585,10 @@ export default function TravelConfirmation() {
             <Card style={styles.resultsCard}>
               {depMatched.map((p, i) => (
                 <Pressable
-                  key={p.name}
+                  key={p.id}
                   accessibilityRole="button"
                   onPress={() => {
-                    ride.setDeparture(p);
+                    ride.setDeparture({ name: p.title, short: p.title, lat: p.lat, lng: p.lng });
                     ride.setPickupPin(null); // a named pickup replaces any dropped pin
                     setSearchingDep(false);
                     setQueryDep('');
@@ -544,11 +596,14 @@ export default function TravelConfirmation() {
                 >
                   <View style={[styles.resultRow, i > 0 && styles.hair]}>
                     <View style={[styles.pin, { backgroundColor: colors.ink }]} />
-                    <Text style={styles.resultName}>{p.name}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.resultName}>{p.title}</Text>
+                      {!!p.subtitle && <Text style={styles.resultMeta}>{p.subtitle}</Text>}
+                    </View>
                   </View>
                 </Pressable>
               ))}
-              {qd !== '' && depMatched.length === 0 && (
+              {qd.length >= 2 && !depSearchBusy && depMatched.length === 0 && (
                 <Text style={styles.noResults}>{t('traveler.noPlacesFound')}</Text>
               )}
               {Platform.OS === 'ios' && (
@@ -578,7 +633,7 @@ export default function TravelConfirmation() {
                 <Text style={styles.routeDistance}>{t('traveler.routeDistance', { miles: routeMiles })}</Text>
               )}
 
-              <Text style={styles.waitNote}>{waitNote}</Text>
+              {waitNote ? <Text style={styles.waitNote}>{waitNote}</Text> : null}
 
               {/* THE VEHICLE CLASS, ON THE SHEET (Chad, 13 Sept 2026: "Merge vehicle class
                   selection directly into the destination summary screen"). Each row states
@@ -594,7 +649,7 @@ export default function TravelConfirmation() {
                           key={cls.key}
                           accessibilityRole="radio"
                           accessibilityState={{ checked: on }}
-                          accessibilityLabel={`${t(classNameKey(cls.key))}, ${fmt(allIn(cls.key))}`}
+                          accessibilityLabel={`${t(classNameKey(cls.key))}, ${displayClassPrice(cls.key)}`}
                           onPress={() => ride.setTravelClass(cls.key)}
                         >
                           <View style={[styles.row, i > 0 && styles.hair]}>
@@ -611,7 +666,7 @@ export default function TravelConfirmation() {
                               <Text style={styles.rowSub}>{t(cls.sub)}</Text>
                             </View>
                             <Num size={15} weight="600">
-                              {fmt(allIn(cls.key))}
+                              {displayClassPrice(cls.key)}
                             </Num>
                           </View>
                         </Pressable>
@@ -735,6 +790,8 @@ export default function TravelConfirmation() {
                 <Text style={styles.totalState}>{t('traveler.calculating')}</Text>
               ) : priceFailed || unavailable ? (
                 <Text style={styles.totalState}>{t('traveler.unavailable')}</Text>
+              ) : !authoritativePriceReady ? (
+                <Text style={styles.totalState}>{t('traveler.calculating')}</Text>
               ) : (
                 <Num size={20} weight="600">
                   {fmt(ride.travelerTotal)}

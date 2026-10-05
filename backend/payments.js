@@ -521,6 +521,26 @@ async function resumePaymentIntent({ paymentIntentId, uid, rideId, email, travel
   };
 }
 
+/** Never offer a paid Travel on a phone's assertion. Retrieve the exact intent from Stripe. */
+async function verifiedTravelPayment(paymentIntentId) {
+  if (!paymentIntentId || typeof paymentIntentId !== 'string') return null;
+  return getStripe().paymentIntents.retrieve(paymentIntentId);
+}
+
+async function cancelUnpaidIntent({ paymentIntentId, uid, rideId }) {
+  try {
+    const pi = await verifiedTravelPayment(paymentIntentId);
+    if (!pi || pi.metadata?.uid !== String(uid) || pi.metadata?.rideId !== String(rideId)) {
+      return { ok: false, reason: 'Payment ownership could not be verified' };
+    }
+    if (pi.status === 'succeeded') return { ok: false, reason: 'Payment succeeded; refund required' };
+    if (pi.status === 'canceled') return { ok: true };
+    if (pi.status === 'processing') return { ok: false, reason: 'Payment is processing; refund reconciliation required' };
+    const cancelled = await getStripe().paymentIntents.cancel(pi.id, { cancellation_reason: 'requested_by_customer' });
+    return { ok: cancelled.status === 'canceled', reason: cancelled.status };
+  } catch (e) { return { ok: false, reason: String(e.message || e) }; }
+}
+
 async function chargeRide({ travelCostCents, travelerPaymentMethod, uid, tripNo, governmentFees, cardCountry, tollCents = 0 }) {
   const stripe = getStripe();
   const q = quote(travelCostCents, undefined, governmentFees, cardCountry, tollCents);
@@ -580,11 +600,11 @@ async function refundableFor({ paymentIntentId, expectUid }) {
     if (expectUid && pi.metadata?.uid !== String(expectUid)) {
       return { cents: 0, reason: 'that payment belongs to a different account' };
     }
-    if (pi.status !== 'succeeded') return { cents: 0, reason: `payment is ${pi.status}` };
+    if (pi.status !== 'succeeded') return { cents: 0, reason: `payment is ${pi.status}`, retryable: pi.status === 'processing' };
     const cents = (pi.amount_received || pi.amount || 0) - (pi.amount_refunded || 0);
     return { cents, reason: cents > 0 ? null : 'nothing left to refund' };
   } catch (e) {
-    return { cents: 0, reason: e.message };
+    return { cents: 0, reason: e.message, retryable: true };
   }
 }
 
@@ -947,7 +967,7 @@ async function probeNetwork() {
  * `travelCostCents` and `uid` back off Stripe's own record hours later, and a scheduled
  * travel must settle through the same path as any other.
  */
-async function chargeScheduledTravel({ travelCostCents, uid, email, tripNo, reservationId, dep, dest, governmentFees, cardCountry, tollCents = 0 }) {
+async function chargeScheduledTravel({ travelCostCents, uid, email, tripNo, reservationId, rideId, dep, dest, governmentFees, cardCountry, tollCents = 0 }) {
   const stripe = getStripe();
   const q = quote(travelCostCents, undefined, governmentFees, cardCountry, tollCents);
   try {
@@ -973,6 +993,7 @@ async function chargeScheduledTravel({ travelCostCents, uid, email, tripNo, rese
           product: 'American Rider travel',
           uid: uid || '',
           tripNo: tripNo || '',
+          rideId: rideId || '',
           travelCostCents: String(travelCostCents),
           // What American Rider retains — see the note at the other intent-creation sites. A
           // scheduled travel is refunded by exactly the same path, so it needs exactly this.
@@ -1118,7 +1139,7 @@ async function chargeOperatorAccountFee({ uid, email, month, amountCents }) {
 
 module.exports = {
   operatorPayoutAccount,
-  quote, commissionCents, platformFeeCents, isDomesticCard, defaultCardCountry, journeyFeeCents, createPaymentIntent, resumePaymentIntent, chargeRide, refundTravel,
+  quote, commissionCents, platformFeeCents, isDomesticCard, defaultCardCountry, journeyFeeCents, createPaymentIntent, resumePaymentIntent, verifiedTravelPayment, cancelUnpaidIntent, chargeRide, refundTravel,
   MIN_PLATFORM_FEE_CENTS,
   customerForTraveler, connectAccountFor, connectOnboardingLink, connectAccountStatus,
   transferToOperator, paidWithFromIntent, refundableFor, connectDashboardLink, pingStripe, probeNetwork,

@@ -111,9 +111,12 @@ function presenceStale(o, now = Date.now()) {
 //     provider is live — additionally demands screeningCheckedAt, the marker recordDecision
 //     writes only on a PASS. Before a provider exists the demo fleet keeps working, and the
 //     launch docs already bar real travelers until screening is live.
-function matchOperator(operators, pickup, travelClass = 'Standard', { requireScreening = false, now = Date.now() } = {}) {
+function matchOperator(operators, pickup, travelClass = 'Standard', { requireScreening = false, now = Date.now(), allowQueued = false } = {}) {
   const candidates = operators
     .filter(o => o.available)
+    // A duty flag means the Operator is online, not free to serve two concurrent Travelers.
+    // The final reservation is still enforced transactionally by booking.js.
+    .filter(o => !o.currentRideId || (allowQueued && o.queueEligible === true && !o.nextRideId))
     // 2. and still there. See PRESENCE_STALE_MS above — `available` alone is a flag nobody
     //    ever clears, and it put a paying traveler in a car that did not exist.
     .filter(o => !presenceStale(o, now))

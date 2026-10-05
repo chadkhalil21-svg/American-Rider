@@ -46,7 +46,10 @@ export type AssignedTravel = {
     luggage: boolean;
   };
   costCents: number;
+  /** Authoritative Travel Fare before Platform Fee/pass-throughs. */
+  travelCostCents: number;
   status: string;
+  releasedAt?: number | null;
   createdAt: number;
   /** When the status last changed. Distinguishes a journey underway from one that never
    *  closed — see ACTIVE_RESTORE_MAX_MS in OperatorContext. */
@@ -135,7 +138,9 @@ export function watchAssignedTravel(
                   }
                 : undefined,
               costCents: Number(x.costCents ?? 0),
+              travelCostCents: Number(x.travelCostCents ?? 0),
               status: String(x.status ?? ''),
+              releasedAt: Number(x.releasedAt) || null,
               createdAt: Number(x.createdAt ?? 0),
               statusAt: Number(x.statusAt ?? 0),
               monitor: (x.monitor as AssignedTravel['monitor']) ?? null,

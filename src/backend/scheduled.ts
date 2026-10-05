@@ -38,6 +38,8 @@ export type ScheduledRide = {
   cost: number;
   /** When the travel is due, as a real instant — what decides whether it is still upcoming. */
   atMs: number;
+  pickupDate?: string;
+  pickupTimeZone?: string;
 
   // ---- What the dispatcher needs. -------------------------------------------------------
   /** Pickup and destination as the traveler will read them. */
@@ -89,6 +91,7 @@ export async function saveScheduledRide(
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({
         ...clean,
+        costCents: Math.round(info.cost * 100),
         travelerName: info.party?.travelerName || auth.currentUser?.displayName || '',
         bookerName: auth.currentUser?.displayName || '',
         partyMode: info.party?.mode || 'self',

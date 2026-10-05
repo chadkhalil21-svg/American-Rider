@@ -30,7 +30,7 @@ import {
   Sub,
   Title,
 } from '../components/UI';
-import { PLACES, TRAVEL_CLASSES } from '../data';
+import { TRAVEL_CLASSES } from '../data';
 import { useRide } from '../state/RideContext';
 import { colors } from '../theme';
 
@@ -72,7 +72,6 @@ export default function Plan() {
   };
 
   const plan = state.k === 'read' ? state.plan : null;
-  const place = plan ? PLACES.find((p) => p.short === plan.destination || p.name === plan.destination) : null;
 
   // Requirements we cannot meet, read from the traveler's own sentence.
   const unserved = UNSERVED.filter((u) => u.test.test(askedRef.current)).map((u) => u.label);
@@ -107,7 +106,7 @@ export default function Plan() {
         <>
           <SectionLabel style={styles.lbl}>What We Understood</SectionLabel>
           <Card style={styles.readCard}>
-            <Row k="Destination" v={place ? place.name : plan!.destination || 'Not identified'} />
+            <Row k="Destination" v={plan!.destination || 'Not identified'} />
             {!!plan!.when && <Row k="When" v={plan!.when} />}
             {plan!.passengers > 0 && <Row k="Passengers" v={String(plan!.passengers)} />}
             {plan!.prefs?.length > 0 && <Row k="Requirements" v={plan!.prefs.join(' · ')} />}
@@ -119,12 +118,9 @@ export default function Plan() {
 
           {/* THE THREE HONEST DEAD ENDS. Each says what is wrong and what to do, and none of
               them books the nearest available thing instead. */}
-          {!place && (
-            <Text style={styles.problem}>
-              American Rider does not serve that destination yet. Enter it on the home screen to
-              see whether it can be priced.
-            </Text>
-          )}
+          <Text style={styles.problem}>
+            Enter the destination on the home screen to check the current service area and fare.
+          </Text>
           {blocked && (
             <Text style={styles.problem}>
               {unserved.join(' and ')} is not available at launch. Booking Standard travel
@@ -138,21 +134,11 @@ export default function Plan() {
 
       <View style={{ flex: 1 }} />
 
-      {place && !blocked ? (
-        <PrimaryButton
-          label="Select This Travel"
-          onPress={() => {
-            ride.startBooking(place);
-            router.navigate('/reserve');
-          }}
-        />
-      ) : (
-        <PrimaryButton
-          label={state.k === 'thinking' ? 'Reading…' : 'Plan Travel'}
-          disabled={state.k === 'thinking' || !text.trim()}
-          onPress={ask}
-        />
-      )}
+      <PrimaryButton
+        label={state.k === 'thinking' ? 'Reading…' : 'Plan Travel'}
+        disabled={state.k === 'thinking' || !text.trim()}
+        onPress={ask}
+      />
 
       {state.k === 'read' && (
         <Pressable onPress={() => setState({ k: 'idle' })} hitSlop={8}>

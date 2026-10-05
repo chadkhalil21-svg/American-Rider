@@ -17,7 +17,7 @@
 //
 // Both messages now carry both uids, the rule lets either party read and each write only as
 // themselves, and `from` is checked against the writer so neither side can forge the other.
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Text } from '../../src/components/AppText';
 import {
@@ -29,16 +29,20 @@ import { useGoBack } from '../../src/components/nav';
 import { Avatar, BackLink, Screen } from '../../src/components/UI';
 import { useOperator } from '../../src/state/OperatorContext';
 import { useLanguage } from '../../src/state/LanguageContext';
+import { useTravelVoice } from '../../src/state/VoiceContext';
 import { colors } from '../../src/theme';
 
 export default function OperatorCommunicate() {
   const { t } = useLanguage();
+  const voice = useTravelVoice();
   const goBack = useGoBack();
   const op = useOperator();
   const [draft, setDraft] = useState('');
   const [msgs, setMsgs] = useState<TravelMessage[]>([]);
   const [threadError, setThreadError] = useState<string | null>(null);
   const [unsent, setUnsent] = useState(false);
+  const [sending, setSending] = useState(false);
+  const sendingRef = useRef(false);
   const traveler = op.op?.traveler ?? t('traveler.yourTravelerLower');
   const initials = op.op?.tInit ?? 'AR';
   // `no` is the travel number on an active operation; `tripNo` is what it is called on
@@ -54,21 +58,28 @@ export default function OperatorCommunicate() {
   }, [tripNo]);
 
   const send = async () => {
-    const t = draft.trim();
-    if (!t || !tripNo) return;
+    const text = draft.trim();
+    if (!text || !tripNo || sendingRef.current) return;
+    sendingRef.current = true;
+    setSending(true);
     setUnsent(false);
-    const stored = await sendTravelMessage({
-      rideId: op.op?.rideId,
-      tripNo,
-      text: t,
-      from: 'operator',
-      travelerUid,
-    });
-    // NOT OPTIMISTIC ABOUT DELIVERY. The message appears because the live thread picks it up,
-    // so a write that failed shows nothing — and says so, rather than leaving an operator
-    // believing the traveler was told something they were not.
-    if (!stored) setUnsent(true);
-    else setDraft('');
+    try {
+      const stored = await sendTravelMessage({
+        rideId: op.op?.rideId,
+        tripNo,
+        text,
+        from: 'operator',
+        travelerUid,
+      });
+      // The live thread is the only proof of delivery. A failed write leaves the draft.
+      if (!stored) setUnsent(true);
+      else setDraft((current) => current.trim() === text ? '' : current);
+    } catch {
+      setUnsent(true);
+    } finally {
+      sendingRef.current = false;
+      setSending(false);
+    }
   };
 
   return (
@@ -81,6 +92,13 @@ export default function OperatorCommunicate() {
           <Text style={styles.role}>{t('traveler.yourTraveler')}</Text>
         </View>
       </View>
+
+      {op.op?.rideId && voice.available && voice.activeId === op.op.rideId && (
+        <Pressable accessibilityRole="button" style={styles.callAction}
+          onPress={() => { if (op.op?.rideId) void voice.start(op.op.rideId); }}>
+          <Text style={styles.name}>{t('common.voiceCallTraveler')}</Text>
+        </Pressable>
+      )}
 
       {!!threadError && <Text style={styles.simNote}>{threadError}</Text>}
       {unsent && (
@@ -115,6 +133,8 @@ export default function OperatorCommunicate() {
           returnKeyType="send"
         />
         <Pressable
+          accessibilityRole="button"
+          disabled={sending || !draft.trim() || !tripNo}
           onPress={send}
           style={({ pressed }) => [styles.sendBtn, pressed && { opacity: 0.86 }]}
         >
@@ -126,6 +146,8 @@ export default function OperatorCommunicate() {
 }
 
 const styles = StyleSheet.create({
+  callAction: { minHeight: 48, justifyContent: 'center', marginTop: 16, paddingHorizontal: 16,
+    borderRadius: 12, borderWidth: 1, borderColor: colors.border },
   head: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 6 },
   simNote: { fontSize: 11.5, color: colors.faint, marginTop: 14, lineHeight: 17.25 },
   name: { fontSize: 18, fontWeight: '600', color: colors.ink },

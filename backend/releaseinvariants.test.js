@@ -23,7 +23,8 @@ assert.ok(payments.includes("idempotencyKey: `ar_transfer_"), 'completed-Travel 
 assert.ok(server.includes("keyMode !== 'test'"), 'terminal charge route must refuse live Stripe mode');
 assert.equal((server.match(/endsWith\('-distance'\) && priced\.tollStatus === 'unknown'/g)||[]).length, 2, 'quote and test charge must fail closed when routed toll verification is unknown');
 
-assert.ok(queue.includes("where('status', 'in', ['pending', 'processing'])"), 'expired processing events must be sweep candidates');
+assert.ok(queue.includes("where('status','==','pending')") && queue.includes("where('nextAttemptAt','<=',now)"), 'only due pending events may consume the sweep budget');
+assert.ok(queue.includes("where('status','==','processing')") && queue.includes("where('leaseUntil','<=',now)"), 'expired processing events must be sweep candidates');
 assert.ok(queue.includes("x.status === 'processing' && Number(x.leaseUntil || 0) > now"), 'live provider lease must prevent concurrent processing');
 
 assert.ok(checkr.includes('activeProviderAdverseActions({ reportId, api })'), 'report replay must reuse active adverse action');

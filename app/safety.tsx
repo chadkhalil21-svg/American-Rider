@@ -28,6 +28,7 @@ export default function SafeTravels() {
   const ride = useRide();
   const [contacts, setContacts] = useState<TrustedContact[]>([]);
   const [adding, setAdding] = useState(false);
+  const [pendingRemoveContact, setPendingRemoveContact] = useState<number | null>(null);
   const [draftName, setDraftName] = useState('');
   const [draftPhone, setDraftPhone] = useState('');
   // Sharing is available from Travel confirmation onward. Vehicle verification waits until
@@ -152,7 +153,7 @@ export default function SafeTravels() {
                 {c.phone ? prettyPhone(c.phone) : t('traveler.noNumberCannotText')}
               </Text>
             </View>
-            <Pressable onPress={() => removeContact(i)} hitSlop={10} accessibilityRole="button">
+            <Pressable onPress={() => setPendingRemoveContact(i)} hitSlop={10} accessibilityRole="button">
               <Text style={styles.removeLink}>{t('traveler.remove')}</Text>
             </Pressable>
           </View>
@@ -212,6 +213,27 @@ export default function SafeTravels() {
           <Text style={styles.ghostWideText}>{t('traveler.contactPatronSupport')}</Text>
         </Pressable>
       </View>
+
+      <Modal visible={pendingRemoveContact !== null} animationType="fade" transparent onRequestClose={() => setPendingRemoveContact(null)}>
+        <Pressable style={styles.sheetScrim} onPress={() => setPendingRemoveContact(null)}>
+          <Pressable style={styles.sheet} onPress={() => {}}>
+            <Text style={styles.sheetTitle}>{t('traveler.trustedContacts')}</Text>
+            <Text style={styles.sheetBody}>{pendingRemoveContact !== null ? contacts[pendingRemoveContact]?.name : ''}</Text>
+            <View style={styles.sheetBtns}>
+              <Pressable onPress={() => setPendingRemoveContact(null)} style={styles.ghostBtn}>
+                <Text style={styles.ghostBtnText}>{t('traveler.cancel2')}</Text>
+              </Pressable>
+              <Pressable onPress={() => {
+                const index = pendingRemoveContact;
+                setPendingRemoveContact(null);
+                if (index !== null) removeContact(index);
+              }} style={styles.ghostBtn}>
+                <Text style={styles.ghostBtnText}>{t('traveler.remove')}</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <Modal visible={adding} animationType="fade" transparent onRequestClose={() => setAdding(false)}>
         <Pressable style={styles.sheetScrim} onPress={() => setAdding(false)}>

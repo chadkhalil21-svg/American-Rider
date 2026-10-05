@@ -148,8 +148,13 @@ async function assignPaidTravel({ db, uid, rideId, payment, candidate, now = Dat
     if (released && ride.operatorId && String(ride.operatorId) !== opRef.id) {
       const oldRef = db.collection('operators').doc(String(ride.operatorId));
       const oldSnap = await tx.get(oldRef);
-      if (oldSnap.exists && String(oldSnap.data().currentRideId || '') === String(rideId)) {
-        tx.update(oldRef, { currentRideId: null, reservedAt: null });
+      if (oldSnap.exists) {
+        const old = oldSnap.data() || {};
+        if (String(old.currentRideId || '') === String(rideId)) {
+          tx.update(oldRef, { currentRideId: null, reservedAt: null });
+        } else if (String(old.nextRideId || '') === String(rideId)) {
+          tx.update(oldRef, { nextRideId: null, nextReservedAt: null });
+        }
       }
     }
     tx.update(opRef, queueAfterRideId

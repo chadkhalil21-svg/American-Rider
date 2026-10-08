@@ -79,7 +79,25 @@ function mfaSecret(name) {
 const productionSecurityReady = () => !isProduction() ||
   (String(readKey('OPS_SESSION_SECRET')||'').length>=32 &&
     opsAccounts().length>0 && opsAccounts().every((acct)=>!!mfaSecret(acct.name)));
-const configured = () => opsAccounts().length > 0 && productionSecurityReady();
+// Diagnostics stay in private application logs. Never print passwords, MFA keys or session secrets.
+function opsConfigurationIssues() {
+  const accounts = opsAccounts();
+  const issues = [];
+  if (!accounts.length) issues.push('OPS_USERS has no valid named account (name:password)');
+  if (isProduction()) {
+    if (String(readKey('OPS_SESSION_SECRET') || '').length < 32)
+      issues.push('OPS_SESSION_SECRET is missing or shorter than 32 characters');
+    const lackingMfa = accounts.filter((acct) => !mfaSecret(acct.name)).map((acct) => acct.name);
+    if (lackingMfa.length)
+      issues.push('OPS_MFA_SECRETS missing or invalid Base32 secret for account(s): ' + lackingMfa.join(', '));
+  }
+  return issues;
+}
+const configured = () => opsConfigurationIssues().length === 0;
+if (isProduction()) {
+  const issues = opsConfigurationIssues();
+  if (issues.length) console.warn('[operations] Sign-in blocked: ' + issues.join('; '));
+}
 const shared = () => !readKey('OPS_USERS') && configured();
 
 /** For /health: how /ops is signed in to. */
@@ -433,7 +451,7 @@ function mount(app, express, deps = {}) {
       return res
         .status(503)
         .type('html')
-        .send(page('Operations', '<h1>Operations</h1><section><p>Set OPS_USERS ("name:password,name:password") in the environment to use this page. The shared OPS_PASSWORD works only outside production, or with OPS_ALLOW_SHARED_PASSWORD=emergency.</p></section>'));
+        .send(page('Operations', '<h1>Operations</h1><section><p>Operations sign-in is unavailable because its security configuration is incomplete. Check the Render service logs for the exact missing requirement.</p></section>'));
     }
     if (!signedIn(req)) return res.type('html').send(page('Operations', LOGIN));
     try {
@@ -617,4 +635,4 @@ function mount(app, express, deps = {}) {
   });
 }
 
-module.exports = { mount, signedIn, opsAccounts, tokenFor, opsAuthMode, sharedMode, actorOf };
+module.exports = { mount, signedIn, opsAccounts, tokenFor, opsAuthMode, sharedMode, actorOf, opsConfigurationIssues };

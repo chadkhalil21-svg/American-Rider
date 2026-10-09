@@ -32,7 +32,7 @@ assert(!verifySession('alice.bad.cookie',acct,signing,1_000_001));
     process.env.OPS_USERS='alice:correct-horse-battery';
     assert.deepEqual(ops.opsConfigurationIssues(), [], 'configuration can recover');
     const routes={};
-    const app={post:(path,...handlers)=>{routes[path]=handlers.at(-1);},get:()=>{}};
+    const app={post:(path,...handlers)=>{routes[path]=handlers.at(-1);},get:(path,...handlers)=>{routes[path]=handlers.at(-1);}};
     const rows={};
     const ref=(id)=>({id,get:async()=>({exists:!!rows[id],data:()=>rows[id]})});
     const db={collection:()=>({doc:ref}),runTransaction:async(fn)=>{
@@ -52,6 +52,39 @@ assert(!verifySession('alice.bad.cookie',acct,signing,1_000_001));
     r=reply();await routes['/ops/enter']({body:{name:'alice',password:acct.pw,otp:code}},r);
     await new Promise((resolve)=>setTimeout(resolve,750));
     assert.equal(r.statusCode,401,'one OTP can authenticate only once');
+    assert.match(r.text,/Sign-in unsuccessful/, 'failed sign-in gets a visible heading');
+    assert.match(r.text,/Support reference: <strong>[0-9a-f]{12}<\/strong>/, 'failed sign-in gets a safe correlation reference');
+    const events=[];
+    const priorInfo=console.info;
+    try {
+      console.info=(...parts)=>events.push(parts.join(' '));
+      let rejected=reply();
+      await routes['/ops/enter']({body:{name:'alice',password:acct.pw,otp:'not-a-code'}},rejected);
+      await new Promise((resolve)=>setTimeout(resolve,750));
+      assert.equal(rejected.statusCode,401, 'invalid authenticator must be rejected');
+      assert.match(events.join(' '),/authenticator_code_rejected/);
+      assert.match(events.join(' '),/Sign-in page rendered|authenticator_code_rejected/);
+      let wrong=reply();
+      await routes['/ops/enter']({body:{name:'nobody',password:'wrong',otp:'not-a-code'}},wrong);
+      await new Promise((resolve)=>setTimeout(resolve,750));
+      assert.equal(wrong.statusCode,401);
+      assert.match(events.join(' '),/credentials_rejected/);
+      let loginPage=reply();
+      await routes['/ops']({headers:{cookie:'ar_ops=invalid'}},loginPage);
+      assert.match(events.join(' '),/session_cookie=present_invalid/);
+      loginPage=reply();
+      await routes['/ops']({headers:{}},loginPage);
+      assert.match(events.join(' '),/session_cookie=absent/);
+      assert.match(loginPage.text,/autocapitalize="none"/, 'Operations name must not autocapitalize on iPhone');
+      assert.match(loginPage.text,/autocorrect="off"/, 'Operations username must not autocorrect');
+      assert.match(loginPage.text,/autocomplete="current-password"/, 'Safari should recognize existing password');
+      assert(!/name="password"[^>]*autofocus/.test(loginPage.text), 'iOS autofocus must not obscure authentication errors');
+      assert(!events.join(' ').includes(acct.pw), 'never log password');
+      assert(!events.join(' ').includes(secret), 'never log authenticator secret');
+      assert(!events.join(' ').includes('not-a-code'), 'never log submitted code');
+    } finally {
+      console.info=priorInfo;
+    }
     assert.equal(ops.signedIn({headers:{cookie:`ar_ops=${encodeURIComponent('alice.'+ops.tokenFor(acct))}`}}),null);
     console.log('PASS RFC 6238, one-use privileged MFA, signed expiring session and dev-cookie rejection');
   }finally{for(const key of keys)if(old[key]===undefined)delete process.env[key];else process.env[key]=old[key];}

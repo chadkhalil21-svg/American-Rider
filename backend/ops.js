@@ -164,10 +164,10 @@ const LOGIN = `
 <p class="lede">Sign in to continue.</p>
 <section>
   <form method="post" action="/ops/enter">
-    <input type="text" name="name" placeholder="Name" autocomplete="username"
+    <input type="text" name="name" placeholder="Name" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false"
       style="width:100%;padding:13px 14px;border:1px solid ${T.border};border-radius:13px;
              font-size:16px;background:#fff;color:${T.ink};box-sizing:border-box;margin-bottom:10px;">
-    <input type="password" name="password" placeholder="Password" autofocus
+    <input type="password" name="password" placeholder="Password" autocomplete="current-password"
       style="width:100%;padding:13px 14px;border:1px solid ${T.border};border-radius:13px;
              font-size:16px;background:#fff;color:${T.ink};box-sizing:border-box;">
     <input type="text" name="otp" placeholder="Authenticator code (production)" inputmode="numeric" autocomplete="one-time-code"
@@ -453,7 +453,15 @@ function mount(app, express, deps = {}) {
         .type('html')
         .send(page('Operations', '<h1>Operations</h1><section><p>Operations sign-in is unavailable because its security configuration is incomplete. Check the Render service logs for the exact missing requirement.</p></section>'));
     }
-    if (!signedIn(req)) return res.type('html').send(page('Operations', LOGIN));
+    if (!signedIn(req)) {
+      if (isProduction()) {
+        // Trace cookie rejection without logging its value or the person's identity.
+        const cookiePresent = String(req.headers?.cookie || '').split(';')
+          .some((part) => part.trim().startsWith(`${COOKIE}=`));
+        console.info(`[operations] Sign-in page rendered: session_cookie=${cookiePresent ? 'present_invalid' : 'absent'}`);
+      }
+      return res.type('html').send(page('Operations', LOGIN));
+    }
     try {
       res.type('html').send(page('Operations', await board()));
     } catch (e) {
@@ -465,46 +473,67 @@ function mount(app, express, deps = {}) {
   });
 
   app.post('/ops/enter', express.urlencoded({ extended: false }), async (req, res) => {
+    // Random reference connects an on-screen failure to private Render diagnostics.
+    // It is NOT an authorization token. Never log names, passwords, codes, or sessions.
+    const attempt = crypto.randomBytes(6).toString('hex');
+    const trace = (outcome) => {
+      if (isProduction()) console.info(`[operations] Sign-in ${attempt}: ${outcome}`);
+    };
     const name = shared() ? opsAccounts()[0].name : String(req.body?.name || '').trim();
     const got = String(req.body?.password || '');
     const acct = opsAccounts().find((x) => x.name === name);
+    let reason = 'credentials_rejected';
     // Constant time again, and a deliberate pause on failure so the form cannot be run at
     // speed against a short password.
-    let ok =
+    let ok = !!(
       acct &&
       got.length === acct.pw.length &&
-      crypto.timingSafeEqual(Buffer.from(got), Buffer.from(acct.pw));
+      crypto.timingSafeEqual(Buffer.from(got), Buffer.from(acct.pw))
+    );
     if (ok && isProduction()) {
-      const step = totpStep(mfaSecret(acct.name),req.body?.otp);
-      ok = step !== null && productionSecurityReady();
+      const step = totpStep(mfaSecret(acct.name), req.body?.otp);
+      const ready = productionSecurityReady();
+      ok = step !== null && ready;
+      if (!ok) reason = ready ? 'authenticator_code_rejected' : 'configuration_incomplete';
       if (ok) {
-        const db=dbOf();
-        if (!db) return res.status(503).send('Operations authentication is temporarily unavailable.');
+        const db = dbOf();
+        if (!db) {
+          trace('mfa_store_unavailable');
+          return res.status(503).send('Operations authentication is temporarily unavailable.');
+        }
         try {
-          ok=await db.runTransaction(async (tx)=>{
-            const ref=db.collection('ops_mfa').doc(acct.name);
-            const prior=await tx.get(ref);
-            if (Number(prior.exists ? prior.data().lastStep : -1)>=step) return false;
-            tx.set(ref,{lastStep:step,acceptedAt:Date.now()},{merge:true});
+          ok = await db.runTransaction(async (tx) => {
+            const ref = db.collection('ops_mfa').doc(acct.name);
+            const prior = await tx.get(ref);
+            if (Number(prior.exists ? prior.data().lastStep : -1) >= step) {
+              reason = 'authenticator_code_already_used';
+              return false;
+            }
+            tx.set(ref, { lastStep: step, acceptedAt: Date.now() }, { merge: true });
             return true;
           });
-        } catch {return res.status(503).send('Operations authentication is temporarily unavailable.');}
+        } catch {
+          trace('mfa_store_error');
+          return res.status(503).send('Operations authentication is temporarily unavailable.');
+        }
       }
     }
     if (!ok) {
+      trace(reason);
       return setTimeout(
-        () =>
-          res
-            .status(401)
-            .type('html')
-            .send(page('Operations', `<h1>Operations</h1><p class="lede">Sign-in unsuccessful. Check your name, password, and current six-digit authenticator code.</p><section>${LOGIN.split('<section>')[1]}`)),
+        () => res.status(401).type('html').send(page('Operations',
+          `<h1>Operations</h1><section role="alert"><h2>Sign-in unsuccessful</h2>
+          <p>Check your name and password, then use a newly refreshed six-digit code from your paired authenticator.</p>
+          <p>Support reference: <strong>${attempt}</strong></p></section>
+          <section>${LOGIN.split('<section>')[1]}`)),
         700,
       );
     }
+    trace('session_issued');
     res.setHeader(
       'Set-Cookie',
       `${COOKIE}=${encodeURIComponent(isProduction()
-        ? sessionFor(acct,readKey('OPS_SESSION_SECRET'))
+        ? sessionFor(acct, readKey('OPS_SESSION_SECRET'))
         : `${acct.name}.${tokenFor(acct)}`)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${60 * 60 * 12}; Secure`,
     );
     res.redirect('/ops');

@@ -20,6 +20,7 @@ require('node:dns').setDefaultResultOrder('ipv4first');
 
 const express = require('express');
 const cors = require('cors');
+const { corsOptionsFor } = require('./cors-policy');
 const {
   quote, createPaymentIntent, resumePaymentIntent, verifiedTravelPayment, cancelUnpaidIntent, chargeRide, refundTravel,
   connectAccountFor, connectOnboardingLink, connectAccountStatus,
@@ -226,12 +227,9 @@ const CORS_ORIGINS = new Set(
   String(readKey('CORS_ORIGINS') || 'https://americanrider.app,https://www.americanrider.app')
     .split(',').map((s) => s.trim()).filter(Boolean),
 );
-app.use(cors({
-  origin(origin, callback) {
-    if (!productionMode || !origin || CORS_ORIGINS.has(origin)) return callback(null, true);
-    return callback(new Error('Origin not allowed'));
-  },
-}));
+// Respect the Operations Console's own origin, while retaining the strict allowlist for
+// requests arriving from any other site. Do not require a Render-specific CORS_ORIGINS override.
+app.use(cors(corsOptionsFor(productionMode, CORS_ORIGINS)));
 
 function productionReadiness() {
   const missing = [];

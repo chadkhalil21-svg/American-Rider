@@ -164,10 +164,10 @@ const LOGIN = `
 <p class="lede">Sign in to continue.</p>
 <section>
   <form method="post" action="/ops/enter">
-    <input type="text" name="name" placeholder="Name" autocomplete="username"
+    <input type="text" name="name" placeholder="Name" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false"
       style="width:100%;padding:13px 14px;border:1px solid ${T.border};border-radius:13px;
              font-size:16px;background:#fff;color:${T.ink};box-sizing:border-box;margin-bottom:10px;">
-    <input type="password" name="password" placeholder="Password" autofocus
+    <input type="password" name="password" placeholder="Password" autocomplete="current-password"
       style="width:100%;padding:13px 14px;border:1px solid ${T.border};border-radius:13px;
              font-size:16px;background:#fff;color:${T.ink};box-sizing:border-box;">
     <input type="text" name="otp" placeholder="Authenticator code (production)" inputmode="numeric" autocomplete="one-time-code"

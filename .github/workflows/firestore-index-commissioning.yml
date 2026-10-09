@@ -1,0 +1,52 @@
+name: Firestore Composite Index Commissioning
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Audit first; create only indexes missing from the committed manifest
+        required: true
+        default: audit
+        type: choice
+        options:
+          - audit
+          - create_missing
+      confirm_project:
+        description: For create_missing, enter american-rider-35688 exactly
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: firestore-index-production
+  cancel-in-progress: false
+
+jobs:
+  firestore-indexes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify index commissioner's parsing and no-delete contract
+        run: node scripts/firestore-index-commission.test.cjs
+      - name: Authenticate to Google Cloud without a long-lived key
+        id: google_auth
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: american-rider-35688
+          workload_identity_provider: ${{ secrets.FIRESTORE_WIF_PROVIDER }}
+          service_account: ${{ secrets.FIRESTORE_INDEX_SA_EMAIL }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/datastore
+      - name: Audit / create only missing Firestore composite indexes
+        run: node scripts/firestore-index-commission.cjs
+        env:
+          FIRESTORE_INDEX_ACTION: ${{ inputs.operation }}
+          FIRESTORE_CONFIRM_PROJECT: ${{ inputs.confirm_project }}
+          FIRESTORE_ACCESS_TOKEN: ${{ steps.google_auth.outputs.access_token }}

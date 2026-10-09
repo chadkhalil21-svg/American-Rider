@@ -1,14 +1,9 @@
 name: Live Firebase Auth Commissioning
 
 on:
+  # This check is required by the release/current ruleset, so it MUST run on every PR.
   pull_request:
     branches: [release/current]
-    paths:
-      - 'src/firebase.ts'
-      - 'src/state/AuthContext.tsx'
-      - 'src/screens/AuthScreen.tsx'
-      - 'scripts/commission-live-firebase-auth.cjs'
-      - '.github/workflows/live-firebase-auth-commissioning.yml'
   push:
     branches: [release/current]
   workflow_dispatch:

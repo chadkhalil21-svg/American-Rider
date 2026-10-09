@@ -497,7 +497,7 @@ function mount(app, express, deps = {}) {
           res
             .status(401)
             .type('html')
-            .send(page('Operations', `<h1>Operations</h1><p class="lede">That name or password is not right.</p><section>${LOGIN.split('<section>')[1]}`)),
+            .send(page('Operations', `<h1>Operations</h1><p class="lede">Sign-in unsuccessful. Check your name, password, and current six-digit authenticator code.</p><section>${LOGIN.split('<section>')[1]}`)),
         700,
       );
     }

@@ -265,7 +265,9 @@ async function board() {
 
   const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
   const loaded = await loadOpsBoard(db, dayAgo);
-  const size = (k) => `${loaded[k].rows.length}${loaded[k].saturated ? '+' : ''}`;
+  const size = (k) => loaded[k].unavailable ? 'Unavailable' : `${loaded[k].rows.length}${loaded[k].saturated ? '+' : ''}`;
+  const unreadable = Object.entries(loaded).filter(([, group]) => group.unavailable).map(([key]) => key);
+  const unavailableText = '<p role="alert">This section is unavailable. Do not interpret missing records as none.</p>';
   const pending = loaded.pending.rows
     .sort((a, b) => (a.qualification?.evaluatedAt || 0) - (b.qualification?.evaluatedAt || 0));
 
@@ -308,6 +310,13 @@ async function board() {
   return `
 <h1>Operations</h1>
 <p class="lede">${new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })}</p>
+${unreadable.length ? `<section role="alert" style="border:2px solid #B42318;">
+  <h2>Operations data incomplete</h2>
+  <p>${unreadable.length} dashboard section${unreadable.length === 1 ? ' is' : 's are'} unavailable.
+  Counts and empty states cannot certify that emergencies, payout obligations, insurance exceptions or other work are clear.
+  Review the affected data sources before making operational decisions.</p>
+  <p>Affected sections: ${unreadable.map(esc).join(', ')}.</p>
+  </section>` : ''}
 <p><a href="/ops/markets">Market readiness, evidence and pause controls →</a></p>
 <p><a href="/ops/cases?kind=emergency">Urgent and deadline cases · acknowledge →</a> · <a href="/ops/cases?kind=support">Support cases →</a></p>
 <p><a href="/ops/disputes">Stripe dispute evidence · review only →</a></p>
@@ -331,12 +340,12 @@ ${alarms.length
   <h2>Recent activity · up to 120 Travels in the last 24 hours</h2>
   <p>These numbers and amounts describe only the records shown, not a complete daily financial or operational total.</p>
   <div class="rows">
-    ${stat('Travel completed', completed.length)}
-    ${stat('Travel started', today.length)}
-    ${stat('Paid to operators · sample', money(paid), true)}
-    ${stat('American Rider kept · sample', money(took), true)}
+    ${stat('Travel completed', loaded.recent.unavailable ? 'Unavailable' : completed.length)}
+    ${stat('Travel started', loaded.recent.unavailable ? 'Unavailable' : today.length)}
+    ${stat('Paid to operators · sample', loaded.recent.unavailable ? 'Unavailable' : money(paid), true)}
+    ${stat('American Rider kept · sample', loaded.recent.unavailable ? 'Unavailable' : money(took), true)}
     <div class="split"></div>
-    ${stat('Payouts owed · shown', `${size('owed')} · ${money(owedCents)}`, true)}
+    ${stat('Payouts owed · shown', loaded.owed.unavailable ? 'Unavailable' : `${size('owed')} · ${money(owedCents)}`, true)}
     ${stat('Disputed · shown', size('disputed'))}
     ${stat('Open cases · shown', size('cases'))}
     ${stat('Receipts not delivered · shown', size('noReceipt'))}
@@ -345,7 +354,7 @@ ${alarms.length
 
 <section>
   <h2>Underway now</h2>
-  ${underway.length
+  ${loaded.underway.unavailable ? unavailableText : underway.length
     ? `<div class="rows">${underway.slice(0, 25).map(rideRow).join('')}</div>`
     : '<p>No travel underway.</p>'}
 </section>
@@ -356,7 +365,7 @@ ${alarms.length
   <p>Operators qualify automatically when every check passes. Only what the checks cannot settle
     — held documents, refusals to reconsider, suspensions — appears here. Every decision is
     recorded with a note and the name of the person who made it.${shared() ? ` <strong>Signed in with the shared password (${esc(sharedMode())}): decisions are recorded as “${esc(opsAccounts()[0]?.name || 'ops')}”, not a named person. Set OPS_USERS.</strong>` : ''}</p>
-  ${pending.length ? pending.map(exceptionCard).join('') : '<p>No operator exceptions.</p>'}
+  ${loaded.pending.unavailable ? unavailableText : pending.length ? pending.map(exceptionCard).join('') : '<p>No operator exceptions.</p>'}
   <div style="margin-top:20px;">
     <strong>Insurance status confirmation</strong>
     <p style="color:${T.muted};font-size:13px;">After reviewing a carrier, agent, broker, or monitoring-provider confirmation, record the current status here. A cancellation or material change removes the Operator from service immediately.</p>
@@ -381,7 +390,7 @@ ${alarms.length
 
 <section>
   <h2>On duty</h2>
-  ${onDuty.length
+  ${loaded.operators.unavailable ? unavailableText : onDuty.length
     ? `<div class="rows">${onDuty
         .map((o) => `<div><span class="k">${esc(o.name || o.id)}<br>
           <span style="color:${T.faint};font-size:13px;">${esc(o.car || '')} ${esc(o.plate || '')}</span></span>
@@ -397,7 +406,7 @@ ${alarms.length
 
 <section>
   <h2>Reservations</h2>
-  ${scheduled.length
+  ${loaded.scheduled.unavailable ? unavailableText : scheduled.length
     ? `<div class="rows">${scheduled
         .slice(0, 15)
         .map(
@@ -411,7 +420,7 @@ ${alarms.length
 
 <section>
   <h2>Open cases</h2>
-  ${cases.length
+  ${loaded.cases.unavailable ? unavailableText : cases.length
     ? `<div class="rows">${cases
         .slice(0, 15)
         .map(
@@ -426,7 +435,7 @@ ${alarms.length
 <section>
   <h2>Systems</h2>
   <div class="rows">
-    ${stat('Firestore', adminStatus().ok ? 'connected' : 'DOWN')}
+    ${stat('Firestore', unreadable.length ? 'DEGRADED' : adminStatus().ok ? 'connected' : 'DOWN')}
     ${stat('Stripe webhook', webhookReady() ? 'configured' : 'NOT CONFIGURED')}
     ${stat('Email receipts', emailReady() ? 'configured' : 'NOT CONFIGURED')}
     ${stat('Operator screening', screeningReady() ? 'configured' : 'NOT CONFIGURED')}
@@ -465,10 +474,11 @@ function mount(app, express, deps = {}) {
     try {
       res.type('html').send(page('Operations', await board()));
     } catch (e) {
-      res
-        .status(500)
-        .type('html')
-        .send(page('Operations', `<h1>Operations</h1><section><h2>Error</h2><p>${esc(e.message)}</p></section>`));
+      // Database error details may contain internal Firebase project paths and links.
+      // Keep the private diagnostic on the server; show Operators an actionable safe state.
+      console.error(`[operations] Dashboard could not render: ${String(e?.code || 'unexpected').slice(0, 48)}`);
+      res.status(503).type('html').send(page('Operations',
+        '<h1>Operations</h1><section role="alert"><h2>Dashboard temporarily unavailable</h2><p>Your sign-in succeeded, but operational data could not be retrieved. Please contact platform administration. Do not assume pending work is clear.</p></section>'));
     }
   });
 

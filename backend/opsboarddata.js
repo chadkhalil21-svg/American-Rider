@@ -6,7 +6,11 @@ const UNDERWAY=['assigned','accepted','arrived','onboard'];
 async function loadOpsBoard(db,dayAgo) {
  if(!db)throw new Error('Firestore required for Operations board');
  const rides=db.collection('rides');
- const [underway,recent,operators,scheduled,cases,pending,owed,disputed,attention,noReceipt]=await Promise.all([
+ // A missing production composite index must not make *every* Operations section disappear.
+ // Preserve successful reads and explicitly mark unavailable sections; never present missing
+ // emergency, payout or insurance-monitoring records as a clean/empty queue.
+ const keys = Object.keys(LIMITS);
+ const outcomes = await Promise.allSettled([
   rides.where('status','in',UNDERWAY).limit(LIMITS.underway).get(),
   rides.where('createdAt','>',dayAgo).orderBy('createdAt','desc').limit(LIMITS.recent).get(),
   db.collection('operators').where('available','==',true).limit(LIMITS.operators).get(),
@@ -18,9 +22,20 @@ async function loadOpsBoard(db,dayAgo) {
   rides.where('monitor.state','in',['emergency','escalated']).limit(LIMITS.attention).get(),
   rides.where('receiptFailed','==',true).limit(LIMITS.noReceipt).get(),
  ]);
- const groups={underway,recent,operators,scheduled,cases,pending,owed,disputed,attention,noReceipt};
- return Object.fromEntries(Object.entries(groups).map(([k,v])=>[k,{
-  rows:v.docs.map((d)=>({id:d.id,...d.data()})),saturated:v.docs.length>=LIMITS[k],limit:LIMITS[k],
- }]));
+ return Object.fromEntries(keys.map((key, index) => {
+  const result = outcomes[index];
+  if (result.status === 'rejected') {
+   const code = String(result.reason?.code ?? '');
+   const indexRequired = code === '9' || code === 'failed-precondition'
+     || /requires an index/i.test(String(result.reason?.message ?? ''));
+   // Do not expose Firestore links, document contents or customer information in logs.
+   console.error(`[operations] Board section ${key} unavailable: ${indexRequired ? 'index_required' : 'query_failed'}`);
+   return [key, { rows: [], unavailable: true, reason: indexRequired ? 'index_required' : 'query_failed',
+     saturated: false, limit: LIMITS[key] }];
+  }
+  const snap = result.value;
+  return [key, { rows: snap.docs.map((d) => ({ id: d.id, ...d.data() })),
+   unavailable: false, saturated: snap.docs.length >= LIMITS[key], limit: LIMITS[key] }];
+ }));
 }
 module.exports={LIMITS,UNDERWAY,loadOpsBoard};

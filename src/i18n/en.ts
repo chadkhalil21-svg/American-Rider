@@ -593,8 +593,6 @@ export default {
     bgNameCompanyFirst: 'Name the screening company first.',
     bgNotRecorded: 'That could not be recorded.',
     bgRecordedWillAsk: 'Recorded. We will ask them to send it.',
-    bgHaveThemEmail: ' Contact %{email} with your case reference to arrange secure delivery from %{agency}. Do not email the screening report or identity documents.',
-    bgCitingCase: ', citing case %{caseNo}.',
     qualBasicsSub: 'Legal name, date of birth, address',
     qualBgSub: 'Completed with an approved screening provider',
     inboxNotSignedIn: 'This device is not signed in, so travel cannot be received.',

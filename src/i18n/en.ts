@@ -564,7 +564,7 @@ export default {
     bgInProgress: 'Screening in progress',
     bgStatusPending: 'We will update this status when the provider report is received.',
     bgCompleteSection: 'COMPLETE SCREENING',
-    bgApprovedProvider: 'Approved screening provider',
+    bgApprovedProvider: 'Screening options',
     bgExternalProvider: 'Secure external screening',
     bgProviderBody: 'Complete the required criminal-record, sex-offender and driving-history searches through the provider’s secure process. Sensitive screening information stays with the screening provider.',
     bgContinueProvider: 'Continue with provider',

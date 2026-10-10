@@ -1,6 +1,6 @@
 'use strict';
 const assert = require('node:assert/strict');
-const { normalize, summarize } = require('./firestore-index-commission.cjs');
+const { normalize, summarize, listIndexes } = require('./firestore-index-commission.cjs');
 const manifest = require('../firestore.indexes.json');
 assert.equal(manifest.indexes.length, 14, 'unexpected production index manifest size');
 for (const index of manifest.indexes) {
@@ -31,3 +31,35 @@ assert.equal(normalize({
   ...source,fields:[...source.fields,{fieldPath:'__name__',order:'ASCENDING'}],
 }) === normalize(live), false, 'non-default __name__ sort should remain distinct');
 console.log('PASS Firestore commissioner source definitions and implicit key order');
+
+async function verifyLiveListProtocol() {
+  const originalFetch = global.fetch;
+  const priorToken = process.env.FIRESTORE_ACCESS_TOKEN;
+  const calls = [];
+  process.env.FIRESTORE_ACCESS_TOKEN = 'fake-test-token';
+  try {
+    global.fetch = async (url, options) => {
+      calls.push({ url: String(url), method: options.method || 'GET' });
+      assert(!String(url).includes('pageSize'), 'Never send unsupported Firestore pageSize');
+      const page = calls.length === 1
+        ? { indexes: [live], nextPageToken: 'next page/+token' }
+        : { indexes: [{ ...live, name: live.name + '-second' }] };
+      return { ok: true, json: async () => page };
+    };
+    const rows = await listIndexes('support_tickets');
+    assert.equal(rows.length, 2, 'all Firestore list pages must be collected');
+    assert.equal(calls.length, 2);
+    assert(calls[0].url.endsWith('/collectionGroups/support_tickets/indexes'),
+      'first page has no query parameters');
+    assert(calls[1].url.includes('?pageToken=next%20page%2F%2Btoken'),
+      'continuation token must be encoded');
+    assert(calls.every(x => x.method === 'GET'), 'audit is read-only');
+  } finally {
+    global.fetch = originalFetch;
+    if (priorToken === undefined) delete process.env.FIRESTORE_ACCESS_TOKEN;
+    else process.env.FIRESTORE_ACCESS_TOKEN = priorToken;
+  }
+}
+verifyLiveListProtocol().then(() =>
+  console.log('PASS Firestore commissioner omits unsupported pageSize and paginates read-only')
+).catch((e) => { console.error(e); process.exitCode = 1; });

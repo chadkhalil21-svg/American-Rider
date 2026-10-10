@@ -66,5 +66,13 @@ async function recordIndependentContact({db,actor,input,now=Date.now()}) {
   });
   return {ok:true,expiresAt:record.expiresAt};
 }
+// Bind responses to the EXACT issued policy. A contact reply for an old policy
+// cannot renew the status clock after a new document or policy is uploaded.
+function policyFingerprint(m) {
+  const p=[m?.insurer,m?.policyNumber,m?.effectiveDate,m?.expirationDate]
+    .map(x=>String(x||'').trim().toUpperCase());
+  if(!p[1] || !p[2] || !p[3])return null;
+  return crypto.createHash('sha256').update(JSON.stringify(p)).digest('hex');
+}
 module.exports={COLLECTION,TRUST_MS,METHODS,contactId,normalizeEmail,
-  validateIndependentContact,currentContactTrust,trustForEmail,recordIndependentContact};
+  validateIndependentContact,currentContactTrust,trustForEmail,recordIndependentContact,policyFingerprint};

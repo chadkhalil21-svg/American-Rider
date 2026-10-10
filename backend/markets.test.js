@@ -106,8 +106,9 @@ check('go on duty: declared market active and position in an active market', /op
 const doc = route("post\\('\\/operator\\/document'");
 check('document reading (a model call) only in an active market', /operatingMarketGate\(u\)/.test(doc));
 check(
-  'external screening evidence review is only available in an active market',
-  /app\.post\('\/operator\/screening\/existing', requireAuth, LIMITS\.screening, requireActiveOperatingMarket/.test(server),
+  'screening report intake can be prepared in a configured Florida market before commercial activation',
+  /app\.post\('\/operator\/screening\/existing', requireAuth, LIMITS\.screening, requireScreeningRequestMarket/.test(server) &&
+    /region\.jurisdiction\?\.stateCode !== 'FL'/.test(server),
 );
 check('Stripe Connect onboarding: only in an active market', /app\.post\('\/connect\/onboard', requireAuth, LIMITS\.connect, requireActiveOperatingMarket/.test(server));
 check('waitlist is lightweight: one record, rate-limited, nothing started', /app\.post\('\/waitlist', requireAuth, LIMITS\.waitlist/.test(server) && !/checkr|readDocument|connectAccountFor/.test(route("post\\('\\/waitlist'")));

@@ -577,6 +577,8 @@ export default {
     bgAlreadyScreened: 'Already screened?',
     bgAlreadyBody: 'A recent report may satisfy some or all of this requirement. We will review it before asking you to complete anything again.',
     bgRequestRecorded: 'Request recorded',
+    bgCaseReference: 'Screening case %{caseNo}.',
+    bgCoordinationOnly: 'For ordinary questions, contact support@americanrider.app with your case reference. Do not send screening reports or identity documents by email. American Rider will arrange verified secure agency transfer.',
     bgCompany: 'SCREENING COMPANY',
     bgProviderName: 'Provider name',
     bgReportDate: 'REPORT DATE',

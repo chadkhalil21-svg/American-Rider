@@ -8,7 +8,7 @@ const REFERENCE_RE = /^[A-Za-z0-9][A-Za-z0-9._:/-]{5,119}$/;
 const CONTACT_CHANNELS = new Set(['verified_business_phone', 'verified_business_email', 'authenticated_agency_portal']);
 const REPORT_CHANNELS = new Set(['authenticated_provider_portal', 'provider_verified_secure_transfer']);
 const CASE_REASON_RE = /^Operator screening — review (existing|new) provider report$/;
-const stages = Object.freeze(['claimed', 'agency_contacted', 'report_authenticated', 'dispute_open']);
+const stages = Object.freeze(['claimed', 'agency_contacted', 'report_authenticated', 'dispute_open', 'clarification_needed']);
 const nameOf = (actor) => String(actor?.name || '');
 const clean = (x) => String(x || '').trim();
 
@@ -62,8 +62,8 @@ async function recordScreeningHandoff({ db, input, actor, now = Date.now() }) {
       if (previous.stage) return { ok: false, status: 409, error: 'Case is already claimed.' };
       nextStage = 'claimed';
     } else if (action === 'agency_contacted') {
-      if (!['claimed','dispute_open'].includes(previous.stage))
-        return { ok: false, status: 409, error: 'Claim the case or open a disputed-report recheck before logging CRA contact.' };
+      if (!['claimed','dispute_open','clarification_needed'].includes(previous.stage))
+        return { ok: false, status: 409, error: 'Claim the case or start a provider clarification or disputed-report recheck before logging CRA contact.' };
       nextStage = 'agency_contacted';
       patch = { agencyContact: { channel: contactChannel, reference: contactReference, verifiedAt: now, by: person },
         authenticatedReport: null };
@@ -86,11 +86,12 @@ async function recordScreeningHandoff({ db, input, actor, now = Date.now() }) {
       agency_contacted: 'American Rider has independently contacted the screening company and is awaiting verified report delivery.',
       report_authenticated: 'A report source has been authenticated. American Rider must still review statutory screening findings before clearance.',
       dispute_open: 'The screening report is being disputed or corrected. Eligibility remains on hold pending verified new evidence.',
+      clarification_needed: 'Screening evidence needs agency clarification. Eligibility remains on hold.',
     }[nextStage];
     tx.set(caseRef, { screeningHandoff: {
       ...previous, ...patch, owner: person, stage: nextStage, updatedAt: now,
-      latestActionBy: person }, acknowledgedAt: previous.acknowledgedAt || now,
-      acknowledgedBy: previous.acknowledgedBy || person,
+      latestActionBy: person }, acknowledgedAt: ticket.acknowledgedAt || now,
+      acknowledgedBy: ticket.acknowledgedBy || person,
     }, { merge: true });
     tx.set(userRef, { screening: {
       summary, ...(nextStage === 'dispute_open' ? { decision: 'review', reportId: null,

@@ -142,7 +142,7 @@ const {
 } = require('./insurance-monitoring');
 const { COLLECTION: TRUSTED_INSURANCE_CONTACTS, contactId: insuranceContactId,
   currentContactTrust, policyFingerprint, normalizeEmail: normalizeInsuranceContact } = require('./insurance-contact-trust');
-const { lookupOfficialAgencyEmail } = require('./florida-official-insurance-contacts');
+const { insuranceSourceState, recognizeOfficialInsuranceContact } = require('./insurance-official-source-router');
 const { normalizeParty, operatorPartyView } = require('./travelparty');
 const family = require('./family');
 const { provisionTeenPin, verifyTeenPin, teenPinReady, pinForRide } = require('./teenpickup');
@@ -2554,6 +2554,7 @@ async function issueInsuranceConfirmationRequest({ uid, user, contact, now = Dat
     policyLast4: last4,
     // Responses for an earlier policy must not renew a different policy.
     policyFingerprint: policyFingerprint(m),
+    sourceStateCode: insuranceSourceState(user),
     attempt,
     deliveryStatus: 'pending',
   });
@@ -2842,11 +2843,10 @@ app.post('/insurance/status-confirmation', express.urlencoded({ extended: false 
   const note = String(req.body?.note || '').trim().slice(0, 500) || null;
   const processStatuses = new Set(['requires_release', 'requires_portal', 'unable_to_verify']);
   const now = Date.now();
-  // Query the official (public, free) Florida valid-business-licence register
-  // BEFORE the transaction: no network requests inside Firestore transactions.
-  // This is evidence of a licensed agency mailbox only, NOT active coverage.
-  // An unavailable/changed regulator file fails closed to the existing human
-  // trust register and Operator self-service.
+  // Query the correct state-specific official source BEFORE the transaction.
+  // Florida has a public adapter. Uncommissioned states have NO implicit
+  // Florida trust fallback and never gain authority from their domain name.
+  // Licence evidence confirms provider identity, not any individual policy.
   let official = { recognized:false, reason:'not_checked' };
   if (status === 'verified_active') {
     const pending = await requestRef.get().catch(()=>null);
@@ -2856,8 +2856,9 @@ app.post('/insurance/status-confirmation', express.urlencoded({ extended: false 
       // carrier/broker. This is a cheap fast-path, rechecked transactionally.
       const already = await db.collection(TRUSTED_INSURANCE_CONTACTS)
         .doc(insuranceContactId(contactEmail)).get().catch(()=>null);
-      if (!already?.exists || !currentContactTrust(already.data(), contactEmail, 'FL', now)) {
-        official = await lookupOfficialAgencyEmail(contactEmail)
+      const stateCode = pending.data().sourceStateCode;
+      if (!already?.exists || !currentContactTrust(already.data(), contactEmail, stateCode, now)) {
+        official = await recognizeOfficialInsuranceContact({ stateCode, email:contactEmail })
           .catch(()=>({ recognized:false, reason:'official_registry_unavailable' }));
       }
     }
@@ -2888,18 +2889,23 @@ app.post('/insurance/status-confirmation', express.urlencoded({ extended: false 
           normalizeInsuranceContact(row.email);
         const matchedPolicy = !!row.policyFingerprint &&
           row.policyFingerprint === policyFingerprint(u.insuranceMonitoring);
-        const staffTrusted = vetted.exists &&
-          currentContactTrust(vetted.data(), row.email, 'FL', now);
-        const officialTrusted = official.recognized === true &&
+        const sameJurisdiction = row.sourceStateCode != null &&
+          row.sourceStateCode === insuranceSourceState(u);
+        const staffTrusted = sameJurisdiction && vetted.exists &&
+          currentContactTrust(vetted.data(), row.email, row.sourceStateCode, now);
+        const officialTrusted = sameJurisdiction && official.recognized === true &&
+          official.jurisdiction === row.sourceStateCode &&
           normalizeInsuranceContact(row.email) === normalizeInsuranceContact(official.email);
-        if (!matched || !matchedPolicy || (!staffTrusted && !officialTrusted)) {
+        if (!matched || !matchedPolicy || !sameJurisdiction || (!staffTrusted && !officialTrusted)) {
           const issue = {
             kind: !matchedPolicy ? 'insurance_policy_changed_since_request' :
               'independent_provider_contact_required', at: now,
             contactEmail: row.email,
             note: !matchedPolicy
               ? 'The insured policy changed after this confirmation request. A fresh provider confirmation is required.'
-              : 'The email did not match a current, recognized Florida licensed agency contact. Use the officially published address or another verified provider channel.',
+              : !sameJurisdiction
+                ? 'The operating jurisdiction changed since the request. Obtain a new confirmation for the current market.'
+                : 'The provider contact could not be independently verified for the operating state. Use an officially registered agency address or a verified provider portal.',
           };
           const monitoring = { ...(u.insuranceMonitoring || {}),
             verificationIssue: issue, untrustedConfirmationAt: now };
@@ -2917,7 +2923,7 @@ app.post('/insurance/status-confirmation', express.urlencoded({ extended: false 
         // Important: an official licence proves business existence and lists
         // a mailbox, not that the insurer actually issued this policy. Only the
         // recipient's fresh, policy-bound affirmative reply renews eligibility.
-        row.officialSource = officialTrusted ? 'FL_DFS_VALID_BUSINESS_LICENSES' :
+        row.officialSource = officialTrusted ? String(official.source||'OFFICIAL_PROVIDER_SOURCE') :
           'NAMED_MFA_VETTED_PROVIDER';
         row.officialSourceHash = officialTrusted ? official.sourceHash : null;
       }

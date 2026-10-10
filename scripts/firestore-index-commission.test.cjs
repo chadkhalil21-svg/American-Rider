@@ -1,13 +1,27 @@
 'use strict';
 const assert = require('node:assert/strict');
-const { normalize, summarize, listIndexes } = require('./firestore-index-commission.cjs');
+const { normalize, summarize, listIndexes, isCompositeDefinition } = require('./firestore-index-commission.cjs');
 const manifest = require('../firestore.indexes.json');
-assert.equal(manifest.indexes.length, 14, 'unexpected production index manifest size');
+assert.equal(manifest.indexes.length, 12, 'manifest must list only necessary composite indexes');
 for (const index of manifest.indexes) {
   assert(index.collectionGroup && index.queryScope, 'index must have collection group and query scope');
   assert(index.fields.length > 0, 'index must have fields');
+  assert(isCompositeDefinition(index), 'manifest must not include automatically indexed single fields');
   assert(normalize(index).includes(index.collectionGroup));
   assert(summarize(index).includes(index.collectionGroup));
+}
+// A normal single-field index, with implicit __name__ ordering, is provided by
+// Firestore automatically. It must not be POSTed as a composite definition.
+for (const [group, field] of [['rides', 'status'], ['operators', 'available']]) {
+  const singleFieldIndex = {
+    collectionGroup: group, queryScope: 'COLLECTION',
+    fields: [{ fieldPath: field, order: 'ASCENDING' },
+             { fieldPath: '__name__', order: 'ASCENDING' }],
+  };
+  assert.equal(isCompositeDefinition(singleFieldIndex), false,
+    'single-field query with default document name ordering is automatic');
+  assert(!manifest.indexes.some(i => normalize(i) === normalize(singleFieldIndex)),
+    'Firestore rejects unnecessary single-field composite indexes');
 }
 const source = {
   collectionGroup: 'support_tickets',
@@ -22,6 +36,7 @@ const live = {
   fields: [...source.fields, {fieldPath:'__name__',order:'DESCENDING'}],
 };
 assert.equal(normalize(source), normalize(live), 'FireStore adds default trailing __name__ field');
+assert(isCompositeDefinition(source), 'real two-field composite index remains required');
 assert.notEqual(normalize(source), normalize({
   ...live,fields:[{fieldPath:'status',order:'ASCENDING'},
                   {fieldPath:'createdAt',order:'ASCENDING'},

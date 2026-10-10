@@ -4,6 +4,7 @@
 // Staff must independently deliver required documents through an approved secure
 // channel and attest to that evidence before moving any state forward.
 // No report particulars, SSNs, dates of birth, or findings are stored here.
+const { reviewPolicyFor } = require('./screening-jurisdictions');
 const HOLD_MS = 7 * 24 * 60 * 60 * 1000; // Conservative internal minimum; NOT a statutory FCRA waiting period.
 const MAX_REPORT_AGE_MS = 3 * 365 * 24 * 60 * 60 * 1000;
 const ACTIONS = new Set(['propose','record_pre_notice','dispute','withdraw','finalize']);
@@ -50,6 +51,9 @@ async function recordAdverseReview({db,input,actor,now=Date.now()}) {
     const [us,cs,fs]=await Promise.all([tx.get(uref),tx.get(cref),tx.get(fref)]);
     if(!us.exists||!cs.exists)return {ok:false,status:404,error:'Operator or screening review case not found.'};
     const u=us.data()||{},caseData=cs.data()||{},screen=u.screening||{},a=screen.adverseAction||{};
+    const policy=reviewPolicyFor(screen);
+    if(!policy||policy.reviewEngine!=='florida_627748_v1')
+      return {ok:false,status:409,error:'No implemented adverse-action policy for this case jurisdiction.'};
     if(screen.transferCaseNo!==caseNo||caseData.uid!==uid||caseData.status!=='open'||
       caseData.kind!=='support'||!/^Operator screening — review (existing|new) provider report$/.test(caseData.reason||'')||
       !screen.consentAt)

@@ -112,7 +112,12 @@ async function recordExternalReview({ db, input, actor, now = Date.now() }) {
         closeNote: 'Authenticated external report reviewed; see restricted screening audit.' }, { merge: true });
     } else {
       tx.set(caseRef, { acknowledgedAt: now, acknowledgedBy: actor.name,
-        acknowledgementNote: 'Screening held; provider clarification required.' }, { merge: true });
+        acknowledgementNote: 'Screening held; provider clarification required.',
+        // The prior unplaceable/uncertain report can no longer justify CLEAR.
+        // Recontact the agency and authenticate corrected evidence first.
+        screeningHandoff: { ...(ticket.screeningHandoff || {}), owner: actor.name,
+          stage: 'clarification_needed', authenticatedReport: null, updatedAt: now },
+      }, { merge: true });
     }
     tx.set(auditRef, { at: now, subject: uid, action: result === 'pass' ? 'screening_external_cleared' : 'screening_external_held',
       actor: { name: actor.name, ip: actor.ip || null, session: actor.session || null },

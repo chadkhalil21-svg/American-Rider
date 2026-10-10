@@ -43,7 +43,8 @@ export default function OperatorBackground() {
 
   const record = status?.screening || null;
   const decision = record?.decision;
-  const passed = decision === 'pass';
+  const passed = decision === 'pass' && Number(record?.recheckDue) > Date.now();
+  const needsRenewal = decision === 'pass' && !passed;
 
   React.useEffect(() => {
     if (!status?.ok) return;
@@ -114,7 +115,7 @@ export default function OperatorBackground() {
                   {record.decision === 'awaiting_agency' ? t('traveler.bgReportRequested') :
                    record.decision === 'review' ? t('traveler.bgInReview') :
                    record.decision === 'refuse' ? t('traveler.bgReviewComplete') :
-                   record.decision === 'expired' ? t('traveler.bgRenewalRequired') : t('traveler.bgInProgress')}
+                   record.decision === 'expired' || needsRenewal ? t('traveler.bgRenewalRequired') : t('traveler.bgInProgress')}
                 </Text>
                 <Text style={styles.body}>{record.summary || t('traveler.bgStatusPending')}</Text>
               </Card>

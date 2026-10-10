@@ -18,6 +18,11 @@ Insurance checks must be **automatic and source-bound** wherever feasible, witho
 ## National-volume monitoring fairness
 The previous scheduler always selected the oldest 250 due users. With over 250 stale or unresolved records, newer active Operators could be postponed indefinitely. The scheduler now persists a due-date/user-ID cursor in the existing Firestore database, walks the ordered due set in 250-record pages, and wraps at the end. This prevents starvation while keeping bounded memory and no paid queue. It does **not** establish throughput for millions of Operators: live stress, email budget, carrier participation, and protected indexes still require commissioning.
 
+## Independent live-data compatibility evidence
+On 2026-10-10, GitHub Actions job `114304913484` successfully retrieved the state's live business-licence CSV and parsed **55,915 distinct qualifying agency email contacts** after rejecting malformed rows. This is an observation about a public registry dataset, not insurer-partner onboarding, company authority to confirm a particular policy or evidence that any Operator is insured.
+
+A dedicated GitHub workflow (`.github/workflows/fl-insurance-source-compat.yml`) repeats this source compatibility check weekly and on relevant changes. An official-source failure is a **failed check**, not a green advisory job. Production recognition fails closed when its own fresh source cannot be parsed. Do not treat stale/failed official snapshots as clearance.
+
 ## Important source limits
 - [Florida DFS Bulk Downloads](https://licenseesearch.fldfs.com/BulkDownload) lists the Business licence CSV. Actual source: `https://www.myfloridacfo.com/downloads/AAS/LicenseeSearch/AllValidLicensesBusiness.csv`. This file is public but its live schema and endpoint availability must pass smoke verification before claiming real use.
 - [Florida OIR Company Search](https://companysearch.floir.gov/index.aspx) identifies insurer companies and NAIC codes, but is not proof of a producer's access to an individual policy.

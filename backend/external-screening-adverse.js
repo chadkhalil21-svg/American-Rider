@@ -5,6 +5,7 @@
 // channel and attest to that evidence before moving any state forward.
 // No report particulars, SSNs, dates of birth, or findings are stored here.
 const HOLD_MS = 7 * 24 * 60 * 60 * 1000; // Conservative internal minimum; NOT a statutory FCRA waiting period.
+const MAX_REPORT_AGE_MS = 3 * 365 * 24 * 60 * 60 * 1000;
 const ACTIONS = new Set(['propose','record_pre_notice','dispute','withdraw','finalize']);
 const REASONS = new Set(['criminal_history','sex_offender_match','driver_license','moving_violations','other_statutory']);
 const validRef = x => /^[A-Za-z0-9][A-Za-z0-9._:/-]{5,119}$/.test(String(x||'').trim());
@@ -17,6 +18,14 @@ function validateTransition(input,now=Date.now()) {
   if(note.length<12)return {ok:false,status:400,error:'A substantive non-sensitive review note is required.'};
   if(['propose','record_pre_notice','finalize'].includes(action)&&!validRef(reference))
     return {ok:false,status:400,error:'A verified agency or delivered-notice evidence reference is required.'};
+  if(action==='propose'){
+    const reportDate=str(input.reportIssuedOn,20);
+    const issuedMs=Date.parse(reportDate+'T12:00:00Z');
+    if(!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(reportDate)||
+       !Number.isFinite(issuedMs)||new Date(issuedMs).toISOString().slice(0,10)!==reportDate||
+       issuedMs>now||now-issuedMs>=MAX_REPORT_AGE_MS)
+      return {ok:false,status:400,error:'The verified CRA report must have a valid date within the statutory check interval.'};
+  }
   if(action==='propose'&&(!REASONS.has(input.reasonCode)||input.agencyAuthenticated!=='yes'||
       input.reportMatchesOperator!=='yes'||input.permittedPurpose!=='yes'||input.disqualifierConfirmed!=='yes'))
     return {ok:false,status:400,error:'Verify authoritative CRA source, report owner, lawful purpose and statute-based disqualification.'};
@@ -50,7 +59,8 @@ async function recordAdverseReview({db,input,actor,now=Date.now()}) {
       if(!['awaiting_agency','review'].includes(decision)||(stage&&stage!=='withdrawn'))
         return {ok:false,status:409,error:'Only an unresolved current agency report may start adverse consideration.'};
       decision='pre_adverse';stage='proposed';
-      changed={stage,reasonCode,reportReference:reference,proposedAt:now,proposedBy:actor.name};
+      changed={stage,reasonCode,reportReference:reference,reportIssuedOn:input.reportIssuedOn,
+        proposedAt:now,proposedBy:actor.name};
     } else if(action==='record_pre_notice') {
       if(decision!=='pre_adverse'||stage!=='proposed')
         return {ok:false,status:409,error:'Prepare the screening decision before recording pre-adverse notice delivery.'};

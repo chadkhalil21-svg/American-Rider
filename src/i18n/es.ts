@@ -568,6 +568,8 @@ export default {
     bgNeedNew: '¿Necesita una nueva verificación?',
     bgNeedNewBody: 'Elija una empresa de verificación que reúna los requisitos. Pídale que realice las búsquedas exigidas y entregue el resultado autenticado a American Rider. Confirme el alcance y el costo antes de pagar.',
     bgNewNotice: 'Esta solicitud no autoriza viajes. El proveedor debe completar sus avisos y consentimientos, y acordar la entrega verificada. No cargue ni envíe informes por correo electrónico.',
+    bgAuthorizeTransfer: 'Autorizo a la empresa de verificación indicada a entregar directamente su informe válido a American Rider para revisar mi idoneidad como Operador. El proveedor puede exigir avisos y autorizaciones adicionales.',
+    bgConsentRequired: 'Autorice la entrega del informe para continuar.',
     bgAlreadyScreened: '¿Ya tiene una verificación?',
     bgAlreadyBody: 'Un informe reciente puede satisfacer parte o la totalidad de este requisito. Lo revisaremos antes de pedirle que complete algo de nuevo.',
     bgRequestRecorded: 'Solicitud registrada',

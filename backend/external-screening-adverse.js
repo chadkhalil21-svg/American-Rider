@@ -59,6 +59,10 @@ async function recordAdverseReview({db,input,actor,now=Date.now()}) {
     // positive and potentially adverse screening decisions. Staff checkboxes
     // alone must not create a disqualifying report or final decision.
     const handoff=caseData.screeningHandoff||{},authenticated=handoff.authenticatedReport||{};
+    // Every adverse-action transition must be attributable to the same assigned
+    // reviewer. A change of staff requires a separate audited reassignment.
+    if(handoff.owner!==actor.name)
+      return {ok:false,status:409,error:'This adverse-review case is assigned to a different reviewer or has no verified owner.'};
     if(action==='propose' && (handoff.stage!=='report_authenticated' ||
         handoff.owner!==actor.name || authenticated.by!==actor.name ||
         !authenticated.verifiedAt || authenticated.reference!==reference ||

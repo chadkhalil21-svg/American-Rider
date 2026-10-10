@@ -55,6 +55,15 @@ assert.equal(reviewPolicyFor({ jurisdictionCode: null })?.id, FL.id,
   'a case predating the registry stays on the original Florida-only standard');
 assert.equal(reviewPolicyFor(null), null);
 
+const { assessOperator } = require('./qualification');
+const mismatched = assessOperator({
+  user: { operatingMarket: { id: 'fl-miami-dade' },
+    screening: { decision: 'pass', jurisdictionCode: 'GA', recheckDue: Date.now() + 1e9 } },
+  fleet: null, context: 'qualify', liveMoney: true, account: { disabled: false },
+});
+assert.ok(mismatched.blockers.some(b => b.code === 'screening_jurisdiction_mismatch'),
+  'Florida qualification cannot inherit a report cleared for a different state');
+
 const server = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
 const external = fs.readFileSync(path.join(__dirname, 'external-screening.js'), 'utf8');
 const adverse = fs.readFileSync(path.join(__dirname, 'external-screening-adverse.js'), 'utf8');

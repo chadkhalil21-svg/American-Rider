@@ -21,6 +21,7 @@ const { emailReady } = require('./email');
 const { screeningReady } = require('./screening');
 const { recordExternalReview } = require('./external-screening');
 const { recordScreeningHandoff } = require('./screening-handoff');
+const { triageScreeningCase, sortScreeningCases } = require('./screening-case-triage');
 const { recordAdverseReview } = require('./external-screening-adverse');
 const { monthlyRemittance } = require('./remittance');
 const { REQUIRED_DOCS, resolveDocument, setSuspension, assessAndRecord } = require('./qualification');
@@ -598,15 +599,28 @@ function mount(app, express, deps = {}) {
           /^Operator screening — review (existing|new) provider report$/.test(row.reason || '')
           ? row : null;
       }));
+      // A solo administrator needs an actionable queue, not an undifferentiated
+      // list of security-sensitive forms. Sorting changes presentation only:
+      // it never changes qualification or screening evidence.
+      const work = sortScreeningCases(candidates.map((user, i) => ({
+        user, screening: user.screening, ticket: relatedCases[i],
+      })));
+      const needingFollowUp = work.filter(row =>
+        triageScreeningCase(row.screening, row.ticket).followUpDue).length;
       const field = (name, label, type = 'text', required = true) =>
         `<label style="display:block;margin:9px 0;font-size:13px;">${esc(label)}
         <input type="${type}" name="${name}" style="display:block;padding:9px;width:100%;max-width:400px;border:1px solid #C9CDD1;border-radius:8px;" ${required ? 'required' : ''}></label>`;
       const box = (name, label) =>
         `<label style="display:block;margin:7px 0;font-size:13px;">
           <input type="checkbox" name="${name}" value="yes"> ${esc(label)}</label>`;
-      const cards = candidates.map((u, i) => {
-        const r = u.screening;
-        const linked = relatedCases[i], handoff = linked?.screeningHandoff || {};
+      const cards = work.map(({ user: u, screening: r, ticket: linked }) => {
+        const handoff = linked?.screeningHandoff || {};
+        const triage = triageScreeningCase(r, linked);
+        const nextReview = triage.followUpAt == null
+          ? 'Missing case date — investigate'
+          : new Date(triage.followUpAt).toLocaleString('en-US', {
+              dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/New_York',
+            });
         if (!linked) return `<section role="alert"><h2>${esc(u.id)}</h2>
           <p>Screening case missing or inconsistent. Stop review and investigate.</p></section>`;
         const hidden = { uid: u.id, caseNo: r.transferCaseNo };
@@ -698,6 +712,10 @@ function mount(app, express, deps = {}) {
             ${esc(r.decision)}. <a href="/ops/cases?kind=support">Open original support case →</a></p>
           <p>Assigned reviewer: <strong>${esc(handoff.owner || 'Unassigned')}</strong> ·
           Verified handoff: <strong>${esc(handoff.stage || 'Not started')}</strong>.</p>
+          <p><strong>Next action:</strong> ${esc(triage.nextAction)}</p>
+          <p><strong>Waiting on:</strong> ${esc(triage.waitingOn)} ·
+             <strong>Internal follow-up:</strong> ${triage.followUpDue ? 'Due for review' : 'Check by'} ${esc(nextReview)}.
+             This is a suggested staff checkpoint, not a promised provider response or legal deadline.</p>
           ${r.decision === 'pre_adverse' ? '' : handoffControls}
           <p>Review a report obtained from the named agency via an authenticated provider portal
           or confirmed secure transfer. Do not rely on an Operator-uploaded copy or an email
@@ -741,9 +759,12 @@ function mount(app, express, deps = {}) {
       res.type('html').send(page('External Operator screening',
         `<h1>External screening review</h1>
           <p><a href="/ops">← Operations</a> · <a href="/ops/cases?kind=support">Provider transfer cases</a></p>
-          <p>A named Operations user attests to source authenticity and Florida's required
-          checks. A button is not a substitute for a provider report. Every decision is
-          transactionally audit-logged, and clearance never puts an Operator on duty.</p>
+          <p>Each case states what to do next and whether an internal follow-up is due.
+          You may operate this queue as one named MFA-backed administrator. No exclusive
+          screening company, vendor integration, automatic outreach or purchase is implied.</p>
+          <p><strong>${work.length} cases displayed · ${needingFollowUp} require follow-up.</strong>
+          Confirm source authenticity and Florida's statutory checks before any
+          decision. A button is not evidence. Clearance never puts an Operator on duty.</p>
           ${snap.docs.length >= 51 ? '<p role="alert">More than 50 screening requests; this is a bounded queue, not the complete backlog.</p>' : ''}
           ${cards || '<p>No authorized screening-transfer requests in this queue.</p>'}`));
     } catch {

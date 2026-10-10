@@ -568,7 +568,7 @@ export default {
     bgExternalProvider: 'Secure external screening',
     bgProviderBody: 'Complete the required criminal-record, sex-offender and driving-history searches through the provider’s secure process. Sensitive screening information stays with the screening provider.',
     bgContinueProvider: 'Continue with provider',
-    bgProviderPending: 'American Rider does not require a particular screening company. Choose an eligible agency and request a secure report transfer; confirm it meets Florida TNC requirements before purchasing.',
+    bgProviderPending: 'American Rider does not require a particular screening company. Choose an eligible agency and request a secure report transfer; confirm it meets the applicable TNC requirements before purchasing.',
     bgNeedNew: 'Need a new screening?',
     bgNeedNewBody: 'Choose a qualified screening company. Ask it to perform the required searches and send its authenticated result to American Rider. Please confirm its eligibility and total cost before paying.',
     bgNewNotice: 'This request does not authorize Travel. The screening company must complete its own notices and consent process, then arrange verified report delivery. Do not upload or email a consumer report.',

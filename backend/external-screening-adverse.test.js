@@ -7,7 +7,7 @@ const actor={name:'reviewer1'};
 const good={
  uid:UID,caseNo:CASE,action:'propose',reference:'CRA-REPORT-556',
  note:'Statutory review verified against an authenticated agency record.',
- reasonCode:'criminal_history',agencyAuthenticated:'yes',reportMatchesOperator:'yes',
+ reportIssuedOn:'2026-09-14',reasonCode:'criminal_history',agencyAuthenticated:'yes',reportMatchesOperator:'yes',
  permittedPurpose:'yes',disqualifierConfirmed:'yes'
 };
 const copy=x=>JSON.parse(JSON.stringify(x));
@@ -54,6 +54,8 @@ async function execute(db,action,over={},at=NOW) {
    assert.equal(validateTransition(x,NOW).ok,false,'missing verification '+k);
  }
  assert.equal(validateTransition({...good,reasonCode:'just_a_guess'},NOW).ok,false);
+ assert.equal(validateTransition({...good,reportIssuedOn:'2021-04-03'},NOW).ok,false,'stale report cannot support adverse claim');
+ assert.equal(validateTransition({...good,reportIssuedOn:'2026-11-03'},NOW).ok,false,'future report cannot support adverse claim');
  let db=fakeDb();
  assert.equal((await execute(db,'finalize',{finalNoticeDelivered:'yes',
    providerFindingsRechecked:'yes',noOpenDispute:'yes'})).ok,false,'cannot finalize without notices');

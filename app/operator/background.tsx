@@ -28,6 +28,7 @@ export default function OperatorBackground() {
   const op = useOperator();
   const [status, setStatus] = React.useState<ScreeningStatus | null>(null);
   const [showExisting, setShowExisting] = React.useState(false);
+  const [requestMode, setRequestMode] = React.useState<'existing' | 'new'>('existing');
   const [showRequirements, setShowRequirements] = React.useState(false);
   const [agency, setAgency] = React.useState('');
   const [reportDate, setReportDate] = React.useState('');
@@ -55,7 +56,7 @@ export default function OperatorBackground() {
       return;
     }
     const parsedDate = reportDateMs(reportDate);
-    if (!reportDate.trim() || Number.isNaN(parsedDate) || parsedDate > Date.now()) {
+    if (requestMode === 'existing' && (!reportDate.trim() || Number.isNaN(parsedDate) || parsedDate > Date.now())) {
       setError(t('traveler.bgReportDateInvalid'));
       return;
     }
@@ -63,9 +64,10 @@ export default function OperatorBackground() {
     setError(null);
     const out = await declareExistingScreening({
       agency: agency.trim(),
-      issuedAt: parsedDate,
-      criminalIncluded,
-      drivingIncluded,
+      mode: requestMode,
+      issuedAt: requestMode === 'new' ? 0 : parsedDate,
+      criminalIncluded: requestMode === 'existing' && criminalIncluded,
+      drivingIncluded: requestMode === 'existing' && drivingIncluded,
     });
     setBusy(false);
     if (!out.ok) {
@@ -137,7 +139,11 @@ export default function OperatorBackground() {
             )}
           </Card>
 
-          <Pressable accessibilityRole="button" onPress={() => setShowExisting((v) => !v)}>
+          <Pressable accessibilityRole="button" onPress={() => {
+            if (requestMode !== 'existing') { setShowExisting(true); setDeclared(null); }
+            else setShowExisting((v) => !v);
+            setRequestMode('existing');
+          }}>
             <Card style={styles.choiceCard}>
               <View style={styles.choiceRow}>
                 <View style={{ flex: 1 }}>
@@ -145,6 +151,22 @@ export default function OperatorBackground() {
                   <Text style={styles.body}>{t('traveler.bgAlreadyBody')}</Text>
                 </View>
                 <Text style={styles.chev}>{showExisting ? '−' : '+'}</Text>
+              </View>
+            </Card>
+          </Pressable>
+
+          <Pressable accessibilityRole="button" onPress={() => {
+            if (requestMode !== 'new') { setShowExisting(true); setDeclared(null); }
+            else setShowExisting((v) => !v);
+            setRequestMode('new');
+          }}>
+            <Card style={styles.choiceCard}>
+              <View style={styles.choiceRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.choiceTitle}>{t('traveler.bgNeedNew')}</Text>
+                  <Text style={styles.body}>{t('traveler.bgNeedNewBody')}</Text>
+                </View>
+                <Text style={styles.chev}>{showExisting && requestMode === 'new' ? '−' : '+'}</Text>
               </View>
             </Card>
           </Pressable>
@@ -166,15 +188,15 @@ export default function OperatorBackground() {
                     placeholderTextColor={colors.faint}
                     style={styles.input}
                   />
-                  <Text style={[styles.fieldLabel, { marginTop: 13 }]}>{t('traveler.bgReportDate')}</Text>
+                  {requestMode === 'existing' ? (<><Text style={[styles.fieldLabel, { marginTop: 13 }]}>{t('traveler.bgReportDate')}</Text>
                   <TextInput
                     value={reportDate}
                     onChangeText={setReportDate}
                     placeholder={t('traveler.bgReportDatePlaceholder')}
                     placeholderTextColor={colors.faint}
                     style={styles.input}
-                  />
-                  <Pressable accessibilityRole="button" style={styles.checkRow} onPress={() => setCriminalIncluded((v) => !v)}>
+                  /></>) : null}
+                  {requestMode === 'existing' ? (<><Pressable accessibilityRole="button" style={styles.checkRow} onPress={() => setCriminalIncluded((v) => !v)}>
                     <Text style={styles.check}>{criminalIncluded ? '✓' : '○'}</Text>
                     <Text style={styles.checkLabel}>{t('traveler.bgCriminalSex')}</Text>
                   </Pressable>
@@ -182,7 +204,8 @@ export default function OperatorBackground() {
                     <Text style={styles.check}>{drivingIncluded ? '✓' : '○'}</Text>
                     <Text style={styles.checkLabel}>{t('traveler.bgDrivingHistory')}</Text>
                   </Pressable>
-                  <Text style={styles.note}>{t('traveler.bgReviewNote')}</Text>
+                  </>) : null}
+                  <Text style={styles.note}>{t(requestMode === 'new' ? 'traveler.bgNewNotice' : 'traveler.bgReviewNote')}</Text>
                   <PrimaryButton
                     label={busy ? t('traveler.busyRecording') : t('traveler.bgRequestReview')}
                     disabled={busy}

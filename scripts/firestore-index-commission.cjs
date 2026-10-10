@@ -37,7 +37,7 @@ function summarize(index) {
 }
 async function request(path, init = {}) {
   const token = process.env.FIRESTORE_ACCESS_TOKEN;
-  if (!token) throw new Error('Missing Workload Identity access token. Configure GitHub secrets before running.');
+  if (!token) throw new Error('Missing short-lived Workload Identity token. Check GitHub OIDC provider trust and the dedicated service account.');
   const response = await fetch(API + path, {
     ...init,
     headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },

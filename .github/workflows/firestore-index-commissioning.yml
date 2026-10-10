@@ -40,8 +40,11 @@ jobs:
         uses: google-github-actions/auth@v3
         with:
           project_id: american-rider-35688
-          workload_identity_provider: ${{ secrets.FIRESTORE_WIF_PROVIDER }}
-          service_account: ${{ secrets.FIRESTORE_INDEX_SA_EMAIL }}
+          # These are public resource identifiers, NOT credentials.
+          # Access is enforced by Google Cloud OIDC conditions (repo ID, release ref,
+          # workflow path, and manual dispatch), plus the SA index-only IAM role.
+          workload_identity_provider: projects/623854974930/locations/global/workloadIdentityPools/american-rider-github/providers/github
+          service_account: firestore-index-deployer@american-rider-35688.iam.gserviceaccount.com
           token_format: access_token
           access_token_scopes: https://www.googleapis.com/auth/datastore
       - name: Audit / create only missing Firestore composite indexes

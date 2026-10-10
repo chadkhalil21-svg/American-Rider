@@ -33,6 +33,7 @@ const { coverageLapsed } = require('./matching');
 const { continuingStatus } = require('./insurance-monitoring');
 const { forState: insuranceForState } = require('./insurance-jurisdictions');
 const { markets } = require('./markets');
+const { policyForState: screeningPolicyForState, reviewPolicyFor } = require('./screening-jurisdictions');
 
 /**
  * The documents that gate an operator: the three the app asks for (app/operator/documents.tsx).
@@ -302,6 +303,19 @@ function assessOperator({ user, fleet = null, context = 'qualify', liveMoney = f
   }
 
   const s = u?.screening || null;
+  // A previously clear Florida report cannot silently authorize an Operator
+  // who changes their selected operating jurisdiction. The old FL-only cases
+  // are compatible only when the selected county still belongs to Florida.
+  if (s?.decision === 'pass') {
+    const marketId = u?.operatingMarket?.id;
+    const market = marketId ? markets().find(m => m.id === marketId) : null;
+    const requiredPolicy = screeningPolicyForState(market?.state);
+    const reportPolicy = reviewPolicyFor(s);
+    if (!requiredPolicy || !reportPolicy || requiredPolicy.id !== reportPolicy.id) {
+      add(finding('qualification', 'incomplete', 'screening_jurisdiction_mismatch', 'screening',
+        'The screening is not cleared for the selected operating jurisdiction.'));
+    }
+  }
   if (s?.decision === 'refuse') {
     add(finding('qualification', 'refused', 'screening_refused', 'screening', s.summary || 'Background screening refused.'));
   } else if (s?.decision === 'review') {

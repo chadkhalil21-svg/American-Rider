@@ -8,25 +8,24 @@ const now = Date.now(), YEAR = 365*24*3600*1000;
 const R = [];
 const check = (l, c, d) => R.push({ l, ok: !!c, d });
 
-// A pasted HTTPS link is not evidence that the CRA can return and adjudicate
-// a statutory report. An explicit post-pilot commissioning sign-off is required.
+// No vendor link is required. Only the owner's verified end-to-end evidence
+// commissioning is authoritative. A URL alone can never enable paid Travel.
 const priorProviderUrl = process.env.SCREENING_PROVIDER_URL;
-const priorPilot = process.env.SCREENING_PROVIDER_E2E_VERIFIED;
+const priorPilot = process.env.SCREENING_EVIDENCE_WORKFLOW_VERIFIED;
 try {
   process.env.SCREENING_PROVIDER_URL = 'https://example.test/cra';
-  delete process.env.SCREENING_PROVIDER_E2E_VERIFIED;
-  check('screening provider HTTPS link alone is NOT operational', !screeningReady());
-  process.env.SCREENING_PROVIDER_E2E_VERIFIED = 'false';
-  check('screening provider unverified sign-off is NOT operational', !screeningReady());
-  process.env.SCREENING_PROVIDER_E2E_VERIFIED = 'true';
-  check('provider may report operational only after explicit end-to-end sign-off', screeningReady());
-  process.env.SCREENING_PROVIDER_URL = 'http://example.test/cra';
-  check('non-HTTPS provider URL cannot report operational', !screeningReady());
+  delete process.env.SCREENING_EVIDENCE_WORKFLOW_VERIFIED;
+  check('vendor link alone cannot mark screening ready', !screeningReady());
+  process.env.SCREENING_EVIDENCE_WORKFLOW_VERIFIED = 'false';
+  check('uncommissioned evidence workflow cannot mark screening ready', !screeningReady());
+  delete process.env.SCREENING_PROVIDER_URL;
+  process.env.SCREENING_EVIDENCE_WORKFLOW_VERIFIED = 'true';
+  check('vendor-neutral verified evidence workflow may be signed off with NO vendor link', screeningReady());
 } finally {
   if (priorProviderUrl === undefined) delete process.env.SCREENING_PROVIDER_URL;
   else process.env.SCREENING_PROVIDER_URL = priorProviderUrl;
-  if (priorPilot === undefined) delete process.env.SCREENING_PROVIDER_E2E_VERIFIED;
-  else process.env.SCREENING_PROVIDER_E2E_VERIFIED = priorPilot;
+  if (priorPilot === undefined) delete process.env.SCREENING_EVIDENCE_WORKFLOW_VERIFIED;
+  else process.env.SCREENING_EVIDENCE_WORKFLOW_VERIFIED = priorPilot;
 }
 
 // screeningCurrent is what the gate turns on.

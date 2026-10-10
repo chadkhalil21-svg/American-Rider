@@ -270,17 +270,13 @@ function screeningCurrent(screening, now = Date.now()) {
   return Number(screening.recheckDue || 0) > now;
 }
 
-/** A provider link by itself does NOT establish a usable screening process.
- * Release sign-off requires an independently verified end-to-end trial:
- * authenticated provider report delivered, statutory coverage reviewed,
- * adverse-action handling tested, and no operator approved from self-declaration.
- * The explicit production flag is owner-controlled and must remain off until
- * that evidence exists; it is not a substitute for the trial.
+/** Screening is provider-neutral. A vendor URL is optional and never proof.
+ * The release gate refers to the whole authenticated external-CRA evidence process,
+ * including a demonstrated provider-to-Operations transfer, FCRA handling and an
+ * approved end-to-end pilot. The owner must independently attest to that evidence;
+ * a checkbox or environment flag is NOT the evidence itself.
  */
-const screeningReady = () => {
-  const url = String(readKey('SCREENING_PROVIDER_URL') || '').trim();
-  return /^https:\/\//i.test(url) && readKey('SCREENING_PROVIDER_E2E_VERIFIED') === 'true';
-};
+const screeningReady = () => readKey('SCREENING_EVIDENCE_WORKFLOW_VERIFIED') === 'true';
 
 // How far ahead of the three-year deadline the operator is warned. Thirty days: enough to
 // pay and complete a new check without losing a single day on the road, short enough that

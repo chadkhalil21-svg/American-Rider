@@ -3081,7 +3081,7 @@ app.get('/operator/screening', requireAuth, async (req, res) => {
     res.json({
       ok: true,
       provider: 'external',
-      providerUrl: screeningReady() ? readKey('SCREENING_PROVIDER_URL') : null,
+      providerUrl: screeningReady() && /^https:\/\//i.test(String(readKey('SCREENING_PROVIDER_URL') || '')) ? readKey('SCREENING_PROVIDER_URL') : null,
       jurisdiction: market?.state ? { state: market.state } : null,
       screening: user.screening || null,
     });
@@ -3109,6 +3109,9 @@ app.post('/operator/screening/existing', requireAuth, LIMITS.screening, requireA
   const issuedAt = Number(req.body?.issuedAt || 0);
   const elements = Array.isArray(req.body?.elements) ? req.body.elements.slice(0, 6) : [];
   const consent = req.body?.consent === true;
+  // The same provider-neutral transfer request may initiate a NEW check or ask
+  // for a previously completed report. Neither declaration conveys clearance.
+  const mode = req.body?.mode === 'new' ? 'new' : 'existing';
   if (!agency || !consent) {
     return res.status(400).json({ error: 'The screening company and your written instruction are required.' });
   }
@@ -3124,8 +3127,10 @@ app.post('/operator/screening/existing', requireAuth, LIMITS.screening, requireA
           declaredIssuedAt: issuedAt || null,
           declaredElements: elements,
           consentAt: Date.now(),
-          consentText:
-            'I instruct the named screening company to release my most recent background screening report to American Rider.',
+          consentText: mode === 'new'
+            ? 'I instruct the screening company I select to release its completed report to American Rider for eligibility review, subject to that company’s own required disclosures and authorization.'
+            : 'I instruct the named screening company to release my most recent background screening report to American Rider.',
+          requestMode: mode,
           summary: 'Waiting for the screening provider to send the authoritative report for review.',
         },
       },
@@ -3136,9 +3141,9 @@ app.post('/operator/screening/existing', requireAuth, LIMITS.screening, requireA
       uid: req.uid,
       email: req.email,
       kind: 'support',
-      reason: 'Operator screening — review existing provider report',
+      reason: mode === 'new' ? 'Operator screening — review new provider report' : 'Operator screening — review existing provider report',
       description:
-        'The Operator instructed ' + agency + ' to release the existing screening report directly to American Rider. ' +
+        'The Operator instructed ' + agency + (mode === 'new' ? ' to send the report when completed.' : ' to release the existing screening report for American Rider review.') + ' ' +
         'Declared issue date: ' + (issuedAt ? new Date(issuedAt).toISOString().slice(0, 10) : 'not provided') + '. ' +
         'Declared components: ' + (elements.join(', ') || 'not provided') + '. ' +
         'Do not qualify from the Operator declaration. Authenticate the provider report, compare each component with the active jurisdiction requirements, preserve every qualifying component, and request only any missing or expired component.',
@@ -3153,7 +3158,9 @@ app.post('/operator/screening/existing', requireAuth, LIMITS.screening, requireA
     }
     res.json({
       ok: true,
-      note: 'Request recorded. We will preserve every qualifying component and ask only for anything still required.',
+      note: mode === 'new'
+        ? 'Request recorded. Use a qualifying screening agency, authorize its checks, and arrange authenticated delivery to American Rider. Do not submit a personal report as clearance.'
+        : 'Request recorded. We will preserve every qualifying component and ask only for anything still required.',
       transferTo,
       transferCaseNo: caseNo,
     });

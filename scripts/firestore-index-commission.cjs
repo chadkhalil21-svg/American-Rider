@@ -55,12 +55,19 @@ async function listIndexes(collection) {
   const parent = '/collectionGroups/' + encodeURIComponent(collection) + '/indexes';
   let pageToken = '';
   const indexes = [];
+  const seenTokens = new Set();
   do {
-    const query = new URLSearchParams({ pageSize: '100' });
-    if (pageToken) query.set('pageToken', pageToken);
-    const result = await request(parent + '?' + query.toString());
+    // The production Firestore Admin ListIndexes endpoint rejects nonzero pageSize
+    // ("Only 0 is supported"). Omit pageSize entirely and follow nextPageToken.
+    const path = pageToken ? parent + '?pageToken=' + encodeURIComponent(pageToken) : parent;
+    const result = await request(path);
     indexes.push(...(result.indexes || []));
-    pageToken = result.nextPageToken || '';
+    const nextToken = result.nextPageToken || '';
+    if (nextToken && seenTokens.has(nextToken)) {
+      throw new Error('Firestore index pagination repeated a token; aborting incomplete audit.');
+    }
+    if (nextToken) seenTokens.add(nextToken);
+    pageToken = nextToken;
   } while (pageToken);
   return indexes;
 }
@@ -112,4 +119,4 @@ if (require.main === module) commission().catch((error) => {
   console.error(error.message);
   process.exitCode = 1;
 });
-module.exports = { normalize, summarize };
+module.exports = { normalize, summarize, listIndexes };

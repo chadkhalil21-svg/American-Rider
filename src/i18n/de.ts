@@ -552,6 +552,8 @@ export default {
     bgNeedNew: 'Benötigen Sie eine neue Überprüfung?',
     bgNeedNewBody: 'Wählen Sie ein geeignetes Prüfunternehmen. Lassen Sie die erforderlichen Prüfungen durchführen und das bestätigte Ergebnis sicher an American Rider übermitteln. Klären Sie Eignung und Kosten vor der Zahlung.',
     bgNewNotice: 'Dieser Antrag berechtigt nicht zur Durchführung von Fahrten. Der Anbieter muss die erforderlichen Hinweise und Einwilligungen einholen und eine verifizierte Übermittlung vereinbaren. Senden Sie keine Berichte per E-Mail.',
+    bgAuthorizeTransfer: 'Ich ermächtige den angegebenen Prüfdienst, seinen geeigneten Bericht direkt an American Rider zur Prüfung meiner Eignung als Operator zu übermitteln. Der Anbieter kann zusätzliche Hinweise und Einwilligungen verlangen.',
+    bgConsentRequired: 'Bitte stimmen Sie der Übermittlung des Berichts zu, bevor Sie fortfahren.',
     bgAlreadyScreened: 'Bereits überprüft?',
     bgAlreadyBody: 'Ein aktueller Bericht kann diese Anforderung ganz oder teilweise erfüllen. Wir prüfen ihn, bevor wir Sie bitten, etwas erneut durchzuführen.',
     bgRequestRecorded: 'Anfrage erfasst',

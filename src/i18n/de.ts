@@ -573,8 +573,6 @@ export default {
     bgNameCompanyFirst: 'Nennen Sie zuerst die Prüfstelle.',
     bgNotRecorded: 'Das konnte nicht erfasst werden.',
     bgRecordedWillAsk: 'Erfasst. Wir werden sie bitten, ihn zu senden.',
-    bgHaveThemEmail: ' Kontaktieren Sie %{email} unter Angabe Ihrer Fallnummer, um die sichere Übermittlung durch %{agency} zu vereinbaren. Senden Sie keine Berichte oder Ausweise per E-Mail.',
-    bgCitingCase: ', unter Angabe des Vorgangs %{caseNo}.',
     qualBasicsSub: 'Vollständiger Name, Geburtsdatum, Anschrift',
     qualBgSub: 'Über einen zugelassenen Prüfanbieter abgeschlossen',
     inboxNotSignedIn: 'Dieses Gerät ist nicht angemeldet und kann daher keine Fahrten empfangen.',

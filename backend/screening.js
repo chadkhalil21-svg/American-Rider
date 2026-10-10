@@ -295,55 +295,96 @@ const RECHECK_WARN_MS = 30 * 24 * 60 * 60 * 1000;
  * Both writes are idempotent by marker (recheckWarnedAt / recheckExpiredAt), so the sweep
  * can run every minute without repeating itself.
  */
-async function sweepScreening({ now = Date.now() } = {}) {
-  const db = adminDb();
+// A durable rotating scan prevents old screening records from occupying the first
+// page forever. Only the screening evidence/current time determine eligibility; the
+// cursor is an operational checkpoint, never an authorization.
+async function sweepScreening({
+  now = Date.now(), db = adminDb(), notify: sendNotice, fileTicket: createTicket = fileTicket,
+  limit = 200,
+} = {}) {
   if (!db) return { ok: false, reason: 'no database' };
-  const { notify } = require('./push'); // required here, not at top: push has no reason to load for adjudication-only callers
-  let warned = 0;
-  let expired = 0;
+  const send = sendNotice || require('./push').notify;
+  const cutoff = now + RECHECK_WARN_MS;
+  const pageSize = Math.max(1, Math.min(500, Math.floor(Number(limit)) || 200));
+  const cursorRef = db.collection('screening_renewal_cursor').doc('v1');
+  let snap;
   try {
-    const snap = await db
-      .collection('users')
-      .where('screening.recheckDue', '<=', now + RECHECK_WARN_MS)
-      .limit(200)
-      .get();
+    const stored = await cursorRef.get();
+    const cursor = stored.exists ? stored.data() : null;
+    const readPage = async (after) => {
+      let q = db.collection('users')
+        .where('screening.recheckDue', '<=', cutoff)
+        .orderBy('screening.recheckDue')
+        .orderBy('__name__')
+        .limit(pageSize);
+      if (after && Number.isFinite(after.lastDueAt) && after.lastUserId)
+        q = q.startAfter(after.lastDueAt, after.lastUserId);
+      return q.get();
+    };
+    snap = await readPage(cursor);
+    if (!snap.docs.length && cursor?.lastUserId) snap = await readPage(null);
+  } catch (e) {
+    return { ok: false, reason: e.message, warned: 0, expired: 0, scanned: 0 };
+  }
+
+  let warned = 0, expired = 0;
+  try {
     for (const doc of snap.docs) {
       const s = doc.data().screening || {};
-      if (s.decision !== 'pass') continue; // refused/held operators already cannot drive
+      const due = Number(s.recheckDue);
+      if (s.decision !== 'pass' || !Number.isFinite(due) || due <= 0) continue;
       const uid = doc.id;
-      if (Number(s.recheckDue) <= now && !s.recheckExpiredAt) {
+      // The old "At" markers were written without a cycle identifier. Accept an
+      // old marker only if it belongs to THIS due-date window; renewal never
+      // inherits the prior check's notification/suspension marker.
+      const warnedThisCycle = Number(s.recheckWarnedForDue) === due ||
+        (!s.recheckWarnedForDue && Number(s.recheckWarnedAt) >= due - RECHECK_WARN_MS &&
+          Number(s.recheckWarnedAt) < due);
+      const expiredThisCycle = Number(s.recheckExpiredForDue) === due ||
+        (!s.recheckExpiredForDue && Number(s.recheckExpiredAt) >= due);
+      if (due <= now && !expiredThisCycle) {
+        // An expired screening always blocks dispatch, regardless of notification.
         await db.collection('operators').doc(uid).set(
-          { available: false, screeningBlocked: true, screeningReason: 'Background check expired — Florida requires a new one every 3 years.' },
+          { available: false, screeningBlocked: true,
+            screeningReason: 'Background screening expired — a current check is required.' },
           { merge: true },
         );
-        await doc.ref.set({ screening: { recheckExpiredAt: now } }, { merge: true });
-        await notify({
-          uid,
-          kind: 'screening_due',
-          title: 'Your background check has expired',
-          body: 'Florida requires a new check every 3 years. Renew it in the app to keep driving.',
+        // Durable, retry-safe case comes before the one-cycle checkpoint. An
+        // email-only notification is not a stored exception. If case storage
+        // fails, retain the expired block and try again on a later sweep.
+        const caseResult = await createTicket({
+          uid, kind: 'support', reason: 'Operator screening expired — renewal due',
+          idempotencyKey: `screening-renewal-${due}`,
+          description: `Operator ${uid}'s background screening conducted ${new Date(Number(s.conductedAt || due - RECHECK_MS)).toISOString().slice(0, 10)} expired ${new Date(due).toISOString().slice(0, 10)}. Dispatch remains blocked until a new, authoritative check passes.`,
         });
-        await fileTicket({
-          uid,
-          kind: 'support',
-          reason: 'Operator screening expired — 3-year recheck due',
-          description: `Operator ${uid}'s screening passed ${new Date(Number(s.conductedAt || 0)).toISOString().slice(0, 10)} and expired ${new Date(Number(s.recheckDue)).toISOString().slice(0, 10)}. Dispatch is blocked until a new check passes.`,
+        if (caseResult?.stored !== true)
+          throw new Error('screening_renewal_case_not_stored');
+        await doc.ref.set({ screening: { recheckExpiredAt: now, recheckExpiredForDue: due } }, { merge: true });
+        await send({
+          uid, kind: 'screening_due', title: 'Your background check has expired',
+          body: 'A current background check is required to resume operations. Renew it in the app.',
         });
-        expired += 1;
-      } else if (Number(s.recheckDue) > now && !s.recheckWarnedAt) {
-        await doc.ref.set({ screening: { recheckWarnedAt: now } }, { merge: true });
-        await notify({
-          uid,
-          kind: 'screening_due',
-          title: 'Background check renewal due soon',
-          body: `Florida requires a new check every 3 years — yours is due ${new Date(Number(s.recheckDue)).toLocaleDateString('en-US')}. Renew in the app to avoid any pause.`,
+        expired++;
+      } else if (due > now && !warnedThisCycle) {
+        await doc.ref.set({ screening: { recheckWarnedAt: now, recheckWarnedForDue: due } }, { merge: true });
+        await send({
+          uid, kind: 'screening_due', title: 'Background check renewal due soon',
+          body: `Your background check renewal is due ${new Date(due).toISOString().slice(0, 10)}. Renew it in the app to avoid a pause.`,
         });
-        warned += 1;
+        warned++;
       }
     }
-    return { ok: true, warned, expired, scanned: snap.size };
+    // A failed page never advances the cursor past unprocessed records.
+    if (snap.docs.length) {
+      const last = snap.docs[snap.docs.length - 1];
+      await cursorRef.set({
+        lastDueAt: Number(last.data().screening.recheckDue),
+        lastUserId: last.id, progressedAt: now,
+      }, { merge: false });
+    }
+    return { ok: true, warned, expired, scanned: snap.docs.length };
   } catch (e) {
-    return { ok: false, reason: e.message };
+    return { ok: false, reason: e.message, warned, expired, scanned: snap.docs.length };
   }
 }
 

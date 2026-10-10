@@ -2,6 +2,7 @@
 // National market EXPANSION planning. A proposal is never geographic activation,
 // market admission, Operator onboarding, screening eligibility or travel authority.
 // Reuse the Census boundary catalogue and jurisdiction registry; no paid API.
+const { createHash } = require('node:crypto');
 const US = require('./jurisdictions/us.json');
 const { markets } = require('./markets');
 
@@ -30,7 +31,11 @@ function validateProposal(input, catalogue=catalog()) {
     return { ok:false, code:'invalid_city', error:'Use a city name, not an address or personal information.' };
   if (city && !county)
     return { ok:false, code:'county_required_for_city', error:'Choose an imported county before identifying a city; otherwise submit a state-level plan.' };
-  const id = county ? county.id : stateCode.toLowerCase();
+  // Different cities within the same county are distinct planning intentions,
+  // but neither is a separate permission to operate or a duplicate service region.
+  const cityKey = city ? createHash('sha256').update(city.toLocaleLowerCase('en-US'))
+    .digest('hex').slice(0, 12) : null;
+  const id = county ? county.id + (cityKey ? '-city-' + cityKey : '') : stateCode.toLowerCase();
   const label = county ? county.name + ', ' + stateCode : STATES.find(j=>j.code===stateCode).name;
   return { ok:true, plan:{ id, stateCode, countyFips:county?.fips||null,
     countyName:county?.name||null, marketId:county?.id||null,

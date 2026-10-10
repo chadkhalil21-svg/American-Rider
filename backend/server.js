@@ -2850,9 +2850,17 @@ app.post('/insurance/status-confirmation', express.urlencoded({ extended: false 
   let official = { recognized:false, reason:'not_checked' };
   if (status === 'verified_active') {
     const pending = await requestRef.get().catch(()=>null);
-    if (pending?.exists && !pending.data()?.usedAt && Number(pending.data()?.expiresAt)>now)
-      official = await lookupOfficialAgencyEmail(pending.data().email)
-        .catch(()=>({ recognized:false, reason:'official_registry_unavailable' }));
+    if (pending?.exists && !pending.data()?.usedAt && Number(pending.data()?.expiresAt)>now) {
+      const contactEmail = pending.data().email;
+      // Do not download the public 25 MB registry for an already-vetted
+      // carrier/broker. This is a cheap fast-path, rechecked transactionally.
+      const already = await db.collection(TRUSTED_INSURANCE_CONTACTS)
+        .doc(insuranceContactId(contactEmail)).get().catch(()=>null);
+      if (!already?.exists || !currentContactTrust(already.data(), contactEmail, 'FL', now)) {
+        official = await lookupOfficialAgencyEmail(contactEmail)
+          .catch(()=>({ recognized:false, reason:'official_registry_unavailable' }));
+      }
+    }
   }
 
   try {

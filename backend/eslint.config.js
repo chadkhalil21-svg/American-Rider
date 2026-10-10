@@ -33,6 +33,7 @@ const globals = {
   TextEncoder: 'readonly',
   TextDecoder: 'readonly',
   AbortController: 'readonly',
+  AbortSignal: 'readonly',
   fetch: 'readonly',
   crypto: 'readonly',
   structuredClone: 'readonly',

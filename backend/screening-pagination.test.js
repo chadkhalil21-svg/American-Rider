@@ -95,8 +95,8 @@ const sweep = now => sweepScreening({
   // Ensure the renewed record is selected after rollover despite its later date.
   for(let i=0;i<5;i++) await sweep(NOW+10+i);
   assert.equal(messages.filter(x=>x.uid===users[0].id).length,2,'renewed screening gets new-cycle warning');
-  assert.equal(renewed.recheckWarnedForDue,renewed.recheckDue);
-  assert.notEqual(renewed.recheckWarnedForDue,oldDue);
+  assert.equal(users[0].data.screening.recheckWarnedForDue, users[0].data.screening.recheckDue);
+  assert.notEqual(users[0].data.screening.recheckWarnedForDue, oldDue);
 
   // On a new, already-expired screening cycle, stale prior expiry markers do
   // not suppress suspension/case. And all 620 Operators eventually get processed.

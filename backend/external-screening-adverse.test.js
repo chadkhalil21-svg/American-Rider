@@ -17,7 +17,12 @@ function fakeDb(seed={}){
   users:{[UID]:{screening:{decision:'review',provider:'Sample Agency',consentAt:NOW-100,
      transferCaseNo:CASE,...seed.screening}}},
   support_tickets:{[CASE]:{uid:UID,kind:'support',status:'open',
-    reason:'Operator screening — review new provider report',...seed.ticket}},
+    reason:'Operator screening — review new provider report',
+    screeningHandoff:{stage:'report_authenticated',owner:'reviewer1',
+      agencyContact:{verifiedAt:NOW-3000,reference:'CRA-CONTACT-900'},
+      authenticatedReport:{verifiedAt:NOW-1000,by:'reviewer1',
+        agency:'Sample Agency',reference:good.reference,channel:'authenticated_provider_portal'}},
+    ...seed.ticket}},
   operators:{[UID]:{available:true,commissioned:true,screeningBlocked:false}},
   audit_log:{}
  };
@@ -56,7 +61,11 @@ async function execute(db,action,over={},at=NOW) {
  assert.equal(validateTransition({...good,reasonCode:'just_a_guess'},NOW).ok,false);
  assert.equal(validateTransition({...good,reportIssuedOn:'2021-04-03'},NOW).ok,false,'stale report cannot support adverse claim');
  assert.equal(validateTransition({...good,reportIssuedOn:'2026-11-03'},NOW).ok,false,'future report cannot support adverse claim');
- let db=fakeDb();
+ let db=fakeDb({ticket:{screeningHandoff:null}});
+ assert.equal((await execute(db,'propose')).ok,false,
+   'statutory adverse proposal cannot rely on self-attestation without a source handoff');
+ assert.equal(db.updates,0);
+ db=fakeDb();
  assert.equal((await execute(db,'finalize',{finalNoticeDelivered:'yes',
    providerFindingsRechecked:'yes',noOpenDispute:'yes'})).ok,false,'cannot finalize without notices');
  assert.equal((await execute(db,'propose')).ok,true);
@@ -82,9 +91,13 @@ async function execute(db,action,over={},at=NOW) {
  assert.equal((await execute(db,'propose')).ok,true);
  assert.equal((await execute(db,'dispute')).ok,true);
  assert.equal(db.state.users[UID].screening.adverseAction.stage,'disputed');
+ assert.equal(db.state.support_tickets[CASE].screeningHandoff.stage,'dispute_open');
+ assert.equal(db.state.support_tickets[CASE].screeningHandoff.authenticatedReport,null,
+   'disputes invalidate the prior CRA report for any future adjudication');
  assert.equal((await execute(db,'finalize',final,NOW+HOLD_MS*5)).ok,false,'any open dispute blocks final');
  assert.equal((await execute(db,'withdraw')).ok,true,'reviewer can withdraw proposed adverse decision');
  assert.equal(db.state.users[UID].screening.decision,'review','withdrawal never constitutes PASS');
+ assert.equal(db.state.support_tickets[CASE].screeningHandoff.stage,'clarification_needed');
  db=fakeDb({ticket:{uid:'different'}});
  assert.equal((await execute(db,'propose')).ok,false,'must own the support case');
  assert.equal(db.updates,0,'unverified owner produces zero writes');

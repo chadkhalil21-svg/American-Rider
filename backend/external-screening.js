@@ -7,7 +7,7 @@ const { RECHECK_MS } = require('./screening');
 
 const CASE_RE = /^AR-C-[A-Za-z0-9-]{1,48}$/;
 const REF_RE = /^[A-Za-z0-9][A-Za-z0-9._:/-]{5,119}$/;
-const DATE_RE = /^\\d{4}-\\d{2}-\\d{2}$/;
+const DATE_RE = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/;
 const TRUSTED_CHANNELS = new Set(['authenticated_provider_portal', 'provider_verified_secure_transfer']);
 const clean = (value, limit = 200) => String(value || '').trim().slice(0, limit);
 const allowedName = (actor) => /^[A-Za-z0-9_-]{1,40}$/.test(String(actor?.name || ''));

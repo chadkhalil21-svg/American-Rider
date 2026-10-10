@@ -1035,7 +1035,8 @@ app.post('/operator/online', requireAuth, requireFreshAuth, requireOperationalRe
     // live mode a stranger gets into a car.
     //
     // The unscreened case is STAMPED either way, so /ops shows who is on duty without a
-    // screening rather than letting it pass unrecorded. Dispatch always demands\n    // current screening in production, independent of provider configuration.
+    // screening rather than letting it pass unrecorded. Dispatch always demands
+    // current screening in production, independent of provider configuration.
     // ---- EVERY OTHER GATE, FROM ONE ASSESSMENT. ------------------------------------------
     //
     // backend/qualification.js assessOperator, context 'online': the documents and what code

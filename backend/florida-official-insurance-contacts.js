@@ -28,8 +28,8 @@ function* csvRows(text) {
     if(ch==='"') {
       if(quoted && text[i+1]==='"') { cell+='"'; i++; }
       else if(quoted) quoted=false;
-      else if(cell.length===0) quoted=true;
-      else throw new Error('invalid_csv_quotes');
+      else if(cell.trim().length===0) {cell='';quoted=true;}
+      else cell+='"'; // Some official business names contain unquoted literal quotes.
     } else if(ch===',' && !quoted) {
       row.push(cell); cell='';
     } else if((ch==='\n'||ch==='\r') && !quoted) {

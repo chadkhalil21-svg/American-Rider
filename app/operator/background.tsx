@@ -126,7 +126,7 @@ export default function OperatorBackground() {
                 {record.transferCaseNo ? (
                   <Text style={styles.body}>{t('traveler.bgCaseReference', { caseNo: record.transferCaseNo })}</Text>
                 ) : null}
-                {(record.decision === 'awaiting_agency' || record.decision === 'review') ? (
+                {(record.decision === 'awaiting_agency' || record.decision === 'review' || record.decision === 'pre_adverse') ? (
                   <Text style={styles.body}>{t('traveler.bgCoordinationOnly')}</Text>
                 ) : null}
               </Card>

@@ -20,6 +20,7 @@ const { webhookReady } = require('./webhook');
 const { emailReady } = require('./email');
 const { screeningReady } = require('./screening');
 const { recordExternalReview } = require('./external-screening');
+const { recordAdverseReview } = require('./external-screening-adverse');
 const { monthlyRemittance } = require('./remittance');
 const { REQUIRED_DOCS, resolveDocument, setSuspension, assessAndRecord } = require('./qualification');
 const { disclosureStale } = require('./matching');
@@ -580,7 +581,7 @@ function mount(app, express, deps = {}) {
     if (!db) return res.status(503).send('Screening review is temporarily unavailable.');
     try {
       const snap = await db.collection('users')
-        .where('screening.decision', 'in', ['awaiting_agency', 'review']).limit(51).get();
+        .where('screening.decision', 'in', ['awaiting_agency', 'review', 'pre_adverse']).limit(51).get();
       const candidates = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
         .filter(u => u.screening?.transferCaseNo && u.screening?.consentAt)
@@ -593,13 +594,67 @@ function mount(app, express, deps = {}) {
           <input type="checkbox" name="${name}" value="yes"> ${esc(label)}</label>`;
       const cards = candidates.map(u => {
         const r = u.screening;
+        const a = r.adverseAction || {};
+        const adverseForm = (stage, action, title, contents = '') =>
+          `<form method="post" action="/ops/operators/screening-adverse" style="border-top:1px solid #CDD1D6;margin-top:16px;padding-top:10px">
+            <input type="hidden" name="uid" value="${esc(u.id)}">
+            <input type="hidden" name="caseNo" value="${esc(r.transferCaseNo)}">
+            <input type="hidden" name="action" value="${action}">
+            <strong>${title}</strong>
+            ${contents}
+            ${field('note','Staff verification note (no protected record details)')}
+            <button type="submit">${title}</button>
+          </form>`;
+        const proposal = adverseForm(a.stage, 'propose', 'Begin pre-adverse review', `
+          <p>Only after independent review of an authenticated CRA report. No denial or report transmission is performed by this form.</p>
+          ${field('reference','Provider report reference (not a government ID)')}
+          <label>Statutory ground <select name="reasonCode" required>
+            <option value="">Choose...</option>
+            <option value="criminal_history">Criminal-history disqualification</option>
+            <option value="sex_offender_match">National sex-offender match</option>
+            <option value="driver_license">Driver license qualification</option>
+            <option value="moving_violations">Moving-violation threshold</option>
+            <option value="other_statutory">Other verified statutory ground</option>
+          </select></label>
+          ${box('agencyAuthenticated','Agency portal/source independently authenticated')}
+          ${box('reportMatchesOperator','Report owner independently matched to Operator')}
+          ${box('permittedPurpose','Lawful American Rider report access verified')}
+          ${box('disqualifierConfirmed','Actual source findings independently checked against statute')}
+        `);
+        const preNotice = adverseForm(a.stage,'record_pre_notice','Record pre-adverse delivery',`
+          <p>Do not press until a report copy, rights summary and pre-adverse notice have actually reached the Operator by an approved channel. This app does not send them.</p>
+          ${field('reference','Verifiable secure-delivery evidence reference')}
+          ${box('reportCopyProvided','Operator received a copy of the actual agency report')}
+          ${box('rightsSummaryProvided','Operator received the FCRA rights summary')}
+          ${box('deliveryConfirmed','Pre-adverse notice was actually sent and delivery evidence checked')}
+        `);
+        const dispute = adverseForm(a.stage,'dispute','Record Operator dispute',`
+          <p>Record a disputed finding. Final refusal remains prohibited until provider clarification and appropriate updated notices.</p>
+        `);
+        const withdraw = adverseForm(a.stage,'withdraw','Withdraw proposed refusal',`
+          <p>Return to source review; this does NOT approve the screening.</p>
+        `);
+        const final = adverseForm(a.stage,'finalize','Record final decision and delivery',`
+          <p>Allowed only after the actual pre-notice, an internal minimum review interval (seven calendar days, NOT a fixed statutory FCRA deadline), no unresolved dispute, and separately delivered final-adverse notice.</p>
+          ${field('reference','Verified final-notice delivery reference')}
+          ${box('finalNoticeDelivered','Final adverse-action notice was actually sent and verified')}
+          ${box('providerFindingsRechecked','Provider findings and records reconfirmed unchanged')}
+          ${box('noOpenDispute','No unresolved or pending dispute remains')}
+        `);
+        const adverseActions = r.decision === 'pre_adverse'
+          ? `<p role="status">Pre-adverse review: ${esc(a.stage || 'missing stage')}. No Operator may accept Travel.</p>
+             ${a.stage === 'proposed' ? preNotice : ''}
+             ${['proposed','pre_notice_sent'].includes(a.stage) ? dispute : ''}
+             ${['proposed','pre_notice_sent','disputed'].includes(a.stage) ? withdraw : ''}
+             ${a.stage === 'pre_notice_sent' ? final : ''}`
+          : proposal;
         return `<section><h2>${esc(u.legalName || u.name || u.email || u.id)}</h2>
           <p>Case <strong>${esc(r.transferCaseNo)}</strong> · ${esc(r.provider || 'Unknown provider')} ·
             ${esc(r.decision)}. <a href="/ops/cases?kind=support">Open original support case →</a></p>
           <p>Review a report obtained from the named agency via an authenticated provider portal
           or confirmed secure transfer. Do not rely on an Operator-uploaded copy or an email
           attachment. No report contents or sensitive personal information belong in this form.</p>
-          <form method="post" action="/ops/operators/screening-review">
+          ${r.decision === 'pre_adverse' ? '' : `<form method="post" action="/ops/operators/screening-review">
             <input type="hidden" name="uid" value="${esc(u.id)}">
             <input type="hidden" name="caseNo" value="${esc(r.transferCaseNo)}">
             <input type="hidden" name="provider" value="${esc(r.provider || '')}">
@@ -629,7 +684,8 @@ function mount(app, express, deps = {}) {
             ${field('note','Verification rationale and any limitations (no consumer-report content)')}
             <button type="submit" name="action" value="hold">Hold for clarification</button>
             <button type="submit" name="action" value="clear">Record verified CLEAR</button>
-          </form>
+          </form>`}
+          ${adverseActions}
         </section>`;
       }).join('');
       res.type('html').send(page('External Operator screening',
@@ -647,6 +703,11 @@ function mount(app, express, deps = {}) {
   });
   exceptionRoute('/ops/operators/screening-review', ({ db, uid, body, actor }) =>
     recordExternalReview({ db, input: { ...body, uid }, actor }));
+  // For legally compliant agency-backed cases ONLY. These actions record
+  // independently established notice/dispute evidence; they do not send
+  // consumer reports or FCRA correspondence.
+  exceptionRoute('/ops/operators/screening-adverse', ({ db, uid, body, actor }) =>
+    recordAdverseReview({ db, input: { ...body, uid }, actor }));
 
   // A person decides one document: a held one, or reconsiders a refused one.
   exceptionRoute('/ops/operators/document', ({ db, uid, body, actor }) =>

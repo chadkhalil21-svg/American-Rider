@@ -88,7 +88,7 @@ check('the Operator comes from the server match, never from the request body',
   /candidate = matchOperator\(fleet/.test(route) && /operatorId: opRef\.id/.test(booking) && !/req\.body\?\.(operatorId|operator)/.test(route));
 check('it runs the shared matchOperator, so a gate added there covers this path too',
   /matchOperator\(/.test(route));
-check('screening is required when a provider is live', /requireScreening: screeningReady\(\)/.test(route));
+check('screening is required for all paid dispatch, even without provider configuration', /requireScreening: operationalMode/.test(route));
 check('provider success, owner, amount and currency are verified before an offer',
   route.indexOf('verifiedTravelPayment(') < route.indexOf('assignPaidTravel(') &&
   /paymentMatches\(ride, payment, req\.uid, id\)/.test(route));

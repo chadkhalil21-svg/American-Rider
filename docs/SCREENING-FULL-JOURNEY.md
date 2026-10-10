@@ -27,6 +27,21 @@ The Operator requests that **the named company** make the report available **to 
 
 **Safe delivery model:** CRA-authenticated web portal or a verified encrypted provider-to-Operations transfer. Store only an audit reference and decision in the app's Firestore database; maintain any original report only under a separately approved, access-restricted retention policy. A case in `support_tickets` is an Operations work item, **not a request sent to a CRA**. Staff must make contact using verified business identity and document the handoff. No report must be sent before legal purpose, contract, consent and data-security requirements are established.
 
+## Named Operations handoff (verified case lifecycle)
+
+The `/ops/screening` console is now a bounded queue with a strict case lifecycle:
+
+1. **Claim screening case:** A named, MFA-backed reviewer takes responsibility. Another staff account cannot silently assume the case.
+2. **Contact verified agency:** The reviewer independently establishes the CRA's authentic business contact (verified phone, business email, or authenticated agency portal), records a non-sensitive contact reference and time, and asks about the permissible purpose and whether a report can be reissued. The act of clicking this button does **not** send a message to the CRA.
+3. **Authenticate report receipt:** After obtaining the report by the agency's authenticated portal or approved secure transfer, the reviewer verifies the agency source, Operator match and lawful receipt, then records only a non-sensitive report reference. Staff **do not upload the report into the Operations form**.
+4. **Adjudicate separately:** The `Clear / Hold` form is hidden until the verified handoff is recorded. A **Clear** operation server-side requires the matching report reference, receipt method and same named reviewer. The statutory search results and driving-history thresholds must be reviewed independently. Clearance does **not** put an Operator on duty.
+5. **Hold / dispute:** Holding a report requires further agency clarification before a new clearance; disputing an authenticated report similarly discards that report as current authority. An auditable recontact and newly authenticated receipt is required.
+6. **Adverse notices:** **Not yet automated.** A potentially disqualifying report remains on hold. Before a company makes an adverse decision where the FCRA applies, staff and counsel must implement/verify the pre-adverse report copy, FCRA Summary of Rights, response/dispute opportunity, source correction and final notice containing the CRA's contact details and consumer rights. This application deliberately has no button that finalizes a refusal from an unsupported report.
+
+The ticket stores accountable stage transitions and non-sensitive references. The actual CRA verification, report handling, outbound notice and report retention remain external human-controlled responsibilities until provider contracts and a compliant secure intake process are commissioned. Tests cover case ownership, ordering, wrong-Operator isolation, idempotency on closed cases, dispute rechecks, no auto-dispatch and audit trail.
+
+**Do not equate an Operations attestation with externally verified provider infrastructure.** The `SCREENING_EVIDENCE_WORKFLOW_VERIFIED` launch flag must remain false unless there is independently documented production evidence and legal review.
+
 ## Florida and consumer-report standards
 
 - [Florida Statutes §627.748(12)](https://www.flsenate.gov/Laws/Statutes/2026/627.748): the TNC conducts or has a third party conduct a local/national criminal check with nationwide commercial database and primary-source validation, national sex-offender search and driving-history review; checks recur every three years. Separate statutory disqualifiers apply. It does **not** name a screening company or demand a specific API.

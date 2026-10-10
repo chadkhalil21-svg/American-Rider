@@ -86,7 +86,7 @@ async function downloadOfficialCsv(url=SOURCE) {
   // no user input, no SSRF, no file uploads, no provider secrets.
   if(url!==SOURCE)throw new Error('unapproved_official_registry_url');
   return new Promise((resolve,reject)=>{
-    let finished=false, bytes=0, chunks=[];
+    let finished=false, bytes=0;
     const stop=(err,value)=>{if(finished)return;finished=true;err?reject(err):resolve(value);};
     const req=https.get(url,{timeout:20000,headers:{'accept':'text/csv,application/octet-stream','user-agent':'AmericanRider-LicenceValidation/1.0'}},res=>{
       if(res.statusCode!==200){res.resume();return stop(new Error('official_registry_http_'+res.statusCode));}
@@ -130,7 +130,7 @@ function createOfficialContactRecognizer({load=downloadOfficialCsv,now=Date.now,
     if(!snapshot || now()-snapshot.fetchedAt>=SUCCESS_AGE_MS)
       return {recognized:false,reason:'official_registry_unavailable'};
     const found=snapshot.contacts.get(crypto.createHash('sha256').update(key).digest('hex'));
-    return found?{recognized:true,source:'FL_DFS_VALID_BUSINESS_LICENSES',
+    return found?{recognized:true,email:key,source:'FL_DFS_VALID_BUSINESS_LICENSES',
       sourceHash:snapshot.sha256,fetchedAt:snapshot.fetchedAt,
       licence:found.licence,business:found.business
     }:{recognized:false,reason:'email_not_in_official_valid_agency_register'};

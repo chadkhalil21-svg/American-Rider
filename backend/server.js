@@ -140,6 +140,8 @@ const {
   initialMonitoringFromDocument, continuingStatus, applyOperatorAttestation, applyIndependentConfirmation,
   providerInstructions, sweepInsuranceMonitoring,
 } = require('./insurance-monitoring');
+const { COLLECTION: TRUSTED_INSURANCE_CONTACTS, contactId: insuranceContactId,
+  currentContactTrust, normalizeEmail: normalizeInsuranceContact } = require('./insurance-contact-trust');
 const { normalizeParty, operatorPartyView } = require('./travelparty');
 const family = require('./family');
 const { provisionTeenPin, verifyTeenPin, teenPinReady, pinForRide } = require('./teenpickup');
@@ -2851,6 +2853,35 @@ app.post('/insurance/status-confirmation', express.urlencoded({ extended: false 
       const actor = { name: row.email, method: 'secure_email_link' };
       const auditRef = db.collection('audit_log').doc();
 
+      // A token proves possession of the mailbox, not that the recipient is
+      // actually a licensed agent, broker or carrier. The Operator chose the
+      // mailbox. For an affirmative policy-status renewal require one prior
+      // independent Ops verification of this EXACT contact. Reuse that trust
+      // across Operators using the same broker without a paid vendor API.
+      if (status === 'verified_active') {
+        const vettedRef = db.collection(TRUSTED_INSURANCE_CONTACTS).doc(insuranceContactId(row.email));
+        const vetted = await tx.get(vettedRef);
+        const matched = normalizeInsuranceContact(u.insuranceMonitoring?.contact?.email) ===
+          normalizeInsuranceContact(row.email);
+        if (!matched || !vetted.exists || !currentContactTrust(vetted.data(), row.email, 'FL', now)) {
+          const issue = {
+            kind: 'independent_provider_contact_required', at: now,
+            contactEmail: row.email,
+            note: 'A mailbox reply does not establish provider identity; independently vet the broker or carrier source.',
+          };
+          const monitoring = { ...(u.insuranceMonitoring || {}),
+            verificationIssue: issue, untrustedConfirmationAt: now };
+          const resultingEligibility = continuingStatus({ ...u, insuranceMonitoring: monitoring }, now);
+          // Do not refresh lastVerifiedAt or clear a previous adverse status.
+          tx.set(userRef, { insuranceMonitoring: monitoring }, { merge: true });
+          tx.set(requestRef, { usedAt: now, result: 'unverified_provider_contact' }, { merge: true });
+          tx.set(auditRef, { at: now, subject: String(row.uid), actor,
+            action: 'insurance_unvetted_contact_confirmation_held', requestId: hash,
+            resultingEligibility });
+          return { invalid:false, process:true, untrusted:true, row, resultingEligibility };
+        }
+      }
+
       if (processStatuses.has(status)) {
         const issue = {
           kind: status,
@@ -2920,18 +2951,30 @@ app.post('/insurance/status-confirmation', express.urlencoded({ extended: false 
     }
 
     if (result.process) {
+      if (result.untrusted) {
+        await fileTicket({
+          uid:String(result.row.uid), email:null, trip:null,
+          reason:'insurance broker identity not independently verified',
+          description:'An insurance-status confirmation was received from an unverified mailbox. Validate the insurer or broker independently before an active result can renew eligibility.',
+          kind:'support', category:'operator-insurance',
+        }).catch(()=>{});
+      }
       await notify?.({
         uid: String(result.row.uid),
         kind: 'insurance_verification_process',
         title: 'Insurance verification needs one more step',
-        body: status === 'requires_release'
+        body: result.untrusted ? 'Your insurer or broker contact needs an independent identity check before American Rider can renew its insurance confirmation.'
+          : status === 'requires_release'
           ? 'Your insurer requires its own authorization form. American Rider Operator Relations will guide the next step.'
           : status === 'requires_portal'
             ? 'Your insurer requires its own verification process. American Rider Operator Relations will guide the next step.'
             : 'Your insurer could not confirm status through the standard request. American Rider Operator Relations will guide the next step.',
         data: { screen: '/operator/insurance' },
       }).catch(() => {});
-      return res.type('html').send(page('Insurance status', '<h1>Process noted.</h1><p class="lede">Thank you. American Rider will use the verification process you identified.</p>'));
+      return res.type('html').send(page('Insurance status',
+        result.untrusted
+          ? '<h1>Confirmation held for review</h1><p class="lede">Thank you. American Rider must independently verify the reporting company before this can renew the Operator\'s eligibility.</p>'
+          : '<h1>Process noted.</h1><p class="lede">Thank you. American Rider will use the verification process you identified.</p>'));
     }
 
     return res.type('html').send(page('Insurance status', '<h1>Confirmation received.</h1><p class="lede">Thank you. No further action is required on this request.</p>'));

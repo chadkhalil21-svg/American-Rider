@@ -556,6 +556,8 @@ export default {
     bgAlreadyScreened: 'Verifica già effettuata?',
     bgAlreadyBody: 'Un rapporto recente può soddisfare in tutto o in parte questo requisito. Lo esamineremo prima di chiederle di ripetere qualsiasi verifica.',
     bgRequestRecorded: 'Richiesta registrata',
+    bgCaseReference: 'Pratica di verifica %{caseNo}.',
+    bgCoordinationOnly: 'Per informazioni generali, contatti support@americanrider.app indicando il numero della pratica. Non invii via email rapporti di verifica o documenti d\'identità. American Rider organizzerà il trasferimento sicuro e verificato con l\'agenzia.',
     bgCompany: 'SOCIETÀ DI VERIFICA',
     bgProviderName: 'Nome del fornitore',
     bgReportDate: 'DATA DEL RAPPORTO',

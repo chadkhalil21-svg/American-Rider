@@ -1,0 +1,13 @@
+# American Rider — repository agent instructions
+
+**MANDATORY FIRST READ:** [PROJECT-LEDGER.md](../PROJECT-LEDGER.md) on the current `release/current` branch; then `AGENTS.md` and relevant live implementation. The canonical ledger distinguishes implemented, tested, deployed, externally commissioned and commercially activated. Old handoffs and old Checkr-only documents may be obsolete. The founder's settled decisions are in ledger ADRs; do not reargue them without a new, express instruction.
+
+This is an Expo/React Native TypeScript app with Node/Express/Firebase/Stripe backend. No paid Travel, Operator qualification, external insurance or screening outcome can be self-certified by the client, uploaded paper, CI simulation, PR text or provider branding. Unknown U.S. jurisdiction policies fail closed.
+
+**Core navigation:** `app/` screens; `src/` UI/backend client; `backend/server.js` protected routes; `backend/qualification.js` dynamic Operator eligibility; `backend/insurance-jurisdictions.js` + `backend/insurance-monitoring.js` status; `backend/screening-jurisdictions.js` + `backend/external-screening.js` CRA; `backend/market-readiness.js` commercial admission; `backend/economics.js` authoritative fare economics; `docs/COMMERCIAL-RELEASE-EVIDENCE.md` real release gates.
+
+Before editing: verify exact baseline SHA and affected call sites, reproduce the actual defect and read relevant tests. Prefer small corrections on a branch; run `npm run check` and complete exact-head release tests. Before saying "live": verify merge SHA and Render service deployment SHAs. If real external provider evidence is absent, state that explicitly and leave the gate closed.
+
+**Change discipline:** Any PR changing founder policy, onboarding/insurance/screening/market admission or production commissioning must update `PROJECT-LEDGER.md` and, for a changed architectural decision, write a **new superseding** ADR in `docs/decisions/`. Do not overwrite accepted ADR history. Do not put credentials, Operator PII, reports, policy documents or raw payment identifiers in source, PRs or ledger.
+
+The product rubric is precise, restrained, institutional, accessible and seamless; the founder uses only an iPhone/iPad. Favor reuse and low lifetime operating cost over added vendors, repetitive clicks or redundant systems. Treat Ford/Rockefeller/Jobs as documented design/business reference lenses, not personal advisers.

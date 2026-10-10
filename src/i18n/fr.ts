@@ -558,6 +558,8 @@ export default {
     bgNeedNew: 'Besoin d’une nouvelle vérification ?',
     bgNeedNewBody: 'Choisissez un organisme qualifié. Demandez-lui de réaliser les contrôles requis et de remettre un résultat authentifié à American Rider. Vérifiez les exigences et les frais avant de payer.',
     bgNewNotice: 'Cette demande ne vous autorise pas à effectuer des trajets. Le prestataire doit recueillir les consentements requis et organiser une transmission vérifiée. Ne transmettez pas le rapport par courriel.',
+    bgAuthorizeTransfer: 'J’autorise le prestataire de vérification indiqué à transmettre directement son rapport admissible à American Rider pour mon évaluation en tant qu’Opérateur. Le prestataire peut exiger des informations et autorisations supplémentaires.',
+    bgConsentRequired: 'Autorisez la transmission du rapport pour continuer.',
     bgAlreadyScreened: 'Déjà vérifié ?',
     bgAlreadyBody: 'Un rapport récent peut satisfaire tout ou partie de cette exigence. Nous l’examinerons avant de vous demander de refaire quoi que ce soit.',
     bgRequestRecorded: 'Demande enregistrée',

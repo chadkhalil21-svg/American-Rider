@@ -37,6 +37,7 @@ const { forMarket: insuranceForMarket, publicConfig: publicInsuranceConfig } = r
 const { manifestFor, inspectMarket, recordEvidence, activateMarket, authorizeOnboarding, pauseMarket } = require('./market-readiness');
 const { setAdmittedFleetOnline, setFleetOnlineIfOpen, deactivateMarketFleet, sweepPausedMarketFleet } = require('./market-fleet');
 const { marketChecklistPage } = require('./market-readiness-ui');
+const { catalog: expansionCatalog, proposeMarket, listPlans: listMarketPlans } = require('./market-expansion');
 const { disputePage } = require('./disputeevidence-ui');
 const { pointFromWaitlist, coarseAreaFor } = require('./waitlistgeo');
 const { listOpsCases, actOnCase } = require('./opscases');
@@ -2323,8 +2324,24 @@ app.get('/ops/disputes', requireOps, async (req, res) => {
 });
 app.get('/ops/markets', requireOps, async (req, res) => {
   const markets = allMarkets().filter((m) => m.regionId);
-  const items = await Promise.all(markets.map(async (market) => ({ market, state: await admittedMarket(market) })));
-  res.type('html').send(marketChecklistPage(items, { production: DEPLOYMENT_MODE === 'production' && keyMode === 'live' }));
+  const [items, plans] = await Promise.all([
+    Promise.all(markets.map(async market => ({ market, state: await admittedMarket(market) }))),
+    listMarketPlans(adminDb()),
+  ]);
+  res.type('html').send(marketChecklistPage(items, {
+    production: DEPLOYMENT_MODE === 'production' && keyMode === 'live',
+    expansion: { catalog: expansionCatalog(), ...plans },
+  }));
+});
+// This is ONLY a national expansion PROPOSAL, never a new county activation.
+// The commissioning lifecycle still requires approved state law, geography,
+// policies, permits, independent evidence and a deliberate market-admission record.
+app.post('/ops/markets/plan', requireOps, requireOpsMutation, async (req, res) => {
+  if (opsAuthMode() !== 'named') return res.status(403).json({ code:'named_ops_required' });
+  try {
+    const out=await proposeMarket({ db:adminDb(), actor:req.opsUser, input:req.body });
+    return res.status(out.ok ? 200 : out.code==='named_operations_required' ? 403 : 400).json(out);
+  } catch { return res.status(503).json({ code:'market_expansion_plan_unavailable' }); }
 });
 app.get('/ops/markets/:id/readiness', requireOps, async (req, res) => {
   const market = opsMarket(req, res);

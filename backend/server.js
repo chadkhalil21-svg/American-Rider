@@ -3182,7 +3182,8 @@ app.post('/operator/screening/existing', requireAuth, LIMITS.screening, requireS
     if (!filed?.stored || !filed?.caseNo) {
       return res.status(503).json({ error: 'The screening review case could not be stored. Nothing has been submitted; please retry.' });
     }
-    await ref.set({
+    const batch = db.batch();
+    batch.set(ref, {
       screening: {
         decision: 'awaiting_agency', provider: agency, transferTo: null,
         transferCaseNo: filed.caseNo, declaredIssuedAt: issuedAt || null,
@@ -3196,13 +3197,14 @@ app.post('/operator/screening/existing', requireAuth, LIMITS.screening, requireS
         summary: 'American Rider is coordinating report eligibility and secure agency delivery. Do not purchase a screening or email sensitive documents until instructions are confirmed.',
       },
     }, { merge: true });
-    // Even a previously screened on-duty Operator who starts a new review must
-    // become non-dispatchable until the current authoritative check is settled.
-    await db.collection('operators').doc(String(req.uid)).set({
+    // Both records change atomically: an old screening pass must not remain
+    // dispatchable when the user has moved back to awaiting verified evidence.
+    batch.set(db.collection('operators').doc(String(req.uid)), {
       available: false, screeningBlocked: true,
       screeningReason: 'Screening report transfer is pending verification.',
       offDutyReason: 'screening_awaiting_agency', offDutyAt: Date.now(),
     }, { merge: true });
+    await batch.commit();
     return res.json({ ok: true, transferTo: null, transferCaseNo: filed.caseNo,
       note: 'Request received. American Rider must first confirm that the agency can provide the required checks and a secure report transfer. Do not purchase a screening or email any report. Your case is being reviewed.' });
   } catch (e) {

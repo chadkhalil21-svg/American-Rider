@@ -2,11 +2,32 @@
 // unscreened person may carry a passenger, so every branch gets a test.
 const path = require('path');
 const ROOT = __dirname;
-const { screeningCurrent, RECHECK_MS } = require(path.join(ROOT, 'screening.js'));
+const { screeningCurrent, screeningReady, RECHECK_MS } = require(path.join(ROOT, 'screening.js'));
 
 const now = Date.now(), YEAR = 365*24*3600*1000;
 const R = [];
 const check = (l, c, d) => R.push({ l, ok: !!c, d });
+
+// A pasted HTTPS link is not evidence that the CRA can return and adjudicate
+// a statutory report. An explicit post-pilot commissioning sign-off is required.
+const priorProviderUrl = process.env.SCREENING_PROVIDER_URL;
+const priorPilot = process.env.SCREENING_PROVIDER_E2E_VERIFIED;
+try {
+  process.env.SCREENING_PROVIDER_URL = 'https://example.test/cra';
+  delete process.env.SCREENING_PROVIDER_E2E_VERIFIED;
+  check('screening provider HTTPS link alone is NOT operational', !screeningReady());
+  process.env.SCREENING_PROVIDER_E2E_VERIFIED = 'false';
+  check('screening provider unverified sign-off is NOT operational', !screeningReady());
+  process.env.SCREENING_PROVIDER_E2E_VERIFIED = 'true';
+  check('provider may report operational only after explicit end-to-end sign-off', screeningReady());
+  process.env.SCREENING_PROVIDER_URL = 'http://example.test/cra';
+  check('non-HTTPS provider URL cannot report operational', !screeningReady());
+} finally {
+  if (priorProviderUrl === undefined) delete process.env.SCREENING_PROVIDER_URL;
+  else process.env.SCREENING_PROVIDER_URL = priorProviderUrl;
+  if (priorPilot === undefined) delete process.env.SCREENING_PROVIDER_E2E_VERIFIED;
+  else process.env.SCREENING_PROVIDER_E2E_VERIFIED = priorPilot;
+}
 
 // screeningCurrent is what the gate turns on.
 check('no screening at all -> not current', !screeningCurrent(null));

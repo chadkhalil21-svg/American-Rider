@@ -107,10 +107,11 @@ function presenceStale(o, now = Date.now()) {
 // read it — a refused operator could self-reinstate with one toggle.)
 //
 //   - screeningBlocked (set on refusal, and by the 3-year-expiry sweep) is ALWAYS fatal.
-//   - requireScreening — passed by callers as screeningReady(), i.e. the moment a screening
-//     provider is live — additionally demands screeningCheckedAt, the marker recordDecision
-//     writes only on a PASS. Before a provider exists the demo fleet keeps working, and the
-//     launch docs already bar real travelers until screening is live.
+//   - requireScreening — passed by production callers as operationalMode, NOT screeningReady(),
+//     so no absent/misconfigured provider URL can waive the background-check requirement.
+//     It demands screeningCheckedAt, stamped only after an actual provider PASS. Separate
+//     readiness checks block paid Travel until an approved screening process is commissioned.
+//     Only non-production demonstrations may explicitly opt out of this requirement.
 function matchOperator(operators, pickup, travelClass = 'Standard', { requireScreening = false, now = Date.now(), allowQueued = false } = {}) {
   const candidates = operators
     .filter(o => o.available)

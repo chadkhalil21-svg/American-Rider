@@ -572,8 +572,6 @@ export default {
     bgNameCompanyFirst: 'Indichi prima la società di verifica.',
     bgNotRecorded: 'Non è stato possibile registrarlo.',
     bgRecordedWillAsk: 'Registrato. Chiederemo loro di inviarlo.',
-    bgHaveThemEmail: ' Contatti %{email} indicando il numero del caso per organizzare la consegna sicura da %{agency}. Non invii rapporti né documenti via e-mail.',
-    bgCitingCase: ', citando la pratica %{caseNo}.',
     qualBasicsSub: 'Nome legale, data di nascita, indirizzo',
     qualBgSub: 'Completata con un fornitore di verifica approvato',
     inboxNotSignedIn: 'Questo dispositivo non ha l’accesso effettuato, quindi non può ricevere viaggi.',

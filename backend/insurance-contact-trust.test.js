@@ -61,7 +61,7 @@ const readDb={collection(name){return {doc(id){return {get:async()=>({
  const server=fs.readFileSync(path.join(__dirname,'server.js'),'utf8');
  const ops=fs.readFileSync(path.join(__dirname,'ops.js'),'utf8');
  assert.match(server,/if \(status === 'verified_active'\) \{/);
- assert.match(server,/currentContactTrust\(vetted\.data\(\), row\.email, 'FL', now\)/);
+ assert.match(server,/currentContactTrust\(vetted\.data\(\), row\.email, row\.sourceStateCode, now\)/);
  assert.match(server,/unverified_provider_contact/);
  assert.match(server,/policy_changed_since_request/);
  assert.match(server,/untrustedConfirmationAt: now/);

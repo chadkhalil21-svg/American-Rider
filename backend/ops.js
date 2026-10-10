@@ -585,9 +585,9 @@ function mount(app, express, deps = {}) {
         .map(d => ({ id: d.id, ...d.data() }))
         .filter(u => u.screening?.transferCaseNo && u.screening?.consentAt)
         .slice(0, 50);
-      const field = (name, label, type = 'text') =>
+      const field = (name, label, type = 'text', required = true) =>
         `<label style="display:block;margin:9px 0;font-size:13px;">${esc(label)}
-        <input type="${type}" name="${name}" style="display:block;padding:9px;width:100%;max-width:400px;border:1px solid #C9CDD1;border-radius:8px;" required></label>`;
+        <input type="${type}" name="${name}" style="display:block;padding:9px;width:100%;max-width:400px;border:1px solid #C9CDD1;border-radius:8px;" ${required ? 'required' : ''}></label>`;
       const box = (name, label) =>
         `<label style="display:block;margin:7px 0;font-size:13px;">
           <input type="checkbox" name="${name}" value="yes"> ${esc(label)}</label>`;
@@ -624,7 +624,7 @@ function mount(app, express, deps = {}) {
               ${box('sexOffenderClear','No disqualifying national sex-offender match exists.')}
               ${box('licenseValid','Current valid driver license independently verified.')}
               ${box('registrationVerified','Valid vehicle registration checked.')}
-              ${field('movingViolations3y','Moving violations in preceding 3 years (0–3)','number')}
+              ${field('movingViolations3y','Moving violations in preceding 3 years (0–3)','number', false)}
             </details>
             ${field('note','Verification rationale and any limitations (no consumer-report content)')}
             <button type="submit" name="action" value="hold">Hold for clarification</button>

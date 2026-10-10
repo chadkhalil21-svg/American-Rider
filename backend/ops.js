@@ -19,6 +19,7 @@ const { readKey } = require('./env');
 const { webhookReady } = require('./webhook');
 const { emailReady } = require('./email');
 const { screeningReady } = require('./screening');
+const { recordExternalReview } = require('./external-screening');
 const { monthlyRemittance } = require('./remittance');
 const { REQUIRED_DOCS, resolveDocument, setSuspension, assessAndRecord } = require('./qualification');
 const { disclosureStale } = require('./matching');
@@ -319,6 +320,7 @@ ${unreadable.length ? `<section role="alert" style="border:2px solid #B42318;">
   </section>` : ''}
 <p><a href="/ops/markets">Market readiness, evidence and pause controls →</a></p>
 <p><a href="/ops/cases?kind=emergency">Urgent and deadline cases · acknowledge →</a> · <a href="/ops/cases?kind=support">Support cases →</a></p>
+<p><a href="/ops/screening">Operator screening · verify authenticated agency reports →</a></p>
 <p><a href="/ops/disputes">Stripe dispute evidence · review only →</a></p>
 ${Object.entries(loaded).some(([,g]) => g.saturated)
   ? '<p role="alert"><strong>Some sections show a bounded sample.</strong> A “+” means more records exist. Do not use sample amounts for accounting; reconcile with Stripe and the financial ledger. Check /health for worker saturation.</p>' : ''}
@@ -568,6 +570,83 @@ function mount(app, express, deps = {}) {
         res.status(500).send(esc(e.message));
       }
     });
+
+  // Provider-neutral screening queue: includes pending reports that are NOT qualification
+  // exceptions yet. A real case, authorized by the Operator, is required for each decision.
+  // This does not show or copy report documents or criminal-history details.
+  app.get('/ops/screening', async (req, res) => {
+    if (!configured() || !signedIn(req)) return res.status(401).type('html').send(page('Operations', LOGIN));
+    const db = dbOf();
+    if (!db) return res.status(503).send('Screening review is temporarily unavailable.');
+    try {
+      const snap = await db.collection('users')
+        .where('screening.decision', 'in', ['awaiting_agency', 'review']).limit(51).get();
+      const candidates = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(u => u.screening?.transferCaseNo && u.screening?.consentAt)
+        .slice(0, 50);
+      const field = (name, label, type = 'text') =>
+        `<label style="display:block;margin:9px 0;font-size:13px;">${esc(label)}
+        <input type="${type}" name="${name}" style="display:block;padding:9px;width:100%;max-width:400px;border:1px solid #C9CDD1;border-radius:8px;" required></label>`;
+      const box = (name, label) =>
+        `<label style="display:block;margin:7px 0;font-size:13px;">
+          <input type="checkbox" name="${name}" value="yes"> ${esc(label)}</label>`;
+      const cards = candidates.map(u => {
+        const r = u.screening;
+        return `<section><h2>${esc(u.legalName || u.name || u.email || u.id)}</h2>
+          <p>Case <strong>${esc(r.transferCaseNo)}</strong> · ${esc(r.provider || 'Unknown provider')} ·
+            ${esc(r.decision)}. <a href="/ops/cases?kind=support">Open original support case →</a></p>
+          <p>Review a report obtained from the named agency via an authenticated provider portal
+          or confirmed secure transfer. Do not rely on an Operator-uploaded copy or an email
+          attachment. No report contents or sensitive personal information belong in this form.</p>
+          <form method="post" action="/ops/operators/screening-review">
+            <input type="hidden" name="uid" value="${esc(u.id)}">
+            <input type="hidden" name="caseNo" value="${esc(r.transferCaseNo)}">
+            <input type="hidden" name="provider" value="${esc(r.provider || '')}">
+            ${field('providerReference','Agency reference (no personal identifiers)')}
+            ${field('issuedOn','Date report was conducted (YYYY-MM-DD)')}
+            <label style="display:block;margin:9px 0;">Verified receipt
+              <select name="channel" required>
+                <option value="">Select source...</option>
+                <option value="authenticated_provider_portal">Authenticated agency portal</option>
+                <option value="provider_verified_secure_transfer">Verified agency secure transfer</option>
+              </select>
+            </label>
+            ${box('sourceAuthenticated','I independently authenticated the agency and origin of this report.')}
+            ${box('reportOwnerMatched','I confirmed that the original report belongs to this Operator.')}
+            ${box('permissiblePurposeVerified','I confirmed written authorization and lawful permission to obtain/use this report for American Rider.')}
+            <details><summary>Statutory checks required before a CLEAR decision</summary>
+              ${box('nationwideChecked','Local and nationwide commercial criminal records search was completed.')}
+              ${box('primarySourceValidated','Any criminal records requiring validation were checked with primary sources.')}
+              ${box('sexOffenderChecked','U.S. DOJ national sex-offender search was completed.')}
+              ${box('drivingHistoryChecked','Driving history was obtained and reviewed.')}
+              ${box('noDisqualifyingCriminalRecords','No statutory disqualifying criminal history or unresolved record exists.')}
+              ${box('sexOffenderClear','No disqualifying national sex-offender match exists.')}
+              ${box('licenseValid','Current valid driver license independently verified.')}
+              ${box('registrationVerified','Valid vehicle registration checked.')}
+              ${field('movingViolations3y','Moving violations in preceding 3 years (0–3)','number')}
+            </details>
+            ${field('note','Verification rationale and any limitations (no consumer-report content)')}
+            <button type="submit" name="action" value="hold">Hold for clarification</button>
+            <button type="submit" name="action" value="clear">Record verified CLEAR</button>
+          </form>
+        </section>`;
+      }).join('');
+      res.type('html').send(page('External Operator screening',
+        `<h1>External screening review</h1>
+          <p><a href="/ops">← Operations</a> · <a href="/ops/cases?kind=support">Provider transfer cases</a></p>
+          <p>A named Operations user attests to source authenticity and Florida's required
+          checks. A button is not a substitute for a provider report. Every decision is
+          transactionally audit-logged, and clearance never puts an Operator on duty.</p>
+          ${snap.docs.length >= 51 ? '<p role="alert">More than 50 screening requests; this is a bounded queue, not the complete backlog.</p>' : ''}
+          ${cards || '<p>No authorized screening-transfer requests in this queue.</p>'}`));
+    } catch {
+      res.status(503).type('html').send(page('External screening review',
+        '<h1>Screening review unavailable</h1><p role="alert">The queue could not be read. Do not interpret this as no pending requests.</p>'));
+    }
+  });
+  exceptionRoute('/ops/operators/screening-review', ({ db, uid, body, actor }) =>
+    recordExternalReview({ db, input: { ...body, uid }, actor }));
 
   // A person decides one document: a held one, or reconsiders a refused one.
   exceptionRoute('/ops/operators/document', ({ db, uid, body, actor }) =>

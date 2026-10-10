@@ -47,7 +47,7 @@ async function recordAdverseReview({db,input,actor,now=Date.now()}) {
       return {ok:false,status:409,error:'The case is not a current, authorized screening review.'};
     let decision=screen.decision,stage=a.stage||null,changed=null,closed=false;
     if(action==='propose') {
-      if(!['awaiting_agency','review'].includes(decision)||stage)
+      if(!['awaiting_agency','review'].includes(decision)||(stage&&stage!=='withdrawn'))
         return {ok:false,status:409,error:'Only an unresolved current agency report may start adverse consideration.'};
       decision='pre_adverse';stage='proposed';
       changed={stage,reasonCode,reportReference:reference,proposedAt:now,proposedBy:actor.name};

@@ -83,10 +83,8 @@ export default function OperatorBackground() {
     }
     setDeclared(
       (out.note || t('traveler.bgRecordedWillAsk')) +
-        (out.transferTo
-          ? ' ' + t('traveler.bgHaveThemEmail', { agency: agency.trim(), email: out.transferTo }) +
-            (out.transferCaseNo ? t('traveler.bgCitingCase', { caseNo: out.transferCaseNo }) : '.')
-          : ''),
+        (out.transferCaseNo ? '\n' + t('traveler.bgCaseReference', { caseNo: out.transferCaseNo }) : '') +
+        '\n' + t('traveler.bgCoordinationOnly'),
     );
     refresh();
   };

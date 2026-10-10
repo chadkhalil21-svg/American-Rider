@@ -554,7 +554,7 @@ export default {
     bgExternalProvider: 'Vérification externe sécurisée',
     bgProviderBody: 'Effectuez les recherches requises sur les antécédents judiciaires, le registre des délinquants sexuels et l’historique de conduite au moyen du processus sécurisé du prestataire. Les données sensibles restent chez le prestataire.',
     bgContinueProvider: 'Continuer avec le prestataire',
-    bgProviderPending: 'American Rider n’impose aucun prestataire particulier. Choisissez un organisme qualifié et confirmez la transmission sécurisée avant tout paiement.',
+    bgProviderPending: 'Le canal sécurisé de transfert des rapports n’est pas encore opérationnel. Vous pouvez demander l’examen d’un rapport existant ou indiquer un prestataire envisagé. N’effectuez aucun paiement et n’envoyez aucun document sensible avant confirmation du prestataire et du canal sécurisé.',
     bgNeedNew: 'Besoin d’une nouvelle vérification ?',
     bgNeedNewBody: 'Choisissez un organisme qualifié. Demandez-lui de réaliser les contrôles requis et de remettre un résultat authentifié à American Rider. Vérifiez les exigences et les frais avant de payer.',
     bgNewNotice: 'Cette demande ne vous autorise pas à effectuer des trajets. Le prestataire doit recueillir les consentements requis et organiser une transmission vérifiée. Ne transmettez pas le rapport par courriel.',

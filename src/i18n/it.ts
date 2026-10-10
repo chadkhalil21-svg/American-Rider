@@ -547,7 +547,7 @@ export default {
     bgExternalProvider: 'Verifica esterna sicura',
     bgProviderBody: 'Completi le ricerche richieste sui precedenti penali, sul registro dei reati sessuali e sulla storia di guida tramite il processo sicuro del fornitore. Le informazioni sensibili restano presso il fornitore.',
     bgContinueProvider: 'Continuare con il fornitore',
-    bgProviderPending: 'American Rider non impone un fornitore specifico. Scelga un servizio qualificato e confermi la consegna sicura prima di pagare.',
+    bgProviderPending: 'Il canale sicuro per ricevere i rapporti non è ancora operativo. Può chiedere la revisione di un rapporto esistente o indicare un potenziale fornitore. Non effettui pagamenti e non invii documenti sensibili prima della conferma del fornitore e del canale sicuro.',
     bgNeedNew: 'Serve una nuova verifica?',
     bgNeedNewBody: 'Scelga un fornitore qualificato. Richieda le verifiche necessarie e la trasmissione autenticata dei risultati ad American Rider. Confermi idoneità e costo prima di pagare.',
     bgNewNotice: 'Questa richiesta non autorizza i viaggi. Il fornitore deve raccogliere i consensi richiesti e concordare una trasmissione verificata. Non invii rapporti o documenti via e-mail.',

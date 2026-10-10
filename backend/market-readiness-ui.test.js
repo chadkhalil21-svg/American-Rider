@@ -23,4 +23,31 @@ const green = marketChecklistPage([{ market, state: { ...state, readyToActivate:
 assert.match(green, /class="activate"[^>]*data-version="abc123"[^>]*>Activate/);
 const testOnly = marketChecklistPage([{ market, state: { ...state, readyToActivate: true, missing: [] } }], { production: false });
 assert.match(testOnly, /class="activate"[^>]*disabled/);
+// Three counties share the same platform-level blocker; it is not three purchases.
+const triCounty = ['Miami-Dade','Broward','Palm Beach'].map((name, i) => ({
+  market: { id: ['fl-miami-dade','fl-broward','fl-palm-beach'][i], name, state:'FL' },
+  state: { ...state,
+    missing: [
+      { id:'provider:screening_provider', reason:'No commissioned provider handoff' },
+      { id:'company_insurance_bound', reason:'Actual coverage evidence required' },
+    ],
+  },
+}));
+const grouped = marketChecklistPage(triCounty, { production: true });
+assert.match(grouped, /Commission markets here, not in Operator screening/);
+assert.match(grouped, /two separate controls/i);
+assert.equal((grouped.match(/Screening Provider/g)||[]).length, 1,
+  'one platform dependency must not be repeated per county');
+assert.equal((grouped.match(/Company Insurance Bound/g)||[]).length, 3,
+  'legally scoped county proof remains required per county');
+assert.match(grouped, /may be referenced only where their actual coverage and validity apply/);
+assert.equal((grouped.match(/class="activate"[^>]*disabled/g)||[]).length, 3,
+  'shared missing dependency may never enable activation');
+const unblockedLocally = marketChecklistPage([{market,state:{
+  ...state, missing:[{id:'provider:screening_provider',reason:'Provider not commissioned'}],
+  readyToActivate:false,
+}}], {production:true});
+assert.match(unblockedLocally,/No remaining county-specific evidence/);
+assert.match(unblockedLocally,/class="activate"[^>]*disabled/);
+
 console.log('PASS market Operations checklist: escape, accessible feedback and production-only one-action activation');

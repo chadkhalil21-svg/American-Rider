@@ -557,6 +557,7 @@ export default {
     bgAlreadyScreened: 'Bereits überprüft?',
     bgAlreadyBody: 'Ein aktueller Bericht kann diese Anforderung ganz oder teilweise erfüllen. Wir prüfen ihn, bevor wir Sie bitten, etwas erneut durchzuführen.',
     bgRequestRecorded: 'Anfrage erfasst',
+    bgPreAdverse: 'Entscheidung zur Überprüfung wird geprüft',
     bgCaseReference: 'Prüffall %{caseNo}.',
     bgCoordinationOnly: 'Für allgemeine Fragen kontaktieren Sie support@americanrider.app unter Angabe Ihrer Vorgangsnummer. Senden Sie keine Prüfberichte oder Identitätsdokumente per E-Mail. American Rider organisiert die verifizierte, sichere Übertragung durch den Anbieter.',
     bgCompany: 'PRÜFUNTERNEHMEN',

@@ -270,8 +270,17 @@ function screeningCurrent(screening, now = Date.now()) {
   return Number(screening.recheckDue || 0) > now;
 }
 
-/** Is a screening provider configured? `/health` and /ops report it. */
-const screeningReady = () => /^https:\/\//i.test(String(readKey('SCREENING_PROVIDER_URL') || '').trim());
+/** A provider link by itself does NOT establish a usable screening process.
+ * Release sign-off requires an independently verified end-to-end trial:
+ * authenticated provider report delivered, statutory coverage reviewed,
+ * adverse-action handling tested, and no operator approved from self-declaration.
+ * The explicit production flag is owner-controlled and must remain off until
+ * that evidence exists; it is not a substitute for the trial.
+ */
+const screeningReady = () => {
+  const url = String(readKey('SCREENING_PROVIDER_URL') || '').trim();
+  return /^https:\/\//i.test(url) && readKey('SCREENING_PROVIDER_E2E_VERIFIED') === 'true';
+};
 
 // How far ahead of the three-year deadline the operator is warned. Thirty days: enough to
 // pay and complete a new check without losing a single day on the road, short enough that

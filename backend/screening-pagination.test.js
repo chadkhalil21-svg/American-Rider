@@ -67,7 +67,7 @@ const db = {
 const sweep = now => sweepScreening({
   db, now, limit:200,
   notify: async data => { messages.push(data);return {ok:true}; },
-  fileTicket: async data => { tickets.push(data);return {caseNo:'AR-C-TEST'}; },
+  fileTicket: async data => { tickets.push(data);return {ok:true,stored:true,caseNo:'AR-C-TEST'}; },
 });
 (async()=>{
   const reports=[];
@@ -112,6 +112,7 @@ const sweep = now => sweepScreening({
   assert.ok(results.every(x=>x.ok),JSON.stringify(results));
   assert.equal(results.reduce((n,x)=>n+x.expired,0),620);
   assert.equal(tickets.length,620);
+  assert.ok(tickets.every(t => /^screening-renewal-\\d+$/.test(t.idempotencyKey)), 'cases are idempotent per screening due-date');
   assert.equal(operators.size,620);
   assert.equal(messages.length,620);
   for(const p of operators.values()) {

@@ -18,6 +18,10 @@ assert.ok(server.includes("const declaredProduction = DEPLOYMENT_MODE === 'produ
 assert.ok(!server.includes("if (!fleet.length && !operationalMode)"), 'paid dispatch never fabricates a demonstration fleet');
 assert.ok(read('backend/booking.js').includes('operatorDemo: false'), 'a paid Travel may only be assigned to a real database Operator');
 assert.ok(server.includes('function productionReadiness()'), 'production readiness is centralized');
+assert.ok(!server.includes('requireScreening: screeningReady()'),
+  'live dispatch may not waive screening merely because a provider URL is missing');
+assert.ok((server.match(/requireScreening: operationalMode/g) || []).length >= 5,
+  'every dispatch matching path must demand screening in production independently of provider config');
 assert.ok(server.includes("code: 'production_not_ready'"), 'production operations fail closed when dependencies are incomplete');
 for (const route of ['/operator/online', '/fare-quote', '/create-payment-intent', '/travel/prepare', '/travel/dispatch', '/travel/schedule', '/travel/accept']) {
   const line = server.split('\\n').find((x) => x.includes(`app.post('${route}'`)) || '';

@@ -3120,8 +3120,8 @@ app.get('/operator/screening', requireAuth, async (req, res) => {
  *
  * They name the company and sign an instruction; FCRA §604(a)(2) makes a consumer's own written
  * instruction a permissible purpose, so that company may lawfully send the report to us. The
- * operator pays nothing if it is complete and recent, or $17.50 if only the driving history is
- * missing — which is the common case, because several gig platforms buy the criminal half alone.
+ * report may be reusable only after verification of source, purpose and CRA authorization.
+ * No fee or reusability is guaranteed merely because the Operator names the provider.
  *
  * NOTHING IS ACCEPTED ON THIS REQUEST. It records the declaration and opens a case to chase the
  * screening company; the report is only ever adjudicated when it arrives FROM them.
@@ -3187,6 +3187,8 @@ app.post('/operator/screening/existing', requireAuth, LIMITS.screening, requireS
         decision: 'awaiting_agency', provider: agency, transferTo: null,
         transferCaseNo: filed.caseNo, declaredIssuedAt: issuedAt || null,
         declaredElements: selectedElements, consentAt: Date.now(),
+        // Superseded screening evidence must never survive as present authority.
+        reportId: null, conductedAt: null, recheckDue: null, externalVerification: null,
         consentText: mode === 'new'
           ? 'I instruct the screening company I select to release its completed report to American Rider for eligibility review, subject to the provider’s separate disclosure and authorization.'
           : 'I instruct the named screening company to release its existing background screening report to American Rider for eligibility review, subject to permitted purpose and transfer requirements.',
@@ -3213,10 +3215,9 @@ app.post('/operator/screening/existing', requireAuth, LIMITS.screening, requireS
 // provider directly. American Rider receives and reviews authoritative provider evidence;
 // it does not create a Stripe charge or purchase a screening on the Operator's behalf.
 
-// The screening company's result arrives on /checkr/webhook — mounted ABOVE express.json()
-// with the Stripe webhook, because its signature is an HMAC over the raw bytes. The event
-// handling itself (fetch the report's screenings, adjudicate by the statutory standard,
-// record the decision, handle expired invitations) lives in checkr.js.
+// Legacy Checkr adapter is not mounted in this provider-neutral server.
+// Operations records verified external CRA evidence at /ops/screening;
+// the old adapter must not be described as a functioning production receiver.
 
 // --- The operations view. -----------------------------------------------------------------
 mountOps(app, express, { checks: qualificationChecks, liveMoney: () => operationalMode });

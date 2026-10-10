@@ -141,7 +141,8 @@ const {
   providerInstructions, sweepInsuranceMonitoring,
 } = require('./insurance-monitoring');
 const { COLLECTION: TRUSTED_INSURANCE_CONTACTS, contactId: insuranceContactId,
-  currentContactTrust, normalizeEmail: normalizeInsuranceContact } = require('./insurance-contact-trust');
+  currentContactTrust, policyFingerprint, normalizeEmail: normalizeInsuranceContact } = require('./insurance-contact-trust');
+const { lookupOfficialAgencyEmail } = require('./florida-official-insurance-contacts');
 const { normalizeParty, operatorPartyView } = require('./travelparty');
 const family = require('./family');
 const { provisionTeenPin, verifyTeenPin, teenPinReady, pinForRide } = require('./teenpickup');
@@ -2551,6 +2552,8 @@ async function issueInsuranceConfirmationRequest({ uid, user, contact, now = Dat
     usedAt: null,
     reason,
     policyLast4: last4,
+    // Responses for an earlier policy must not renew a different policy.
+    policyFingerprint: policyFingerprint(m),
     attempt,
     deliveryStatus: 'pending',
   });
@@ -2839,6 +2842,18 @@ app.post('/insurance/status-confirmation', express.urlencoded({ extended: false 
   const note = String(req.body?.note || '').trim().slice(0, 500) || null;
   const processStatuses = new Set(['requires_release', 'requires_portal', 'unable_to_verify']);
   const now = Date.now();
+  // Query the official (public, free) Florida valid-business-licence register
+  // BEFORE the transaction: no network requests inside Firestore transactions.
+  // This is evidence of a licensed agency mailbox only, NOT active coverage.
+  // An unavailable/changed regulator file fails closed to the existing human
+  // trust register and Operator self-service.
+  let official = { recognized:false, reason:'not_checked' };
+  if (status === 'verified_active') {
+    const pending = await requestRef.get().catch(()=>null);
+    if (pending?.exists && !pending.data()?.usedAt && Number(pending.data()?.expiresAt)>now)
+      official = await lookupOfficialAgencyEmail(pending.data().email)
+        .catch(()=>({ recognized:false, reason:'official_registry_unavailable' }));
+  }
 
   try {
     const result = await db.runTransaction(async (tx) => {
@@ -2863,23 +2878,40 @@ app.post('/insurance/status-confirmation', express.urlencoded({ extended: false 
         const vetted = await tx.get(vettedRef);
         const matched = normalizeInsuranceContact(u.insuranceMonitoring?.contact?.email) ===
           normalizeInsuranceContact(row.email);
-        if (!matched || !vetted.exists || !currentContactTrust(vetted.data(), row.email, 'FL', now)) {
+        const matchedPolicy = !!row.policyFingerprint &&
+          row.policyFingerprint === policyFingerprint(u.insuranceMonitoring);
+        const staffTrusted = vetted.exists &&
+          currentContactTrust(vetted.data(), row.email, 'FL', now);
+        const officialTrusted = official.recognized === true &&
+          normalizeInsuranceContact(row.email) === normalizeInsuranceContact(official.email);
+        if (!matched || !matchedPolicy || (!staffTrusted && !officialTrusted)) {
           const issue = {
-            kind: 'independent_provider_contact_required', at: now,
+            kind: !matchedPolicy ? 'insurance_policy_changed_since_request' :
+              'independent_provider_contact_required', at: now,
             contactEmail: row.email,
-            note: 'A mailbox reply does not establish provider identity; independently vet the broker or carrier source.',
+            note: !matchedPolicy
+              ? 'The insured policy changed after this confirmation request. A fresh provider confirmation is required.'
+              : 'The email did not match a current, recognized Florida licensed agency contact. Use the officially published address or another verified provider channel.',
           };
           const monitoring = { ...(u.insuranceMonitoring || {}),
             verificationIssue: issue, untrustedConfirmationAt: now };
           const resultingEligibility = continuingStatus({ ...u, insuranceMonitoring: monitoring }, now);
           // Do not refresh lastVerifiedAt or clear a previous adverse status.
           tx.set(userRef, { insuranceMonitoring: monitoring }, { merge: true });
-          tx.set(requestRef, { usedAt: now, result: 'unverified_provider_contact' }, { merge: true });
+          tx.set(requestRef, { usedAt: now, result: !matchedPolicy ?
+            'policy_changed_since_request' : 'unverified_provider_contact' }, { merge: true });
           tx.set(auditRef, { at: now, subject: String(row.uid), actor,
             action: 'insurance_unvetted_contact_confirmation_held', requestId: hash,
             resultingEligibility });
-          return { invalid:false, process:true, untrusted:true, row, resultingEligibility };
+          return { invalid:false, process:true, untrusted:true, row,
+            issueKind:issue.kind, resultingEligibility };
         }
+        // Important: an official licence proves business existence and lists
+        // a mailbox, not that the insurer actually issued this policy. Only the
+        // recipient's fresh, policy-bound affirmative reply renews eligibility.
+        row.officialSource = officialTrusted ? 'FL_DFS_VALID_BUSINESS_LICENSES' :
+          'NAMED_MFA_VETTED_PROVIDER';
+        row.officialSourceHash = officialTrusted ? official.sourceHash : null;
       }
 
       if (processStatuses.has(status)) {
@@ -2932,6 +2964,8 @@ app.post('/insurance/status-confirmation', express.urlencoded({ extended: false 
         action: 'insurance_status_confirmation',
         status,
         source: row.contactType || 'broker',
+        verifiedSource: status === 'verified_active' ? row.officialSource : null,
+        officialSourceHash: status === 'verified_active' ? row.officialSourceHash : null,
         requestId: hash,
         note,
         resultingEligibility,
@@ -2951,11 +2985,14 @@ app.post('/insurance/status-confirmation', express.urlencoded({ extended: false 
     }
 
     if (result.process) {
-      if (result.untrusted) {
+      // First exceptions are self-service: do not create one founder task for
+      // every unfamiliar licensed agency or changed Operator policy. Escalate
+      // only after repeated unsuccessful attempts.
+      if (result.untrusted && Number(result.row?.attempt) >= 3) {
         await fileTicket({
           uid:String(result.row.uid), email:null, trip:null,
           reason:'insurance broker identity not independently verified',
-          description:'An insurance-status confirmation was received from an unverified mailbox. Validate the insurer or broker independently before an active result can renew eligibility.',
+          description:'Repeated insurance confirmations could not be independently authenticated or were issued for an old policy. Ask the Operator for the official insurer/broker contact or a supported agency portal; review only if unresolved.',
           kind:'support', category:'operator-insurance',
         }).catch(()=>{});
       }
@@ -2963,7 +3000,10 @@ app.post('/insurance/status-confirmation', express.urlencoded({ extended: false 
         uid: String(result.row.uid),
         kind: 'insurance_verification_process',
         title: 'Insurance verification needs one more step',
-        body: result.untrusted ? 'Your insurer or broker contact needs an independent identity check before American Rider can renew its insurance confirmation.'
+        body: result.untrusted ?
+          result.issueKind === 'insurance_policy_changed_since_request'
+            ? 'The insurance policy changed since your verification request. Ask the insurer or broker to confirm the current policy again.'
+            : 'The agency email could not be matched to an independently verified contact. Use the agency’s official registered email or its authenticated verification portal.'
           : status === 'requires_release'
           ? 'Your insurer requires its own authorization form. American Rider Operator Relations will guide the next step.'
           : status === 'requires_portal'
@@ -2973,7 +3013,7 @@ app.post('/insurance/status-confirmation', express.urlencoded({ extended: false 
       }).catch(() => {});
       return res.type('html').send(page('Insurance status',
         result.untrusted
-          ? '<h1>Confirmation held for review</h1><p class="lede">Thank you. American Rider must independently verify the reporting company before this can renew the Operator\'s eligibility.</p>'
+          ? '<h1>Confirmation needs more information</h1><p class="lede">Thank you. The Operator can request verification from the licensed agency’s registered email or verified portal.</p>'
           : '<h1>Process noted.</h1><p class="lede">Thank you. American Rider will use the verification process you identified.</p>'));
     }
 

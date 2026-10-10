@@ -60,9 +60,14 @@ function parseOfficialBusinessCsv(text,{minimumContacts=500}={}) {
   if(['email','license','type','business'].some(k=>ix[k]<0))
     throw new Error('official_registry_schema_unrecognized');
   const matched=new Map();
-  let validRows=0;
+  let validRows=0,totalRows=0,malformedRows=0;
   for(const row of rows) {
-    if(row.length!==h.length)throw new Error('official_registry_row_shape_changed');
+    totalRows++;
+    // Official public records sometimes contain an unescaped comma or quote
+    // in a name. A malformed row cannot establish provider identity. Skip
+    // that row, never shift its columns, and fail the entire source when the
+    // structural corruption rate exceeds a conservative maximum.
+    if(row.length!==h.length) {malformedRows++;continue;}
     const email=normEmail(row[ix.email]);
     const licence=String(row[ix.license]||'').trim();
     const licenseType=String(row[ix.type]||'').trim().toUpperCase();
@@ -78,8 +83,11 @@ function parseOfficialBusinessCsv(text,{minimumContacts=500}={}) {
     matched.set(hash,{licence:licence.slice(0,60),business:business.slice(0,200)});
     if(validRows>500000)throw new Error('official_registry_unexpected_row_count');
   }
+  if(malformedRows>Math.max(100,Math.ceil(totalRows*.02)))
+    throw new Error('official_registry_corrupt_ratio');
   if(matched.size<minimumContacts)throw new Error('official_registry_insufficient_agency_contacts');
-  return { contacts:matched, matchedCount:matched.size, validRows };
+  return { contacts:matched, matchedCount:matched.size, validRows,
+    totalRows, malformedRows };
 }
 async function downloadOfficialCsv(url=SOURCE) {
   // Fixed, literal state-government host and path: no arbitrary URL/redirect,

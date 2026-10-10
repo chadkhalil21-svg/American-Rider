@@ -59,6 +59,7 @@ export async function declareExistingScreening(opts: {
   issuedAt?: number;
   criminalIncluded: boolean;
   drivingIncluded: boolean;
+  mode?: 'existing' | 'new';
 }): Promise<{ ok: boolean; note?: string; transferTo?: string | null; transferCaseNo?: string | null; error?: string }> {
   const elements = [
     ...(opts.criminalIncluded ? ['nationwide_criminal', 'sex_offender'] : []),
@@ -70,7 +71,8 @@ export async function declareExistingScreening(opts: {
       headers: await authHeaders(),
       body: JSON.stringify({
         agency: opts.agency,
-        issuedAt: opts.issuedAt || 0,
+        mode: opts.mode || 'existing',
+        issuedAt: opts.mode === 'new' ? 0 : opts.issuedAt || 0,
         elements,
         consent: true,
       }),

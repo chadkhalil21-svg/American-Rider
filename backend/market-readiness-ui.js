@@ -7,10 +7,10 @@ function marketChecklistPage(items, { production = false, expansion = null } = {
   const c = expansion?.catalog || {jurisdictions:[], counties:[]};
   const plans = Array.isArray(expansion?.plans) ? expansion.plans : [];
   const planner = `<section id="expansion">
-    <h2>Plan another market</h2>
-    <p>National expansion is planned here. A proposal does not launch Travel,
-      commission a state or authorize spending. Only configured and independently
-      approved counties appear in the activation controls below.</p>
+    <h2>Expand American Rider</h2>
+    <p>Choose a state or territory once to prepare a new market. No individual county
+      forms are required at this stage. This creates a planning record only:
+      it does not authorize paid Travel or spend money.</p>
     ${expansion?.ok === false ? '<p role="alert">Expansion records are temporarily unavailable. No planning status can be confirmed.</p>' : ''}
     <form id="expansion-plan">
       <label>State or jurisdiction
@@ -19,7 +19,9 @@ function marketChecklistPage(items, { production = false, expansion = null } = {
           ${c.jurisdictions.map(j=>`<option value="${esc(j.code)}">${esc(j.name)} (${esc(j.code)})</option>`).join('')}
         </select>
       </label>
-      <label>County (optional — only where official boundaries have been imported)
+      <details class="expansion-advanced">
+        <summary>Focus on a particular county or city (optional)</summary>
+      <label>County (only where official boundaries have been imported)
         <select name="marketId" id="expansion-county">
           <option value="">State-level expansion plan</option>
           ${c.counties.map(m=>`<option value="${esc(m.id)}" data-state="${esc(m.state)}">${esc(m.name)}${m.configured?' · configured region':''}</option>`).join('')}
@@ -28,10 +30,11 @@ function marketChecklistPage(items, { production = false, expansion = null } = {
       <label>City focus (optional, requires an imported county)
         <input name="city" id="expansion-city" maxlength="80" placeholder="City name, not an address">
       </label>
-      <button type="submit">Record expansion plan — not activation</button>
+      </details>
+      <button type="submit">Prepare selected market — no activation</button>
       <p id="expansion-result" role="status" aria-live="polite"></p>
     </form>
-    <details><summary>Recorded expansion plans (${plans.length})</summary>
+    <details><summary>Saved expansion plans (${plans.length})</summary>
       ${expansion?.ok===false ? '<p>Plans cannot currently be retrieved.</p>' :
       plans.length ? `<ul>${plans.map(p=>`<li>${esc(p.label || p.id)}
         ${p.city ? ' · '+esc(p.city):''} · Proposed only — not commissioned</li>`).join('')}</ul>` :
@@ -51,7 +54,9 @@ function marketChecklistPage(items, { production = false, expansion = null } = {
     const ready = production && state.readyToActivate && state.manifestVersion && state.status !== 'active';
     const canOnboard = production && state.readyToOnboard && state.manifestVersion && state.status === 'waitlist';
     return `<section data-market="${id}">
-  <h2>${esc(market.name)} · ${esc(market.state)} · ${esc(state.status)}</h2>
+  <details class="county-review">
+    <summary>${esc(market.name)} · ${esc(market.state)} · ${esc(state.status)} ${ready ? '· Ready for final authorization' : ''}</summary>
+    <p>County-specific commissioning evidence and controls are available below.</p>
   <p>${state.status === 'active' ? 'New bookings are admitted in this county.' : state.status === 'onboarding' ? 'Only approved Operator intake is allowed; no paid Travel or duty is admitted.' : 'No paid Travel or expensive Operator onboarding is admitted in this county.'} Evidence references must be independently checked against real contracts, coverage and staffed service.</p>
   <p>Manifest ${esc(state.manifestVersion?.slice(0, 16) || 'not configured')} ·
      ${localMissing.length} county evidence or configuration requirement${localMissing.length === 1 ? '' : 's'} ·
@@ -77,10 +82,31 @@ function marketChecklistPage(items, { production = false, expansion = null } = {
     <label>Pause reason <input name="reason" minlength="8" maxlength="500" required></label>
     <button type="submit" ${['active', 'onboarding'].includes(state.status) ? '' : 'disabled'}>Pause intake and new offers</button>
   </form>
+  </details>
 </section>`;
   }).join('');
   return page('Market readiness · Operations', `<style>
 section[data-market] { margin-top:18px; }
+#expansion { margin-top:12px; }
+#expansion form { display:grid; gap:12px; }
+#expansion label { display:block; font-size:14px; font-weight:600; }
+#expansion select, #expansion input { display:block; width:100%; min-height:46px; padding:10px 12px; margin-top:6px;
+  border:1px solid var(--border); border-radius:10px; background:#fff; color:var(--ink); font:16px Arial,sans-serif; }
+#expansion button { width:100%; min-height:48px; padding:12px 14px;
+  background:var(--blue); color:#fff; border:1px solid var(--blue);
+  border-radius:12px; cursor:pointer; font:600 16px Arial,sans-serif; }
+#expansion details.expansion-advanced { margin:0; padding:0; }
+#expansion details.expansion-advanced label { margin-top:10px; }
+#expansion details.expansion-advanced summary, section[data-market] details.county-review>summary {
+  min-height:44px; display:flex; align-items:center; cursor:pointer; font-weight:600; }
+#expansion :focus-visible, section[data-market] summary:focus-visible {
+  outline:3px solid var(--blue); outline-offset:3px;
+}
+@media (max-width:560px) {
+  #expansion { padding:16px; }
+  section[data-market] { padding:12px; }
+  #expansion button { min-height:52px; }
+}
 section[data-market] h2 { margin-bottom:16px; }
 section[data-market] details { margin:16px 0; border-top:1px solid var(--hairline); padding-top:10px; }
 section[data-market] summary { cursor:pointer; min-height:44px; display:flex; align-items:center; font-weight:600; color:var(--blue); }
@@ -103,9 +129,12 @@ section[data-market] button:focus-visible,section[data-market] input:focus-visib
 section[data-market] select:focus-visible,section[data-market] summary:focus-visible {outline:3px solid var(--blue);outline-offset:3px;}
 #result:not(:empty) { padding:10px 12px; border:1px solid var(--blue-border); background:var(--blue-tint); border-radius:10px; }
 </style>
-<h1>Market readiness</h1>
-${planner}
+<h1>Markets</h1>
 <p class="lede"><a href="/ops">← Operations</a> · Commission markets here, not in Operator screening.</p>
+${planner}
+<h2>South Florida · commissioning</h2>
+<p>These counties are already configured geographically. The system checks their operational requirements automatically.
+Expand a county's details only when you need to investigate an exception or authorize a market that is genuinely ready.</p>
 <p><strong>Two separate controls:</strong> counties are configured geographically, but paid Travel requires separate commercial approval.
 Operator screening is an ongoing eligibility process, not a button that opens a county. You should not manually process every Operator's routine documents to activate a market.</p>
 <p><strong>Shared production dependencies:</strong> ${sharedDependencies.length ? sharedDependencies.map(x => esc(title(x))).join(' · ') : 'No missing shared infrastructure reported in this checklist.'}

@@ -55,6 +55,19 @@ async function recordAdverseReview({db,input,actor,now=Date.now()}) {
       !screen.consentAt)
       return {ok:false,status:409,error:'The case is not a current, authorized screening review.'};
     let decision=screen.decision,stage=a.stage||null,changed=null,closed=false;
+    // An independent CRA contact and authenticated receipt must precede both
+    // positive and potentially adverse screening decisions. Staff checkboxes
+    // alone must not create a disqualifying report or final decision.
+    const handoff=caseData.screeningHandoff||{},authenticated=handoff.authenticatedReport||{};
+    if(action==='propose' && (handoff.stage!=='report_authenticated' ||
+        handoff.owner!==actor.name || authenticated.by!==actor.name ||
+        !authenticated.verifiedAt || authenticated.reference!==reference ||
+        String(authenticated.agency||'').toLowerCase()!==String(screen.provider||'').toLowerCase()))
+      return {ok:false,status:409,error:'Independently verify agency contact and matching report receipt before proposing adverse action.'};
+    if(['record_pre_notice','finalize'].includes(action) &&
+        (handoff.stage!=='report_authenticated' ||
+         authenticated.reference!==a.reportReference || !authenticated.verifiedAt))
+      return {ok:false,status:409,error:'Adverse review lacks a still-authenticated, matching agency report.'};
     if(action==='propose') {
       if(!['awaiting_agency','review'].includes(decision)||(stage&&stage!=='withdrawn'))
         return {ok:false,status:409,error:'Only an unresolved current agency report may start adverse consideration.'};
@@ -95,7 +108,14 @@ async function recordAdverseReview({db,input,actor,now=Date.now()}) {
     if(closed)tx.set(cref,{status:'closed',closedAt:now,closedBy:actor.name,
       closeNote:'Final adverse decision verified with separate provider/notice references in restricted audit.'},{merge:true});
     else tx.set(cref,{acknowledgedAt:now,acknowledgedBy:actor.name,
-      acknowledgementNote:'Screening adverse review: '+stage},{merge:true});
+      acknowledgementNote:'Screening adverse review: '+stage,
+      // A dispute or withdrawn proposal invalidates the old report as
+      // clearance/adverse-action authority. Recontact CRA and authenticate a
+      // corrected report before any new adjudication can proceed.
+      ...(['dispute','withdraw'].includes(action) ? {screeningHandoff:{
+        ...handoff, stage:action==='dispute'?'dispute_open':'clarification_needed',
+        authenticatedReport:null,updatedAt:now,owner:handoff.owner||actor.name}} : {})
+    },{merge:true});
     tx.set(aref,{at:now,subject:uid,actor:{name:actor.name},action:'screening_adverse_'+action,
       caseNo,stage,reference:reference||null,reasonCode:action==='propose'?reasonCode:null,note});
     return {ok:true,decision,stage,caseNo};

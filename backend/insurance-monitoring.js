@@ -11,6 +11,7 @@
 //
 // No AI model is allowed to invent "active". AI may read carrier/broker evidence; a deterministic
 // state machine decides whether that evidence is fresh enough to permit service.
+const { createHash, randomUUID } = require('node:crypto');
 const DAY_MS = 24 * 60 * 60 * 1000;
 const STATUS_INTERVAL_DAYS = 30;
 const STATUS_GRACE_DAYS = 5;
@@ -182,6 +183,73 @@ function applyIndependentConfirmation(monitoring, {
   };
 }
 
+// One action reminder, then one stale-status reminder per independently verified
+// policy cycle. Store delivery bookkeeping outside insuranceMonitoring so a
+// provider's status update cannot overwrite it with an older policy snapshot.
+// A push acceptance is NOT delivery proof or insurance eligibility evidence.
+function insuranceReminderPlan(user, now = Date.now()) {
+  const m = user?.insuranceMonitoring;
+  if (!m || !['verified_active', 'verification_due'].includes(m.status)) return null;
+  const state = continuingStatus(user, now);
+  const verifiedAt = Number(m.lastVerifiedAt);
+  if (!Number.isSafeInteger(verifiedAt) || verifiedAt <= 0 || verifiedAt > now) return null;
+  const stage = state.code === 'insurance_status_stale' ? 'stale'
+    : state.code === 'insurance_attestation_due' ? 'due' : null;
+  if (!stage) return null;
+  const cycle = createHash('sha256').update(JSON.stringify([
+    m.insurer, m.policyNumber, m.effectiveDate, m.expirationDate, verifiedAt,
+  ])).digest('hex');
+  const prior = user.insuranceReminder?.cycle === cycle ? user.insuranceReminder : null;
+  const attempt = prior?.stages?.[stage];
+  if (attempt?.acceptedAt || Number(attempt?.attempts) >= 3 || Number(attempt?.nextAttemptAt) > now) return null;
+  return { cycle, stage, prior, attempts: (Number(attempt?.attempts) || 0) + 1 };
+}
+
+async function sendInsuranceReminder({ db, uid, notify, now = Date.now() }) {
+  if (typeof notify !== 'function') return { ok: false, skipped: true };
+  const ref = db.collection('users').doc(uid);
+  const claimId = randomUUID();
+  // Claim before I/O; transaction retries must never send notifications.
+  const claim = await db.runTransaction(async tx => {
+    const snap = await tx.get(ref);
+    const plan = snap.exists ? insuranceReminderPlan(snap.data(), now) : null;
+    if (!plan) return null;
+    tx.update(ref, { insuranceReminder: { cycle: plan.cycle, stages: {
+      ...(plan.prior?.stages || {}), [plan.stage]: {
+        claimId, attempts: plan.attempts, attemptedAt: now,
+        nextAttemptAt: now + 15 * 60 * 1000 * (4 ** (plan.attempts - 1)),
+      },
+    } } });
+    return plan;
+  });
+  if (!claim) return { ok: false, skipped: true };
+  let result;
+  try {
+    result = await notify({ uid, kind: 'insurance_verification_due',
+      title: 'Insurance status confirmation',
+      body: claim.stage === 'stale'
+        ? 'Independent insurance confirmation is overdue. Obtain current insurer or broker confirmation before commencing operations or accepting new Travel.'
+        : 'Confirm that your commercial coverage is unchanged while American Rider refreshes it with your insurer or broker.',
+      data: { screen: '/operator/insurance' },
+    });
+  } catch { result = { ok: false }; }
+  const accepted = result?.ok === true && typeof result.id === 'string' && !!result.id.trim();
+  await db.runTransaction(async tx => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) return;
+    const receipt = snap.data().insuranceReminder;
+    const attempt = receipt?.stages?.[claim.stage];
+    if (receipt?.cycle !== claim.cycle || attempt?.claimId !== claimId) return;
+    tx.update(ref, { insuranceReminder: { ...receipt, stages: {
+      ...receipt.stages, [claim.stage]: { ...attempt,
+        outcome: accepted ? 'accepted' : 'not_accepted',
+        ...(accepted ? { acceptedAt: now, ticketId: result.id } : {}),
+      },
+    } } });
+  });
+  return { ok: accepted, skipped: false };
+}
+
 async function sweepInsuranceMonitoring({ db, requestConfirmation, notify, now = Date.now(), limit = 250 } = {}) {
   if (!db) return { ok: false, reason: 'no database', considered: 0, requested: 0, reminded: 0 };
   const report = { ok: true, considered: 0, requested: 0, reminded: 0, failed: [] };
@@ -216,7 +284,7 @@ async function sweepInsuranceMonitoring({ db, requestConfirmation, notify, now =
     report.considered += 1;
     const u = doc.data() || {};
     const m = u.insuranceMonitoring || {};
-    if (cleanStatus(m.status) !== 'verified_active') continue;
+    if (!['verified_active', 'verification_due'].includes(cleanStatus(m.status))) continue;
     const due = Number(m.nextVerificationDueAt) || 0;
     const lastRequest = Number(m.verificationRequestedAt) || 0;
     const contact = m.contact || null;
@@ -246,20 +314,15 @@ async function sweepInsuranceMonitoring({ db, requestConfirmation, notify, now =
       }
     }
 
-    // Only when independent verification is actually due do we ask the Operator to touch
-    // anything. One tap opens the five-day grace; it never resets the independent clock.
-    if (due && now > due && !(Number(m.operatorAttestedAt) >= due)) {
+    // Check the page snapshot first to avoid transaction reads on every minute's
+    // sweep. Recheck current state inside the claim to exclude stale page data.
+    if (insuranceReminderPlan(u, now)) {
       try {
-        await notify?.({
-          uid: doc.id,
-          kind: 'insurance_verification_due',
-          title: 'Insurance status confirmation',
-          body: 'Confirm that your commercial coverage is unchanged while American Rider refreshes it with your insurer or broker.',
-          data: { screen: '/operator/insurance' },
-        });
-        report.reminded += 1;
+        const result = await sendInsuranceReminder({ db, uid: doc.id, notify, now });
+        if (result.ok) report.reminded += 1;
+        else if (!result.skipped) report.failed.push({ uid: doc.id, reason: 'insurance_reminder_not_accepted' });
       } catch {
-        /* the status gate itself still protects service */
+        report.failed.push({ uid: doc.id, reason: 'insurance_reminder_unavailable' });
       }
     }
   }
@@ -309,4 +372,6 @@ module.exports = {
   applyIndependentConfirmation,
   providerInstructions,
   sweepInsuranceMonitoring,
+  insuranceReminderPlan,
+  sendInsuranceReminder,
 };

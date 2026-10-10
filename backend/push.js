@@ -83,6 +83,7 @@ async function notify({ uid, kind, title, body, data }) {
   try {
     const res = await fetch(EXPO_PUSH, {
       method: 'POST',
+      signal: AbortSignal.timeout(10000),
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
         to: token,
@@ -96,13 +97,18 @@ async function notify({ uid, kind, title, body, data }) {
     });
     const out = await res.json().catch(() => ({}));
     const ticket = out?.data;
+    if (!res.ok) return { ok: false, reason: `push HTTP ${res.status}` };
     if (ticket?.status === 'error') {
       // DeviceNotRegistered means the app was deleted or the token rotated. Dropped, so we
       // stop sending into the void — and so a reinstall re-registers cleanly.
       if (ticket?.details?.error === 'DeviceNotRegistered') await dropToken(uid);
       return { ok: false, reason: ticket.message || 'push rejected' };
     }
-    return { ok: true, id: ticket?.id || null };
+    if (ticket?.status !== 'ok' || typeof ticket.id !== 'string' || !ticket.id.trim()) {
+      return { ok: false, reason: 'push acceptance ticket missing' };
+    }
+    // Expo acceptance is not a device delivery receipt.
+    return { ok: true, id: ticket.id };
   } catch (e) {
     return { ok: false, reason: e.message };
   }

@@ -349,13 +349,17 @@ async function sweepScreening({
             screeningReason: 'Background screening expired — a current check is required.' },
           { merge: true },
         );
-        await doc.ref.set({ screening: { recheckExpiredAt: now, recheckExpiredForDue: due } }, { merge: true });
-        // Record the exception before attempting the optional notification, so a
-        // temporary push failure cannot suppress the case.
-        await createTicket({
+        // Durable, retry-safe case comes before the one-cycle checkpoint. An
+        // email-only notification is not a stored exception. If case storage
+        // fails, retain the expired block and try again on a later sweep.
+        const caseResult = await createTicket({
           uid, kind: 'support', reason: 'Operator screening expired — renewal due',
+          idempotencyKey: `screening-renewal-${due}`,
           description: `Operator ${uid}'s background screening conducted ${new Date(Number(s.conductedAt || due - RECHECK_MS)).toISOString().slice(0, 10)} expired ${new Date(due).toISOString().slice(0, 10)}. Dispatch remains blocked until a new, authoritative check passes.`,
         });
+        if (caseResult?.stored !== true)
+          throw new Error('screening_renewal_case_not_stored');
+        await doc.ref.set({ screening: { recheckExpiredAt: now, recheckExpiredForDue: due } }, { merge: true });
         await send({
           uid, kind: 'screening_due', title: 'Your background check has expired',
           body: 'A current background check is required to resume operations. Renew it in the app.',

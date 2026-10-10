@@ -577,6 +577,8 @@ function mount(app, express, deps = {}) {
   // This does not show or copy report documents or criminal-history details.
   app.get('/ops/screening', async (req, res) => {
     if (!configured() || !signedIn(req)) return res.status(401).type('html').send(page('Operations', LOGIN));
+    if (opsAuthMode() !== 'named') return res.status(403).type('html').send(page('Screening',
+      '<h1>Named Operations access required</h1><p>Screening reports and adjudication require attributable MFA-backed staff access.</p>'));
     const db = dbOf();
     if (!db) return res.status(503).send('Screening review is temporarily unavailable.');
     try {
@@ -692,9 +694,11 @@ function mount(app, express, deps = {}) {
     }
   });
   exceptionRoute('/ops/operators/screening-handoff', ({ db, uid, body, actor }) =>
-    recordScreeningHandoff({ db, input: { ...body, uid }, actor }));
+    opsAuthMode() !== 'named' ? { ok:false, status:403, error:'Named Operations MFA is required.' }
+      : recordScreeningHandoff({ db, input: { ...body, uid }, actor }));
   exceptionRoute('/ops/operators/screening-review', ({ db, uid, body, actor }) =>
-    recordExternalReview({ db, input: { ...body, uid }, actor }));
+    opsAuthMode() !== 'named' ? { ok:false, status:403, error:'Named Operations MFA is required.' }
+      : recordExternalReview({ db, input: { ...body, uid }, actor }));
 
   // A person decides one document: a held one, or reconsiders a refused one.
   exceptionRoute('/ops/operators/document', ({ db, uid, body, actor }) =>

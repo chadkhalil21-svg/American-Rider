@@ -4,6 +4,8 @@ const src=fs.readFileSync(path.join(__dirname,'server.js'),'utf8');
 const R=[];const check=(l,c)=>R.push({l,ok:!!c});
 check('clock work is guarded by Firestore lease',/const name = 'operations_sweep'[\s\S]*acquireLease\(name,/.test(src));
 check('non-owner skips sweep',/if \(!lease\.acquired\) return/.test(src));
+check('same-instance reentrancy is guarded',/const runLeasedSweeps = singleFlight\(runLeasedSweepsOnce\);/.test(src));
+check('lease retries do not reacquire active same-owner lease',/const \{ singleFlight \} = require\('\.\/sweep-singleflight'\);/.test(src));
 check('internal timer calls leased sweep',/setInterval\([\s\S]*runLeasedSweeps\(\)/.test(src));
 check('external scheduler calls leased sweep',/async function runSweep[\s\S]*runLeasedSweeps\(\)/.test(src));
 check('external scheduler requires configured token',/const want = readKey\('SCHEDULER_TOKEN'\)[\s\S]*if \(!want \|\| got !== want\)[\s\S]*status\(401\)/.test(src));

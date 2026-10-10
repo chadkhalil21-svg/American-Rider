@@ -68,6 +68,17 @@ async function recordExternalReview({ db, input, actor, now = Date.now() }) {
       return { ok: false, status: 409, error: 'An active written Operator release instruction is required.' };
     if (clean(prior.provider).toLowerCase() !== provider.toLowerCase())
       return { ok: false, status: 409, error: 'The reporting company differs from the Operator authorization.' };
+    if (action === 'clear') {
+      const handoff = ticket.screeningHandoff || {};
+      const report = handoff.authenticatedReport || {};
+      if (handoff.stage !== 'report_authenticated' || handoff.owner !== actor.name ||
+          !report.verifiedAt || report.by !== actor.name ||
+          report.reference !== providerReference || report.channel !== channel ||
+          clean(report.agency).toLowerCase() !== provider.toLowerCase()) {
+        return { ok: false, status: 409,
+          error: 'Claim the case, verify direct agency contact and log authenticated report receipt before clearance.' };
+      }
+    }
     const result = action === 'clear' ? 'pass' : 'review';
     const recorded = {
       decision: result,
@@ -101,7 +112,10 @@ async function recordExternalReview({ db, input, actor, now = Date.now() }) {
         closeNote: 'Authenticated external report reviewed; see restricted screening audit.' }, { merge: true });
     } else {
       tx.set(caseRef, { acknowledgedAt: now, acknowledgedBy: actor.name,
-        acknowledgementNote: 'Screening held; provider clarification required.' }, { merge: true });
+        acknowledgementNote: 'Screening held; provider clarification required.',
+        screeningHandoff: { ...(ticket.screeningHandoff || {}), owner: actor.name,
+          stage: 'clarification_needed', authenticatedReport: null, updatedAt: now },
+      }, { merge: true });
     }
     tx.set(auditRef, { at: now, subject: uid, action: result === 'pass' ? 'screening_external_cleared' : 'screening_external_held',
       actor: { name: actor.name, ip: actor.ip || null, session: actor.session || null },

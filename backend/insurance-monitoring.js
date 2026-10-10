@@ -52,12 +52,16 @@ function policyIdentityFromDocument(doc = {}) {
 
 function initialMonitoringFromDocument(doc, now = Date.now()) {
   const p = policyIdentityFromDocument(doc);
+  // OCR/document checks prove what a paper says, not that the policy is
+  // currently in force. First qualification requires an authenticated insurer
+  // or independently verified broker confirmation; never manufacture the
+  // 30-day clock merely by accepting a document upload.
   return {
-    status: 'verified_active',
-    source: 'onboarding_document',
-    lastVerifiedAt: now,
+    status: 'unverified',
+    source: 'onboarding_document_unconfirmed',
+    lastVerifiedAt: null,
     operatorAttestedAt: null,
-    nextVerificationDueAt: now + STATUS_INTERVAL_DAYS * DAY_MS,
+    nextVerificationDueAt: now,
     statusMaxAgeDays: STATUS_INTERVAL_DAYS + STATUS_GRACE_DAYS,
     ...p,
   };

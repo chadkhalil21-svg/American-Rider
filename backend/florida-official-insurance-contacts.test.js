@@ -18,6 +18,9 @@ const data=HEADER+
 assert.equal([...csvRows(HEADER+'A1,"Foo, Bar",mail@example.com,"AGENCY LICENSE",VALID\r\n')].length,2);
 assert.deepEqual([...csvRows('Name,Note\r\n"Name A","Line 1\nLine 2"\r\n')][1],
   ['Name A','Line 1\nLine 2']);
+assert.deepEqual([...csvRows('Name,Email'+String.fromCharCode(10)+
+  'Company \"Insurance\" Agency,contact@example.com'+String.fromCharCode(10))][1],
+  ['Company "Insurance" Agency','contact@example.com']);
 assert.throws(()=>[...csvRows('x,y\n"unterminated,z')],/unclosed_csv_quote/);
 assert.throws(()=>parseOfficialBusinessCsv('not,csv', {minimumContacts:1}),
   /header|schema/);

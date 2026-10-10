@@ -29,6 +29,12 @@ function normalize(index) {
     fields,
   });
 }
+// Firebase generates indexes for ordinary single-field queries automatically.
+// Do not attempt to POST those as composite indexes: Firestore rejects them
+// with "this index is not necessary, configure using single field index controls".
+function isCompositeDefinition(index) {
+  return JSON.parse(normalize(index)).fields.length >= 2;
+}
 function summarize(index) {
   const value = JSON.parse(normalize(index));
   return value.collectionGroup + ' [' +
@@ -78,6 +84,13 @@ async function commission() {
   const manifest = JSON.parse(fs.readFileSync('firestore.indexes.json', 'utf8'));
   const indexes = manifest.indexes;
   if (!Array.isArray(indexes) || !indexes.length) throw new Error('Missing index manifest');
+  // Validate before making *any* live API call, and never mix single-field
+  // definitions into an add-only composite index deployment.
+  for (const index of indexes) {
+    if (!isCompositeDefinition(index)) {
+      throw new Error('Single-field index must not be in the composite manifest: ' + summarize(index));
+    }
+  }
   const collections = [...new Set(indexes.map((i) => i.collectionGroup))];
   const liveByCollection = new Map();
   for (const collection of collections) liveByCollection.set(collection, await listIndexes(collection));
@@ -119,4 +132,4 @@ if (require.main === module) commission().catch((error) => {
   console.error(error.message);
   process.exitCode = 1;
 });
-module.exports = { normalize, summarize, listIndexes };
+module.exports = { normalize, summarize, listIndexes, isCompositeDefinition };

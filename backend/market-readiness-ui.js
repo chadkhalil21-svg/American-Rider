@@ -3,7 +3,43 @@ const { page } = require('./shell');
 const { REQUIRED_EVIDENCE } = require('./market-readiness');
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c]);
 const title = (id) => id.replaceAll('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-function marketChecklistPage(items, { production = false } = {}) {
+function marketChecklistPage(items, { production = false, expansion = null } = {}) {
+  const c = expansion?.catalog || {jurisdictions:[], counties:[]};
+  const plans = Array.isArray(expansion?.plans) ? expansion.plans : [];
+  const planner = `<section id="expansion">
+    <h2>Plan another market</h2>
+    <p>National expansion is planned here. A proposal does not launch Travel,
+      commission a state or authorize spending. Only configured and independently
+      approved counties appear in the activation controls below.</p>
+    ${expansion?.ok === false ? '<p role="alert">Expansion records are temporarily unavailable. No planning status can be confirmed.</p>' : ''}
+    <form id="expansion-plan">
+      <label>State or jurisdiction
+        <select name="stateCode" id="expansion-state" required>
+          <option value="">Choose a jurisdiction</option>
+          ${c.jurisdictions.map(j=>`<option value="${esc(j.code)}">${esc(j.name)} (${esc(j.code)})</option>`).join('')}
+        </select>
+      </label>
+      <label>County (optional — only where official boundaries have been imported)
+        <select name="marketId" id="expansion-county">
+          <option value="">State-level expansion plan</option>
+          ${c.counties.map(m=>`<option value="${esc(m.id)}" data-state="${esc(m.state)}">${esc(m.name)}${m.configured?' · configured region':''}</option>`).join('')}
+        </select>
+      </label>
+      <label>City focus (optional, requires an imported county)
+        <input name="city" id="expansion-city" maxlength="80" placeholder="City name, not an address">
+      </label>
+      <button type="submit">Record expansion plan — not activation</button>
+      <p id="expansion-result" role="status" aria-live="polite"></p>
+    </form>
+    <details><summary>Recorded expansion plans (${plans.length})</summary>
+      ${expansion?.ok===false ? '<p>Plans cannot currently be retrieved.</p>' :
+      plans.length ? `<ul>${plans.map(p=>`<li>${esc(p.label || p.id)}
+        ${p.city ? ' · '+esc(p.city):''} · Proposed only — not commissioned</li>`).join('')}</ul>` :
+      '<p>No expansion plans recorded yet.</p>'}
+      ${expansion?.truncated ? '<p role="alert">More than 100 plans exist. This is an incomplete list.</p>' : ''}
+    </details>
+  </section>`;
+
   // Global infrastructure blockers are shared across counties. Showing them
   // three times can look like three separate contracts or purchases are needed.
   // The same problem should be visible once, without weakening each county gate.
@@ -68,6 +104,7 @@ section[data-market] select:focus-visible,section[data-market] summary:focus-vis
 #result:not(:empty) { padding:10px 12px; border:1px solid var(--blue-border); background:var(--blue-tint); border-radius:10px; }
 </style>
 <h1>Market readiness</h1>
+${planner}
 <p class="lede"><a href="/ops">← Operations</a> · Commission markets here, not in Operator screening.</p>
 <p><strong>Two separate controls:</strong> counties are configured geographically, but paid Travel requires separate commercial approval.
 Operator screening is an ongoing eligibility process, not a button that opens a county. You should not manually process every Operator's routine documents to activate a market.</p>
@@ -77,6 +114,41 @@ These are one platform-wide requirement each, not a new expense in every county.
 <p id="result" role="status" aria-live="polite"></p>
 ${cards || '<section><p>No configured service counties.</p></section>'}
 <script>
+const expansionForm=document.getElementById('expansion-plan');
+const expansionState=document.getElementById('expansion-state');
+const expansionCounty=document.getElementById('expansion-county');
+function filterCounties() {
+  const chosen=expansionState.value;
+  for(const option of expansionCounty.options) {
+    if(!option.value) continue;
+    option.hidden=option.dataset.state!==chosen;
+    option.disabled=option.dataset.state!==chosen;
+  }
+  if(expansionCounty.selectedOptions[0]?.disabled) expansionCounty.value='';
+}
+if(expansionForm) {
+  expansionState.addEventListener('change',filterCounties);
+  filterCounties();
+  expansionForm.addEventListener('submit',async e=>{
+    e.preventDefault();
+    const status=document.getElementById('expansion-result');
+    const f=new FormData(expansionForm);
+    status.textContent='Recording a planning request…';
+    try{
+      const r=await fetch('/ops/markets/plan',{
+        method:'POST',credentials:'same-origin',
+        headers:{'content-type':'application/json','x-ar-ops-action':'1'},
+        body:JSON.stringify({
+          stateCode:f.get('stateCode'),marketId:f.get('marketId'),city:f.get('city'),
+        })
+      });
+      const result=await r.json();
+      if(!r.ok) {status.textContent='Not recorded: '+String(result.error||result.code||'unavailable');return;}
+      status.textContent='Expansion plan recorded. No market has been opened. Refreshing…';
+      location.reload();
+    }catch{status.textContent='No plan was confirmed. Check the list before trying again.';}
+  });
+}
 async function action(market, verb, body) {
   const status=document.getElementById('result'); status.textContent='Saving…';
   try {

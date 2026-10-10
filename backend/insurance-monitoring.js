@@ -186,12 +186,28 @@ async function sweepInsuranceMonitoring({ db, requestConfirmation, notify, now =
   if (!db) return { ok: false, reason: 'no database', considered: 0, requested: 0, reminded: 0 };
   const report = { ok: true, considered: 0, requested: 0, reminded: 0, failed: [] };
   const requestWindow = now + 10 * DAY_MS;
+  // Do not repeatedly select the oldest 250 due Operators. Long-overdue
+  // policy cases are deliberately still eligible for reminders, but may NOT
+  // starve new users forever. Persist an indexed cursor across leased sweeps.
+  const cursorRef = db.collection('insurance_monitor_cursor').doc('v1');
   let snap;
   try {
-    snap = await db.collection('users')
-      .where('insuranceMonitoring.nextVerificationDueAt', '<=', requestWindow)
-      .limit(Math.max(1, Math.min(500, Number(limit) || 250)))
-      .get();
+    const cursorSnap = await cursorRef.get();
+    const cursor = cursorSnap.exists ? cursorSnap.data() : null;
+    const size = Math.max(1, Math.min(500, Number(limit) || 250));
+    const readPage = async (after) => {
+      let query = db.collection('users')
+        .where('insuranceMonitoring.nextVerificationDueAt', '<=', requestWindow)
+        .orderBy('insuranceMonitoring.nextVerificationDueAt')
+        .orderBy('__name__')
+        .limit(size);
+      if (after && Number.isFinite(after.lastDueAt) && after.lastUserId)
+        query = query.startAfter(after.lastDueAt, after.lastUserId);
+      return query.get();
+    };
+    snap = await readPage(cursor);
+    // On reaching the end, wrap in the same sweep so capacity is not wasted.
+    if (!snap.docs.length && cursor?.lastUserId) snap = await readPage(null);
   } catch (e) {
     return { ok: false, reason: e.message, considered: 0, requested: 0, reminded: 0 };
   }
@@ -245,6 +261,20 @@ async function sweepInsuranceMonitoring({ db, requestConfirmation, notify, now =
       } catch {
         /* the status gate itself still protects service */
       }
+    }
+  }
+  // Only the cursor is checkpointed. Eligibility always remains derived
+  // from live insurance status and never from this scheduler checkpoint.
+  if (snap.docs.length) {
+    const last = snap.docs[snap.docs.length-1];
+    try {
+      await cursorRef.set({
+        lastDueAt:Number(last.data()?.insuranceMonitoring?.nextVerificationDueAt),
+        lastUserId:last.id, progressedAt:now,
+      },{merge:false});
+    } catch (e) {
+      report.ok=false;
+      report.failed.push({reason:'insurance_monitor_cursor_unavailable'});
     }
   }
   return report;

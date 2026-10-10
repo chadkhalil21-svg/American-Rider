@@ -5,6 +5,7 @@
 // An affirmative status reply may renew eligibility only from a previously
 // vetted, unexpired source. This registry never creates insurance coverage.
 const crypto = require('node:crypto');
+const { forState: insuranceRequirements } = require('./insurance-jurisdictions');
 const COLLECTION = 'insurance_verified_contacts';
 const TRUST_MS = 365 * 24 * 60 * 60 * 1000;
 const METHODS = new Set([
@@ -24,7 +25,7 @@ function validateIndependentContact(input, actor, now=Date.now()) {
   const note=String(input?.note||'').trim();
   const reviewer=String(actor?.name||'');
   if(!validEmail(email)) return {ok:false, code:'invalid_email', error:'Enter the independently verified provider mailbox.'};
-  if(stateCode!=='FL') return {ok:false, code:'uncommissioned_jurisdiction',error:'The contact-trust process is currently commissioned only for Florida.'};
+  if(!insuranceRequirements(stateCode)) return {ok:false, code:'uncommissioned_jurisdiction',error:'Insurance policy for this jurisdiction is not yet commissioned.'};
   if(!METHODS.has(method)) return {ok:false, code:'independent_verification_required',error:'Verify the agency from an independent official source and an outbound callback.'};
   if(sourceReference.length<8 || sourceReference.length>180 || note.length<12 || note.length>500)
     return {ok:false,code:'evidence_required',error:'Record a nonsensitive official source reference and the independent callback evidence.'};
@@ -46,7 +47,7 @@ function currentContactTrust(record, email, stateCode='FL', now=Date.now()) {
     record.revokedAt==null;
 }
 async function trustForEmail(db,email,stateCode='FL',now=Date.now()) {
-  if(!db || !validEmail(normalizeEmail(email)) || stateCode!=='FL') return false;
+  if(!db || !validEmail(normalizeEmail(email)) || !insuranceRequirements(stateCode)) return false;
   const snap=await db.collection(COLLECTION).doc(contactId(email)).get();
   return snap.exists && currentContactTrust(snap.data(),email,stateCode,now);
 }
@@ -66,5 +67,13 @@ async function recordIndependentContact({db,actor,input,now=Date.now()}) {
   });
   return {ok:true,expiresAt:record.expiresAt};
 }
+// Bind responses to the EXACT issued policy. A contact reply for an old policy
+// cannot renew the status clock after a new document or policy is uploaded.
+function policyFingerprint(m) {
+  const p=[m?.insurer,m?.policyNumber,m?.effectiveDate,m?.expirationDate]
+    .map(x=>String(x||'').trim().toUpperCase());
+  if(!p[1] || !p[2] || !p[3])return null;
+  return crypto.createHash('sha256').update(JSON.stringify(p)).digest('hex');
+}
 module.exports={COLLECTION,TRUST_MS,METHODS,contactId,normalizeEmail,
-  validateIndependentContact,currentContactTrust,trustForEmail,recordIndependentContact};
+  validateIndependentContact,currentContactTrust,trustForEmail,recordIndependentContact,policyFingerprint};

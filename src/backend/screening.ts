@@ -16,7 +16,7 @@ async function authHeaders(): Promise<Record<string, string>> {
 }
 
 export type ScreeningRecord = {
-  decision?: 'pass' | 'refuse' | 'review' | 'in_progress' | 'awaiting_agency' | 'expired';
+  decision?: 'pass' | 'refuse' | 'review' | 'pre_adverse' | 'in_progress' | 'awaiting_agency' | 'expired';
   summary?: string;
   reasons?: string[];
   provider?: string | null;

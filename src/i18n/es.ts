@@ -573,6 +573,7 @@ export default {
     bgAlreadyScreened: '¿Ya tiene una verificación?',
     bgAlreadyBody: 'Un informe reciente puede satisfacer parte o la totalidad de este requisito. Lo revisaremos antes de pedirle que complete algo de nuevo.',
     bgRequestRecorded: 'Solicitud registrada',
+    bgPreAdverse: 'Decisión de verificación en revisión',
     bgCaseReference: 'Caso de verificación %{caseNo}.',
     bgCoordinationOnly: 'Para consultas generales, escriba a support@americanrider.app e indique su número de caso. No envíe informes de antecedentes ni documentos de identidad por correo electrónico. American Rider coordinará una transferencia segura y verificada con la agencia.',
     bgCompany: 'EMPRESA DE VERIFICACIÓN',

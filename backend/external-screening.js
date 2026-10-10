@@ -76,6 +76,9 @@ async function recordExternalReview({ db, input, actor, now = Date.now() }) {
       provider, reportId: providerReference, checkedAt: now, conductedAt: issuedAt,
       recheckDue: issuedAt + RECHECK_MS,
       transferCaseNo: caseNo,
+      // A new independently verified decision supersedes any withdrawn prior
+      // adverse consideration; historical actions remain in audit_log.
+      adverseAction: null, proposedDecision: null, finalizedAt: null,
       externalVerification: {
         source: channel, actor: actor.name, at: now, caseNo, agencyReference: providerReference,
         nationwideAndPrimarySource: result === 'pass', sexOffender: result === 'pass',

@@ -3190,6 +3190,7 @@ app.post('/operator/screening/existing', requireAuth, LIMITS.screening, requireS
         declaredElements: selectedElements, consentAt: Date.now(),
         // Superseded screening evidence must never survive as present authority.
         reportId: null, conductedAt: null, recheckDue: null, externalVerification: null,
+        adverseAction: null, proposedDecision: null, finalizedAt: null,
         consentText: mode === 'new'
           ? 'I instruct the screening company I select to release its completed report to American Rider for eligibility review, subject to the provider’s separate disclosure and authorization.'
           : 'I instruct the named screening company to release its existing background screening report to American Rider for eligibility review, subject to permitted purpose and transfer requirements.',

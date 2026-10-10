@@ -50,4 +50,23 @@ const unblockedLocally = marketChecklistPage([{market,state:{
 assert.match(unblockedLocally,/No remaining county-specific evidence/);
 assert.match(unblockedLocally,/class="activate"[^>]*disabled/);
 
+const { catalog: expansionCatalog } = require('./market-expansion');
+const marketList = expansionCatalog();
+const national = marketChecklistPage([{market,state}],{
+  production:true,
+  expansion:{ok:true,plans:[{
+    id:'ca',label:'<California>',status:'proposed',city:'San Jose'
+  }],catalog:marketList},
+});
+assert.match(national,/Plan another market/);
+assert.match(national,/Record expansion plan — not activation/);
+assert.match(national,/\/ops\/markets\/plan/);
+assert.match(national,/Choose a jurisdiction/);
+assert.match(national,/California \(CA\)/);
+assert.match(national,/data-state="FL"/);
+assert.ok(marketList.counties.filter(c=>c.state==='FL').length>3);
+assert.match(national,/&lt;California&gt;/);
+assert.doesNotMatch(national,/<California>/);
+assert.match(national,/Proposed only — not commissioned/);
+assert.match(national,/class="activate"[^>]*disabled/);
 console.log('PASS market Operations checklist: escape, accessible feedback and production-only one-action activation');

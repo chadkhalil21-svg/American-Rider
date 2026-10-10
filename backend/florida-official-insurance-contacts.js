@@ -15,8 +15,8 @@ const normHeader = v => String(v || '').replace(/^\uFEFF/, '').toLowerCase().rep
 const columns = {
   email: ['email','emailaddress','businessemail','businesscontactemail','businessemailaddress','emailaddr','contactemail'],
   license: ['licensenum','licensenumber','licenseno','license','fllicensenumber','fllicenseno','licenseid'],
-  type: ['licensetype','licensetypename','licensetitle','licensecategory','licensecategoryname','licenseclass'],
-  business: ['agencyname','agencyfirmname','businessname','licenseename','firmname','entityname','fullbusinessname'],
+  type: ['licensetype','licensetypename','licensetitle','licensecategory','licensecategoryname','licenseclass','licensetycldesc'],
+  business: ['agencyname','agencyfirmname','businessname','licenseename','firmname','entityname','fullbusinessname','fullname'],
   status: ['licensestatus','status','validity'],
 };
 // CSV parser is quote-aware (including commas/newlines inside quoted names),

@@ -2422,7 +2422,8 @@ app.post('/operator/market', requireAuth, LIMITS.market, async (req, res) => {
       );
     }
     res.json({ market: selected, active: available.filter((x) => x.status === 'active'),
-      onboarding: available.filter((x) => x.status === 'onboarding') });
+      onboarding: available.filter((x) => x.status === 'onboarding'),
+      waitlist: available.filter((x) => x.status === 'waitlist') });
   } catch (e) {
     res.status(502).json({ error: e.message });
   }
@@ -2439,6 +2440,7 @@ app.get('/operator/market', requireAuth, async (req, res) => {
       market: listedMarket(market, available),
       active: available.filter((x) => x.status === 'active'),
       onboarding: available.filter((x) => x.status === 'onboarding'),
+      waitlist: available.filter((x) => x.status === 'waitlist'),
     });
   } catch (e) {
     res.status(502).json({ error: e.message });

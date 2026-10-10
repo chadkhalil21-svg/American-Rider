@@ -20,14 +20,20 @@ Project: `american-rider-35688`, Firestore database: `(default)`.
    Grant that identity `roles/iam.workloadIdentityUser` on the dedicated
    service account. Confirm a provider attribute condition restricting
    `assertion.repository` and `assertion.ref` before enabling access.
-3. In GitHub repository → Settings → Secrets and variables → Actions,
-   create two repository secrets:
-   - `FIRESTORE_WIF_PROVIDER` — full provider resource name, such as
-     `projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/POOL/providers/PROVIDER`.
-   - `FIRESTORE_INDEX_SA_EMAIL` — email address of the dedicated service
-     account.
-   Store the actual values in GitHub, **never in chat**.
-4. Merge the reviewed workflow to `release/current`. In GitHub →
+3. The project-owner-approved Google Cloud connection uses the **public**
+   Workload Identity Provider resource name and dedicated service-account email
+   in the committed workflow, without GitHub secrets or JSON service-account keys.
+   These identifiers are **not** authentication credentials:
+   - Provider:
+     `projects/623854974930/locations/global/workloadIdentityPools/american-rider-github/providers/github`
+   - Service account:
+     `firestore-index-deployer@american-rider-35688.iam.gserviceaccount.com`
+   Verify the provider's GitHub OIDC condition is bound to repository numeric ID
+   `1382358737`, `refs/heads/release/current`, `workflow_dispatch`, and
+   `.github/workflows/firestore-index-commissioning.yml`. The account should
+   have only `roles/datastore.indexAdmin` on the project, while the WIF principal
+   has `roles/iam.workloadIdentityUser` **on this service account only**.
+4. After merging the reviewed workflow to `release/current`, open GitHub →
    Actions → **Firestore Composite Index Commissioning** →
    Run workflow, select `audit` first.
 5. Review its list of live, READY, BUILDING and MISSING indexes. Then run
@@ -41,7 +47,8 @@ The audit reports nonzero status for missing/building indexes; a deployment
 request may also finish with a nonzero status while indexes are building.
 This is deliberate: creation acknowledged is not the same as READY.
 
-Current ChatGPT connector availability: GitHub and Render can inspect and
-maintain this integration's source and deployments, but they cannot grant
-Google Cloud IAM permissions or set GitHub Actions repository secrets
-themselves. A Google Cloud owner must complete the above authorization.
+The GitHub connector can maintain this workflow and review runs, but does not
+expose a manual workflow-dispatch or Google Cloud IAM management action. The
+Google Cloud project owner performs IAM authorization; the user dispatches
+the first audit/create_missing run through GitHub Actions, then shares its
+logs so we can independently verify the results.

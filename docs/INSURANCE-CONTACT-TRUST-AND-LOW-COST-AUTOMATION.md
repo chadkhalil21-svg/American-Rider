@@ -6,6 +6,9 @@
 - Carrier-confirmed cancellation, nonrenewal, reduction or vehicle removal blocks duty and new Travel; eligibility is checked server-side. A current document expiration date **is not proof** of ongoing paid-up status.
 - No new insurance provider API, AI inference of coverage, monitoring vendor, scheduler, email sender or subscription is added.
 
+## Initial proof must come from an insurer or broker
+Before this correction an accepted scanned document itself initialized `verified_active` and a fresh 30-day clock. This confused evidence that a policy **was represented on a document** with independent confirmation it is in force today. The new initial state is `unverified`: no first Travel until the already implemented insurer/broker confirmation is genuine. Routine *subsequent* checks use the low-cost monthly automation below. An Operator's paper document and an email that the Operator controls are not independent sources.
+
 ## Fixed trust boundary (October 2026)
 The old verification-request route allowed an Operator to supply **any mailbox**, which received a valid capability link. If that mailbox replied `verified_active`, the 30-day verification timestamp previously renewed with no independent proof it belonged to a real carrier/broker.
 

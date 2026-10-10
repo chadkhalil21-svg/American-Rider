@@ -572,6 +572,8 @@ export default {
     bgNeedNew: 'Need a new screening?',
     bgNeedNewBody: 'Choose a qualified screening company. Ask it to perform the required searches and send its authenticated result to American Rider. Please confirm its eligibility and total cost before paying.',
     bgNewNotice: 'This request does not authorize Travel. The screening company must complete its own notices and consent process, then arrange verified report delivery. Do not upload or email a consumer report.',
+    bgAuthorizeTransfer: 'I authorize the named screening company to release its qualifying report directly to American Rider for my Operator eligibility review. The provider may require a separate disclosure and authorization.',
+    bgConsentRequired: 'Authorize the report release before continuing.',
     bgAlreadyScreened: 'Already screened?',
     bgAlreadyBody: 'A recent report may satisfy some or all of this requirement. We will review it before asking you to complete anything again.',
     bgRequestRecorded: 'Request recorded',

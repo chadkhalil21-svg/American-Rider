@@ -21,7 +21,9 @@ async function acquireLease(name, { owner = crypto.randomUUID(), now = Date.now(
     return await db.runTransaction(async (tx) => {
       const snap = await tx.get(ref);
       const cur = snap.exists ? (snap.data() || {}) : {};
-      if (Number(cur.leaseUntil || 0) > now && cur.owner && cur.owner !== owner) {
+      // A valid lease is in use even if the same worker asks again: reacquiring
+      // from the same process must not start a second concurrent payment/dispatch sweep.
+      if (Number(cur.leaseUntil || 0) > now && cur.owner) {
         return { ok: true, acquired: false, owner: cur.owner, leaseUntil: cur.leaseUntil };
       }
       const leaseUntil = now + Math.max(1_000, Number(ttlMs) || DEFAULT_LEASE_MS);

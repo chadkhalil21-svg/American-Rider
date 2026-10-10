@@ -4,17 +4,27 @@ const { REQUIRED_EVIDENCE } = require('./market-readiness');
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c]);
 const title = (id) => id.replaceAll('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 function marketChecklistPage(items, { production = false } = {}) {
+  // Global infrastructure blockers are shared across counties. Showing them
+  // three times can look like three separate contracts or purchases are needed.
+  // The same problem should be visible once, without weakening each county gate.
+  const sharedDependencies = [...new Set(items.flatMap(({ state }) =>
+    (state.missing || []).filter(m => m.id?.startsWith('provider:')).map(m => m.id.slice(9))))].sort();
   const cards = items.map(({ market, state }) => {
+    const localMissing = (state.missing || []).filter(m => !m.id?.startsWith('provider:'));
     const id = esc(market.id);
     const ready = production && state.readyToActivate && state.manifestVersion && state.status !== 'active';
     const canOnboard = production && state.readyToOnboard && state.manifestVersion && state.status === 'waitlist';
     return `<section data-market="${id}">
   <h2>${esc(market.name)} · ${esc(market.state)} · ${esc(state.status)}</h2>
   <p>${state.status === 'active' ? 'New bookings are admitted in this county.' : state.status === 'onboarding' ? 'Only approved Operator intake is allowed; no paid Travel or duty is admitted.' : 'No paid Travel or expensive Operator onboarding is admitted in this county.'} Evidence references must be independently checked against real contracts, coverage and staffed service.</p>
-  <p>Manifest ${esc(state.manifestVersion?.slice(0, 16) || 'not configured')} · ${state.missing.length} unmet requirement${state.missing.length === 1 ? '' : 's'}</p>
+  <p>Manifest ${esc(state.manifestVersion?.slice(0, 16) || 'not configured')} ·
+     ${localMissing.length} county evidence or configuration requirement${localMissing.length === 1 ? '' : 's'} ·
+     ${sharedDependencies.length} shared production dependenc${sharedDependencies.length === 1 ? 'y' : 'ies'}.</p>
+  <p>County status reflects BOTH the production dependencies shown above and this county's own approved evidence. Shared Florida-wide documents need not be purchased again for each county, but they may be referenced only where their actual coverage and validity apply.</p>
   ${state.fleetCleanupPending ? '<p role="alert"><strong>Fleet shutdown pending:</strong> new offers are blocked, but some Operator devices may still show on-duty. The leased cleanup must finish and be checked before reactivation.</p>' : ''}
   ${state.onboardingMissing?.length ? `<p>Prelaunch intake needs: ${state.onboardingMissing.map((m) => esc(title(m.id))).join(', ')}.</p>` : ''}
-  ${state.missing.length ? `<ul>${state.missing.map((m) => `<li><strong>${esc(title(m.id))}</strong>: ${esc(m.reason)}</li>`).join('')}</ul>` : '<p>All source and externally reviewed records are current. Independently verify the underlying references before activation.</p>'}
+  ${localMissing.length ? `<ul>${localMissing.map((m) => `<li><strong>${esc(title(m.id))}</strong>: ${esc(m.reason)}</li>`).join('')}</ul>` :
+    '<p>No remaining county-specific evidence or geography blockers. This is not permission to activate while shared dependencies are missing.</p>'}
   <details><summary>Record independently reviewed evidence</summary>
     <p>Paste only a document reference, independent issuer and expiry, not personal data or the document itself. This pauses an active county until it is re-approved.</p>
     <form class="evidence" data-market="${id}" data-version="${esc(state.manifestVersion || '')}">
@@ -58,8 +68,12 @@ section[data-market] select:focus-visible,section[data-market] summary:focus-vis
 #result:not(:empty) { padding:10px 12px; border:1px solid var(--blue-border); background:var(--blue-tint); border-radius:10px; }
 </style>
 <h1>Market readiness</h1>
-<p class="lede"><a href="/ops">← Operations</a> · No market can activate from geography or API keys alone.</p>
-<p>Only named, MFA-authenticated Operations users may record evidence. Production activation additionally requires live provider readiness and all current external records. No market was activated by this page being created.</p>
+<p class="lede"><a href="/ops">← Operations</a> · Commission markets here, not in Operator screening.</p>
+<p><strong>Two separate controls:</strong> counties are configured geographically, but paid Travel requires separate commercial approval.
+Operator screening is an ongoing eligibility process, not a button that opens a county. You should not manually process every Operator's routine documents to activate a market.</p>
+<p><strong>Shared production dependencies:</strong> ${sharedDependencies.length ? sharedDependencies.map(x => esc(title(x))).join(' · ') : 'No missing shared infrastructure reported in this checklist.'}
+These are one platform-wide requirement each, not a new expense in every county. This screen does not verify the contents of external reports.</p>
+<p>Only named, MFA-authenticated Operations users may record independently checked evidence. The platform requires actual insurance coverage, provider arrangements and tested operational safeguards. Never invent evidence or enable a market merely to clear a warning.</p>
 <p id="result" role="status" aria-live="polite"></p>
 ${cards || '<section><p>No configured service counties.</p></section>'}
 <script>

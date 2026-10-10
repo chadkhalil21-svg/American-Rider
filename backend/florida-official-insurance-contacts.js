@@ -139,5 +139,5 @@ function createOfficialContactRecognizer({load=downloadOfficialCsv,now=Date.now,
     fetchedAt:snapshot?.fetchedAt||null,attemptAt})};
 }
 const recognizer=createOfficialContactRecognizer();
-module.exports={ SOURCE,csvRows,parseOfficialBusinessCsv,createOfficialContactRecognizer,
+module.exports={ SOURCE,downloadOfficialCsv,csvRows,parseOfficialBusinessCsv,createOfficialContactRecognizer,
   lookupOfficialAgencyEmail: recognizer.lookup, officialRegistryStats:recognizer.stats };

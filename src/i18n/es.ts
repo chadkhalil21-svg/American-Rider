@@ -589,8 +589,6 @@ export default {
     bgNameCompanyFirst: 'Indique primero la empresa de verificación.',
     bgNotRecorded: 'No se pudo registrar.',
     bgRecordedWillAsk: 'Registrado. Les pediremos que lo envíen.',
-    bgHaveThemEmail: ' Comuníquese con %{email} e indique su caso para coordinar la entrega segura desde %{agency}. No envíe el informe ni documentos de identidad por correo.',
-    bgCitingCase: ', citando el caso %{caseNo}.',
     qualBasicsSub: 'Nombre legal, fecha de nacimiento, dirección',
     qualBgSub: 'Se completa con un proveedor de verificación aprobado',
     inboxNotSignedIn: 'Este dispositivo no tiene la sesión iniciada, por lo que no puede recibir viajes.',

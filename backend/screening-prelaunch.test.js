@@ -15,9 +15,13 @@ const external = read('backend/external-screening.js');
 assert.match(server, /async function requireScreeningRequestMarket\(req, res, next\)/,
   'screening has a separate early-interest market gate');
 assert.match(server, /app\.post\('\/operator\/screening\/existing', requireAuth, LIMITS\.screening, requireScreeningRequestMarket/,
-  'screening accepts Florida prelaunch preparation independently of commercial admission');
-assert.match(server, /region\.jurisdiction\?\.stateCode !== 'FL'/,
-  'unconfigured jurisdiction cannot enter Florida screening');
+  'screening accepts policy-authorized prelaunch preparation independently of commercial admission');
+assert.match(server, /const gate = screeningPreparationFor\(market, region\)/,
+  'the screening gate reads the national jurisdiction policy registry');
+assert.match(server, /req\.screeningPolicy = gate\.policy/,
+  'the server binds the verified screening policy to the request');
+assert.doesNotMatch(server, /region\.jurisdiction\?\.stateCode !== 'FL'/,
+  'the route no longer hard-codes one state');
 assert.match(server, /app\.post\('\/operator\/qualification\/submit', requireAuth, LIMITS\.qualification, requireActiveOperatingMarket/,
   'qualification remains fully admission-gated');
 assert.match(server, /app\.post\('\/operator\/online', requireAuth, requireFreshAuth, requireOperationalReadiness/,
@@ -33,6 +37,8 @@ assert.match(server, /await batch\.commit\(\)/, 'atomic screening transition mus
 assert.match(server, /transferTo: null/, 'unverified support mailbox is not a secure report destination');
 assert.match(server, /reportId: null, conductedAt: null, recheckDue: null, externalVerification: null/,
   'previous clearance cannot remain current when review restarts');
+assert.match(server, /jurisdictionCode: policy\.stateCode, policyId: policy\.id/,
+  'the new case binds the authoritative state and screening policy');
 assert.match(server, /oldCase\.exists && oldCase\.data\(\)\.uid === req\.uid/,
   'repeated request checks case ownership and reuses its existing case');
 assert.match(ui, /\.\.\.area\.waitlist/, 'Operator can find listed prelaunch counties');

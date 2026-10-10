@@ -145,6 +145,7 @@ const { provisionTeenPin, verifyTeenPin, teenPinReady, pinForRide } = require('.
 const { listPlatformMessages, markPlatformMessageRead } = require('./platforminbox');
 const { page } = require('./shell');
 const { screeningReady, screeningCurrent, sweepScreening } = require('./screening');
+const { screeningPreparationFor } = require('./screening-jurisdictions');
 const { runMarketReferenceSweep, firestoreReady: marketReferenceReady } = require('./market-reference-service');
 const { configuredCollectors: marketReferenceCollectors } = require('./market-evidence-collectors');
 
@@ -2206,10 +2207,10 @@ async function operatorMarketOptions() {
 }
 
 /** Express middleware: the signed-in operator's declared operating market must be ACTIVE. */
-// A screening report-transfer request is preparatory, not permission to take
-// paid Travel. Allow it for a selected *configured Florida* service region even
-// while the county is waitlisted. Full document, qualification, payments and
-// dispatch remain bound to the separate market/admission gates.
+// A screening report-transfer request is preparation, not permission for paid Travel.
+// The national policy registry (not an 'FL' literal or a client-provided state)
+// decides which region can prepare. Full qualification, payments, duty and dispatch
+// remain bound to independent market/admission checks.
 async function requireScreeningRequestMarket(req, res, next) {
   const db = adminDb();
   if (!db) return res.status(503).json({ code: 'no_admin_db', error: 'Operator records unavailable.' });
@@ -2217,11 +2218,10 @@ async function requireScreeningRequestMarket(req, res, next) {
     const snap = await db.collection('users').doc(String(req.uid)).get();
     const market = operatingMarketOf(snap.exists ? snap.data() : null);
     const region = market?.regionId ? REGIONS.find(r => r.id === market.regionId) : null;
-    if (!market || !region || region.jurisdiction?.stateCode !== 'FL') {
-      return res.status(409).json({ code: 'screening_market_required',
-        error: 'Select a supported Florida operating county before requesting screening. No screening purchase is required during prelaunch.' });
-    }
+    const gate = screeningPreparationFor(market, region);
+    if (!gate.ok) return res.status(409).json({ code: gate.code, error: gate.error });
     req.screeningMarket = market;
+    req.screeningPolicy = gate.policy;
     next();
   } catch {
     res.status(503).json({ code: 'screening_market_unavailable',
@@ -3137,6 +3137,9 @@ app.post('/operator/screening/existing', requireAuth, LIMITS.screening, requireS
   // The same provider-neutral transfer request may initiate a NEW check or ask
   // for a previously completed report. Neither declaration conveys clearance.
   const mode = req.body?.mode === 'new' ? 'new' : 'existing';
+  const policy = req.screeningPolicy;
+  if (!policy) return res.status(409).json({ code: 'screening_jurisdiction_not_configured',
+    error: 'An authoritative screening policy is required.' });
   if (!agency || !consent) {
     return res.status(400).json({ error: 'The screening company and your written instruction are required.' });
   }
@@ -3146,11 +3149,11 @@ app.post('/operator/screening/existing', requireAuth, LIMITS.screening, requireS
   if (agency.length < 3 || !/^[A-Za-z0-9][A-Za-z0-9 .&'-]{2,119}$/.test(agency))
     return res.status(400).json({ error: 'Enter the name of the screening agency, not a report or URL.' });
   if (mode === 'existing' && (!Number.isFinite(issuedAt) || issuedAt <= 0 ||
-       issuedAt > Date.now() || issuedAt < Date.now() - 3 * 365 * 86400000))
+       issuedAt > Date.now() || issuedAt < Date.now() - policy.existingReportMaxAgeMs))
     return res.status(400).json({ error: 'Enter a report date within three years; older checks require a new request.' });
   if (mode === 'new' && issuedAt !== 0)
     return res.status(400).json({ error: 'A new report cannot have a prior completion date.' });
-  const selectedElements = elements.filter(x => ['nationwide_criminal','sex_offender','driving_history'].includes(x));
+  const selectedElements = elements.filter(x => policy.requiredElements.includes(x));
   if (selectedElements.length !== elements.length)
     return res.status(400).json({ error: 'Unrecognized screening component.' });
 
@@ -3161,6 +3164,9 @@ app.post('/operator/screening/existing', requireAuth, LIMITS.screening, requireS
     // The same pending request is idempotent while the case remains open.
     if (prior.decision === 'awaiting_agency' &&
         prior.requestMode === mode && String(prior.provider || '').toLowerCase() === agency.toLowerCase() &&
+        (prior.jurisdictionCode === policy.stateCode ||
+          (prior.jurisdictionCode == null && policy.stateCode === 'FL')) &&
+        (!prior.policyId || prior.policyId === policy.id) &&
         prior.transferCaseNo && prior.consentAt) {
       const oldCase = await db.collection('support_tickets').doc(String(prior.transferCaseNo)).get();
       if (oldCase.exists && oldCase.data().uid === req.uid && oldCase.data().status === 'open') {
@@ -3175,6 +3181,7 @@ app.post('/operator/screening/existing', requireAuth, LIMITS.screening, requireS
       reason: mode === 'new' ? 'Operator screening — review new provider report' : 'Operator screening — review existing provider report',
       description:
         'The Operator instructed ' + agency + (mode === 'new' ? ' to send the report when completed.' : ' to release the existing screening report for American Rider review.') + ' ' +
+        'Jurisdiction: ' + policy.stateCode + '; policy: ' + policy.id + '; market: ' + req.screeningMarket.id + '. ' +
         'Declared issue date: ' + (issuedAt ? new Date(issuedAt).toISOString().slice(0, 10) : 'not provided') + '. ' +
         'Declared components: ' + (selectedElements.join(', ') || 'not provided') + '. ' +
         'Do not qualify from an Operator declaration or consumer-provided PDF. Staff must establish the receiving channel, authenticated source and permitted report use before clearance.',
@@ -3186,6 +3193,8 @@ app.post('/operator/screening/existing', requireAuth, LIMITS.screening, requireS
     batch.set(ref, {
       screening: {
         decision: 'awaiting_agency', provider: agency, transferTo: null,
+        jurisdictionCode: policy.stateCode, policyId: policy.id,
+        screeningMarketId: req.screeningMarket.id,
         transferCaseNo: filed.caseNo, declaredIssuedAt: issuedAt || null,
         declaredElements: selectedElements, consentAt: Date.now(),
         // Superseded screening evidence must never survive as present authority.

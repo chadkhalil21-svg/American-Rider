@@ -5,6 +5,7 @@
 const { pricingProblems } = require('./market-pricing');
 const insurance = require('./insurance-jurisdictions');
 const US = require('./jurisdictions/us.json');
+const { policyForState: screeningPolicyForState } = require('./screening-jurisdictions');
 const tollAuthorities = require('./toll-authorities');
 const marketEvidence = require('./market-evidence');
 
@@ -13,7 +14,11 @@ function regionAdmissionProblems(region) {
   const p = [...pricingProblems(region), ...marketEvidence.planProblems(region.id)];
   const j = region.jurisdiction;
   if (!j?.stateCode || !j?.tncStatute || !j?.disclosureStatute) p.push(`${region.id}: jurisdiction incomplete`);
+  if (region.state !== j?.stateCode) p.push(`${region.id}: region and jurisdiction state mismatch`);
   if (!Number.isInteger(j?.screeningYears) || j.screeningYears <= 0) p.push(`${region.id}: screening cadence missing`);
+  const screening = screeningPolicyForState(j?.stateCode);
+  if (!screening || screening.screeningYears !== j?.screeningYears)
+    p.push(`${region.id}: authoritative screening jurisdiction is not configured`);
   if (!US.jurisdictions.some((x) => x.code === j?.stateCode)) p.push(`${region.id}: jurisdiction is not in the U.S. registry`);
   if (!insurance.forState(j?.stateCode)) p.push(`${region.id}: Operator insurance requirements not configured`);
   if (region.geographyEvidence?.status !== 'verified') p.push(`${region.id}: authoritative geography not verified`);

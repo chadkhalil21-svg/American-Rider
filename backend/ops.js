@@ -595,7 +595,7 @@ function mount(app, express, deps = {}) {
       const cards = candidates.map(u => {
         const r = u.screening;
         const a = r.adverseAction || {};
-        const adverseForm = (stage, action, title, contents = '') =>
+        const adverseForm = (action, title, contents = '') =>
           `<form method="post" action="/ops/operators/screening-adverse" style="border-top:1px solid #CDD1D6;margin-top:16px;padding-top:10px">
             <input type="hidden" name="uid" value="${esc(u.id)}">
             <input type="hidden" name="caseNo" value="${esc(r.transferCaseNo)}">
@@ -605,7 +605,7 @@ function mount(app, express, deps = {}) {
             ${field('note','Staff verification note (no protected record details)')}
             <button type="submit">${title}</button>
           </form>`;
-        const proposal = adverseForm(a.stage, 'propose', 'Begin pre-adverse review', `
+        const proposal = adverseForm('propose', 'Begin pre-adverse review', `
           <p>Only after independent review of an authenticated CRA report. No denial or report transmission is performed by this form.</p>
           ${field('reference','Provider report reference (not a government ID)')}
           ${field('reportIssuedOn','Verified CRA report date (YYYY-MM-DD)')}
@@ -622,20 +622,20 @@ function mount(app, express, deps = {}) {
           ${box('permittedPurpose','Lawful American Rider report access verified')}
           ${box('disqualifierConfirmed','Actual source findings independently checked against statute')}
         `);
-        const preNotice = adverseForm(a.stage,'record_pre_notice','Record pre-adverse delivery',`
+        const preNotice = adverseForm('record_pre_notice','Record pre-adverse delivery',`
           <p>Do not press until a report copy, rights summary and pre-adverse notice have actually reached the Operator by an approved channel. This app does not send them.</p>
           ${field('reference','Verifiable secure-delivery evidence reference')}
           ${box('reportCopyProvided','Operator received a copy of the actual agency report')}
           ${box('rightsSummaryProvided','Operator received the FCRA rights summary')}
           ${box('deliveryConfirmed','Pre-adverse notice was actually sent and delivery evidence checked')}
         `);
-        const dispute = adverseForm(a.stage,'dispute','Record Operator dispute',`
+        const dispute = adverseForm('dispute','Record Operator dispute',`
           <p>Record a disputed finding. Final refusal remains prohibited until provider clarification and appropriate updated notices.</p>
         `);
-        const withdraw = adverseForm(a.stage,'withdraw','Withdraw proposed refusal',`
+        const withdraw = adverseForm('withdraw','Withdraw proposed refusal',`
           <p>Return to source review; this does NOT approve the screening.</p>
         `);
-        const final = adverseForm(a.stage,'finalize','Record final decision and delivery',`
+        const final = adverseForm('finalize','Record final decision and delivery',`
           <p>Allowed only after the actual pre-notice, an internal minimum review interval (seven calendar days, NOT a fixed statutory FCRA deadline), no unresolved dispute, and separately delivered final-adverse notice.</p>
           ${field('reference','Verified final-notice delivery reference')}
           ${box('finalNoticeDelivered','Final adverse-action notice was actually sent and verified')}

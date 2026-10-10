@@ -68,6 +68,20 @@ async function recordExternalReview({ db, input, actor, now = Date.now() }) {
       return { ok: false, status: 409, error: 'An active written Operator release instruction is required.' };
     if (clean(prior.provider).toLowerCase() !== provider.toLowerCase())
       return { ok: false, status: 409, error: 'The reporting company differs from the Operator authorization.' };
+    // Reviewer checkboxes alone must NEVER clear an Operator. An independently
+    // logged agency contact, secure report receipt and matching evidence reference
+    // are required in this same durable support case before recording CLEAR.
+    if (action === 'clear') {
+      const handoff = ticket.screeningHandoff || {};
+      const report = handoff.authenticatedReport || {};
+      if (handoff.stage !== 'report_authenticated' || handoff.owner !== actor.name ||
+          !report.verifiedAt || report.by !== actor.name ||
+          report.reference !== providerReference || report.channel !== channel ||
+          clean(report.agency).toLowerCase() !== provider.toLowerCase()) {
+        return { ok: false, status: 409,
+          error: 'Claim the case, verify direct agency contact and log authenticated report receipt before clearance.' };
+      }
+    }
     const result = action === 'clear' ? 'pass' : 'review';
     const recorded = {
       decision: result,

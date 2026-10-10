@@ -564,7 +564,7 @@ export default {
     bgExternalProvider: 'Verificación externa segura',
     bgProviderBody: 'Complete las búsquedas requeridas de antecedentes penales, registro de delincuentes sexuales e historial de conducción mediante el proceso seguro del proveedor. La información sensible permanece con el proveedor.',
     bgContinueProvider: 'Continuar con el proveedor',
-    bgProviderPending: 'American Rider no exige una empresa concreta. Elija un proveedor que cumpla los requisitos de Florida y confirme la entrega segura antes de pagar.',
+    bgProviderPending: 'American Rider no exige una empresa concreta. Elija un proveedor que cumpla los requisitos para operar y confirme la entrega segura antes de pagar.',
     bgNeedNew: '¿Necesita una nueva verificación?',
     bgNeedNewBody: 'Elija una empresa de verificación que reúna los requisitos. Pídale que realice las búsquedas exigidas y entregue el resultado autenticado a American Rider. Confirme el alcance y el costo antes de pagar.',
     bgNewNotice: 'Esta solicitud no autoriza viajes. El proveedor debe completar sus avisos y consentimientos, y acordar la entrega verificada. No cargue ni envíe informes por correo electrónico.',

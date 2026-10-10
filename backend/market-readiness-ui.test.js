@@ -38,7 +38,7 @@ assert.match(grouped, /Commission markets here, not in Operator screening/);
 assert.match(grouped, /two separate controls/i);
 assert.equal((grouped.match(/Screening Provider/g)||[]).length, 1,
   'one platform dependency must not be repeated per county');
-assert.equal((grouped.match(/Company Insurance Bound/g)||[]).length, 3,
+assert.equal((grouped.match(/<li><strong>Company Insurance Bound<\/strong>/g)||[]).length, 3,
   'legally scoped county proof remains required per county');
 assert.match(grouped, /may be referenced only where their actual coverage and validity apply/);
 assert.equal((grouped.match(/class="activate"[^>]*disabled/g)||[]).length, 3,

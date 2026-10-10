@@ -1,3 +1,7 @@
+> **Historical handoff, not live operating status (2026-10-10).** Start with [PROJECT-LEDGER.md](PROJECT-LEDGER.md) and the current `release/current` GitHub/Render/market-admission evidence. This file retains older checkpoints for audit; its old branch/SHA, Checkr, pricing, and TestFlight instructions are **not** the authority for today's build or launch. More recent checked implementation and ADRs in the ledger supersede conflicting historical prose.
+
+---
+
 # CURRENT HANDOFF — American Rider
 
 Written Tuesday 15 September 2026, 13:15 EDT, replacing the 13 September handoff; §0 rewritten

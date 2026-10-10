@@ -1,3 +1,9 @@
+# Read-first instruction for all American Rider agents — updated 2026-10-10
+
+**First read [PROJECT-LEDGER.md](PROJECT-LEDGER.md), then inspect the relevant source and live release evidence.** The ledger is the canonical index of settled founder decisions, verified modules, open commissioning requirements and current release posture. The legacy design notes below are useful background but do not supersede newer verified ledger decisions. Do not resurrect superseded Checkr-only onboarding, per-county manual administration, million-email insurance plans or unsupported commercial activation. Every material architecture/launch decision change updates the ledger and a superseding ADR in the same PR. Never mistake code, CI, or an expansion plan for legal approval or a live market. The founder has already authorized tri-county launch **once external/operational evidence passes**.
+
+---
+
 Always use ASD – STE 100 Simplified Technical English when you talk to me.
 
 # Expo HAS CHANGED

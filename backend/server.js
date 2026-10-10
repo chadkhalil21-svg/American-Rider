@@ -127,6 +127,7 @@ const { notify } = require('./push');
 const { handleEvent, webhookReady } = require('./webhook');
 const { enqueueProviderEvent, processProviderEvent, sweepProviderEvents, replayDeadEvent } = require('./providerqueue');
 const { acquireLease, renewLease, releaseLease, DEFAULT_LEASE_MS } = require('./schedulerlease');
+const { singleFlight } = require('./sweep-singleflight');
 const { sweepOperatorAccountFees } = require('./operatorfees');
 const crypto = require('node:crypto');
 const WORKER_ID = crypto.randomUUID();
@@ -1921,7 +1922,7 @@ async function runAllSweeps() {
   };
 }
 
-async function runLeasedSweeps() {
+async function runLeasedSweepsOnce() {
   const name = 'operations_sweep';
   const lease = await acquireLease(name, { owner: WORKER_ID, ttlMs: DEFAULT_LEASE_MS });
   if (!lease.ok) return { ok: false, reason: lease.reason || 'scheduler lease unavailable' };
@@ -1942,6 +1943,10 @@ async function runLeasedSweeps() {
     await releaseLease(name, { owner: WORKER_ID }).catch(() => {});
   }
 }
+
+// All timer and authenticated requests share one in-process execution slot. The
+// Firestore lease remains the cross-instance authority.
+const runLeasedSweeps = singleFlight(runLeasedSweepsOnce);
 
 async function runSweep(req, res) {
   // Operational sweeps can dispatch reserved travel, re-offer assignments, block expired

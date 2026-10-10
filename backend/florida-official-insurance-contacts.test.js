@@ -42,6 +42,13 @@ assert.equal(parseOfficialBusinessCsv(officialCsv,{minimumContacts:2}).matchedCo
 const parsed=parseOfficialBusinessCsv(data,{minimumContacts:2});
 assert.equal(parsed.matchedCount,2,'only active qualifying agency/general-lines contacts');
 assert.equal(parsed.validRows,2);
+const withMalformed=data+'BAD,ROW'+String.fromCharCode(10);
+const parsedWithBad=parseOfficialBusinessCsv(withMalformed,{minimumContacts:2});
+assert.equal(parsedWithBad.matchedCount,2);
+assert.equal(parsedWithBad.malformedRows,1);
+assert.throws(()=>parseOfficialBusinessCsv(data+
+  Array.from({length:150},()=> 'BAD,ROW').join(String.fromCharCode(10)),
+  {minimumContacts:2}),/official_registry_corrupt_ratio/);
 assert.throws(()=>parseOfficialBusinessCsv(data,{minimumContacts:500}),/insufficient/);
 assert.throws(()=>parseOfficialBusinessCsv(data.replace('Email Address','Never An Email')),
   /schema_unrecognized/);

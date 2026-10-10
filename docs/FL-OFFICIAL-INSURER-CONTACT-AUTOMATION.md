@@ -15,6 +15,9 @@ Insurance checks must be **automatic and source-bound** wherever feasible, witho
 - Security regression tests cover untrusted mailbox, incorrect role, stale/replaced source, CSV quote handling, caching, and new-policy mismatch.
 - CI includes a **nonblocking real-data smoke check**. An unsuccessful source check means official auto-recognition is **not commissioned**, even though fallback gates and previous named contacts remain safe.
 
+## National-volume monitoring fairness
+The previous scheduler always selected the oldest 250 due users. With over 250 stale or unresolved records, newer active Operators could be postponed indefinitely. The scheduler now persists a due-date/user-ID cursor in the existing Firestore database, walks the ordered due set in 250-record pages, and wraps at the end. This prevents starvation while keeping bounded memory and no paid queue. It does **not** establish throughput for millions of Operators: live stress, email budget, carrier participation, and protected indexes still require commissioning.
+
 ## Important source limits
 - [Florida DFS Bulk Downloads](https://licenseesearch.fldfs.com/BulkDownload) lists the Business licence CSV. Actual source: `https://www.myfloridacfo.com/downloads/AAS/LicenseeSearch/AllValidLicensesBusiness.csv`. This file is public but its live schema and endpoint availability must pass smoke verification before claiming real use.
 - [Florida OIR Company Search](https://companysearch.floir.gov/index.aspx) identifies insurer companies and NAIC codes, but is not proof of a producer's access to an individual policy.

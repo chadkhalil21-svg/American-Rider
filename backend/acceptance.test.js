@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const { acceptOffer } = require('./eligibility');
 const { assessOperator } = require('./qualification');
-const { initialMonitoringFromDocument } = require('./insurance-monitoring');
+const { initialMonitoringFromDocument, applyIndependentConfirmation } = require('./insurance-monitoring');
 const { DISCLOSURE_VERSION } = require('./disclosure');
 
 const R = [];
@@ -63,7 +63,8 @@ const goodUser = () => {
     operatingMarket: { id: 'fl-miami-dade' },
     insuranceDisclosure: { version: DISCLOSURE_VERSION, at: NOW - 1000 },
     documents: { license: doc(), registration: doc({ plate: 'KTR4821' }), insurance },
-    insuranceMonitoring: initialMonitoringFromDocument(insurance, NOW),
+    insuranceMonitoring: applyIndependentConfirmation(initialMonitoringFromDocument(insurance, NOW),
+      { status: 'verified_active', source: 'independently_verified_broker', now: NOW }),
     screening: { decision: 'pass', recheckDue: NOW + 1e10 },
   };
 };

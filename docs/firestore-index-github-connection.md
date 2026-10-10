@@ -5,6 +5,28 @@ Google Cloud credentials through Workload Identity Federation (WIF); it never
 writes service-account JSON keys to source code or ChatGPT, never reads
 customer documents, and has **no delete operation**.
 
+## Composite versus automatic indexes
+
+The production index manifest has **12 required composite definitions**.
+The previous 14-entry manifest also included `rides.status ASC` and
+`operators.available ASC`, each followed only by the default `__name__ ASC`.
+Those are **single-field** queries covered by Firestore automatic indexing;
+Firestore's composite-index create API rejects them with HTTP 400 ("this index
+is not necessary, configure using single field index controls"). The two
+unnecessary composite definitions were removed from the manifest without
+changing or deleting any live indexes. If the project ever disables automatic
+single-field indexing for these fields, address that separately via Firestore
+single-field configuration and a documented query test—not by POSTing a
+composite definition. The commissioner now pre-validates the manifest to
+prevent this incident recurring.
+
+The first live `create_missing` run accepted creation of the composite
+`support_tickets(status ASC, kind ASC, createdAt ASC)` before encountering the
+single-field error. Subsequent runs detect any index already present (including
+indexes still building), skip its creation, and create only genuinely absent
+composite definitions. Always audit again until the **12 composite indexes**
+report READY; separately validate single-field query behavior in the app.
+
 ## One-time connection, authorized by the Google Cloud project owner
 
 Project: `american-rider-35688`, Firestore database: `(default)`.

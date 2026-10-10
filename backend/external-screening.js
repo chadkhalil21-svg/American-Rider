@@ -68,7 +68,7 @@ async function recordExternalReview({ db, input, actor, now = Date.now() }) {
       return { ok: false, status: 409, error: 'An active written Operator release instruction is required.' };
     if (clean(prior.provider).toLowerCase() !== provider.toLowerCase())
       return { ok: false, status: 409, error: 'The reporting company differs from the Operator authorization.' };
-    if (action === 'clear') {
+    if (action === 'clear' || action === 'hold') {
       const handoff = ticket.screeningHandoff || {};
       const report = handoff.authenticatedReport || {};
       if (handoff.stage !== 'report_authenticated' || handoff.owner !== actor.name ||

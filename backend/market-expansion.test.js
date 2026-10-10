@@ -45,10 +45,17 @@ const db={
  assert.equal((await proposeMarket({db,actor:'founder',input:{stateCode:'XX'}})).ok,false);
  assert.equal((await proposeMarket({db,actor:'founder',input:{stateCode:'FL',marketId:another.id},now:12345})).ok,true);
  assert.equal((await proposeMarket({db,actor:'founder',input:{stateCode:'FL',marketId:another.id,city:'Tampa'},now:12346})).ok,true);
- assert.equal(records.size,1,'a re-proposed county is the same stable planning record');
+ assert.equal(records.size,2,'city and county plans are distinct; no overwritten intentions');
  assert.equal(records.get(PLAN_COLLECTION+'/'+another.id).status,'proposed');
+ const cityPlans=[...records.values()].filter(v=>v.city==='Tampa');
+ assert.equal(cityPlans.length,1);
+ assert.notEqual(cityPlans[0].id,another.id);
+ assert.equal(cityPlans[0].commercialAuthority,false);
+ assert.equal((await proposeMarket({db,actor:'founder',input:{stateCode:'FL',
+   marketId:another.id,city:'tampa'},now:12347})).ok,true);
+ assert.equal(records.size,2,'same city does not create duplicates');
  assert.equal(records.has('market_admission/'+another.id),false,'planning never touches commercial admission');
- assert.equal(audits.length,2);
- assert.equal((await listPlans(db)).plans.length,1);
+ assert.equal(audits.length,3);
+ assert.equal((await listPlans(db)).plans.length,2);
  console.log('PASS national market planning: 56 jurisdictions, all imported counties, one proposal per region, no travel authority');
 })().catch(e=>{console.error(e);process.exitCode=1;});

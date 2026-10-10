@@ -47,7 +47,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "test:backend": "for f in backend/*.test.js; do echo \"--- $f\"; node \"$f\" || exit 1; done",
+    "test:backend": "for f in backend/*.test.js; do echo \"--- $f\"; node \"$f\" || exit 1; done && node scripts/firestore-index-commission.test.cjs",
     "typecheck": "tsc --noEmit",
     "i18n": "node scripts/check-i18n.mjs && node scripts/check-untranslated.mjs && node scripts/check-unused-i18n.mjs",
     "check": "npm run typecheck && npm run i18n && npm run backend:lint && npm run test:backend",

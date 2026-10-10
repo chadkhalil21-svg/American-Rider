@@ -140,6 +140,81 @@ async function activateMarket({ db, market, region, actor, expectedVersion, prov
   });
 }
 
+
+/**
+ * One-command admission for an already configured service region.
+ * All market proofs are re-read in a single transaction and every market must pass.
+ * This never manufactures evidence, treats a proposal as a licence, or authorizes an
+ * unconfigured state. A single failure means ZERO new county activations.
+ */
+async function activateRegion({ db, entries, actor, expectedVersions, providerMissing = [], now = Date.now() }) {
+  if (!db || !actor || !Array.isArray(entries) || !entries.length || entries.length > 100 ||
+      !expectedVersions || typeof expectedVersions !== 'object' || Array.isArray(expectedVersions))
+    return { ok: false, code: 'invalid_region_request' };
+  const ids = new Set(), prepared = [];
+  let regionId = null;
+  for (const entry of entries) {
+    const { market, region } = entry || {};
+    const manifest = manifestFor(market, region);
+    if (!manifest || !market?.id || ids.has(market.id) || !region?.id ||
+        (regionId && regionId !== region.id))
+      return { ok: false, code: 'invalid_region_markets' };
+    ids.add(market.id);
+    regionId = region.id;
+    if (expectedVersions[market.id] !== manifest.version)
+      return { ok: false, code: 'stale_manifest', marketId: market.id };
+    prepared.push({ market, region, manifest, ref: db.collection(COLLECTION).doc(market.id) });
+  }
+  return db.runTransaction(async (tx) => {
+    // Firestore requires all transaction reads to precede writes.
+    const snapshots = await Promise.all(prepared.map((p) => tx.get(p.ref)));
+    const checked = prepared.map((p, i) => ({
+      marketId: p.market.id,
+      state: readinessFor({
+        market: p.market, region: p.region,
+        record: snapshots[i].exists ? snapshots[i].data() : {},
+        providerMissing, now,
+      }),
+    }));
+    const blocked = checked.filter((c) => !c.state.readyToActivate);
+    if (blocked.length) {
+      // Report each unique issue once and identify the affected counties.
+      const grouped = new Map();
+      for (const b of blocked) for (const missing of b.state.missing) {
+        const key = missing.id + ':' + missing.reason;
+        if (!grouped.has(key)) grouped.set(key, { id: missing.id, reason: missing.reason, markets: [] });
+        grouped.get(key).markets.push(b.marketId);
+      }
+      return {
+        ok: false, code: 'region_not_ready', regionId,
+        ready: checked.length - blocked.length, total: checked.length,
+        blockedMarkets: blocked.map((b) => b.marketId),
+        missing: [...grouped.values()],
+      };
+    }
+    const newlyOpened = [];
+    for (let i = 0; i < prepared.length; i++) {
+      const { market, manifest, ref } = prepared[i];
+      const prior = snapshots[i].exists ? snapshots[i].data() : {};
+      if (prior.status === 'active' && prior.manifestVersion === manifest.version) continue;
+      tx.set(ref, {
+        status: 'active', manifestVersion: manifest.version,
+        activatedAt: now, activatedBy: actor, updatedAt: now,
+      }, { merge: true });
+      tx.create(db.collection('audit_log').doc(), {
+        at: now, action: 'market_activated', marketId: market.id,
+        regionId, manifestVersion: manifest.version,
+        actor: { name: actor, method: 'named_ops_mfa' },
+      });
+      newlyOpened.push(market.id);
+    }
+    return {
+      ok: true, code: newlyOpened.length ? 'region_activated' : 'already_active',
+      regionId, status: 'active', marketIds: [...ids], newlyOpened,
+    };
+  });
+}
+
 async function authorizeOnboarding({ db, market, region, actor, expectedVersion, providerMissing = [], now = Date.now() }) {
   if (!db || !market || !actor || !expectedVersion) return { ok: false, code: 'invalid_request' };
   const manifest = manifestFor(market, region);
@@ -177,4 +252,4 @@ async function pauseMarket({ db, market, actor, reason, now = Date.now() }) {
 
 module.exports = { SCHEMA_VERSION, REQUIRED_EVIDENCE, ONBOARDING_EVIDENCE,
   manifestFor, requirementsFor, readinessFor, inspectMarket, recordEvidence,
-  activateMarket, authorizeOnboarding, pauseMarket };
+  activateMarket, activateRegion, authorizeOnboarding, pauseMarket };

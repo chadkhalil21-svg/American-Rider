@@ -560,7 +560,7 @@ export default {
     bgInProgress: 'Verificación en curso',
     bgStatusPending: 'Actualizaremos este estado cuando recibamos el informe del proveedor.',
     bgCompleteSection: 'COMPLETAR VERIFICACIÓN',
-    bgApprovedProvider: 'Proveedor de verificación aprobado',
+    bgApprovedProvider: 'Opciones de verificación',
     bgExternalProvider: 'Verificación externa segura',
     bgProviderBody: 'Complete las búsquedas requeridas de antecedentes penales, registro de delincuentes sexuales e historial de conducción mediante el proceso seguro del proveedor. La información sensible permanece con el proveedor.',
     bgContinueProvider: 'Continuar con el proveedor',

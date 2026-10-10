@@ -550,7 +550,7 @@ export default {
     bgInProgress: 'Vérification en cours',
     bgStatusPending: 'Nous mettrons ce statut à jour dès réception du rapport du prestataire.',
     bgCompleteSection: 'EFFECTUER LA VÉRIFICATION',
-    bgApprovedProvider: 'Prestataire de vérification approuvé',
+    bgApprovedProvider: 'Options de vérification',
     bgExternalProvider: 'Vérification externe sécurisée',
     bgProviderBody: 'Effectuez les recherches requises sur les antécédents judiciaires, le registre des délinquants sexuels et l’historique de conduite au moyen du processus sécurisé du prestataire. Les données sensibles restent chez le prestataire.',
     bgContinueProvider: 'Continuer avec le prestataire',

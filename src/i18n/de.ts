@@ -544,7 +544,7 @@ export default {
     bgInProgress: 'Überprüfung läuft',
     bgStatusPending: 'Wir aktualisieren diesen Status, sobald der Bericht des Anbieters eingegangen ist.',
     bgCompleteSection: 'ÜBERPRÜFUNG ABSCHLIESSEN',
-    bgApprovedProvider: 'Zugelassener Prüfanbieter',
+    bgApprovedProvider: 'Prüfmöglichkeiten',
     bgExternalProvider: 'Sichere externe Überprüfung',
     bgProviderBody: 'Führen Sie die erforderlichen Strafregister-, Sexualstraftäter- und Fahrverlaufsprüfungen über den sicheren Prozess des Anbieters durch. Sensible Prüfdaten verbleiben beim Anbieter.',
     bgContinueProvider: 'Beim Anbieter fortfahren',

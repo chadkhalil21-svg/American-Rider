@@ -14,6 +14,7 @@ function regionAdmissionProblems(region) {
   const p = [...pricingProblems(region), ...marketEvidence.planProblems(region.id)];
   const j = region.jurisdiction;
   if (!j?.stateCode || !j?.tncStatute || !j?.disclosureStatute) p.push(`${region.id}: jurisdiction incomplete`);
+  if (region.state !== j?.stateCode) p.push(`${region.id}: region and jurisdiction state mismatch`);
   if (!Number.isInteger(j?.screeningYears) || j.screeningYears <= 0) p.push(`${region.id}: screening cadence missing`);
   const screening = screeningPolicyForState(j?.stateCode);
   if (!screening || screening.screeningYears !== j?.screeningYears)

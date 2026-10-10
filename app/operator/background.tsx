@@ -118,6 +118,7 @@ export default function OperatorBackground() {
                 <Text style={styles.statusTitle}>
                   {record.decision === 'awaiting_agency' ? t('traveler.bgReportRequested') :
                    record.decision === 'review' ? t('traveler.bgInReview') :
+                   record.decision === 'pre_adverse' ? t('traveler.bgPreAdverse') :
                    record.decision === 'refuse' ? t('traveler.bgReviewComplete') :
                    record.decision === 'expired' || needsRenewal ? t('traveler.bgRenewalRequired') : t('traveler.bgInProgress')}
                 </Text>

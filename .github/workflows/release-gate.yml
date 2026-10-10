@@ -24,9 +24,6 @@ jobs:
       - name: Audit production backend dependencies
         run: npm audit --omit=dev --prefix backend
       - run: npm run check
-      - name: Probe live Florida insurer/agency registry (advisory only)
-        continue-on-error: true
-        run: node backend/florida-official-insurance-smoke.js
       - name: Export Expo web bundle
         run: npx expo export --platform web --output-dir dist-ci-web
       - name: Export Expo iOS bundle

@@ -551,6 +551,8 @@ export default {
     bgNeedNew: 'Serve una nuova verifica?',
     bgNeedNewBody: 'Scelga un fornitore qualificato. Richieda le verifiche necessarie e la trasmissione autenticata dei risultati ad American Rider. Confermi idoneità e costo prima di pagare.',
     bgNewNotice: 'Questa richiesta non autorizza i viaggi. Il fornitore deve raccogliere i consensi richiesti e concordare una trasmissione verificata. Non invii rapporti o documenti via e-mail.',
+    bgAuthorizeTransfer: 'Autorizzo il fornitore indicato a trasmettere direttamente ad American Rider il rapporto valido ai fini della mia idoneità come Operatore. Il fornitore potrebbe richiedere ulteriori informative e autorizzazioni.',
+    bgConsentRequired: 'Autorizzi la trasmissione del rapporto per continuare.',
     bgAlreadyScreened: 'Verifica già effettuata?',
     bgAlreadyBody: 'Un rapporto recente può soddisfare in tutto o in parte questo requisito. Lo esamineremo prima di chiederle di ripetere qualsiasi verifica.',
     bgRequestRecorded: 'Richiesta registrata',

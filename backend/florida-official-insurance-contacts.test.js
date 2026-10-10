@@ -21,6 +21,21 @@ assert.deepEqual([...csvRows('Name,Note\r\n"Name A","Line 1\nLine 2"\r\n')][1],
 assert.throws(()=>[...csvRows('x,y\n"unterminated,z')],/unclosed_csv_quote/);
 assert.throws(()=>parseOfficialBusinessCsv('not,csv', {minimumContacts:1}),
   /header|schema/);
+// Official Florida DFS schema was verified by live GitHub Actions 2026-10-10.
+const officialHeader=['License Number','Full Name','NPN Number','Residency Type',
+  'License TYCL','License TYCL Desc','License Status','License Issue Date',
+  'Email Address','Business Phone','Business Address1','Business Address2',
+  'Business City','Business State','Business Zip','Business County',
+  'Mailing Address','Mailing Address2','Mailing City','Mailing State','Mailing Zip'];
+const official=(record)=> officialHeader.map(h=>record[h]||'').join(',')+'\\n';
+const officialCsv=officialHeader.join(',')+'\\n'+
+  official({'License Number':'A123','Full Name':'Official Agency',
+    'License TYCL Desc':'AGENCY LICENSE','License Status':'VALID',
+    'Email Address':'official@example.com'})+
+  official({'License Number':'A124','Full Name':'Second Agency',
+    'License TYCL Desc':'GENERAL LINES','License Status':'VALID',
+    'Email Address':'second@example.com'});
+assert.equal(parseOfficialBusinessCsv(officialCsv,{minimumContacts:2}).matchedCount,2);
 const parsed=parseOfficialBusinessCsv(data,{minimumContacts:2});
 assert.equal(parsed.matchedCount,2,'only active qualifying agency/general-lines contacts');
 assert.equal(parsed.validRows,2);

@@ -48,6 +48,26 @@ function marketChecklistPage(items, { production = false, expansion = null } = {
   // The same problem should be visible once, without weakening each county gate.
   const sharedDependencies = [...new Set(items.flatMap(({ state }) =>
     (state.missing || []).filter(m => m.id?.startsWith('provider:')).map(m => m.id.slice(9))))].sort();
+  // All South Florida counties are controlled together, rather than three founder
+  // actions. An incomplete market is shown as an exception; only the backend can
+  // approve and commit activation after a fresh transactional recheck.
+  const southFlorida = items.filter(({ market }) =>
+    market.regionId === 'fl-southeast' ||
+    ['fl-miami-dade', 'fl-broward', 'fl-palm-beach'].includes(market.id));
+  const southVersions = Object.fromEntries(southFlorida.map(({market,state}) =>
+    [market.id, state.manifestVersion || '']));
+  const southVersionsJson = JSON.stringify(southVersions).replace(/</g, '\\u003c');
+  const southActive = southFlorida.length > 0 && southFlorida.every(({ state }) => state.status === 'active');
+  const southReady = southFlorida.length > 0 && southFlorida.every(({ state }) => state.readyToActivate);
+  const southStatus = southActive ? 'Open' : southReady ? 'Ready to open' :
+    'Not yet cleared for paid Travel';
+  const quickAction = `<section id="south-florida-launch" aria-label="South Florida launch">
+    <h2>South Florida</h2>
+    <p>Miami-Dade · Broward · Palm Beach</p>
+    <p><strong>Status: ${esc(southStatus)}</strong> · ${southFlorida.filter(({ state }) => state.status === 'active').length} of ${southFlorida.length} counties open</p>
+    <button type="button" id="open-south-florida" ${!production || !southFlorida.length || southActive ? 'disabled' : ''}>Open South Florida</button>
+    <p id="south-florida-result" role="status" aria-live="polite">One action. The server rechecks all counties and either opens them together or tells you exactly what remains. No partial launch.</p>
+  </section>`;
   const cards = items.map(({ market, state }) => {
     const localMissing = (state.missing || []).filter(m => !m.id?.startsWith('provider:'));
     const id = esc(market.id);
@@ -87,6 +107,12 @@ function marketChecklistPage(items, { production = false, expansion = null } = {
   }).join('');
   return page('Market readiness · Operations', `<style>
 section[data-market] { margin-top:18px; }
+#south-florida-launch { margin:16px 0; padding:16px; border:1px solid var(--hairline); border-radius:12px; }
+#south-florida-launch button { min-height:48px; width:100%; border-radius:10px; font:600 16px Arial,sans-serif; background:var(--blue); color:#fff; border:0; cursor:pointer; }
+#south-florida-launch button:disabled { background:#F1F1EF; color:#555; cursor:not-allowed; }
+#south-florida-launch button:focus-visible { outline:3px solid var(--blue); outline-offset:3px; }
+#south-florida-result { white-space:pre-wrap; }
+
 #expansion { margin-top:12px; }
 #expansion form { display:grid; gap:12px; }
 #expansion label { display:block; font-size:14px; font-weight:600; }
@@ -131,8 +157,11 @@ section[data-market] select:focus-visible,section[data-market] summary:focus-vis
 </style>
 <h1>Markets</h1>
 <p class="lede"><a href="/ops">← Operations</a> · Commission markets here, not in Operator screening.</p>
+${quickAction}
+<details id="other-markets"><summary>Plan another city or state</summary>
 ${planner}
-<h2>South Florida · commissioning</h2>
+</details>
+<h2>South Florida · commissioning details</h2>
 <p>These counties are already configured geographically. The system checks their operational requirements automatically.
 Expand a county's details only when you need to investigate an exception or authorize a market that is genuinely ready.</p>
 <p><strong>Two separate controls:</strong> counties are configured geographically, but paid Travel requires separate commercial approval.
@@ -143,6 +172,40 @@ These are one platform-wide requirement each, not a new expense in every county.
 <p id="result" role="status" aria-live="polite"></p>
 ${cards || '<section><p>No configured service counties.</p></section>'}
 <script>
+const southVersions=${southVersionsJson};
+const southButton=document.getElementById('open-south-florida');
+if (southButton) southButton.addEventListener('click',async()=>{
+  if(southButton.disabled)return;
+  const output=document.getElementById('south-florida-result');
+  southButton.disabled=true;
+  output.textContent='Checking all counties together…';
+  try {
+    const r=await fetch('/ops/markets/regions/fl-southeast/activate',{
+      method:'POST',credentials:'same-origin',
+      headers:{'content-type':'application/json','x-ar-ops-action':'1'},
+      body:JSON.stringify({manifestVersions:southVersions}),
+    });
+    const result=await r.json();
+    if(!r.ok){
+      const issues=Array.isArray(result.missing)?result.missing:[];
+      const details=issues.slice(0,16).map(x=>
+        String(x.id||'requirement').replaceAll('_',' ') +
+        (Array.isArray(x.markets)&&x.markets.length ? ' ('+x.markets.length+' counties)' : '')
+      );
+      output.textContent='South Florida was not opened. '+
+        (details.length?details.join('; '):String(result.code||'Not yet authorized'))+
+        '. See commissioning details below.';
+      southButton.disabled=false;
+      return;
+    }
+    output.textContent=result.code==='already_active'?'All counties are already open.':
+      'South Florida opened. Verifying updated county status…';
+    location.reload();
+  } catch {
+    output.textContent='Activation not confirmed. Check current market status before retrying.';
+    southButton.disabled=false;
+  }
+});
 const expansionForm=document.getElementById('expansion-plan');
 const expansionState=document.getElementById('expansion-state');
 const expansionCounty=document.getElementById('expansion-county');

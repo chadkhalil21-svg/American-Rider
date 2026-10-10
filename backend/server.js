@@ -34,7 +34,7 @@ const { requireAuth, requireFreshAuth, attachAuth, requireVerifiedEmail } = requ
 const { perAccount, countOnly, perIp } = require('./ratelimit');
 const { marketFor, servesPoint, listMarkets, markets: allMarkets } = require('./markets');
 const { forMarket: insuranceForMarket, publicConfig: publicInsuranceConfig } = require('./insurance-jurisdictions');
-const { manifestFor, inspectMarket, recordEvidence, activateMarket, authorizeOnboarding, pauseMarket } = require('./market-readiness');
+const { manifestFor, inspectMarket, recordEvidence, activateMarket, activateRegion, authorizeOnboarding, pauseMarket } = require('./market-readiness');
 const { setAdmittedFleetOnline, setFleetOnlineIfOpen, deactivateMarketFleet, sweepPausedMarketFleet } = require('./market-fleet');
 const { marketChecklistPage } = require('./market-readiness-ui');
 const { catalog: expansionCatalog, proposeMarket, listPlans: listMarketPlans } = require('./market-expansion');
@@ -2350,6 +2350,29 @@ app.post('/ops/markets/plan', requireOps, requireOpsMutation, async (req, res) =
     const out=await proposeMarket({ db:adminDb(), actor:req.opsUser, input:req.body });
     return res.status(out.ok ? 200 : out.code==='named_operations_required' ? 403 : 400).json(out);
   } catch { return res.status(503).json({ code:'market_expansion_plan_unavailable' }); }
+});
+// One authenticated founder action opens an entire configured region atomically.
+ // Never create regulatory evidence, bypass missing provider dependencies or partially
+ // open a multi-county region. Future configured regions reuse exactly this endpoint.
+app.post('/ops/markets/regions/:regionId/activate', requireOps, requireOpsMutation, async (req, res) => {
+  if (DEPLOYMENT_MODE !== 'production' || keyMode !== 'live' || opsAuthMode() !== 'named')
+    return res.status(409).json({ code: 'production_authority_required' });
+  const region = REGIONS.find((r) => r.id === req.params.regionId);
+  if (!region) return res.status(404).json({ code: 'unknown_region' });
+  const regionMarkets = allMarkets().filter((m) => m.regionId === region.id);
+  if (!regionMarkets.length) return res.status(409).json({ code: 'region_not_configured' });
+  try {
+    const out = await activateRegion({
+      db: adminDb(), entries: regionMarkets.map((market) => ({ market, region })),
+      actor: req.opsUser, expectedVersions: req.body?.manifestVersions,
+      providerMissing: productionReadiness().missing,
+    });
+    if (out.ok) invalidatePublicMarkets();
+    return res.status(out.ok ? 200 : out.code === 'region_not_ready' ? 409 : 400).json(out);
+  } catch (e) {
+    console.error('[markets] region activation unavailable:', e?.message || e);
+    return res.status(503).json({ code: 'region_activation_unavailable' });
+  }
 });
 app.get('/ops/markets/:id/readiness', requireOps, async (req, res) => {
   const market = opsMarket(req, res);

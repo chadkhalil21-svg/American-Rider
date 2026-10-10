@@ -41,7 +41,13 @@ function makeDb(overrideUser={}, overrideCase={}) {
     users: { op1: { screening: { decision:'awaiting_agency',provider:good.provider,transferCaseNo:CASE,consentAt:NOW-1000 },...overrideUser } },
     operators: { op1: { available:true, commissioned:true, screeningBlocked:true } },
     support_tickets: { [CASE]: { uid:'op1', kind:'support', status:'open',
-      reason:'Operator screening — review existing provider report', ...overrideCase } },
+      reason:'Operator screening — review existing provider report',
+      screeningHandoff: {
+        stage:'report_authenticated',owner:'reviewer1',
+        agencyContact:{verifiedAt:NOW-2000,reference:'CRA-CONTACT-1'},
+        authenticatedReport:{verifiedAt:NOW-1000,by:'reviewer1',agency:good.provider,
+          reference:good.providerReference,channel:good.channel}},
+      ...overrideCase } },
     audit_log: {},
   };
   let serial=0, committed=0;
@@ -100,12 +106,30 @@ const actor = { name:'reviewer1', ip:'127.0.0.1', session:'testsession' };
   assert.equal((await recordExternalReview({db:mismatch,input:good,actor,now:NOW})).ok,false);
   assert.equal(mismatch.committed,0,'case ownership required');
 
+  const missingHandoff = makeDb({}, {screeningHandoff:null});
+  assert.equal((await recordExternalReview({db:missingHandoff,input:good,actor,now:NOW})).ok,false,
+    'manual clearance requires an independently verified case handoff');
+  assert.equal(missingHandoff.committed,0);
+  const wrongReportRef = makeDb({}, {screeningHandoff:{stage:'report_authenticated',owner:'reviewer1',
+    authenticatedReport:{verifiedAt:NOW-1000,by:'reviewer1',agency:good.provider,
+      channel:good.channel,reference:'WRONG-REPORT'}}});
+  assert.equal((await recordExternalReview({db:wrongReportRef,input:good,actor,now:NOW})).ok,false,
+    'the final review must match the authenticated original CRA report');
+  const wrongReviewer = makeDb();
+  assert.equal((await recordExternalReview({db:wrongReviewer,input:good,
+    actor:{name:'other-reviewer'},now:NOW})).ok,false,
+    'staff cannot silently take over a named CRA review');
+
   const hold=makeDb();
   const held=await recordExternalReview({db:hold,input:{...good,action:'hold',nationwideChecked:undefined},actor,now:NOW});
   assert.equal(held.ok,true);
   assert.equal(hold.state.users.op1.screening.decision,'review');
   assert.equal(hold.state.operators.op1.screeningBlocked,true);
   assert.equal(hold.state.support_tickets[CASE].status,'open','hold remains visible');
+  assert.equal(hold.state.support_tickets[CASE].screeningHandoff.stage,'clarification_needed');
+  assert.equal(hold.state.support_tickets[CASE].screeningHandoff.authenticatedReport,null);
+  assert.equal((await recordExternalReview({db:hold,input:good,actor,now:NOW+1000})).ok,false,
+    'holding an ambiguous report revokes clearance authority until fresh CRA evidence');
   assert.equal(Object.values(hold.state.audit_log)[0].action,'screening_external_held');
 
   const anon=makeDb();

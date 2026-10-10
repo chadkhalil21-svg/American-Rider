@@ -1035,7 +1035,7 @@ app.post('/operator/online', requireAuth, requireFreshAuth, requireOperationalRe
     // live mode a stranger gets into a car.
     //
     // The unscreened case is STAMPED either way, so /ops shows who is on duty without a
-    // screening rather than letting it pass unrecorded.
+    // screening rather than letting it pass unrecorded. Dispatch always demands\n    // current screening in production, independent of provider configuration.
     // ---- EVERY OTHER GATE, FROM ONE ASSESSMENT. ------------------------------------------
     //
     // backend/qualification.js assessOperator, context 'online': the documents and what code
@@ -3302,7 +3302,7 @@ app.post('/travel/prepare', requireAuth, LIMITS.dispatch, requireFreshAuth, requ
     // Availability is a pre-charge hint, not a reservation. The post-payment transaction is
     // authoritative and can still find the fleet gone; then the paid Travel is refund-owed.
     const fleet = await availableOperatorCandidates(db, pickup);
-    if (!matchOperator(fleet, pickup, String(b.cls || 'Standard'), { requireScreening: screeningReady(), allowQueued: true })) {
+    if (!matchOperator(fleet, pickup, String(b.cls || 'Standard'), { requireScreening: operationalMode, allowQueued: true })) {
       return res.status(409).json({ error: 'No eligible Operator is available; nothing was charged', code: 'no_operator' });
     }
     const tripNo = travelNumberFor(id, pickup);
@@ -3352,10 +3352,10 @@ app.post('/travel/dispatch', requireAuth, LIMITS.dispatch, requireFreshAuth, req
     let candidate = null;
     if (ride.status !== 'assigned') {
       const fleet = await availableOperatorCandidates(db, pickup);
-      candidate = matchOperator(fleet, pickup, ride.travelClass, { requireScreening: screeningReady(), allowQueued: true });
+      candidate = matchOperator(fleet, pickup, ride.travelClass, { requireScreening: operationalMode, allowQueued: true });
     }
     const outcome = await assignPaidTravel({
-      db, uid: req.uid, rideId: id, payment, candidate, requireScreening: screeningReady(),
+      db, uid: req.uid, rideId: id, payment, candidate, requireScreening: operationalMode,
     });
     if (outcome.status !== 200) return res.status(outcome.status).json(outcome.body);
     if (outcome.body.matched && !outcome.body.reused) {
@@ -3692,7 +3692,7 @@ app.post('/travel/return-operator', requireAuth, LIMITS.dispatch, requireOperati
       fleet.filter((o) => String(o.id) === originalId),
       destination,
       'Standard',
-      { requireScreening: screeningReady() },
+      { requireScreening: operationalMode },
     );
     if (still) return res.json(strip(still.operator, 'original-operator', 0));
   }
@@ -3700,7 +3700,7 @@ app.post('/travel/return-operator', requireAuth, LIMITS.dispatch, requireOperati
     fleet.filter((o) => String(o.id) !== originalId),
     destination,
     'Standard',
-    { requireScreening: screeningReady() },
+    { requireScreening: operationalMode },
   );
   if (!next) return res.json({ path: null, operator: null });
   const priced = await authoritativeFare({

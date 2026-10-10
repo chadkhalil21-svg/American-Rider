@@ -11,7 +11,6 @@ function marketChecklistPage(items, { production = false } = {}) {
     (state.missing || []).filter(m => m.id?.startsWith('provider:')).map(m => m.id.slice(9))))].sort();
   const cards = items.map(({ market, state }) => {
     const localMissing = (state.missing || []).filter(m => !m.id?.startsWith('provider:'));
-    const evidenceMissing = localMissing.filter(m => !['source','fleet_cleanup'].includes(m.id));
     const id = esc(market.id);
     const ready = production && state.readyToActivate && state.manifestVersion && state.status !== 'active';
     const canOnboard = production && state.readyToOnboard && state.manifestVersion && state.status === 'waitlist';

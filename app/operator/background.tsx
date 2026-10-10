@@ -36,6 +36,7 @@ export default function OperatorBackground() {
   const [drivingIncluded, setDrivingIncluded] = React.useState(true);
   const [declared, setDeclared] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
+  const [releaseAuthorized, setReleaseAuthorized] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
   const refresh = React.useCallback(() => fetchScreening().then(setStatus), []);
@@ -52,6 +53,10 @@ export default function OperatorBackground() {
   }, [status?.ok, passed, record?.conductedAt, op]);
 
   const submitExisting = async () => {
+    if (!releaseAuthorized) {
+      setError(t('traveler.bgConsentRequired'));
+      return;
+    }
     if (!agency.trim()) {
       setError(t('traveler.bgNameCompanyFirst'));
       return;
@@ -66,6 +71,7 @@ export default function OperatorBackground() {
     const out = await declareExistingScreening({
       agency: agency.trim(),
       mode: requestMode,
+      consent: releaseAuthorized,
       issuedAt: requestMode === 'new' ? 0 : parsedDate,
       criminalIncluded: requestMode === 'existing' && criminalIncluded,
       drivingIncluded: requestMode === 'existing' && drivingIncluded,
@@ -207,9 +213,14 @@ export default function OperatorBackground() {
                   </Pressable>
                   </>) : null}
                   <Text style={styles.note}>{t(requestMode === 'new' ? 'traveler.bgNewNotice' : 'traveler.bgReviewNote')}</Text>
+                  <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: releaseAuthorized }}
+                    style={styles.checkRow} onPress={() => setReleaseAuthorized(v => !v)}>
+                    <Text style={styles.check}>{releaseAuthorized ? '✓' : '○'}</Text>
+                    <Text style={styles.checkLabel}>{t('traveler.bgAuthorizeTransfer')}</Text>
+                  </Pressable>
                   <PrimaryButton
                     label={busy ? t('traveler.busyRecording') : t('traveler.bgRequestReview')}
-                    disabled={busy}
+                    disabled={busy || !releaseAuthorized}
                     onPress={submitExisting}
                     style={styles.primary}
                   />

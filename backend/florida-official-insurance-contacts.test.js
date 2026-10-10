@@ -96,7 +96,7 @@ const recognition=createOfficialContactRecognizer({
   assert.equal(policyFingerprint({...first,policyNumber:''}),null);
 
   const server=fs.readFileSync(path.join(__dirname,'server.js'),'utf8');
-  assert.match(server,/official = await lookupOfficialAgencyEmail/);
+  assert.match(server,/official = await recognizeOfficialInsuranceContact/);
   assert.match(server,/row\.policyFingerprint === policyFingerprint\(u\.insuranceMonitoring\)/);
   assert.match(server,/official\.recognized === true/);
   assert.match(server,/officialSourceHash/);

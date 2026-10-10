@@ -58,8 +58,14 @@ const national = marketChecklistPage([{market,state}],{
     id:'ca',label:'<California>',status:'proposed',city:'San Jose'
   }],catalog:marketList},
 });
-assert.match(national,/Plan another market/);
-assert.match(national,/Record expansion plan — not activation/);
+assert.match(national,/Expand American Rider/);
+assert.match(national,/No individual county/);
+assert.match(national,/<details class="expansion-advanced">/);
+assert.match(national,/Focus on a particular county or city \(optional\)/);
+assert.match(national,/<details class="county-review">/);
+assert.match(national,/at this stage/);
+assert.match(national,/<h2>South Florida · commissioning<\/h2>/);
+assert.match(national,/Prepare selected market — no activation/);
 assert.match(national,/\/ops\/markets\/plan/);
 assert.match(national,/Choose a jurisdiction/);
 assert.match(national,/California \(CA\)/);

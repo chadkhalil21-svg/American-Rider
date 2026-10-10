@@ -373,11 +373,13 @@ ${alarms.length
     recorded with a note and the name of the person who made it.${shared() ? ` <strong>Signed in with the shared password (${esc(sharedMode())}): decisions are recorded as “${esc(opsAccounts()[0]?.name || 'ops')}”, not a named person. Set OPS_USERS.</strong>` : ''}</p>
   ${loaded.pending.unavailable ? unavailableText : pending.length ? pending.map(exceptionCard).join('') : '<p>No operator exceptions.</p>'}
   <div style="margin-top:20px;">
-    <details><summary><strong>Verify an insurance company or broker contact once</strong></summary>
-      <p>For recurring automated confirmations, independently verify the company's real email
-      address from an official source and outbound callback. Do not trust an address
-      provided by an Operator alone. A verified contact may serve multiple Operators.
-      This does not certify a policy or create coverage.</p>
+    <p style="color:${T.muted};font-size:13px;">Routine insurance confirmations are requested and processed by the platform. You do not need to visit Operations to handle each monthly check. An exception may require independent provider-identity verification if the system cannot establish a trusted source.</p>
+    <details><summary><strong>Exceptional case · verify an unrecognized insurer or broker contact</strong></summary>
+      <p>This is not a monthly task for every Operator. When a new provider cannot be
+      independently authenticated by existing configured evidence, establish the
+      company's genuine mailbox using its official directory and an outbound callback.
+      Do not trust an address provided solely by the Operator. One verified mailbox
+      can serve many Operators. This does not certify any particular policy or create coverage.</p>
       <form method="post" action="/ops/insurance/trust-contact">
         ${small('email','Verified insurer / broker email','type="email" required')}
         ${small('sourceReference','Official source / licensing reference','required')}

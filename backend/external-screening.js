@@ -4,6 +4,7 @@
 // Operator request. An unverified/self-supplied report can never qualify an Operator.
 'use strict';
 const { RECHECK_MS } = require('./screening');
+const { reviewPolicyFor } = require('./screening-jurisdictions');
 
 const CASE_RE = /^AR-C-[A-Za-z0-9-]{1,48}$/;
 const REF_RE = /^[A-Za-z0-9][A-Za-z0-9._:/-]{5,119}$/;
@@ -60,6 +61,11 @@ async function recordExternalReview({ db, input, actor, now = Date.now() }) {
     if (!userSnap.exists || !caseSnap.exists) return { ok: false, status: 404, error: 'Operator or screening case not found.' };
     const u = userSnap.data() || {}, ticket = caseSnap.data() || {};
     const prior = u.screening || {};
+    // The Florida adjudicator cannot clear a report for an unconfigured state.
+    // Pre-registry pending cases are Florida-only and remain under that engine.
+    const policy = reviewPolicyFor(prior);
+    if (!policy || policy.reviewEngine !== 'florida_627748_v1')
+      return { ok: false, status: 409, error: 'No implemented screening adjudication policy for this case jurisdiction.' };
     if (prior.transferCaseNo !== caseNo || ticket.uid !== uid ||
         ticket.kind !== 'support' || ticket.status !== 'open' ||
         !/^Operator screening — review (existing|new) provider report$/.test(ticket.reason || ''))
@@ -82,6 +88,7 @@ async function recordExternalReview({ db, input, actor, now = Date.now() }) {
     const result = action === 'clear' ? 'pass' : 'review';
     const recorded = {
       decision: result,
+      jurisdictionCode: policy.stateCode, policyId: policy.id,
       summary: result === 'pass' ? 'Independently verified screening meets the configured Florida TNC checks.' : 'Provider screening held for additional verification.',
       reasons: result === 'pass' ? [] : ['Operations requested clarification; screening is not cleared.'],
       provider, reportId: providerReference, checkedAt: now, conductedAt: issuedAt,

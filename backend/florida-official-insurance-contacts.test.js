@@ -27,8 +27,8 @@ const officialHeader=['License Number','Full Name','NPN Number','Residency Type'
   'Email Address','Business Phone','Business Address1','Business Address2',
   'Business City','Business State','Business Zip','Business County',
   'Mailing Address','Mailing Address2','Mailing City','Mailing State','Mailing Zip'];
-const official=(record)=> officialHeader.map(h=>record[h]||'').join(',')+'\\n';
-const officialCsv=officialHeader.join(',')+'\\n'+
+const official=(record)=> officialHeader.map(h=>record[h]||'').join(',')+String.fromCharCode(10);
+const officialCsv=officialHeader.join(',')+String.fromCharCode(10)+
   official({'License Number':'A123','Full Name':'Official Agency',
     'License TYCL Desc':'AGENCY LICENSE','License Status':'VALID',
     'Email Address':'official@example.com'})+

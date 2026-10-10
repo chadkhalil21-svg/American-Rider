@@ -555,7 +555,7 @@ function mount(app, express, deps = {}) {
   // THE EXCEPTION ACTIONS. Each one: authenticated here, validated and audit-logged in the same
   // transaction as the change (backend/qualification.js), then the operator is re-assessed —
   // so resolving the last held item qualifies them on the spot, with nobody clicking Approve.
-  const exceptionRoute = (path, act) =>
+  const exceptionRoute = (path, act, { reassess = true } = {}) =>
     app.post(path, express.urlencoded({ extended: false }), async (req, res) => {
       if (!configured() || !signedIn(req)) return res.status(401).type('html').send(page('Operations', LOGIN));
       const db = dbOf();
@@ -565,7 +565,7 @@ function mount(app, express, deps = {}) {
       try {
         const out = await act({ db, uid, body: req.body || {}, actor: actorOf(req) });
         if (!out.ok) return res.status(out.status || 400).send(esc(out.error));
-        await assessAndRecord({ db, uid, checks, liveMoney: liveMoney() });
+        if (reassess) await assessAndRecord({ db, uid, checks, liveMoney: liveMoney() });
         res.redirect(303, '/ops');
       } catch (e) {
         res.status(500).send(esc(e.message));
@@ -695,7 +695,7 @@ function mount(app, express, deps = {}) {
   });
   exceptionRoute('/ops/operators/screening-handoff', ({ db, uid, body, actor }) =>
     opsAuthMode() !== 'named' ? { ok:false, status:403, error:'Named Operations MFA is required.' }
-      : recordScreeningHandoff({ db, input: { ...body, uid }, actor }));
+      : recordScreeningHandoff({ db, input: { ...body, uid }, actor }), { reassess: false });
   exceptionRoute('/ops/operators/screening-review', ({ db, uid, body, actor }) =>
     opsAuthMode() !== 'named' ? { ok:false, status:403, error:'Named Operations MFA is required.' }
       : recordExternalReview({ db, input: { ...body, uid }, actor }));

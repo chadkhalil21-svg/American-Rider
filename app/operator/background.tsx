@@ -122,6 +122,12 @@ export default function OperatorBackground() {
                    record.decision === 'expired' || needsRenewal ? t('traveler.bgRenewalRequired') : t('traveler.bgInProgress')}
                 </Text>
                 <Text style={styles.body}>{record.summary || t('traveler.bgStatusPending')}</Text>
+                {record.transferCaseNo ? (
+                  <Text style={styles.body}>{t('traveler.bgCaseReference', { caseNo: record.transferCaseNo })}</Text>
+                ) : null}
+                {(record.decision === 'awaiting_agency' || record.decision === 'review') ? (
+                  <Text style={styles.body}>{t('traveler.bgCoordinationOnly')}</Text>
+                ) : null}
               </Card>
             </>
           ) : null}

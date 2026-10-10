@@ -579,8 +579,6 @@ export default {
     bgNameCompanyFirst: 'Indiquez d’abord la société de vérification.',
     bgNotRecorded: 'Cela n’a pas pu être enregistré.',
     bgRecordedWillAsk: 'Enregistré. Nous leur demanderons de l’envoyer.',
-    bgHaveThemEmail: ' Contactez %{email} en indiquant votre dossier pour organiser la remise sécurisée par %{agency}. N’envoyez ni rapport ni pièce d’identité par courriel.',
-    bgCitingCase: ', en citant le dossier %{caseNo}.',
     qualBasicsSub: 'Nom légal, date de naissance, adresse',
     qualBgSub: 'Effectuée auprès d’un prestataire de vérification approuvé',
     inboxNotSignedIn: 'Cet appareil n’est pas connecté, il ne peut donc pas recevoir de courses.',

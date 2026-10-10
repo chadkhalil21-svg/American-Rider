@@ -27,6 +27,7 @@ const { monthlyRemittance } = require('./remittance');
 const { REQUIRED_DOCS, resolveDocument, setSuspension, assessAndRecord } = require('./qualification');
 const { disclosureStale } = require('./matching');
 const { applyIndependentConfirmation, continuingStatus } = require('./insurance-monitoring');
+const { recordIndependentContact } = require('./insurance-contact-trust');
 const { codeFor, totpStep, sessionFor, verifySession } = require('./opssecurity');
 const { loadOpsBoard, UNDERWAY } = require('./opsboarddata');
 
@@ -372,6 +373,28 @@ ${alarms.length
     recorded with a note and the name of the person who made it.${shared() ? ` <strong>Signed in with the shared password (${esc(sharedMode())}): decisions are recorded as “${esc(opsAccounts()[0]?.name || 'ops')}”, not a named person. Set OPS_USERS.</strong>` : ''}</p>
   ${loaded.pending.unavailable ? unavailableText : pending.length ? pending.map(exceptionCard).join('') : '<p>No operator exceptions.</p>'}
   <div style="margin-top:20px;">
+    <details><summary><strong>Verify an insurance company or broker contact once</strong></summary>
+      <p>For recurring automated confirmations, independently verify the company's real email
+      address from an official source and outbound callback. Do not trust an address
+      provided by an Operator alone. A verified contact may serve multiple Operators.
+      This does not certify a policy or create coverage.</p>
+      <form method="post" action="/ops/insurance/trust-contact">
+        ${small('email','Verified insurer / broker email','type="email" required')}
+        ${small('sourceReference','Official source / licensing reference','required')}
+        <select name="method" required style="padding:8px;border:1px solid ${T.border};border-radius:13px;margin:6px 8px 0 0;">
+          <option value="">How identity was independently verified</option>
+          <option value="verified_carrier_website_and_callback">Official carrier website + callback</option>
+          <option value="verified_broker_website_and_callback">Official broker website + callback</option>
+          <option value="regulator_licence_lookup_and_callback">Regulator licence + callback</option>
+          <option value="authenticated_provider_contract">Existing authenticated provider agreement</option>
+        </select>
+        ${noteInput}
+        <button type="submit" style="border:1px solid ${T.border};background:#fff;color:${T.ink};border-radius:13px;padding:8px 14px;font-size:14px;cursor:pointer;margin-top:6px;">
+          Record independently vetted contact
+        </button>
+      </form>
+      <p>One-year renewal of contact identity. Coverage itself is independently confirmed on the existing 30-day schedule.</p>
+    </details>
     <strong>Insurance status confirmation</strong>
     <p style="color:${T.muted};font-size:13px;">After reviewing a carrier, agent, broker, or monitoring-provider confirmation, record the current status here. A cancellation or material change removes the Operator from service immediately.</p>
     <form method="post" action="/ops/operators/insurance-status">
@@ -552,6 +575,21 @@ function mount(app, express, deps = {}) {
         : `${acct.name}.${tokenFor(acct)}`)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${60 * 60 * 12}; Secure`,
     );
     res.redirect('/ops');
+  });
+
+  // First-contact identity is a company-level reusable fact, not a new per-Operator
+  // screening step. It is recorded only after independent, named MFA-backed review.
+  app.post('/ops/insurance/trust-contact', express.urlencoded({ extended:false }), async(req,res)=>{
+    if(!configured() || !signedIn(req)) return res.status(401).type('html').send(page('Operations',LOGIN));
+    if(opsAuthMode() !== 'named') return res.status(403).send('Named MFA-backed Operations access required');
+    const db=dbOf();
+    if(!db) return res.status(503).send('Insurance contact registry unavailable');
+    try{
+      const actor=actorOf(req);
+      const result=await recordIndependentContact({db,actor,input:req.body});
+      if(!result.ok) return res.status(400).send(esc(result.error||result.code));
+      return res.redirect(303,'/ops');
+    }catch{return res.status(503).send('Insurance contact verification could not be stored');}
   });
 
   // THE EXCEPTION ACTIONS. Each one: authenticated here, validated and audit-logged in the same

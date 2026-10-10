@@ -20,6 +20,7 @@ const { webhookReady } = require('./webhook');
 const { emailReady } = require('./email');
 const { screeningReady } = require('./screening');
 const { recordExternalReview } = require('./external-screening');
+const { recordScreeningHandoff } = require('./screening-handoff');
 const { recordAdverseReview } = require('./external-screening-adverse');
 const { monthlyRemittance } = require('./remittance');
 const { REQUIRED_DOCS, resolveDocument, setSuspension, assessAndRecord } = require('./qualification');
@@ -555,7 +556,7 @@ function mount(app, express, deps = {}) {
   // THE EXCEPTION ACTIONS. Each one: authenticated here, validated and audit-logged in the same
   // transaction as the change (backend/qualification.js), then the operator is re-assessed —
   // so resolving the last held item qualifies them on the spot, with nobody clicking Approve.
-  const exceptionRoute = (path, act) =>
+  const exceptionRoute = (path, act, { reassess = true } = {}) =>
     app.post(path, express.urlencoded({ extended: false }), async (req, res) => {
       if (!configured() || !signedIn(req)) return res.status(401).type('html').send(page('Operations', LOGIN));
       const db = dbOf();
@@ -565,7 +566,7 @@ function mount(app, express, deps = {}) {
       try {
         const out = await act({ db, uid, body: req.body || {}, actor: actorOf(req) });
         if (!out.ok) return res.status(out.status || 400).send(esc(out.error));
-        await assessAndRecord({ db, uid, checks, liveMoney: liveMoney() });
+        if (reassess) await assessAndRecord({ db, uid, checks, liveMoney: liveMoney() });
         res.redirect(303, '/ops');
       } catch (e) {
         res.status(500).send(esc(e.message));
@@ -577,6 +578,8 @@ function mount(app, express, deps = {}) {
   // This does not show or copy report documents or criminal-history details.
   app.get('/ops/screening', async (req, res) => {
     if (!configured() || !signedIn(req)) return res.status(401).type('html').send(page('Operations', LOGIN));
+    if (opsAuthMode() !== 'named') return res.status(403).type('html').send(page('Screening',
+      '<h1>Named Operations access required</h1><p>Screening evidence requires MFA-backed attributable staff access.</p>'));
     const db = dbOf();
     if (!db) return res.status(503).send('Screening review is temporarily unavailable.');
     try {
@@ -586,14 +589,54 @@ function mount(app, express, deps = {}) {
         .map(d => ({ id: d.id, ...d.data() }))
         .filter(u => u.screening?.transferCaseNo && u.screening?.consentAt)
         .slice(0, 50);
+      // Bound to 50 cases. A missing/mismatched source ticket is not actionable.
+      const relatedCases = await Promise.all(candidates.map(async (u) => {
+        const d = await db.collection('support_tickets').doc(String(u.screening.transferCaseNo)).get();
+        if (!d.exists) return null;
+        const row = d.data() || {};
+        return row.uid === u.id && row.status === 'open' &&
+          /^Operator screening — review (existing|new) provider report$/.test(row.reason || '')
+          ? row : null;
+      }));
       const field = (name, label, type = 'text', required = true) =>
         `<label style="display:block;margin:9px 0;font-size:13px;">${esc(label)}
         <input type="${type}" name="${name}" style="display:block;padding:9px;width:100%;max-width:400px;border:1px solid #C9CDD1;border-radius:8px;" ${required ? 'required' : ''}></label>`;
       const box = (name, label) =>
         `<label style="display:block;margin:7px 0;font-size:13px;">
           <input type="checkbox" name="${name}" value="yes"> ${esc(label)}</label>`;
-      const cards = candidates.map(u => {
+      const cards = candidates.map((u, i) => {
         const r = u.screening;
+        const linked = relatedCases[i], handoff = linked?.screeningHandoff || {};
+        if (!linked) return `<section role="alert"><h2>${esc(u.id)}</h2>
+          <p>Screening case missing or inconsistent. Stop review and investigate.</p></section>`;
+        const hidden = { uid: u.id, caseNo: r.transferCaseNo };
+        const contactChoices = `<select name="contactChannel" required>
+          <option value="">Verified CRA contact method…</option>
+          <option value="verified_business_phone">Independently verified business phone</option>
+          <option value="verified_business_email">Independently verified business email</option>
+          <option value="authenticated_agency_portal">CRA authenticated portal</option></select>`;
+        const reportChoices = `<select name="reportChannel" required>
+          <option value="">Authenticated receipt method…</option>
+          <option value="authenticated_provider_portal">Agency authenticated portal</option>
+          <option value="provider_verified_secure_transfer">Verified secure agency transfer</option></select>`;
+        const handoffControls = !handoff.stage
+          ? decide('/ops/operators/screening-handoff', { ...hidden, action:'claim' }, 'Claim screening case')
+          : handoff.stage === 'claimed' || handoff.stage === 'dispute_open' || handoff.stage === 'clarification_needed'
+            ? decide('/ops/operators/screening-handoff', { ...hidden, action:'agency_contacted' },
+                'Record verified agency contact', contactChoices +
+                small('contactReference','CRA contact case reference','required') +
+                box('agencyIdentityVerified','I independently verified the CRA contact identity'))
+            : handoff.stage === 'agency_contacted'
+              ? decide('/ops/operators/screening-handoff', { ...hidden, action:'report_authenticated' },
+                  'Record authenticated report receipt', reportChoices +
+                  small('providerReference','CRA report reference','required') +
+                  box('sourceAuthenticated','I authenticated the report origin through the agency') +
+                  box('reportOwnerMatched','I matched this report to the Operator') +
+                  box('permissiblePurposeVerified','I verified lawful report receipt and reuse for American Rider'))
+              : handoff.stage === 'report_authenticated' && r.decision !== 'pre_adverse'
+                ? decide('/ops/operators/screening-handoff', { ...hidden, action:'dispute_open' },
+                    'Open dispute and require corrected report')
+                : '';
         const a = r.adverseAction || {};
         const adverseForm = (action, title, contents = '') =>
           `<form method="post" action="/ops/operators/screening-adverse" style="border-top:1px solid #CDD1D6;margin-top:16px;padding-top:10px">
@@ -648,14 +691,20 @@ function mount(app, express, deps = {}) {
              ${['proposed','pre_notice_sent'].includes(a.stage) ? dispute : ''}
              ${['proposed','pre_notice_sent','disputed'].includes(a.stage) ? withdraw : ''}
              ${a.stage === 'pre_notice_sent' ? final : ''}`
-          : proposal;
+          : handoff.stage === 'report_authenticated' ? proposal
+            : '<p>Authenticate the agency report before considering a potential adverse decision.</p>';
         return `<section><h2>${esc(u.legalName || u.name || u.email || u.id)}</h2>
           <p>Case <strong>${esc(r.transferCaseNo)}</strong> · ${esc(r.provider || 'Unknown provider')} ·
             ${esc(r.decision)}. <a href="/ops/cases?kind=support">Open original support case →</a></p>
+          <p>Assigned reviewer: <strong>${esc(handoff.owner || 'Unassigned')}</strong> ·
+          Verified handoff: <strong>${esc(handoff.stage || 'Not started')}</strong>.</p>
+          ${r.decision === 'pre_adverse' ? '' : handoffControls}
           <p>Review a report obtained from the named agency via an authenticated provider portal
           or confirmed secure transfer. Do not rely on an Operator-uploaded copy or an email
           attachment. No report contents or sensitive personal information belong in this form.</p>
-          ${r.decision === 'pre_adverse' ? '' : `<form method="post" action="/ops/operators/screening-review">
+          ${r.decision === 'pre_adverse' || handoff.stage !== 'report_authenticated'
+            ? '<p>Complete the case assignment, verified agency contact and authenticated report receipt before adjudication.</p>'
+            : `<form method="post" action="/ops/operators/screening-review">
             <input type="hidden" name="uid" value="${esc(u.id)}">
             <input type="hidden" name="caseNo" value="${esc(r.transferCaseNo)}">
             <input type="hidden" name="provider" value="${esc(r.provider || '')}">
@@ -702,13 +751,18 @@ function mount(app, express, deps = {}) {
         '<h1>Screening review unavailable</h1><p role="alert">The queue could not be read. Do not interpret this as no pending requests.</p>'));
     }
   });
+  exceptionRoute('/ops/operators/screening-handoff', ({ db, uid, body, actor }) =>
+    opsAuthMode() !== 'named' ? { ok:false, status:403, error:'Named Operations MFA is required.' }
+      : recordScreeningHandoff({ db, input: { ...body, uid }, actor }), { reassess: false });
   exceptionRoute('/ops/operators/screening-review', ({ db, uid, body, actor }) =>
-    recordExternalReview({ db, input: { ...body, uid }, actor }));
+    opsAuthMode() !== 'named' ? { ok:false, status:403, error:'Named Operations MFA is required.' }
+      : recordExternalReview({ db, input: { ...body, uid }, actor }));
   // For legally compliant agency-backed cases ONLY. These actions record
   // independently established notice/dispute evidence; they do not send
   // consumer reports or FCRA correspondence.
   exceptionRoute('/ops/operators/screening-adverse', ({ db, uid, body, actor }) =>
-    recordAdverseReview({ db, input: { ...body, uid }, actor }));
+    opsAuthMode() !== 'named' ? { ok:false, status:403, error:'Named Operations MFA is required.' }
+      : recordAdverseReview({ db, input: { ...body, uid }, actor }));
 
   // A person decides one document: a held one, or reconsiders a refused one.
   exceptionRoute('/ops/operators/document', ({ db, uid, body, actor }) =>

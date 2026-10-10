@@ -2206,6 +2206,29 @@ async function operatorMarketOptions() {
 }
 
 /** Express middleware: the signed-in operator's declared operating market must be ACTIVE. */
+// A screening report-transfer request is preparatory, not permission to take
+// paid Travel. Allow it for a selected *configured Florida* service region even
+// while the county is waitlisted. Full document, qualification, payments and
+// dispatch remain bound to the separate market/admission gates.
+async function requireScreeningRequestMarket(req, res, next) {
+  const db = adminDb();
+  if (!db) return res.status(503).json({ code: 'no_admin_db', error: 'Operator records unavailable.' });
+  try {
+    const snap = await db.collection('users').doc(String(req.uid)).get();
+    const market = operatingMarketOf(snap.exists ? snap.data() : null);
+    const region = market?.regionId ? REGIONS.find(r => r.id === market.regionId) : null;
+    if (!market || !region || region.jurisdiction?.stateCode !== 'FL') {
+      return res.status(409).json({ code: 'screening_market_required',
+        error: 'Select a supported Florida operating county before requesting screening. No screening purchase is required during prelaunch.' });
+    }
+    req.screeningMarket = market;
+    next();
+  } catch {
+    res.status(503).json({ code: 'screening_market_unavailable',
+      error: 'The operating area cannot be verified. Please try again.' });
+  }
+}
+
 async function requireActiveOperatingMarket(req, res, next) {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
@@ -2399,7 +2422,8 @@ app.post('/operator/market', requireAuth, LIMITS.market, async (req, res) => {
       );
     }
     res.json({ market: selected, active: available.filter((x) => x.status === 'active'),
-      onboarding: available.filter((x) => x.status === 'onboarding') });
+      onboarding: available.filter((x) => x.status === 'onboarding'),
+      waitlist: available.filter((x) => x.status === 'waitlist') });
   } catch (e) {
     res.status(502).json({ error: e.message });
   }
@@ -2416,6 +2440,7 @@ app.get('/operator/market', requireAuth, async (req, res) => {
       market: listedMarket(market, available),
       active: available.filter((x) => x.status === 'active'),
       onboarding: available.filter((x) => x.status === 'onboarding'),
+      waitlist: available.filter((x) => x.status === 'waitlist'),
     });
   } catch (e) {
     res.status(502).json({ error: e.message });
@@ -3095,13 +3120,13 @@ app.get('/operator/screening', requireAuth, async (req, res) => {
  *
  * They name the company and sign an instruction; FCRA §604(a)(2) makes a consumer's own written
  * instruction a permissible purpose, so that company may lawfully send the report to us. The
- * operator pays nothing if it is complete and recent, or $17.50 if only the driving history is
- * missing — which is the common case, because several gig platforms buy the criminal half alone.
+ * report may be reusable only after verification of source, purpose and CRA authorization.
+ * No fee or reusability is guaranteed merely because the Operator names the provider.
  *
  * NOTHING IS ACCEPTED ON THIS REQUEST. It records the declaration and opens a case to chase the
  * screening company; the report is only ever adjudicated when it arrives FROM them.
  */
-app.post('/operator/screening/existing', requireAuth, LIMITS.screening, requireActiveOperatingMarket, async (req, res) => {
+app.post('/operator/screening/existing', requireAuth, LIMITS.screening, requireScreeningRequestMarket, async (req, res) => {
   const db = adminDb();
   if (!db) return res.status(503).json({ error: adminStatus().reason, code: 'no_admin_db' });
 
@@ -3116,54 +3141,72 @@ app.post('/operator/screening/existing', requireAuth, LIMITS.screening, requireA
     return res.status(400).json({ error: 'The screening company and your written instruction are required.' });
   }
 
-  try {
-    const transferTo = 'support@americanrider.app';
-    await db.collection('users').doc(String(req.uid)).set(
-      {
-        screening: {
-          decision: 'awaiting_agency',
-          provider: agency,
-          transferTo,
-          declaredIssuedAt: issuedAt || null,
-          declaredElements: elements,
-          consentAt: Date.now(),
-          consentText: mode === 'new'
-            ? 'I instruct the screening company I select to release its completed report to American Rider for eligibility review, subject to that company’s own required disclosures and authorization.'
-            : 'I instruct the named screening company to release my most recent background screening report to American Rider.',
-          requestMode: mode,
-          summary: 'Waiting for the screening provider to send the authoritative report for review.',
-        },
-      },
-      { merge: true },
-    );
+  // Names are untrusted declarations. No company is approved by being typed here.
+  // No general support mailbox is advertised as a secure consumer-report endpoint.
+  if (agency.length < 3 || !/^[A-Za-z0-9][A-Za-z0-9 .&'-]{2,119}$/.test(agency))
+    return res.status(400).json({ error: 'Enter the name of the screening agency, not a report or URL.' });
+  if (mode === 'existing' && (!Number.isFinite(issuedAt) || issuedAt <= 0 ||
+       issuedAt > Date.now() || issuedAt < Date.now() - 3 * 365 * 86400000))
+    return res.status(400).json({ error: 'Enter a report date within three years; older checks require a new request.' });
+  if (mode === 'new' && issuedAt !== 0)
+    return res.status(400).json({ error: 'A new report cannot have a prior completion date.' });
+  const selectedElements = elements.filter(x => ['nationwide_criminal','sex_offender','driving_history'].includes(x));
+  if (selectedElements.length !== elements.length)
+    return res.status(400).json({ error: 'Unrecognized screening component.' });
 
+  try {
+    const ref = db.collection('users').doc(String(req.uid));
+    const previous = await ref.get();
+    const prior = previous.exists ? (previous.data().screening || {}) : {};
+    // The same pending request is idempotent while the case remains open.
+    if (prior.decision === 'awaiting_agency' &&
+        prior.requestMode === mode && String(prior.provider || '').toLowerCase() === agency.toLowerCase() &&
+        prior.transferCaseNo && prior.consentAt) {
+      const oldCase = await db.collection('support_tickets').doc(String(prior.transferCaseNo)).get();
+      if (oldCase.exists && oldCase.data().uid === req.uid && oldCase.data().status === 'open') {
+        return res.json({ ok: true, transferCaseNo: prior.transferCaseNo, transferTo: null,
+          note: 'Your screening request is already recorded. American Rider will arrange a verified agency transfer. Do not email reports or purchase a package until eligibility and the total price are confirmed.' });
+      }
+    }
+    // Store the authoritative case BEFORE displaying success or changing screening
+    // status. An email alone is insufficient: staff need an actual Operations case.
     const filed = await fileTicket({
-      uid: req.uid,
-      email: req.email,
-      kind: 'support',
+      uid: req.uid, email: req.email, kind: 'support',
       reason: mode === 'new' ? 'Operator screening — review new provider report' : 'Operator screening — review existing provider report',
       description:
         'The Operator instructed ' + agency + (mode === 'new' ? ' to send the report when completed.' : ' to release the existing screening report for American Rider review.') + ' ' +
         'Declared issue date: ' + (issuedAt ? new Date(issuedAt).toISOString().slice(0, 10) : 'not provided') + '. ' +
-        'Declared components: ' + (elements.join(', ') || 'not provided') + '. ' +
-        'Do not qualify from the Operator declaration. Authenticate the provider report, compare each component with the active jurisdiction requirements, preserve every qualifying component, and request only any missing or expired component.',
+        'Declared components: ' + (selectedElements.join(', ') || 'not provided') + '. ' +
+        'Do not qualify from an Operator declaration or consumer-provided PDF. Staff must establish the receiving channel, authenticated source and permitted report use before clearance.',
     });
-
-    const caseNo = filed?.caseNo || null;
-    if (caseNo) {
-      await db.collection('users').doc(String(req.uid)).set(
-        { screening: { transferCaseNo: caseNo } },
-        { merge: true },
-      );
+    if (!filed?.stored || !filed?.caseNo) {
+      return res.status(503).json({ error: 'The screening review case could not be stored. Nothing has been submitted; please retry.' });
     }
-    res.json({
-      ok: true,
-      note: mode === 'new'
-        ? 'Request recorded. Use a qualifying screening agency, authorize its checks, and arrange authenticated delivery to American Rider. Do not submit a personal report as clearance.'
-        : 'Request recorded. We will preserve every qualifying component and ask only for anything still required.',
-      transferTo,
-      transferCaseNo: caseNo,
-    });
+    const batch = db.batch();
+    batch.set(ref, {
+      screening: {
+        decision: 'awaiting_agency', provider: agency, transferTo: null,
+        transferCaseNo: filed.caseNo, declaredIssuedAt: issuedAt || null,
+        declaredElements: selectedElements, consentAt: Date.now(),
+        // Superseded screening evidence must never survive as present authority.
+        reportId: null, conductedAt: null, recheckDue: null, externalVerification: null,
+        consentText: mode === 'new'
+          ? 'I instruct the screening company I select to release its completed report to American Rider for eligibility review, subject to the provider’s separate disclosure and authorization.'
+          : 'I instruct the named screening company to release its existing background screening report to American Rider for eligibility review, subject to permitted purpose and transfer requirements.',
+        requestMode: mode,
+        summary: 'American Rider is coordinating report eligibility and secure agency delivery. Do not purchase a screening or email sensitive documents until instructions are confirmed.',
+      },
+    }, { merge: true });
+    // Both records change atomically: an old screening pass must not remain
+    // dispatchable when the user has moved back to awaiting verified evidence.
+    batch.set(db.collection('operators').doc(String(req.uid)), {
+      available: false, screeningBlocked: true,
+      screeningReason: 'Screening report transfer is pending verification.',
+      offDutyReason: 'screening_awaiting_agency', offDutyAt: Date.now(),
+    }, { merge: true });
+    await batch.commit();
+    return res.json({ ok: true, transferTo: null, transferCaseNo: filed.caseNo,
+      note: 'Request received. American Rider must first confirm that the agency can provide the required checks and a secure report transfer. Do not purchase a screening or email any report. Your case is being reviewed.' });
   } catch (e) {
     res.status(502).json({ error: e.message });
   }
@@ -3174,10 +3217,9 @@ app.post('/operator/screening/existing', requireAuth, LIMITS.screening, requireA
 // provider directly. American Rider receives and reviews authoritative provider evidence;
 // it does not create a Stripe charge or purchase a screening on the Operator's behalf.
 
-// The screening company's result arrives on /checkr/webhook — mounted ABOVE express.json()
-// with the Stripe webhook, because its signature is an HMAC over the raw bytes. The event
-// handling itself (fetch the report's screenings, adjudicate by the statutory standard,
-// record the decision, handle expired invitations) lives in checkr.js.
+// Legacy Checkr adapter is not mounted in this provider-neutral server.
+// Operations records verified external CRA evidence at /ops/screening;
+// the old adapter must not be described as a functioning production receiver.
 
 // --- The operations view. -----------------------------------------------------------------
 mountOps(app, express, { checks: qualificationChecks, liveMoney: () => operationalMode });

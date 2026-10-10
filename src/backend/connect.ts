@@ -159,9 +159,9 @@ export async function submitForReview(): Promise<{ ok: boolean; error?: string }
 // The county an operator will work in. The server unlocks document reading, screening and
 // prelaunch intake needs separate evidence; full activation alone permits paid duty.
 export type Market = { id: string; name: string; status: 'active' | 'onboarding' | 'waitlist' };
-export type MarketState = { market: Market | null; active: Market[]; onboarding: Market[] };
+export type MarketState = { market: Market | null; active: Market[]; onboarding: Market[]; waitlist: Market[] };
 
-const EMPTY_MARKETS: MarketState = { market: null, active: [], onboarding: [] };
+const EMPTY_MARKETS: MarketState = { market: null, active: [], onboarding: [], waitlist: [] };
 
 /** Never throws. */
 export async function getOperatingMarket(): Promise<MarketState> {
@@ -170,7 +170,8 @@ export async function getOperatingMarket(): Promise<MarketState> {
     if (!res.ok) return EMPTY_MARKETS;
     const d = await res.json();
     return { market: d?.market ?? null, active: Array.isArray(d?.active) ? d.active : [],
-      onboarding: Array.isArray(d?.onboarding) ? d.onboarding : [] };
+      onboarding: Array.isArray(d?.onboarding) ? d.onboarding : [],
+      waitlist: Array.isArray(d?.waitlist) ? d.waitlist : [] };
   } catch {
     return EMPTY_MARKETS;
   }
@@ -189,7 +190,8 @@ export async function setOperatingMarket(
     if (!res.ok) return EMPTY_MARKETS;
     const d = await res.json();
     return { market: d?.market ?? null, active: Array.isArray(d?.active) ? d.active : [],
-      onboarding: Array.isArray(d?.onboarding) ? d.onboarding : [] };
+      onboarding: Array.isArray(d?.onboarding) ? d.onboarding : [],
+      waitlist: Array.isArray(d?.waitlist) ? d.waitlist : [] };
   } catch {
     return EMPTY_MARKETS;
   }

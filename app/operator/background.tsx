@@ -83,10 +83,8 @@ export default function OperatorBackground() {
     }
     setDeclared(
       (out.note || t('traveler.bgRecordedWillAsk')) +
-        (out.transferTo
-          ? ' ' + t('traveler.bgHaveThemEmail', { agency: agency.trim(), email: out.transferTo }) +
-            (out.transferCaseNo ? t('traveler.bgCitingCase', { caseNo: out.transferCaseNo }) : '.')
-          : ''),
+        (out.transferCaseNo ? '\n' + t('traveler.bgCaseReference', { caseNo: out.transferCaseNo }) : '') +
+        '\n' + t('traveler.bgCoordinationOnly'),
     );
     refresh();
   };
@@ -124,6 +122,12 @@ export default function OperatorBackground() {
                    record.decision === 'expired' || needsRenewal ? t('traveler.bgRenewalRequired') : t('traveler.bgInProgress')}
                 </Text>
                 <Text style={styles.body}>{record.summary || t('traveler.bgStatusPending')}</Text>
+                {record.transferCaseNo ? (
+                  <Text style={styles.body}>{t('traveler.bgCaseReference', { caseNo: record.transferCaseNo })}</Text>
+                ) : null}
+                {(record.decision === 'awaiting_agency' || record.decision === 'review') ? (
+                  <Text style={styles.body}>{t('traveler.bgCoordinationOnly')}</Text>
+                ) : null}
               </Card>
             </>
           ) : null}

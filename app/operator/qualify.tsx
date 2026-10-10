@@ -124,7 +124,7 @@ export default function OperatorQualification() {
               </Text>
               {!areaAuthorized && (
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 8 }}>
-                  {[...area.active, ...area.onboarding].map((m) => (
+                  {[...area.active, ...area.onboarding, ...area.waitlist].map((m) => (
                     <Pressable
                       key={m.id}
                       hitSlop={6}
@@ -171,6 +171,13 @@ export default function OperatorQualification() {
               key={d.key}
               onPress={() => {
                 if (!areaAuthorized) {
+                  // Screening request is preparatory only. Operators on the
+                  // waitlist may request an existing-report review or guidance,
+                  // but NOT submit qualification, pay or commence operations.
+                  if (d.key === 'background' && area?.market?.status === 'waitlist') {
+                    router.navigate('/operator/background');
+                    return;
+                  }
                   setAreaError(t('operator.marketAdmissionRequired'));
                   return;
                 }

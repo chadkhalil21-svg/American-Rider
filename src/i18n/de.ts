@@ -548,7 +548,7 @@ export default {
     bgExternalProvider: 'Sichere externe Überprüfung',
     bgProviderBody: 'Führen Sie die erforderlichen Strafregister-, Sexualstraftäter- und Fahrverlaufsprüfungen über den sicheren Prozess des Anbieters durch. Sensible Prüfdaten verbleiben beim Anbieter.',
     bgContinueProvider: 'Beim Anbieter fortfahren',
-    bgProviderPending: 'American Rider schreibt keinen bestimmten Anbieter vor. Wählen Sie einen geeigneten Dienst und klären Sie die sichere Übermittlung vor der Zahlung.',
+    bgProviderPending: 'Der sichere Übermittlungsweg für Prüfberichte ist noch nicht freigegeben. Sie können einen vorhandenen Bericht zur Prüfung anmelden oder einen möglichen Anbieter nennen. Bezahlen Sie keine neue Prüfung und senden Sie keine sensiblen Unterlagen, bevor Anbieter und sicherer Übermittlungsweg bestätigt sind.',
     bgNeedNew: 'Benötigen Sie eine neue Überprüfung?',
     bgNeedNewBody: 'Wählen Sie ein geeignetes Prüfunternehmen. Lassen Sie die erforderlichen Prüfungen durchführen und das bestätigte Ergebnis sicher an American Rider übermitteln. Klären Sie Eignung und Kosten vor der Zahlung.',
     bgNewNotice: 'Dieser Antrag berechtigt nicht zur Durchführung von Fahrten. Der Anbieter muss die erforderlichen Hinweise und Einwilligungen einholen und eine verifizierte Übermittlung vereinbaren. Senden Sie keine Berichte per E-Mail.',

@@ -608,6 +608,7 @@ function mount(app, express, deps = {}) {
         const proposal = adverseForm(a.stage, 'propose', 'Begin pre-adverse review', `
           <p>Only after independent review of an authenticated CRA report. No denial or report transmission is performed by this form.</p>
           ${field('reference','Provider report reference (not a government ID)')}
+          ${field('reportIssuedOn','Verified CRA report date (YYYY-MM-DD)')}
           <label>Statutory ground <select name="reasonCode" required>
             <option value="">Choose...</option>
             <option value="criminal_history">Criminal-history disqualification</option>

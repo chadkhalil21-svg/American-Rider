@@ -72,9 +72,22 @@ function eligibleEvidenceMarkets(enabledMarketIds=[]) {
   const permitted=new Set(Array.isArray(enabledMarketIds)?enabledMarketIds:[]);
   return Object.keys(plans).filter(id=>plans[id]?.admissionOnly!==true&&permitted.has(id));
 }
+// Publisher APIs may return the same bounded sample in a different row/order
+// or JSON-key order. Those are not market-price changes and must not trigger
+// duplicate document-create attempts or a Firestore checkpoint write.
+function canonicalEvidence(value) {
+  if (Array.isArray(value)) return value.map(canonicalEvidence);
+  if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+    return Object.fromEntries(Object.keys(value).sort().map(k => [k, canonicalEvidence(value[k])]));
+  }
+  return value;
+}
 function sourceFingerprint(rows) {
   const crypto=require('node:crypto');
-  return crypto.createHash('sha256').update(JSON.stringify(rows)).digest('hex');
+  // Preserve duplicates/values. Only row permutation and object-key order
+  // are irrelevant. The sweep already restricts this set to a bounded sample.
+  const canonical=rows.map(row => JSON.stringify(canonicalEvidence(row))).sort();
+  return crypto.createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
 }
 async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false,enabledMarketIds=[]}={}){
   // A public research catalog does NOT create a live hourly workload.

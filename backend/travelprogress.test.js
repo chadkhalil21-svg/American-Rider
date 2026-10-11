@@ -19,6 +19,17 @@ const R=[];const check=(l,c,d)=>R.push({l,ok:!!c,d});
  {const h=dbFor(base,atDest);const o=await progressTravel({db:h.db,uid:'op1',rideId:'r1',status:'arrived',now});check('being at the destination cannot manufacture arrival at pickup',o.body.code==='outside_transition_radius');}
  {const h=dbFor(base,atPickup);const o=await progressTravel({db:h.db,uid:'op1',rideId:'r1',status:'arrived',now});check('current Operator at pickup can mark arrived',o.status===200&&h.data.rides.r1.status==='arrived'&&h.data.rides.r1.arrivedAt===now);}
  {const h=dbFor({...base,status:'arrived',party:{teen:true},teenPickup:{}},atPickup);const o=await progressTravel({db:h.db,uid:'op1',rideId:'r1',status:'onboard',now});check('Teen cannot board before server PIN verification',o.body.code==='teen_pickup_unverified');}
+ // Real PIN provisioning explicitly stores verifiedAt:null; null must NEVER mean verified.
+ for(const [name,verifiedAt] of [
+   ['null',null],['zero',0],['false',false],['empty text',''],
+   ['numeric text',String(now-1)],['future',now+60_000],['NaN',Number.NaN],
+ ]){
+   const h=dbFor({...base,status:'arrived',party:{teen:true},
+     teenPickup:{required:true,hash:'synthetic-hash',verifiedAt}},atPickup);
+   const o=await progressTravel({db:h.db,uid:'op1',rideId:'r1',status:'onboard',now});
+   check('Teen PIN: '+name+' is not verified',o.status===409&&
+     o.body.code==='teen_pickup_unverified'&&h.data.rides.r1.status==='arrived');
+ }
  {const h=dbFor({...base,status:'arrived',party:{teen:true},teenPickup:{verifiedAt:now-1}},atPickup);const o=await progressTravel({db:h.db,uid:'op1',rideId:'r1',status:'onboard',now});check('verified Teen can board',o.status===200&&h.data.rides.r1.status==='onboard');}
  {const h=dbFor({...base,status:'onboard'},atPickup);const o=await progressTravel({db:h.db,uid:'op1',rideId:'r1',status:'completed',now});check('pickup position cannot manufacture completion',o.body.code==='outside_transition_radius'&&!h.data.rides.r1.needsPayout);}
  {const h=dbFor({...base,status:'onboard'},atDest);const o=await progressTravel({db:h.db,uid:'op1',rideId:'r1',status:'completed',now});check('completion at destination queues payout server-side',o.status===200&&h.data.rides.r1.status==='completed'&&h.data.rides.r1.needsPayout===true);}

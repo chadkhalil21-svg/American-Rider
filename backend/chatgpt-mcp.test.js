@@ -108,6 +108,7 @@ function request(method,path,{body={},query={},headers={}}={}){
  }).run();
  assert.ok(form.redirect.startsWith(pending.redirect_uri+'?code='));
  const redirect=new URL(form.redirect),code=redirect.searchParams.get('code');
+ assert.equal(data.get('ar_mcp_oauth_codes/'+hash(code)).actor,'founder');
  assert.equal(redirect.searchParams.get('iss'),M.BASE);
  const exchange=()=>request('POST','/ar/oauth/token',{body:{
   grant_type:'authorization_code',client_id:pending.client_id,redirect_uri:pending.redirect_uri,

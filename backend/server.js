@@ -133,6 +133,7 @@ const { singleFlight } = require('./sweep-singleflight');
 const { createSweepCadence, createQuotaBackoff, quotaError } = require('./sweepcadence');
 const { createBackgroundReporter } = require('./workload-summary');
 const { sweepOperatorAccountFees } = require('./operatorfees');
+const { cachedPayoutStatus } = require('./stripe-duty-cache');
 const crypto = require('node:crypto');
 const WORKER_ID = crypto.randomUUID();
 const { send, receiptEmail, emailReady: mailReady } = require('./email');
@@ -1010,7 +1011,17 @@ app.post('/operator/online', requireAuth, requireFreshAuth, requireOperationalRe
         return refuse({ code: 'market_waitlist', error: 'New Operator offers are paused in this market.' });
       }
     }
-    const status = await connectAccountStatus(rec.stripeAccountId || null);
+    // Location renewals are not financial events. Reuse only a recent, server-bound
+    // Connect status from a direct provider check or a verified account.updated event.
+    // Recheck Stripe on first duty entry, after expiry, and at each paid acceptance.
+    // An absent/unreadable fleet record is NOT proof of payout readiness.
+    const dutySnap = await db.collection('operators').doc(String(req.uid)).get();
+    const dutyRecord = dutySnap.exists ? dutySnap.data() : null;
+    const cachedStatus = cachedPayoutStatus({
+      accountId: rec.stripeAccountId || null, fleet: dutyRecord,
+    });
+    const status = cachedStatus || await connectAccountStatus(rec.stripeAccountId || null);
+    const stripeCheckedAt = cachedStatus ? cachedStatus.stripeCheckedAt : Date.now();
     if (!status.payoutsEnabled) {
       return refuse({
         code: 'payouts_not_ready',
@@ -1147,6 +1158,11 @@ app.post('/operator/online', requireAuth, requireFreshAuth, requireOperationalRe
     const fleetUpdate = {
         uid: String(req.uid),
         ...identity,
+        // Bound to the account fetched server-side; never accept a phone's Stripe status.
+        // Do not extend the cached attestation timestamp on GPS-only renewals.
+        payoutsEnabled: true,
+        stripeAccountId: rec.stripeAccountId || null,
+        stripeCheckedAt,
         // Stored on the fleet record so dispatch can drop an operator whose policy runs out
         // during a shift, without waiting for them to go off duty and back on.
         insuranceExpiry: expiry,

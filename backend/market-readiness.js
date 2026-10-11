@@ -147,7 +147,7 @@ async function activateMarket({ db, market, region, actor, expectedVersion, prov
  * This never manufactures evidence, treats a proposal as a licence, or authorizes an
  * unconfigured state. A single failure means ZERO new county activations.
  */
-async function activateRegion({ db, entries, actor, expectedVersions, providerMissing = [], now = Date.now() }) {
+async function activateRegion({ db, entries, actor, expectedVersions, providerMissing = [], auditMethod = 'named_ops_mfa', now = Date.now() }) {
   if (!db || !actor || !Array.isArray(entries) || !entries.length || entries.length > 100 ||
       !expectedVersions || typeof expectedVersions !== 'object' || Array.isArray(expectedVersions))
     return { ok: false, code: 'invalid_region_request' };
@@ -204,7 +204,7 @@ async function activateRegion({ db, entries, actor, expectedVersions, providerMi
       tx.create(db.collection('audit_log').doc(), {
         at: now, action: 'market_activated', marketId: market.id,
         regionId, manifestVersion: manifest.version,
-        actor: { name: actor, method: 'named_ops_mfa' },
+        actor: { name: actor, method: ['named_ops_mfa','oauth_delegated_mfa'].includes(auditMethod) ? auditMethod : 'named_ops_mfa' },
       });
       newlyOpened.push(market.id);
     }
@@ -234,7 +234,7 @@ async function authorizeOnboarding({ db, market, region, actor, expectedVersion,
   });
 }
 
-async function pauseMarket({ db, market, actor, reason, now = Date.now() }) {
+async function pauseMarket({ db, market, actor, reason, auditMethod = 'named_ops_mfa', now = Date.now() }) {
   if (!db || !market || !actor || String(reason || '').trim().length < 8) return { ok: false, code: 'reason_required' };
   const ref = db.collection(COLLECTION).doc(market.id);
   return db.runTransaction(async (tx) => {
@@ -244,7 +244,7 @@ async function pauseMarket({ db, market, actor, reason, now = Date.now() }) {
       fleetCleanupPending: true, fleetCleanupCursor: null });
     tx.create(db.collection('audit_log').doc(), {
       at: now, action: 'market_paused', marketId: market.id,
-      actor: { name: actor, method: 'named_ops_mfa' }, reason: String(reason).slice(0, 500),
+      actor: { name: actor, method: ['named_ops_mfa','oauth_delegated_mfa'].includes(auditMethod) ? auditMethod : 'named_ops_mfa' }, reason: String(reason).slice(0, 500),
     });
     return { ok: true, status: 'paused' };
   });

@@ -114,6 +114,17 @@ function opsAuthMode() {
   return m === 'off' ? 'off (shared password disabled in production)' : `shared-${m}`;
 }
 
+/** Bind delegated credentials to a real, currently enabled named Ops account.
+ * A password rotation, secret rotation, account removal or loss of MFA invalidates them.
+ * Only the HMAC digest is persisted by OAuth; never the actual password or TOTP secret. */
+function oauthActorFingerprint(name) {
+  if (opsAuthMode() !== 'named' || !productionSecurityReady()) return null;
+  const account = opsAccounts().find(a => a.name === name);
+  if (!account) return null;
+  return crypto.createHmac('sha256', readKey('OPS_SESSION_SECRET'))
+    .update('ar-mcp-v1:' + account.name + ':' + account.pw).digest('hex');
+}
+
 /** A session token for one account. Changing that person's password ends their sessions. */
 const tokenFor = (acct) => crypto.createHash('sha256').update(`ar-ops:${acct.name}:${acct.pw}`).digest('hex');
 
@@ -323,6 +334,7 @@ ${unreadable.length ? `<section role="alert" style="border:2px solid #B42318;">
   <p>Affected sections: ${unreadable.map(esc).join(', ')}.</p>
   </section>` : ''}
 <p><a href="/ops/markets">Market readiness, evidence and pause controls →</a></p>
+<p><a href="/ar/oauth/connections">ChatGPT Operations connection · view or disconnect →</a></p>
 <p><a href="/ops/cases?kind=emergency">Urgent and deadline cases · acknowledge →</a> · <a href="/ops/cases?kind=support">Support cases →</a></p>
 <p><a href="/ops/screening">Operator screening · verify authenticated agency reports →</a></p>
 <p><a href="/ops/disputes">Stripe dispute evidence · review only →</a></p>
@@ -576,7 +588,10 @@ function mount(app, express, deps = {}) {
         ? sessionFor(acct, readKey('OPS_SESSION_SECRET'))
         : `${acct.name}.${tokenFor(acct)}`)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${60 * 60 * 12}; Secure`,
     );
-    res.redirect('/ops');
+    // Resume a pending OAuth consent only after real named Ops MFA sign-in.
+    // The following GET validates the signed, short-lived HttpOnly request cookie.
+    res.redirect(String(req.headers?.cookie || '').split(';').some(v =>
+      v.trim().startsWith('ar_mcp_pending=')) ? '/ar/oauth/consent' : '/ops');
   });
 
   // First-contact identity is a company-level reusable fact, not a new per-Operator
@@ -930,4 +945,4 @@ function mount(app, express, deps = {}) {
   });
 }
 
-module.exports = { mount, signedIn, opsAccounts, tokenFor, opsAuthMode, sharedMode, actorOf, opsConfigurationIssues };
+module.exports = { mount, signedIn, opsAccounts, tokenFor, opsAuthMode, sharedMode, actorOf, opsConfigurationIssues, oauthActorFingerprint };

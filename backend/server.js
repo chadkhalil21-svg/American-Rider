@@ -130,6 +130,7 @@ const { handleEvent, webhookReady } = require('./webhook');
 const { enqueueProviderEvent, processProviderEvent, sweepProviderEvents, replayDeadEvent } = require('./providerqueue');
 const { acquireLease, renewLease, releaseLease, DEFAULT_LEASE_MS } = require('./schedulerlease');
 const { singleFlight } = require('./sweep-singleflight');
+const { createSweepCadence, createQuotaBackoff, quotaError } = require('./sweepcadence');
 const { sweepOperatorAccountFees } = require('./operatorfees');
 const crypto = require('node:crypto');
 const WORKER_ID = crypto.randomUUID();
@@ -1867,6 +1868,10 @@ app.post('/charge-ride', requireAuth, LIMITS.payments, requireOperationalReadine
 // invoke the same leased sweep the process clock invokes. SCHEDULER_TOKEN is mandatory; callers
 // without the configured token fail closed before any operational work begins.
 let lastSweep = { at: 0, report: null };
+const maintenanceCadence = createSweepCadence();
+const quotaBackoff = createQuotaBackoff();
+const maintenanceSweep = (name, work) => maintenanceCadence.run(name, work);
+
 
 /**
  * One tick of everything the platform does on a clock.
@@ -1890,22 +1895,25 @@ async function runAllSweeps() {
     } }),
     sweepMonitor(),
     sweepAssignments({ checkMarket }),
-    sweepScreening(),
+    maintenanceSweep('screening', () => sweepScreening()),
     sweepSettlements(),
     sweepBookingRecovery({ db: adminDb(), stripeConfigured: keyMode !== 'no-key',
       deps: { refundableFor, refundTravel, cancelUnpaidIntent, verifiedTravelPayment,
         transferFixed, operatorPayoutAccount } }),
     sweepProviderEvents({ handlers: PROVIDER_HANDLERS, workerId: WORKER_ID }),
-    sweepOperatorAccountFees({
+    maintenanceSweep('operatorFees', () => sweepOperatorAccountFees({
       charge: ({ uid, email, month, amountCents }) =>
         chargeOperatorAccountFee({ uid, email, month, amountCents }),
       cardCountryFor: async (uid) => defaultCardCountry({ uid }),
-    }),
-    family.sweepFamilyAgeOut(),
-    sweepInsuranceMonitoring({ db: adminDb(), requestConfirmation: issueInsuranceConfirmationRequest, notify }),
-    runMarketReferenceSweep({ collectors: marketReferenceCollectors() }),
+    })),
+    maintenanceSweep('familyAgeOut', () => family.sweepFamilyAgeOut()),
+    maintenanceSweep('insuranceMonitoring', () => sweepInsuranceMonitoring({ db: adminDb(), requestConfirmation: issueInsuranceConfirmationRequest, notify })),
+
+    maintenanceSweep('marketReference', () => runMarketReferenceSweep({ collectors: marketReferenceCollectors() })),
+
     sweepPausedMarketFleet({ db: adminDb(), marketById: (id) => allMarkets().find((m) => m.id === id) }),
-    sweepAccountDeletion({ db: adminDb(), auth: adminStatus().ok ? require('firebase-admin/auth').getAuth() : null }),
+    maintenanceSweep('accountDeletion', () => sweepAccountDeletion({ db: adminDb(), auth: adminStatus().ok ? require('firebase-admin/auth').getAuth() : null })),
+
   ]);
   const unwrap = (r) => (r.status === 'fulfilled' ? r.value : { ok: false, reason: String(r.reason) });
   return {
@@ -1927,8 +1935,18 @@ async function runAllSweeps() {
 
 async function runLeasedSweepsOnce() {
   const name = 'operations_sweep';
+  // A quota-exhausted Firestore rejects writes/transactions. Retrying every minute
+  // wastes provider RPCs for up to 60 seconds each and amplifies the outage.
+  if (quotaBackoff.blocked()) return { ok:false, code:'firestore_quota_backoff',
+    retryInMs:quotaBackoff.remainingMs() };
   const lease = await acquireLease(name, { owner: WORKER_ID, ttlMs: DEFAULT_LEASE_MS });
-  if (!lease.ok) return { ok: false, reason: lease.reason || 'scheduler lease unavailable' };
+  if (!lease.ok) {
+    if (quotaError(lease.reason)) {
+      const retryAt = quotaBackoff.failure();
+      console.warn('[scheduler] Firestore quota exhausted; suspending optional sweeps until', new Date(retryAt).toISOString());
+    }
+    return { ok: false, reason: quotaError(lease.reason) ? 'Firestore quota exhausted' : (lease.reason || 'scheduler lease unavailable') };
+  }
   if (!lease.acquired) return { ok: true, skipped: 'another server owns this sweep', leaseUntil: lease.leaseUntil };
 
   // Renew well before expiry while provider/network work is still running. If this process
@@ -1940,9 +1958,16 @@ async function runLeasedSweepsOnce() {
   }, Math.max(15_000, Math.floor(DEFAULT_LEASE_MS / 3)));
   heartbeat.unref?.();
   try {
-    return await runAllSweeps();
+    const report = await runAllSweeps();
+    if (Object.values(report).some(quotaError)) {
+      const retryAt = quotaBackoff.failure();
+      console.warn('[scheduler] Firestore quota exhausted during sweeps; retry after', new Date(retryAt).toISOString());
+    } else quotaBackoff.clear();
+    return report;
   } finally {
     clearInterval(heartbeat);
+    // Release still follows existing lease safety. It must not become a reason
+    // to retry every failed maintenance task inside the same request.
     await releaseLease(name, { owner: WORKER_ID }).catch(() => {});
   }
 }

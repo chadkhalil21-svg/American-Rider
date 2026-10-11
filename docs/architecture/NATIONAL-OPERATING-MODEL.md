@@ -30,7 +30,7 @@ Realtime requirements cannot be reduced to a once-per-hour price polling or a on
 
 ## Zero-work safeguards implemented incrementally
 - PR #101: future markets in catalog are not automatically ingested; candidate source records capped.
-- This PR: for a configured market, **zero active authorized collectors causes zero Firestore operations**, identical source batch digest skips ingestion, append-only create skips writing duplicate historical trips, empty/no-new sample does not recompute up to 10,000 documents or rewrite pricing snapshots. Explicit `force` recalibration remains available.
+- This PR: for a configured market, **zero active authorized collectors causes zero Firestore operations**, identical source batch digest skips ingestion, append-only create skips writing duplicate historical trips, empty/no-new sample does not recompute up to 10,000 documents or rewrite pricing snapshots; an unchanged source fingerprint does not rewrite the market checkpoint hourly. Explicit `force` recalibration remains available.
 - Existing active-safety and finance recovery sweeps untouched. **Do not call this a full queue/real-time migration.**
 - A once-hourly stdout-only aggregated workload summary now reports each scheduler job's available counts, skipped or failed state without any personal fields or extra Firestore writes. These are **logical results, not billable read/write counts**; reconcile with Google's collection-level Usage Insights.
 

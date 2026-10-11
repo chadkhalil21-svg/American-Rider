@@ -79,10 +79,6 @@ async function applyResendDeliveryEvent({ db, event, now = Date.now() }) {
          Number(request.deliveryEventAt || 0) >= Number(event.eventAt || now))) {
       return { ok: true, ignored: true };
     }
-    tx.set(ref, {
-      deliveryStatus: event.type, deliveryEventAt: event.eventAt || now,
-      deliveryEventId: event.id, deliveryUpdatedAt: now,
-    }, { merge: true });
     // A bounce means contact cannot receive this request, NOT that insurance has lapsed.
     // Only the latest pending request may set an Operator-facing action; older/out-of-order
     // events and a completed confirmation cannot alter current Operator state.
@@ -103,6 +99,10 @@ async function applyResendDeliveryEvent({ db, event, now = Date.now() }) {
         }
       }
     }
+    tx.set(ref, {
+      deliveryStatus: event.type, deliveryEventAt: event.eventAt || now,
+      deliveryEventId: event.id, deliveryUpdatedAt: now,
+    }, { merge: true });
     return { ok: true, updated: true, status: event.type };
   });
 }

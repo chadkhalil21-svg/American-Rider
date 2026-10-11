@@ -84,5 +84,39 @@ function fakeDb() {
  assert.equal(await fleet.setAdmittedFleetOnline({db,operatorId:'op1',fleetUpdate:{available:true},markets:[market],now}),false,
    'a concurrently written closing fence forces the duty transaction to retry and refuse');
  assert.equal(db.rows.get('operators/op1').available,false);
- console.log('PASS market pause and renewal serialize; bounded fleet cleanup clears current and legacy availability');
+ // A signed Connect downgrade concurrent with a stale positive GPS heartbeat must win.
+ db.set('account_closures/op1',{closingAt:0,state:'open'});
+ db.set(key,{status:'active',manifestVersion:version,evidence,fleetCleanupPending:false});
+ const verifiedAt=now-1_000;
+ db.set('operators/op1',{marketId:market.id,available:true,
+   payoutsEnabled:true,stripeAccountId:'acct_operator_1',stripeCheckedAt:verifiedAt});
+ db.setBeforeCommit(()=>{
+   db.set('operators/op1',{...db.rows.get('operators/op1'),
+     payoutsEnabled:false,available:false,stripeCheckedAt:verifiedAt+1});
+ });
+ const oldRenewal=await fleet.setAdmittedFleetOnline({
+   db,operatorId:'op1',fleetUpdate:{available:true,
+     payoutsEnabled:true,stripeAccountId:'acct_operator_1',stripeCheckedAt:verifiedAt},
+   markets:[market],now,
+ });
+ assert.equal(oldRenewal,false,'transaction must not resurrect a newer signed Stripe restriction');
+ assert.equal(db.rows.get('operators/op1').available,false,
+   'Operator remains unavailable after the raced webhook');
+ db.set('operators/op1',{marketId:market.id,available:false,payoutsEnabled:false,
+   stripeCheckedAt:verifiedAt+1}); // legacy signed webhook record without account ID
+ assert.equal(await fleet.setAdmittedFleetOnline({
+   db,operatorId:'op1',fleetUpdate:{available:true,payoutsEnabled:true,
+     stripeAccountId:'acct_operator_1',stripeCheckedAt:verifiedAt},
+   markets:[market],now,
+ }),false,'old fleet records without account ID must also preserve newer downgrades');
+ // A subsequent actual Stripe retrieval is newer than the hold and can restore
+ // availability. This cannot be achieved by an old cached GPS heartbeat.
+ const verifiedRecovery=await fleet.setAdmittedFleetOnline({
+   db,operatorId:'op1',fleetUpdate:{available:true,
+     payoutsEnabled:true,stripeAccountId:'acct_operator_1',stripeCheckedAt:verifiedAt+2},
+   markets:[market],now,
+ });
+ assert.equal(verifiedRecovery,true,'a genuinely more recent provider check can recover duty');
+ assert.equal(db.rows.get('operators/op1').available,true);
+ console.log('PASS market pause, account-closure and Stripe webhook/renewal races serialize');
 })().catch(e=>{console.error(e);process.exitCode=1;});

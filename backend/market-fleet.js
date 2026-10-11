@@ -18,6 +18,21 @@ async function setAdmittedFleetOnline({ db, operatorId, fleetUpdate, markets, pr
         record: snap.exists ? snap.data() : {}, providerMissing, now });
       if (state.status !== 'active') return false;
     }
+    // A signed Stripe downgrade can arrive while an /operator/online renewal is
+    // evaluating an older positive status. Read the same fleet doc in this
+    // transaction: Firestore retries if the webhook races the write. Never let
+    // stale GPS state clear a newer financial hold.
+    if (fleetUpdate.available === true && fleetUpdate.payoutsEnabled === true) {
+      const opRef = db.collection('operators').doc(String(operatorId));
+      const current = await tx.get(opRef);
+      const status = current.exists ? current.data() || {} : {};
+      // Historic webhook records may predate the fleet account-ID field. A newer
+      // signed negative status must win even without that optional metadata.
+      if (status.payoutsEnabled === false &&
+          Number(status.stripeCheckedAt || 0) >= Number(fleetUpdate.stripeCheckedAt || 0)) {
+        return false;
+      }
+    }
     tx.set(db.collection('operators').doc(String(operatorId)), fleetUpdate, { merge: true });
     return true;
   });

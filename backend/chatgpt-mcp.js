@@ -65,20 +65,23 @@ const TOOLS = [
   { name: 'pause_market', title: 'Pause a market', description: 'Consequential: stop new paid Travel in a configured county using the existing audited market pause and fleet-cleanup path. Requires explicit founder command and ChatGPT confirmation.',
     inputSchema: { type: 'object', properties: { marketId: { type: 'string' }, reason: { type: 'string', minLength: 8, maxLength: 500 }, confirmation: { type: 'string', description: 'Must exactly equal PAUSE followed by a space and the market ID.' } }, required: ['marketId', 'reason', 'confirmation'], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: true }, scope: 'market:pause' },
-].map(t => ({...t, _meta: { securitySchemes: [{type: 'oauth2', scopes: [t.scope]}]}}));
+].map(t => ({...t, securitySchemes: [{type:'oauth2',scopes:[t.scope]}],
+  _meta: { securitySchemes: [{type:'oauth2',scopes:[t.scope]}]}}));
 function mount(app, express, deps) {
   const db = () => deps.db();
   const named = req => deps.opsSignedIn(req) && deps.authMode() === 'named';
   const operational = () => deps.isProduction() && deps.authMode() === 'named';
   const issueFingerprint = actor => deps.actorFingerprint(actor);
-  const requireOAuth = (req, res) => {
+  const authError = (reason = 'invalid_token', detail = 'Connect your American Rider account to continue.') => ({
+    content:[{type:'text',text:detail}], isError:true,
+    _meta:{'mcp/www_authenticate':[
+      'Bearer resource_metadata="' + BASE + '/.well-known/oauth-protected-resource", error="' +
+      reason + '", error_description="' + detail + '"',
+    ]},
+  });
+  const bearerFrom = req => {
     const v = String(req.get('authorization') || '');
-    if (!v.startsWith('Bearer ') || v.length > 500) {
-      res.set('WWW-Authenticate', 'Bearer resource_metadata="' + BASE + '/.well-known/oauth-protected-resource", scope="market:read"');
-      res.status(401).json({ error: 'oauth_required' });
-      return null;
-    }
-    return v.slice(7);
+    return v.startsWith('Bearer ') && v.length <= 500 ? v.slice(7) : null;
   };
   app.get('/.well-known/oauth-protected-resource', (_req, res) => res.json({
     resource: RESOURCE, authorization_servers: [BASE], scopes_supported: SCOPES,
@@ -216,8 +219,8 @@ function mount(app, express, deps) {
     if (method === 'tools/list') return res.json(jsonrpc(id, { tools: TOOLS }));
     if (method === 'ping') return res.json(jsonrpc(id, {}));
     if (method !== 'tools/call') return res.status(400).json(error(id, -32601, 'Unknown method.'));
-    const bearer = requireOAuth(req, res);
-    if (!bearer) return;
+    const bearer = bearerFrom(req);
+    if (!bearer) return res.json(jsonrpc(id, authError()));
     const chosen = TOOLS.find(t => t.name === data.params?.name);
     if (!chosen) return res.json(error(id, -32602, 'Unknown tool.'));
     const args = data.params?.arguments || {};
@@ -230,8 +233,8 @@ function mount(app, express, deps) {
     if (!auth || auth.expires <= Date.now() || auth.client_id !== CLIENT ||
         auth.resource !== RESOURCE || issueFingerprint(auth.actor) !== auth.fingerprint ||
         !String(auth.scope || '').split(' ').includes(chosen.scope)) {
-      res.set('WWW-Authenticate', 'Bearer resource_metadata="' + BASE + '/.well-known/oauth-protected-resource"');
-      return res.status(401).json(error(id, -32001, 'Authorization expired, revoked or insufficient.'));
+      return res.json(jsonrpc(id, authError('insufficient_scope',
+        'Authorization expired, revoked or insufficient. Reconnect American Rider.')));
     }
     try {
       let out;

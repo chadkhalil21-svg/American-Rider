@@ -134,6 +134,7 @@ const { createSweepCadence, createQuotaBackoff, quotaError } = require('./sweepc
 const { createBackgroundReporter } = require('./workload-summary');
 const { sweepOperatorAccountFees } = require('./operatorfees');
 const { cachedPayoutStatus } = require('./stripe-duty-cache');
+const { dutyCoverageExpiry } = require('./operator-duty-coverage');
 const crypto = require('node:crypto');
 const WORKER_ID = crypto.randomUUID();
 const { send, receiptEmail, emailReady: mailReady } = require('./email');
@@ -1097,22 +1098,25 @@ app.post('/operator/online', requireAuth, requireFreshAuth, requireOperationalRe
     const disclosure = user?.insuranceDisclosure || null;
     const screened = screeningCurrent(user?.screening || null);
 
-    const expiry = String(b.insuranceExpiry || '').trim();
-    const expiryMs = expiry ? Date.parse(`${expiry}T23:59:59Z`) : NaN;
-    if (!expiry || Number.isNaN(expiryMs)) {
-      return refuse({
-        code: 'no_coverage_on_file',
-        error: 'Record the expiry date of your commercial policy before going available.',
-      });
-    }
-    if (expiryMs < Date.now()) {
+    // A background location task carries position only. Do not trust the phone
+    // to supply a policy expiry, and never stamp a later client-supplied date.
+    // assessOperator above already verifies this document and independent status.
+    const coverage = dutyCoverageExpiry(user);
+    if (!coverage.ok && coverage.code === 'coverage_expired') {
       return refuse({
         code: 'coverage_expired',
         error:
-          'Your commercial coverage expired on ' + expiry + '. Travel cannot be assigned ' +
+          'Your commercial coverage expired on ' + coverage.expiry + '. Travel cannot be assigned ' +
           'until it is renewed and the new date is on file.',
       });
     }
+    if (!coverage.ok) {
+      return refuse({
+        code: 'no_coverage_on_file',
+        error: 'A verified commercial policy expiry is required before going available.',
+      });
+    }
+    const expiry = coverage.expiry;
 
     const lat = Number(b.lat);
     const lng = Number(b.lng);

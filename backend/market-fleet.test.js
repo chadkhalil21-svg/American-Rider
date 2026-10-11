@@ -102,6 +102,13 @@ function fakeDb() {
  assert.equal(oldRenewal,false,'transaction must not resurrect a newer signed Stripe restriction');
  assert.equal(db.rows.get('operators/op1').available,false,
    'Operator remains unavailable after the raced webhook');
+ db.set('operators/op1',{marketId:market.id,available:false,payoutsEnabled:false,
+   stripeCheckedAt:verifiedAt+1}); // legacy signed webhook record without account ID
+ assert.equal(await fleet.setAdmittedFleetOnline({
+   db,operatorId:'op1',fleetUpdate:{available:true,payoutsEnabled:true,
+     stripeAccountId:'acct_operator_1',stripeCheckedAt:verifiedAt},
+   markets:[market],now,
+ }),false,'old fleet records without account ID must also preserve newer downgrades');
  // A subsequent actual Stripe retrieval is newer than the hold and can restore
  // availability. This cannot be achieved by an old cached GPS heartbeat.
  const verifiedRecovery=await fleet.setAdmittedFleetOnline({

@@ -1909,7 +1909,13 @@ async function runAllSweeps() {
     maintenanceSweep('familyAgeOut', () => family.sweepFamilyAgeOut()),
     maintenanceSweep('insuranceMonitoring', () => sweepInsuranceMonitoring({ db: adminDb(), requestConfirmation: issueInsuranceConfirmationRequest, notify })),
 
-    maintenanceSweep('marketReference', () => runMarketReferenceSweep({ collectors: marketReferenceCollectors() })),
+    maintenanceSweep('marketReference', () => runMarketReferenceSweep({
+      collectors: marketReferenceCollectors(),
+      // The evidence catalog contains future regions (e.g. Chicago); catalog entries
+      // are not service market authorization. Never import 1,000 trips hourly for
+      // unconfigured markets while the platform is still pre-launch in Florida.
+      enabledMarketIds: allMarkets().filter(m => m.regionId && m.status === 'active').map(m => m.id),
+    })),
 
     sweepPausedMarketFleet({ db: adminDb(), marketById: (id) => allMarkets().find((m) => m.id === id) }),
     maintenanceSweep('accountDeletion', () => sweepAccountDeletion({ db: adminDb(), auth: adminStatus().ok ? require('firebase-admin/auth').getAuth() : null })),

@@ -117,10 +117,18 @@ async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false
     // No new observations => do not scan up to 10k old documents and do
     // not rewrite a snapshot just to change its asOf timestamp.
     const reference=(force || written>0)?await recomputeMarket(db,marketId,{now}):null;
-    await stateRef.set({lastSweepAt:now,lastSweepIso:new Date(now).toISOString(),
-      sourceFingerprints:fingerprints,lastWritten:written,
-      ...(reference?{lastReferenceAsOf:reference.asOf}:{}),collectorResults:results},{merge:true});
-    report.markets[marketId]={written,reference,skipped:written===0?'no_new_observations':null,collectors:results};
+    // No source changes and no recalibration? No database write at all.
+    // Periodic scheduling is already handled in-process; the durable checkpoint
+    // records actual evidence changes rather than charging once per market/hour.
+    const fingerprintsChanged=Object.keys(fingerprints).some(
+      id=>fingerprints[id]!==((state.sourceFingerprints||{})[id]));
+    if (written>0 || fingerprintsChanged || force) {
+      await stateRef.set({lastSweepAt:now,lastSweepIso:new Date(now).toISOString(),
+        sourceFingerprints:fingerprints,lastWritten:written,
+        ...(reference?{lastReferenceAsOf:reference.asOf}:{}),collectorResults:results},{merge:true});
+    }
+    report.markets[marketId]={written,reference,
+      skipped:written===0?'no_new_observations':null,collectors:results};
   }
   return report;
 }

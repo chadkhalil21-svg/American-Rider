@@ -91,3 +91,34 @@ export async function resolveCurrentDeparture(): Promise<DepPlace | null> {
     return null;
   }
 }
+
+/**
+ * Operator duty needs a fresh position, never a reverse-geocoded address label.
+ * The server validates eligibility/market status; this only establishes where
+ * the physical device reports it is. A location without reliable age/accuracy
+ * is not evidence of current dispatch availability.
+ */
+export async function resolveOperatorDutyPosition({
+  requestPermission = false,
+}: { requestPermission?: boolean } = {}): Promise<{ lat: number; lng: number } | null> {
+  try {
+    const permission = requestPermission
+      ? await Location.requestForegroundPermissionsAsync()
+      : await Location.getForegroundPermissionsAsync();
+    if (permission.status !== 'granted') return null;
+    const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+    const lat = Number(pos.coords.latitude);
+    const lng = Number(pos.coords.longitude);
+    const accuracy = Number(pos.coords.accuracy);
+    const ageMs = Date.now() - Number(pos.timestamp);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) ||
+        Math.abs(lat) > 90 || Math.abs(lng) > 180 ||
+        pos.coords.accuracy === null || !Number.isFinite(accuracy) ||
+        accuracy < 0 || accuracy > 150 ||
+        !Number.isFinite(ageMs) || ageMs < -5_000 || ageMs > 60_000 ||
+        pos.mocked === true) return null;
+    return { lat, lng };
+  } catch {
+    return null;
+  }
+}

@@ -102,7 +102,7 @@ async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false
         if(!Array.isArray(observed))throw new Error('collector returned an invalid batch');
         const rows=observed.slice(0,perSourceCap);
         const fingerprint=sourceFingerprint(rows);
-        if(fingerprints[sourceId]===fingerprint) {
+        if(!force && fingerprints[sourceId]===fingerprint) {
           results.push({sourceId,ok:true,observations:0,skipped:'unchanged_source'});
           continue;
         }
@@ -114,7 +114,7 @@ async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false
     }
     // No new observations => do not scan up to 10k old documents and do
     // not rewrite a snapshot just to change its asOf timestamp.
-    const reference=written>0?await recomputeMarket(db,marketId,{now}):null;
+    const reference=(force || written>0)?await recomputeMarket(db,marketId,{now}):null;
     await stateRef.set({lastSweepAt:now,lastSweepIso:new Date(now).toISOString(),
       sourceFingerprints:fingerprints,lastWritten:written,
       ...(reference?{lastReferenceAsOf:reference.asOf}:{}),collectorResults:results},{merge:true});

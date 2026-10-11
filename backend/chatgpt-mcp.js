@@ -142,7 +142,7 @@ function mount(app, express, deps) {
       await store.collection('ar_mcp_oauth_codes').doc(hash(code)).create({
         actor, fingerprint: issueFingerprint(actor), scope: ctx.scope, client_id: CLIENT,
         redirect_uri: REDIRECT, resource: RESOURCE, challenge: ctx.challenge,
-        expires: Date.now() + 90 * 1000, consumed: false,
+        expires: Date.now() + 90 * 1000, authorizedAt: Date.now(), consumed: false,
       });
       cookie(res, '', 0);
       const callback = new URL(REDIRECT);
@@ -184,10 +184,12 @@ function mount(app, express, deps) {
               previous.resource !== RESOURCE) return null;
         } else return null;
         if (!previous.actor || issueFingerprint(previous.actor) !== previous.fingerprint) return null;
+        const revokeSnap = await tx.get(store.collection('ar_mcp_revoke').doc(previous.actor));
+        if (revokeSnap.exists && Number(revokeSnap.data().revokedAt) >= Number(previous.authorizedAt || 0)) return null;
         tx.set(ref, { consumed: true }, { merge: true });
         const detail = {
           actor: previous.actor, fingerprint: previous.fingerprint, scope: previous.scope,
-          client_id: CLIENT, resource: RESOURCE,
+          client_id: CLIENT, resource: RESOURCE, authorizedAt: previous.authorizedAt || now,
         };
         tx.create(store.collection('ar_mcp_access').doc(hash(access)), {
           ...detail, expires: now + 60 * 60 * 1000,
@@ -201,6 +203,25 @@ function mount(app, express, deps) {
     if (!auth) return res.status(400).json({error:'invalid_grant'});
     return res.json({access_token: access, token_type:'Bearer', expires_in:3600,
       refresh_token: refresh, scope: auth.scope});
+  });
+  // An authenticated founder can revoke every prior OAuth grant with one phone action.
+  app.get('/ar/oauth/connections', (req,res) => {
+    if (!named(req)) return res.redirect(303,'/ops');
+    res.set('Cache-Control','no-store').type('html').send(
+      '<!doctype html><html><meta name="viewport" content="width=device-width,initial-scale=1">' +
+      '<body style="font:18px system-ui;max-width:540px;margin:50px auto;padding:22px">' +
+      '<h1>ChatGPT connection</h1><p>Disconnect any existing delegated American Rider sessions.</p>' +
+      '<form method="post" action="/ar/oauth/disconnect">' +
+      '<button style="padding:14px">Disconnect ChatGPT</button></form>' +
+      '<p><a href="/ops">Return to Operations</a></p></body></html>');
+  });
+  app.post('/ar/oauth/disconnect', express.urlencoded({extended:false}), async (req,res) => {
+    const actor=named(req);
+    if (!actor || req.get('origin') !== BASE) return res.status(403).send('Named Operations MFA required.');
+    try {
+      await db().collection('ar_mcp_revoke').doc(actor).set({revokedAt:Date.now()},{merge:true});
+      return res.type('html').send('<h1>ChatGPT disconnected</h1><p>Existing access and refresh tokens are now invalid.</p><p><a href="/ops">Operations</a></p>');
+    } catch { return res.status(503).send('Disconnection not confirmed. Retry from Operations.'); }
   });
   app.post('/mcp', async (req, res) => {
     res.set('Cache-Control', 'no-store');
@@ -230,7 +251,14 @@ function mount(app, express, deps) {
       const snap = await db()?.collection('ar_mcp_access').doc(hash(bearer)).get();
       auth = snap?.exists ? snap.data() : null;
     } catch { return res.status(503).json(error(id, -32000, 'Authorization unavailable.')); }
-    if (!auth || auth.expires <= Date.now() || auth.client_id !== CLIENT ||
+    let revoked=false;
+    if (auth?.actor) {
+      try {
+        const snapshot=await db().collection('ar_mcp_revoke').doc(auth.actor).get();
+        revoked=snapshot.exists && Number(snapshot.data().revokedAt) >= Number(auth.authorizedAt || 0);
+      } catch { return res.status(503).json(error(id,-32000,'Credential revocation status unavailable.')); }
+    }
+    if (!auth || revoked || auth.expires <= Date.now() || auth.client_id !== CLIENT ||
         auth.resource !== RESOURCE || issueFingerprint(auth.actor) !== auth.fingerprint ||
         !String(auth.scope || '').split(' ').includes(chosen.scope)) {
       return res.json(jsonrpc(id, authError('insufficient_scope',

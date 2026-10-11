@@ -103,7 +103,7 @@ async function main() {
   }), /headers/);
   const packet = JSON.stringify({
     type: 'email.bounced', created_at: '2026-10-11T05:00:00.000Z',
-    data: { email_id: 'message-1', to: ['broker@example.test'],
+    data: { email_id: 'message-1', from: 'American Rider Insurance Verification <insurance@americanrider.app>', to: ['broker@example.test'],
       bounce: { message: 'private provider information must not be stored' } },
   });
   const h = signed(packet, { signature: signatureFor(Buffer.from(packet),
@@ -113,8 +113,11 @@ async function main() {
   assert.deepEqual(Object.keys(clean).sort(), ['emailId','eventAt','id','recipient','type']);
   assert(!JSON.stringify(clean).includes('private provider information'));
   assert.equal(sanitizeResendEvent('event1', { type: 'domain.created', data: {} }), null);
+  assert.equal(sanitizeResendEvent('event2', { type: 'email.bounced', data: {
+    email_id: 'message-1', from: 'receipts@americanrider.app',
+  } }), null, 'ordinary receipts never enter the insurance provider queue');
   assert.throws(() => sanitizeResendEvent('event1',
-    { type: 'email.sent', data: { email_id: '' } }), /invalid email/);
+    { type: 'email.sent', data: { email_id: '', from: 'insurance@americanrider.app' } }), /invalid email/);
 
   const h1 = database();
   const event = (type, time, extra = {}) => ({

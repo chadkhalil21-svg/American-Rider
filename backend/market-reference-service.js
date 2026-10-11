@@ -59,13 +59,14 @@ async function recomputeMarket(db,marketId,{now=Date.now(),lookbackDays=90}={}){
 }
 
 async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false,enabledMarketIds=[]}={}){
-  const db=adminDb();
-  if(!db)return{ok:false,reason:'no database'};
   const plans=require('./market-evidence').MARKET_EVIDENCE_PLANS;
   // Research/catalog entries must not trigger production Firestore ingestion.
   // Only explicit, configured service markets are eligible for scheduled collection.
   const permitted=new Set(Array.isArray(enabledMarketIds)?enabledMarketIds:[]);
   const markets=Object.keys(plans).filter(id=>plans[id]?.admissionOnly!==true&&permitted.has(id));
+  if(!markets.length)return{ok:true,markets:{},skipped:'no_enabled_service_markets'};
+  const db=adminDb();
+  if(!db)return{ok:false,reason:'no database'};
   const report={ok:true,markets:{}};
   for(const marketId of markets){
     const plan=planForRegion(marketId);

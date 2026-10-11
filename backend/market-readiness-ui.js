@@ -185,7 +185,7 @@ ${otherRegionActions}
 <details id="other-markets"><summary>Plan another city or state</summary>
 ${planner}
 </details>
-<h2>South Florida · commissioning details</h2>
+<h2>Market commissioning details</h2>
 <p>These counties are already configured geographically. The system checks their operational requirements automatically.
 Expand a county's details only when you need to investigate an exception or authorize a market that is genuinely ready.</p>
 <p><strong>Two separate controls:</strong> counties are configured geographically, but paid Travel requires separate commercial approval.

@@ -36,7 +36,9 @@ async function progressTravel({ db, uid, rideId, status, now = Date.now() }) {
     if (!TRANSITIONS[next].includes(current)) return fail(409, `Travel cannot move from ${current || 'unknown'} to ${next}`, 'invalid_transition');
 
     // Teen pickup verification is server-stamped by /travel/teen-pickup/verify.
-    if (next === 'onboard' && ride.party?.teen === true && !Number.isFinite(Number(ride.teenPickup?.verifiedAt))) {
+    const teenVerifiedAt = ride.teenPickup?.verifiedAt;
+    if (next === 'onboard' && ride.party?.teen === true &&
+        (!Number.isSafeInteger(teenVerifiedAt) || teenVerifiedAt <= 0 || teenVerifiedAt > now)) {
       return fail(409, 'Verify the Teen pickup code before boarding.', 'teen_pickup_unverified');
     }
 

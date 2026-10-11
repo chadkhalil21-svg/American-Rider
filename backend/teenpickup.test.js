@@ -23,6 +23,11 @@ const before=process.env.TEEN_PIN_SECRET;
   const second=await provisionTeenPin({rideRef:ref('r1'),rideId:'r1',party:base.party});
   assert.equal(second.pin,first.pin);assert.equal(second.reused,true);
   assert(!teenMayBoard(rows.r1));
+  for(const invalid of [null,0,false,'','123',Date.now()+60_000]){
+    assert.equal(teenMayBoard({...rows.r1,teenPickup:{...rows.r1.teenPickup,verifiedAt:invalid}}),false,
+      'unverified or forged Teen pickup timestamp must not permit boarding');
+  }
+
   assert.equal((await verifyTeenPin({rideId:'r1',operatorUid:'stranger',pin:first.pin})).status,403);
   assert.equal((await verifyTeenPin({rideId:'r1',operatorUid:'op',pin:first.pin})).status,200);
   assert(teenMayBoard(rows.r1));

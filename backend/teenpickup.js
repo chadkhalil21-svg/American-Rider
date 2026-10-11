@@ -46,5 +46,10 @@ async function verifyTeenPin({rideId,operatorUid,pin,now=Date.now()}){
   tx.set(ref,{teenPickup:{...r.teenPickup,verifiedAt:now,verifiedBy:String(operatorUid)}},{merge:true});return {ok:true,status:200,required:true,verified:true};
  });
 }
-function teenMayBoard(ride){return ride?.party?.teen!==true||!!ride?.teenPickup?.verifiedAt;}
+function teenMayBoard(ride, now = Date.now()){
+ if(ride?.party?.teen!==true)return true;
+ const verifiedAt=ride?.teenPickup?.verifiedAt;
+ // The unverified state is explicitly null. Only a genuine server-stamped time is proof.
+ return Number.isSafeInteger(verifiedAt)&&verifiedAt>0&&verifiedAt<=now;
+}
 module.exports={provisionTeenPin,verifyTeenPin,teenMayBoard,teenPinReady,pinForRide};

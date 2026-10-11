@@ -1,0 +1,66 @@
+'use strict';
+// Management planning ONLY — not a quote, a charge, a production load test,
+// a provider contract, an insurance certificate, or an authorization to launch.
+// Published provider rates: Stripe Connect, Firestore Standard (regional),
+// Resend Pro + overages, Stadia commercial Starter, DigitalOcean Droplets,
+// Render. Consumption, staff, corporate and capacity ladder are SCENARIOS.
+const DEFAULT_TIERS=Object.freeze({
+  50:{backendUsd:25,routingUsd:96,monitoringUsd:30},
+  100:{backendUsd:50,routingUsd:96,monitoringUsd:40},
+  200:{backendUsd:100,routingUsd:192,monitoringUsd:60},
+  500:{backendUsd:200,routingUsd:384,monitoringUsd:100},
+  1000:{backendUsd:400,routingUsd:768,monitoringUsd:160},
+});
+function nonNegativeNumber(value,label){if(!Number.isFinite(value)||value<0)throw new RangeError(label+' must be finite and nonnegative');return value;}
+function computeOperatorFleetEconomics(registeredOperators,overrides={}){
+  if(!Number.isSafeInteger(registeredOperators)||registeredOperators<0)throw new RangeError('registeredOperators must be a nonnegative integer');
+  const opt={activeFraction:.60,operatingDays:20,travelsPerActiveDay:5,
+    hoursPerActiveDay:6,mapCreditsPerTravel:500,mapCreditsPerDutyDay:400,
+    emailsPerTravel:2,readsPerTravel:100,writesPerTravel:40,
+    presenceWritesPerActiveDay:360,otherOperationsCentsPerTravel:17,
+    presenceBudgetUsdPerHour:.035,corporateBaseUsd:1500,
+    corporatePerRegisteredOperatorUsd:3,collectionFraction:1,
+    ...overrides};
+  for(const [key,value] of Object.entries(opt))if(key!=='tiers')nonNegativeNumber(value,key);
+  if(opt.activeFraction>1||opt.collectionFraction>1)throw new RangeError('fractions must be <= 1');
+  const tier=opt.tiers||DEFAULT_TIERS[registeredOperators];
+  if(!tier)throw new RangeError('specify paid capacity tier for this cohort, no unverified infinite scaling');
+  for(const [key,value] of Object.entries(tier))nonNegativeNumber(value,key);
+  const active=registeredOperators*opt.activeFraction;
+  const travels=active*opt.operatingDays*opt.travelsPerActiveDay;
+  const monthlyHours=active*opt.operatingDays*opt.hoursPerActiveDay;
+  const cardUsd=travels*.88,connectPercentUsd=travels*.09;
+  const connectActiveUsd=active*2,accountFeeCollectedUsd=connectActiveUsd*opt.collectionFraction;
+  const payoutFixedUsd=active*4*.25;
+  const reservedRiskUsd=travels*.25; // earmarked provision, not vendor cash
+  const otherVariableUsd=travels*opt.otherOperationsCentsPerTravel/100;
+  const operatorDutyUsd=monthlyHours*opt.presenceBudgetUsdPerHour;
+  const mapCredits=travels*opt.mapCreditsPerTravel+active*opt.operatingDays*opt.mapCreditsPerDutyDay;
+  const paidMapsUsd=20+Math.max(0,mapCredits-1_000_000)*.03/1000;
+  const emailCount=travels*opt.emailsPerTravel;
+  const emailUsd=20+Math.max(0,emailCount-50000)*.90/1000;
+  const avgReadDaily=travels*opt.readsPerTravel/30;
+  const avgWriteDaily=(travels*opt.writesPerTravel+
+    active*opt.operatingDays*opt.presenceWritesPerActiveDay)/30;
+  const firestoreUsd=30*(Math.max(0,avgReadDaily-50000)*.03/100000+
+    Math.max(0,avgWriteDaily-20000)*.09/100000);
+  const infrastructureUsd=tier.backendUsd+tier.routingUsd+tier.monitoringUsd;
+  const corporateBudgetUsd=opt.corporateBaseUsd+
+    registeredOperators*opt.corporatePerRegisteredOperatorUsd;
+  const expenses={cardUsd,connectPercentUsd,connectActiveUsd,payoutFixedUsd,
+    reservedRiskUsd,otherVariableUsd,operatorDutyUsd,paidMapsUsd,
+    emailUsd,firestoreUsd,infrastructureUsd,corporateBudgetUsd};
+  const totalExpenseUsd=Object.values(expenses).reduce((x,y)=>x+y,0);
+  const platformTravelRevenueUsd=travels*2.67;
+  const grossRevenueUsd=platformTravelRevenueUsd+accountFeeCollectedUsd;
+  const remainderUsd=grossRevenueUsd-totalExpenseUsd;
+  return {registeredOperators,activeOperators:active,
+    travelsDaily:travels/30,travelsMonthly:travels,
+    mapCredits,emailCount,payouts:active*4,
+    platformTravelRevenueUsd,accountFeeCollectedUsd,grossRevenueUsd,
+    expenses,totalExpenseUsd,remainderUsd,
+    remainderPerTravelUsd:travels?remainderUsd/travels:null,
+    breakEven:remainderUsd>=0,
+    assumptions:opt};
+}
+module.exports={computeOperatorFleetEconomics,DEFAULT_TIERS};

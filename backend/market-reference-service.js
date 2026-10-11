@@ -80,8 +80,10 @@ async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false
   // A public research catalog does NOT create a live hourly workload.
   // Even when a market is configured, zero active licensed collectors means
   // zero Firestore reads/writes and no meaningless snapshot recomputation.
-  const markets=eligibleEvidenceMarkets(enabledMarketIds)
-    .filter(id=>planForRegion(id).sources.some(sourceId=>typeof collectors[sourceId]==='function'));
+  const eligible=eligibleEvidenceMarkets(enabledMarketIds);
+  if(!eligible.length)return{ok:true,markets:{},skipped:'no_enabled_service_markets'};
+  const markets=eligible.filter(id=>
+    planForRegion(id).sources.some(sourceId=>typeof collectors[sourceId]==='function'));
   if(!markets.length)return{ok:true,markets:{},skipped:'no_active_market_collectors'};
   const db=adminDb();
   if(!db)return{ok:false,reason:'no database'};

@@ -49,7 +49,7 @@ let online=true, actor='founder', production=true;
 const market={id:'fl-miami-dade',regionId:'fl-southeast'},region={id:'fl-southeast'};
 const deps={
  db:()=>db,opsSignedIn:()=>actor,authMode:()=>online?'named':'off',
- actorFingerprint:()=>online?'fingerprint123':null,isProduction:()=>production,
+ actorFingerprint:(identity)=>identity==='founder' && online?'fingerprint123':null,isProduction:()=>production,
  markets:()=>[market], regions:[region], productionReadiness:()=>({missing:['screening_provider']}),
  inspectMarket:async()=>({status:'waitlist',readyToActivate:false,missing:[{id:'screening_agreement',reference:'secret-must-not-appear'}]}),
  manifestFor:()=>({version:'v1'}),
@@ -108,6 +108,7 @@ function request(method,path,{body={},query={},headers={}}={}){
  }).run();
  assert.ok(form.redirect.startsWith(pending.redirect_uri+'?code='));
  const redirect=new URL(form.redirect),code=redirect.searchParams.get('code');
+ assert.equal(data.get('ar_mcp_oauth_codes/'+hash(code)).actor,'founder');
  assert.equal(redirect.searchParams.get('iss'),M.BASE);
  const exchange=()=>request('POST','/ar/oauth/token',{body:{
   grant_type:'authorization_code',client_id:pending.client_id,redirect_uri:pending.redirect_uri,

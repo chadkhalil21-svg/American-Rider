@@ -24,6 +24,8 @@ check('new policy persists following months',noWaiverConsentEffective(consent,'2
 check('missing verified server consent fails closed',!noWaiverConsentEffective({accountFeeConsent:{...consent.accountFeeConsent,verifiedServerSide:false}},'2026-11'));
 check('missing revision fails closed',!noWaiverConsentEffective({accountFeeConsent:{...consent.accountFeeConsent,revision:'old'}},'2026-11'));
 check('incomplete consent fails closed',!noWaiverConsentEffective({accountFeeConsent:{revision:NO_WAIVER_POLICY_REVISION,effectiveMonth:'2026-11'}},'2026-11'));
+check('consent cannot apply retroactively',!noWaiverConsentEffective({accountFeeConsent:{...consent.accountFeeConsent,acceptedAt:Date.UTC(2026,10,3)}},'2026-11'));
+check('invalid month never accepted',!noWaiverConsentEffective({accountFeeConsent:{...consent.accountFeeConsent,effectiveMonth:'2026-19'}},'2026-19'));
 check('month key is UTC',monthKey(Date.UTC(2026,8,30,23,59))==='2026-09');
 const b=monthBounds('2026-02');
 check('month bounds are exact',b.start===Date.UTC(2026,1,1)&&b.end===Date.UTC(2026,2,1));

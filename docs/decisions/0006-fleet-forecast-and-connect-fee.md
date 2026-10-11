@@ -22,13 +22,13 @@ Funding: $2.67 platform Travel revenue + $2 active-account recovery (assumed 100
 
 | Registered Operators | Active Operators | Completed Travels/month | Monthly service/expense budget, including contingency provision | Pre-tax modeled remainder |
 |---:|---:|---:|---:|---:|
-| 50 | 30 | 3,000 | $6,309 | **$1,701** |
-| 100 | 60 | 6,000 | $10,978 | **$5,042** |
-| 200 | 120 | 12,000 | $20,337 | **$11,703** |
-| 500 | 300 | 30,000 | $48,426 | **$31,674** |
-| 1,000 | 600 | 60,000 | $95,235 | **$64,965** |
+| 50 | 30 | 3,000 | $6,369 | **$1,701** |
+| 100 | 60 | 6,000 | $11,098 | **$5,042** |
+| 200 | 120 | 12,000 | $20,577 | **$11,703** |
+| 500 | 300 | 30,000 | $49,026 | **$31,674** |
+| 1,000 | 600 | 60,000 | $96,435 | **$64,965** |
 
-**No universal profitability guarantee:** At 50 registered Operators and only 10 active, completing 2/day × 20 days each, the 400-Travels/month scenario loses about **$1,421** under the same budget. At the normal 3,000-Travels base but with company fixed budget **$5,000** instead of $1,500, the 50-Operator scenario loses about **$1,799**. These are essential adverse checks, not defects to hide.
+**Accounting consistency:** A platform that fully collects the active account charge must record BOTH the $2 from the Operator in gross receipts and the $2 charged by Stripe as an expense. They cancel in the pre-tax remainder, but cannot simply disappear from an 'all expenses' table. The displayed totals include both sides, assuming successful collection, not zero spend or extra profit.\n\n**No universal profitability guarantee:** At 50 registered Operators and only 10 active, completing 2/day × 20 days each, the 400-Travels/month scenario loses about **$1,421** under the same budget. At the normal 3,000-Travels base but with company fixed budget **$5,000** instead of $1,500, the 50-Operator scenario loses about **$1,799**. These are essential adverse checks, not defects to hide.
 
 The map fallback and paid email lines are included in the expense budget even though the service may in the future choose to self-host or contract for different terms. **Never double-count** these plus a purported per-Travel blanket $0.25; this model replaces the existing overhead allowance with named categories and retains the $0.25 loss reserve as a provision.
 
@@ -44,13 +44,13 @@ The map fallback and paid email lines are included in the expense budget even th
 
 | Registered Operators | Active | Monthly completed Travels | Total monthly budget incl risk provision and illustrative company placeholder | Monthly pre-tax scenario remainder |
 |---:|---:|---:|---:|---:|
-| 50 | 30 | 3,000 | **$6,309** | **+$1,701** |
-| 100 | 60 | 6,000 | **$10,978** | **+$5,042** |
-| 200 | 120 | 12,000 | **$20,337** | **+$11,703** |
-| 500 | 300 | 30,000 | **$48,426** | **+$31,674** |
-| 1,000 | 600 | 60,000 | **$95,235** | **+$64,965** |
-| 10,000 | 6,000 | 600,000 | **$940,207** | **+$661,793** |
-| 50,000 | 30,000 | 3,000,000 | **$4,695,641** | **+$3,314,359** |
+| 50 | 30 | 3,000 | **$6,369** | **+$1,701** |
+| 100 | 60 | 6,000 | **$11,098** | **+$5,042** |
+| 200 | 120 | 12,000 | **$20,577** | **+$11,703** |
+| 500 | 300 | 30,000 | **$49,026** | **+$31,674** |
+| 1,000 | 600 | 60,000 | **$96,435** | **+$64,965** |
+| 10,000 | 6,000 | 600,000 | **$952,207** | **+$661,793** |
+| 50,000 | 30,000 | 3,000,000 | **$4,755,641** | **+$3,314,359** |
 
 At 10K/50K, stage routing/Render/monitor budget is a **linear hypothetical extrapolation** of 1K, not independently benchmarked capacity. The platform fee / Fare split and actual payment math are unchanged by this management-only forecast.
 

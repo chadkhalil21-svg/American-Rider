@@ -69,7 +69,9 @@ const TOOLS = [
   _meta: { securitySchemes: [{type:'oauth2',scopes:[t.scope]}]}}));
 function mount(app, express, deps) {
   const db = () => deps.db();
-  const named = req => deps.opsSignedIn(req) && deps.authMode() === 'named';
+  // Return the authenticated account identity, not a boolean.
+  // Consent must bind the real named Ops principal to its credential fingerprint.
+  const named = req => deps.authMode() === 'named' ? deps.opsSignedIn(req) : null;
   const operational = () => deps.isProduction() && deps.authMode() === 'named';
   const issueFingerprint = actor => deps.actorFingerprint(actor);
   const authError = (reason = 'invalid_token', detail = 'Connect your American Rider account to continue.') => ({

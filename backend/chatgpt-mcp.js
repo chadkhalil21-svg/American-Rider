@@ -4,6 +4,7 @@
 // Token material is never stored in plaintext; all commercial checks remain in market-readiness.
 const crypto = require('node:crypto');
 const { readKey } = require('./env');
+const { withinDeadline, OPS_MFA_DEADLINE_MS } = require('./opslatency');
 const BASE = 'https://american-rider-server-3d7x.onrender.com';
 const RESOURCE = BASE + '/mcp';
 const CLIENT = 'https://chatgpt.com/oauth/client.json';
@@ -141,11 +142,11 @@ function mount(app, express, deps) {
     const code = random(), store = db();
     if (!store) return res.status(503).send('Operations database unavailable.');
     try {
-      await store.collection('ar_mcp_oauth_codes').doc(hash(code)).create({
+      await withinDeadline(() => store.collection('ar_mcp_oauth_codes').doc(hash(code)).create({
         actor, fingerprint: issueFingerprint(actor), scope: ctx.scope, client_id: CLIENT,
         redirect_uri: REDIRECT, resource: RESOURCE, challenge: ctx.challenge,
         expires: Date.now() + 90 * 1000, authorizedAt: Date.now(), consumed: false,
-      });
+      }), OPS_MFA_DEADLINE_MS);
       cookie(res, '', 0);
       const callback = new URL(REDIRECT);
       callback.searchParams.set('code', code);
@@ -163,7 +164,7 @@ function mount(app, express, deps) {
     const store = db(), now = Date.now(), access = random(), refresh = random();
     let auth;
     try {
-      auth = await store.runTransaction(async tx => {
+      auth = await withinDeadline(() => store.runTransaction(async tx => {
         let ref, previous;
         if (kind === 'authorization_code') {
           if (q.redirect_uri !== REDIRECT || !CHALLENGE.test(String(q.code_verifier || '')) ||
@@ -200,7 +201,7 @@ function mount(app, express, deps) {
           ...detail, expires: now + 14 * 24 * 60 * 60 * 1000, consumed: false,
         });
         return detail;
-      });
+      }), OPS_MFA_DEADLINE_MS);
     } catch { return res.status(503).json({error:'temporarily_unavailable'}); }
     if (!auth) return res.status(400).json({error:'invalid_grant'});
     return res.json({access_token: access, token_type:'Bearer', expires_in:3600,
@@ -250,13 +251,13 @@ function mount(app, express, deps) {
     if (typeof args !== 'object' || Array.isArray(args)) return res.json(error(id, -32602, 'Invalid tool arguments.'));
     let auth;
     try {
-      const snap = await db()?.collection('ar_mcp_access').doc(hash(bearer)).get();
+      const snap = await withinDeadline(() => db()?.collection('ar_mcp_access').doc(hash(bearer)).get(), OPS_MFA_DEADLINE_MS);
       auth = snap?.exists ? snap.data() : null;
     } catch { return res.status(503).json(error(id, -32000, 'Authorization unavailable.')); }
     let revoked=false;
     if (auth?.actor) {
       try {
-        const snapshot=await db().collection('ar_mcp_revoke').doc(auth.actor).get();
+        const snapshot=await withinDeadline(() => db().collection('ar_mcp_revoke').doc(auth.actor).get(), OPS_MFA_DEADLINE_MS);
         revoked=snapshot.exists && Number(snapshot.data().revokedAt) >= Number(auth.authorizedAt || 0);
       } catch { return res.status(503).json(error(id,-32000,'Credential revocation status unavailable.')); }
     }

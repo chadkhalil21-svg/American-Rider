@@ -29,6 +29,7 @@ const { disclosureStale } = require('./matching');
 const { applyIndependentConfirmation, continuingStatus } = require('./insurance-monitoring');
 const { recordIndependentContact } = require('./insurance-contact-trust');
 const { codeFor, totpStep, sessionFor, verifySession } = require('./opssecurity');
+const { withinDeadline, OPS_MFA_DEADLINE_MS } = require('./opslatency');
 const { loadOpsBoard, UNDERWAY } = require('./opsboarddata');
 
 const COOKIE = 'ar_ops';
@@ -553,20 +554,28 @@ function mount(app, express, deps = {}) {
           trace('mfa_store_unavailable');
           return res.status(503).send('Operations authentication is temporarily unavailable.');
         }
+        let timedOut = false;
         try {
-          ok = await db.runTransaction(async (tx) => {
+          ok = await withinDeadline(() => db.runTransaction(async (tx) => {
             const ref = db.collection('ops_mfa').doc(acct.name);
             const prior = await tx.get(ref);
+            // A timed-out response must never authorize the caller. Avoid committing
+            // a delayed step when Firestore recovers after the founder saw a failure.
+            if (timedOut) return false;
             if (Number(prior.exists ? prior.data().lastStep : -1) >= step) {
               reason = 'authenticator_code_already_used';
               return false;
             }
             tx.set(ref, { lastStep: step, acceptedAt: Date.now() }, { merge: true });
             return true;
-          });
-        } catch {
-          trace('mfa_store_error');
-          return res.status(503).send('Operations authentication is temporarily unavailable.');
+          }), OPS_MFA_DEADLINE_MS);
+        } catch (e) {
+          timedOut = true;
+          trace(e?.code === 'OPS_STORAGE_TIMEOUT' ? 'mfa_store_timeout' : 'mfa_store_error');
+          return res.status(503).type('html').send(page('Operations',
+            '<h1>Operations</h1><section role="alert"><h2>Security database temporarily unavailable</h2>' +
+            '<p>Your sign-in was not confirmed. This is a database delay, not an incorrect authenticator code. ' +
+            'Please retry only when the database is responding.</p></section>'));
         }
       }
     }

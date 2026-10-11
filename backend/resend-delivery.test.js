@@ -178,6 +178,18 @@ async function main() {
     { emailId: 'late-message-id', recipient: 'unrelated@example.test' }) })).unmatched, true);
   assert.equal(h4.writes, 1, 'unmatched recipient cannot create a second write');
 
+  // Cross-module ordering contract: the outgoing request stamp must be durable
+  // before a message ID is exposed to the asynchronous webhook listener.
+  const server = require('node:fs').readFileSync(require('node:path').join(__dirname, 'server.js'), 'utf8');
+  const requestStart = server.indexOf('async function issueInsuranceConfirmationRequest');
+  const requestEnd = server.indexOf('// --- Continuing Operator insurance status.', requestStart);
+  assert(requestStart >= 0 && requestEnd > requestStart, 'find the actual insurance send workflow');
+  const sendFlow = server.slice(requestStart, requestEnd);
+  const stampPos = sendFlow.lastIndexOf('insuranceMonitoring: nextMonitoring');
+  const correlatePos = sendFlow.lastIndexOf('providerMessageId: sent.id || null');
+  assert(stampPos >= 0 && correlatePos > stampPos,
+    'the current user request stamp must be persisted before exposing providerMessageId');
+
   console.log('PASS Resend published Svix signature vector, tampering, timestamp, size and event minimization');
   console.log('PASS insurance email delivery, race recovery, bounce, duplicates, stale/confirmed request and zero policy-approval effects');
 }

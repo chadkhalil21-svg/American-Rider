@@ -23,6 +23,15 @@ const {runMarketReferenceSweep,persistObservations,MAX_OBSERVATIONS_PER_MARKET_S
   assert.equal(noSource.skipped,'no_active_market_collectors');
   assert.deepEqual(noSource.markets,{});
   assert.equal(collectorCalled,false);
+  // National expansion must not multiply database work for research-only cities.
+  const thousandFutureMarkets=Array.from({length:1000},(_,i)=>'research-city-'+i);
+  const idleNation=await runMarketReferenceSweep({
+    collectors:{'chicago-tnp-open-data':async()=>{collectorCalled=true;throw Error('research collector unexpectedly invoked');}},
+    enabledMarketIds:thousandFutureMarkets,
+  });
+  assert.equal(idleNation.skipped,'no_enabled_service_markets');
+  assert.deepEqual(idleNation.markets,{});
+  assert.equal(collectorCalled,false,'1000 uncommissioned markets cause zero source fetches');
   const sample={marketId:'fl-miami-dade',sourceId:'independent',observedAt:'2026-10-10T12:00:00Z'};
   assert.equal(sourceFingerprint([sample]),sourceFingerprint([{...sample}]));
   assert.notEqual(sourceFingerprint([sample]),sourceFingerprint([{...sample,observedAt:'2026-10-11T12:00:00Z'}]));

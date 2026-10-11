@@ -1,0 +1,33 @@
+'use strict';
+const assert=require('node:assert/strict');
+const { enqueueWithDeadline, ACK_DEADLINE_MS }=require('./provider-ack');
+const { readFileSync }=require('node:fs');
+const { join }=require('node:path');
+async function main(){
+  assert(ACK_DEADLINE_MS > 0 && ACK_DEADLINE_MS <= 5000);
+  let entered=0;
+  const ok=await enqueueWithDeadline(async()=>{entered++;return {ok:true,id:'resend:evt1'};},50);
+  assert.equal(ok.ok,true);assert.equal(ok.id,'resend:evt1');assert.equal(entered,1);
+  const declined=await enqueueWithDeadline(async()=>({ok:false,reason:'quota exhausted'}),50);
+  assert.equal(declined.ok,false);
+  const thrown=await enqueueWithDeadline(async()=>{throw Error('simulated outage');},50);
+  assert.equal(thrown.ok,false);assert.equal(thrown.timedOut,false);
+  let release;
+  const pending=new Promise(resolve=>{release=resolve;});
+  const t=Date.now();
+  const timeout=await enqueueWithDeadline(()=>pending,20);
+  assert.equal(timeout.ok,false);
+  assert.equal(timeout.timedOut,true,'unresolved Firestore write never hangs provider response');
+  assert(Date.now()-t<500,'budgeted 20ms enqueue does not wait indefinitely');
+  release({ok:true,id:'late-event'});
+  await new Promise(r=>setImmediate(r));
+  const source=readFileSync(join(__dirname,'server.js'),'utf8');
+  const s=source.slice(source.indexOf('async function acceptDurableProviderEvent'),source.indexOf("app.post('/stripe/webhook'"));
+  assert(s.includes('await enqueueWithDeadline('));
+  assert(s.includes('enqueueProviderEvent({ provider, event })'));
+  assert(s.indexOf('res.json({ received: true')>s.indexOf('await enqueueWithDeadline('));
+  assert(s.indexOf('res.status(503)')<s.indexOf('res.json({ received: true'));
+  assert(!s.includes('res.json({ received: true, type: event?.type || \'unknown\', duplicate: false }'), 'no optimistic acknowledgments');
+  console.log('PASS bounded provider webhook acknowledgment: committed, quota failure, thrown error, stalled Firestore, late resolution and route ordering');
+}
+main().catch(e=>{console.error(e);process.exitCode=1;});

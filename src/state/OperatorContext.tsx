@@ -30,7 +30,8 @@ import { announceTravel, answerCheckIn } from '../backend/checkin';
 import { submitDocument, type DocKind, type DocReview } from '../backend/documentUpload';
 import { reportPosition } from '../backend/telemetry';
 import { sendTravelMessage, watchTravelThread } from '../backend/messages';
-import { resolveCurrentDeparture } from '../location';
+import { resolveOperatorDutyPosition } from '../location';
+import { AppState, Platform } from 'react-native';
 import { useAuth } from './AuthContext';
 // Aliased: this module has local bindings named `t` (a message string, a timer).
 import { t as tr } from '../i18n';
@@ -1104,27 +1105,60 @@ export function OperatorProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!online) return;
     let stopped = false;
+    let inFlight = false;
     const renew = async () => {
-      const here = await resolveCurrentDeparture();
-      if (stopped || !here || !Number.isFinite(here.lat) || !Number.isFinite(here.lng)) return;
-      const r = await goOnline({
-        lat: here.lat as number,
-        lng: here.lng as number,
-        name: user?.displayName?.trim() || '',
-        car: vehicleRef.current?.car ?? '',
-        plate: vehicleRef.current?.plate ?? '',
-        classes: ['Standard'],
-        insuranceExpiry: coverageRef.current ?? '',
-      });
-      if (stopped || r.ok || !r.code) return;
-      setOnlineState(false);
-      setOnlineError(r.error || tr('traveler.noLongerInService'));
-      setOnlineErrorCode(r.code);
+      // iOS timers are suspended in the background. Native location owns those
+      // updates; this foreground path runs once on resume and at the usual cadence.
+      if (stopped || inFlight) return;
+      inFlight = true;
+      try {
+        const here = await resolveOperatorDutyPosition();
+        if (stopped || !here) return;
+        const r = await goOnline({
+          lat: here.lat,
+          lng: here.lng,
+          name: user?.displayName?.trim() || '',
+          car: vehicleRef.current?.car ?? '',
+          plate: vehicleRef.current?.plate ?? '',
+          classes: ['Standard'],
+          insuranceExpiry: coverageRef.current ?? '',
+        });
+        if (stopped) {
+          // The Operator has ended service while a renewal was in flight.
+          // A late success must not resurrect dispatch availability.
+          if (r.ok && !onlineRef.current) void goOffline();
+          return;
+        }
+        if (r.ok) {
+          setOnlineError(null);
+          setOnlineErrorCode(null);
+          return;
+        }
+        if (r.code) {
+          setOnlineState(false);
+          setOnlineError(r.error || tr('traveler.noLongerInService'));
+          setOnlineErrorCode(r.code);
+        } else {
+          // Network uncertainty is not authority to declare a qualification loss.
+          // Matching still fails closed once the server's presence age expires.
+          setOnlineError(r.error || tr('traveler.errReachDispatch'));
+        }
+      } finally {
+        inFlight = false;
+      }
     };
-    const t = setInterval(renew, PRESENCE_RENEW_MS);
+    const t = setInterval(() => {
+      if (Platform.OS === 'web' || AppState.currentState === 'active') void renew();
+    }, PRESENCE_RENEW_MS);
+    let prior = AppState.currentState;
+    const subscription = Platform.OS === 'web' ? null : AppState.addEventListener('change', next => {
+      if (next === 'active' && prior !== 'active') void renew();
+      prior = next;
+    });
     return () => {
       stopped = true;
       clearInterval(t);
+      subscription?.remove();
     };
   }, [online, user?.displayName]);
 
@@ -1222,7 +1256,7 @@ tr('traveler.gateCoverageExpired'),
       }
       setOnlineBusy(true);
       (async () => {
-        const here = await resolveCurrentDeparture();
+        const here = await resolveOperatorDutyPosition({ requestPermission: true });
         if (attempt !== dutyAttemptRef.current) return;
         // Coordinates are optional on a DepPlace (a named pickup has none), and dispatch
         // matches purely by distance — so a position we cannot use is the same as no position.
@@ -1263,6 +1297,8 @@ tr('traveler.gateLocation'),
         // the app is in the foreground; iOS suspends it the moment the operator pockets the
         // phone, and five minutes later dispatch correctly concludes they are not there.
         //
+        // Native background updates are conditional on OS delivery and permissions.
+        // Foreground resume now revalidates with the server and exposes a refusal.
         // A refusal is not fatal and is not silent: the operator stays in service while
         // LOOKING at the app, which is a real limitation, so `backgroundPresence` records
         // whether it took and the screen says so rather than letting them discover it by

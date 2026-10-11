@@ -127,6 +127,8 @@ const { sweepBookingRecovery } = require('./bookingrecovery');
 const { sweepMonitor, sweepAssignments } = require('./monitor');
 const { notify } = require('./push');
 const { handleEvent, webhookReady } = require('./webhook');
+const { verifyResendEvent } = require('./resend-webhook');
+const { handleResendDeliveryEvent } = require('./resend-delivery');
 const { enqueueProviderEvent, processProviderEvent, sweepProviderEvents, replayDeadEvent } = require('./providerqueue');
 const { acquireLease, renewLease, releaseLease, DEFAULT_LEASE_MS } = require('./schedulerlease');
 const { singleFlight } = require('./sweep-singleflight');
@@ -180,7 +182,7 @@ app.set('trust proxy', 1);
 // A signature is computed over the EXACT bytes Stripe sent. Once express.json() has parsed and
 // re-serialised the body, those bytes are gone and every event fails verification — which is
 // the classic way this endpoint ends up either broken or, worse, "fixed" by skipping the check.
-const PROVIDER_HANDLERS = { stripe: handleEvent };
+const PROVIDER_HANDLERS = { stripe: handleEvent, resend: handleResendDeliveryEvent };
 
 async function acceptDurableProviderEvent(provider, event, res) {
   const queued = await enqueueProviderEvent({ provider, event });
@@ -217,6 +219,24 @@ app.post('/stripe/connect-webhook', express.raw({ type: 'application/json' }), a
   return acceptDurableProviderEvent('stripe', event, res);
 });
 
+
+// Verify the exact signed bytes before JSON parsing. A missing signing secret cannot
+// be bypassed. Durable provider inbox acknowledges events only after Firestore storage.
+app.post('/resend/webhook', express.raw({ type: 'application/json', limit: '32kb' }), async (req, res) => {
+  const secret = readKey('RESEND_WEBHOOK_SECRET');
+  if (!secret) return res.status(503).json({ error: 'Resend delivery events are not configured' });
+  let event;
+  try {
+    event = verifyResendEvent(req.body, {
+      id: req.get('svix-id'), timestamp: req.get('svix-timestamp'),
+      signature: req.get('svix-signature'),
+    }, secret);
+  } catch {
+    return res.status(400).json({ error: 'Invalid Resend callback signature or payload' });
+  }
+  if (!event) return res.json({ received: true, ignored: true });
+  return acceptDurableProviderEvent('resend', event, res);
+});
 
 app.use(express.json()); // parse JSON request bodies — everything BELOW the webhook
 

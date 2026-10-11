@@ -2,11 +2,11 @@
 const assert=require('node:assert/strict');
 const {computeOperatorFleetEconomics: forecast}=require('./fleet-economics-forecast');
 const expected={
-  50:{travels:3000,remainder:1821,expense:6249},
-  100:{travels:6000,remainder:5268,expense:10872},
-  200:{travels:12000,remainder:12065,expense:20215},
-  500:{travels:30000,remainder:32612,expense:48088},
-  1000:{travels:60000,remainder:66728,expense:94672},
+  50:{travels:3000,remainder:1701,expense:6309},
+  100:{travels:6000,remainder:5042,expense:10978},
+  200:{travels:12000,remainder:11703,expense:20337},
+  500:{travels:30000,remainder:31674,expense:48426},
+  1000:{travels:60000,remainder:64965,expense:95235},
 };
 for(const [label,row] of Object.entries(expected)){
   const n=Number(label),r=forecast(n);
@@ -18,8 +18,31 @@ for(const [label,row] of Object.entries(expected)){
   assert.equal(r.expenses.connectActiveUsd,r.accountFeeCollectedUsd,
     'only actually recovered account fees can be netted against billed active accounts');
   assert(r.expenses.reservedRiskUsd===r.travelsMonthly*.25);
-  assert(r.expenses.paidMapsUsd>=20,'commercial map fallback is budgeted');
+  assert(r.expenses.paidMapsUsd>=20,'full-commercial tile usage is budgeted');
+  assert.equal(r.payouts,r.activeOperators*20,'Stripe Express unmodified default is daily rolling, not weekly');
+  const weekly=forecast(n,{payoutsPerActiveMonth:4});
+  assert(Math.abs(weekly.totalExpenseUsd-r.totalExpenseUsd+r.activeOperators*4)<1e-6,
+    'weekly schedule saves $4 per active monthly account, never assumed as live');
+  const bare=forecast(n,{corporateBaseUsd:0,corporatePerRegisteredOperatorUsd:0});
+  assert(Math.abs(bare.remainderUsd-r.remainderUsd-r.expenses.corporateBudgetUsd)<1e-6,
+    'sole-founder infrastructure-only view is not identical to total-company net profit');
+  assert.equal(bare.unverifiedFullCompanyExpenses,true);
   assert(r.expenses.emailUsd>=20,'provider daily limits are not mistaken for commercial plan');
+}
+const noFallback=forecast(50,{mapBudgetMode:'openFreeMapOnly'});
+assert.equal(noFallback.expenses.paidMapsUsd,0);
+assert.equal(noFallback.unverifiedFullCompanyExpenses,true,
+  'zero tile invoice is not proof of commercial outage resilience');
+assert.equal(forecast(200,{mapBudgetMode:'starterStandby'}).expenses.paidMapsUsd,20,
+  'standby subscription is a budget, not live implementation');
+assert(forecast(1000).expenses.paidMapsUsd < 420,
+  'choose cheaper professional plan instead of permanently using Starter overage');
+for(const n of [10000,50000]){
+  const tier={backendUsd:400*n/1000,routingUsd:768*n/1000,monitoringUsd:160*n/1000};
+  const r=forecast(n,{tiers:tier});
+  assert.equal(r.travelsMonthly,n*60);
+  assert(r.remainderUsd>0 && r.unverifiedFullCompanyExpenses,
+    'million-scale arithmetic is NOT a million-concurrent production load test or net profit guarantee');
 }
 const weak=forecast(50,{activeFraction:.20,travelsPerActiveDay:2});
 assert.equal(weak.travelsMonthly,400);
@@ -37,4 +60,4 @@ assert(moreRides.travelsMonthly===9600 && moreRides.expenses.cardUsd>forecast(10
 assert.throws(()=>forecast(75),/paid capacity tier/);
 assert.throws(()=>forecast(50,{activeFraction:1.2}),/fractions/);
 assert.throws(()=>forecast(50,{corporateBaseUsd:-100}),/nonnegative/);
-console.log('PASS 50/100/200/500/1000 cohort model, no-ride loss, idle utilization stress, $2 account fee collections, maps/Firestore/email/vendor accounting, demand increase, missing capacity tier and corporate insurance stress');
+console.log('PASS 50/100/200/500/1000 cohort model, no-ride loss, idle utilization stress, $2 account fee collections, optimized paid-tile tiers/default-daily and weekly-payout variations, maps/Firestore/email/vendor accounting, 10K/50K cohort scenario (not load cert), demand increase, missing capacity tier and corporate insurance stress');

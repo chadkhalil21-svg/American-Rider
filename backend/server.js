@@ -131,6 +131,7 @@ const { enqueueProviderEvent, processProviderEvent, sweepProviderEvents, replayD
 const { acquireLease, renewLease, releaseLease, DEFAULT_LEASE_MS } = require('./schedulerlease');
 const { singleFlight } = require('./sweep-singleflight');
 const { createSweepCadence, createQuotaBackoff, quotaError } = require('./sweepcadence');
+const { createBackgroundReporter } = require('./workload-summary');
 const { sweepOperatorAccountFees } = require('./operatorfees');
 const crypto = require('node:crypto');
 const WORKER_ID = crypto.randomUUID();
@@ -1871,6 +1872,7 @@ let lastSweep = { at: 0, report: null };
 const maintenanceCadence = createSweepCadence();
 const quotaBackoff = createQuotaBackoff();
 const maintenanceSweep = (name, work) => maintenanceCadence.run(name, work);
+const reportBackgroundWork = createBackgroundReporter();
 
 
 /**
@@ -1922,7 +1924,7 @@ async function runAllSweeps() {
 
   ]);
   const unwrap = (r) => (r.status === 'fulfilled' ? r.value : { ok: false, reason: String(r.reason) });
-  return {
+  const report = {
     scheduled: unwrap(scheduled),
     monitor: unwrap(monitor),
     assignments: unwrap(assignments),

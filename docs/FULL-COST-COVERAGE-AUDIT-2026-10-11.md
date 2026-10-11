@@ -64,6 +64,10 @@ The management-only `backend/fully-loaded-coverage.js` and its deterministic tes
 
 **Vendor cost caveat:** Some suppliers offer different price schedules or forbid certain regulated use cases in cheap plans. E.g. [HERE plan exclusions](https://www.here.com/get-started/pricing/rps-limits-excluded-use-cases) may matter for location/asset tracking; American Rider currently uses HERE only as toll fallback but must confirm its particular plan and intended commercial license. Never assume a free-tier or a published low-cost SKU applies to all nationwide TNC use.
 
+### Live Resend usage evidence retrieved during this audit
+
+Read-only [Resend account usage](https://resend.com/pricing) reports **3/100 daily emails and 4/3,000 monthly** (at query time), with one of three permitted domains and 10 requests/sec. Those limits match the provider's **Free** plan. This is real current limit evidence, not a guessed monthly bill or a demonstrated scalable commercial email service. A platform sending 1–3 emails per completed Travel could exceed the 100/day limit at surprisingly low Travel volume, even before Operator onboarding, insurance reminders, lost items, disputes and support. The **Pro** public price is $20/month for 50,000 transactional messages with no daily email limit and $0.90 per 1,000 overage; actual billing enrollment/contract remains an owner action. A resilient TNC should set alerts and an appropriate paid plan **before** routine high-volume launch; do not design a customer notification failure into a free-tier ceiling.
+
 ## Institutional decision: price model and commercial launch
 
 - [Harvard Business School / Frances Frei](https://www.hbs.edu/faculty/Pages/item.aspx?research=7002) says successful service offerings require an explicit funding mechanism. An undocumented overhead provision is an **engineering assumption**, not an explicit funded service cost.

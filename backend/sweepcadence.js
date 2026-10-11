@@ -7,7 +7,7 @@ const PERIOD_MS = Object.freeze({
   insuranceMonitoring: 30 * 60_000,
   operatorFees: 6 * 60 * 60_000,
   familyAgeOut: 60 * 60_000,
-  marketReference: 4 * 60 * 60_000,
+  marketReference: 60 * 60_000,
   accountDeletion: 60 * 60_000,
 });
 function createSweepCadence(periods = PERIOD_MS) {
@@ -34,7 +34,7 @@ function createQuotaBackoff() {
     remainingMs(now = Date.now()) { return Math.max(0, retryAfter - now); },
     failure(now = Date.now()) {
       attempts = Math.min(attempts + 1, 5);
-      retryAfter = now + Math.min(60 * 60_000, 5 * 60_000 * (2 ** (attempts - 1)));
+      retryAfter = now + Math.min(10 * 60_000, 5 * 60_000 * (2 ** (attempts - 1)));
       return retryAfter;
     },
     clear() { attempts = 0; retryAfter = 0; },

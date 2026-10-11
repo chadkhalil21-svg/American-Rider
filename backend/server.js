@@ -128,6 +128,7 @@ const { sweepMonitor, sweepAssignments } = require('./monitor');
 const { notify } = require('./push');
 const { handleEvent, webhookReady } = require('./webhook');
 const { enqueueProviderEvent, processProviderEvent, sweepProviderEvents, replayDeadEvent } = require('./providerqueue');
+const { enqueueWithDeadline } = require('./provider-ack');
 const { verifyResendWebhook, sanitizeResendEvent, applyResendDeliveryEvent } = require('./resend-delivery');
 const { acquireLease, renewLease, releaseLease, DEFAULT_LEASE_MS } = require('./schedulerlease');
 const { singleFlight } = require('./sweep-singleflight');
@@ -186,10 +187,17 @@ const PROVIDER_HANDLERS = { stripe: handleEvent,
 };
 
 async function acceptDurableProviderEvent(provider, event, res) {
-  const queued = await enqueueProviderEvent({ provider, event });
-  // No durable write means no acknowledgement. The provider will retry instead of us losing
-  // an event in a process crash or Firestore outage.
-  if (!queued.ok) return res.status(503).json({ error: queued.reason || 'event queue unavailable' });
+  const startedAt = Date.now();
+  // Firestore may stall for longer than the sender's delivery deadline when
+  // quota is exhausted. Never acknowledge an unconfirmed write. Instead return
+  // retryable 503 while the original create-only write remains idempotent.
+  const queued = await enqueueWithDeadline(() => enqueueProviderEvent({ provider, event }));
+  const elapsedMs = Date.now() - startedAt;
+  if (!queued.ok) {
+    console.warn(`[${provider}] durable webhook receipt refused, reason=${queued.timedOut ? 'write_deadline' : 'write_failed'}, elapsedMs=${elapsedMs}`);
+    return res.status(503).json({ error: 'Provider event not yet durably recorded', code: queued.timedOut ? 'enqueue_deadline' : 'enqueue_unavailable' });
+  }
+  if (elapsedMs > 1500) console.log(`[${provider}] slow durable receipt, elapsedMs=${elapsedMs}`);
   res.json({ received: true, type: event?.type || 'unknown', duplicate: !!queued.duplicate });
   processProviderEvent({ id: queued.id, handlers: PROVIDER_HANDLERS, workerId: WORKER_ID })
     .then((out) => console.log(`[${provider}] ${event?.type}: ${out.result?.action || out.reason || (out.skipped ? 'already claimed' : 'processed')}`))

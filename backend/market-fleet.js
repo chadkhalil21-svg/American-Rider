@@ -26,8 +26,9 @@ async function setAdmittedFleetOnline({ db, operatorId, fleetUpdate, markets, pr
       const opRef = db.collection('operators').doc(String(operatorId));
       const current = await tx.get(opRef);
       const status = current.exists ? current.data() || {} : {};
+      // Historic webhook records may predate the fleet account-ID field. A newer
+      // signed negative status must win even without that optional metadata.
       if (status.payoutsEnabled === false &&
-          status.stripeAccountId === fleetUpdate.stripeAccountId &&
           Number(status.stripeCheckedAt || 0) >= Number(fleetUpdate.stripeCheckedAt || 0)) {
         return false;
       }

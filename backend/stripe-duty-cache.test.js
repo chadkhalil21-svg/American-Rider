@@ -5,13 +5,15 @@ const { cachedPayoutStatus, STRIPE_DUTY_MAX_AGE_MS } = require('./stripe-duty-ca
 
 const NOW = 1_800_000_000_000;
 const ready = { available: true, payoutsEnabled: true,
-  stripeAccountId: 'acct_operator_1', stripeCheckedAt: NOW - 60_000 };
+  stripeAccountId: 'acct_operator_1', stripeCheckedAt: NOW - 60_000,
+  onlineAt: NOW - 90_000 };
 const lookup = fleet => cachedPayoutStatus({ accountId:'acct_operator_1', fleet, now:NOW });
 
 assert.deepEqual(lookup(ready), { payoutsEnabled:true, cached:true,
   due:[], stripeCheckedAt:NOW-60_000 }, 'one recent server-verified status survives an ordinary GPS renewal');
 for (const changed of [
   { available:false }, { payoutsEnabled:false }, { stripeAccountId:'acct_other' },
+  { onlineAt:0 }, { onlineAt:NOW+1 }, { onlineAt:NOW-5*60_000 },
   { stripeCheckedAt:null }, { stripeCheckedAt:0 }, { stripeCheckedAt:NOW+1 },
   { stripeCheckedAt:NOW-STRIPE_DUTY_MAX_AGE_MS },
   { stripeCheckedAt:NOW-STRIPE_DUTY_MAX_AGE_MS-1 },

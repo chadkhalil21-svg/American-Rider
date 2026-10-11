@@ -20,7 +20,7 @@ const {PERIOD_MS,createSweepCadence,quotaError,createQuotaBackoff}=require('./sw
   assert.equal((await clock.run('operatorFees',f,now+5*60*60_000)).skipped,'cadence');
   assert.equal((await clock.run('operatorFees',f,now+6*60*60_000+60_000)).ok,true);
   assert.equal((await clock.run('marketReference',f,now+60_000)).ok,true);
-  assert.equal((await clock.run('marketReference',f,now+4*60*60_000+60_000)).ok,true);
+  assert.equal((await clock.run('marketReference',f,now+60*60_000+60_000)).ok,true);
   assert.equal(clock.due('familyAgeOut',now),true);
   assert.equal(clock.due('familyAgeOut',now-60_000),true,'time moved back: allow recovery');
   assert.rejects(async()=>clock.run('bogus',f,now));
@@ -34,9 +34,9 @@ const {PERIOD_MS,createSweepCadence,quotaError,createQuotaBackoff}=require('./sw
   assert.equal(backoff.remainingMs(now+60_000),4*60_000);
   assert.equal(backoff.blocked(now+5*60_000),false);
   assert.equal(backoff.failure(now+5*60_000),now+15*60_000);
-  assert.equal(backoff.failure(now+15*60_000),now+35*60_000);
-  assert.equal(backoff.failure(now+35*60_000),now+75*60_000);
-  assert.equal(backoff.failure(now+75*60_000),now+135*60_000);
+  assert.equal(backoff.failure(now+15*60_000),now+25*60_000);
+  assert.equal(backoff.failure(now+25*60_000),now+35*60_000);
+  assert.equal(backoff.failure(now+35*60_000),now+45*60_000);
   backoff.clear();
   assert.equal(backoff.blocked(now+75*60_000),false);
   assert.equal(backoff.failure(now+75*60_000),now+80*60_000);

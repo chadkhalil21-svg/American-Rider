@@ -277,7 +277,16 @@ function mount(app, express, deps) {
         else if (!market) out={ok:false,code:'unknown_market'};
         else if (args.confirmation !== 'PAUSE '+marketId || reason.trim().length < 8 || reason.length > 500)
           out={ok:false,code:'explicit_confirmation_required'};
-        else out=await deps.pauseMarket({db:db(),market,actor:auth.actor,reason,auditMethod:'oauth_delegated_mfa'});
+        else {
+          out=await deps.pauseMarket({db:db(),market,actor:auth.actor,reason,auditMethod:'oauth_delegated_mfa'});
+          if (out.ok) {
+            try {
+              out.fleetCleanup = await deps.deactivateMarketFleet({db:db(),market,maxPages:2});
+            } catch {
+              out.fleetCleanup = {ok:false,done:false,reason:'fleet_cleanup_unconfirmed'};
+            }
+          }
+        }
       }
       if (out?.ok && ['open_region','pause_market'].includes(chosen.name)) deps.invalidatePublicMarkets();
       return res.json(jsonrpc(id,toolResult(out || {ok:false,code:'action_unavailable'})));

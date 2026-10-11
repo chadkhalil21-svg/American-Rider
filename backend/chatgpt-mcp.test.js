@@ -25,6 +25,7 @@ const doc=(collection,id)=>{
  const key=collection+'/'+id;
  return { key,async get(){return {exists:data.has(key),data:()=>data.get(key)};},
    async create(value){assert.ok(!data.has(key),key);data.set(key,value);},
+   async set(value,opt){data.set(key,opt?.merge?{...data.get(key),...value}:value);},
  };
 };
 const db={
@@ -141,6 +142,17 @@ function request(method,path,{body={},query={},headers={}}={}){
   refresh_token:tokens.body.refresh_token
  }}).run();
  assert.equal(again.status,400,'refresh token must rotate');
+ const disconnect=await request('POST','/ar/oauth/disconnect',{headers:{origin:M.BASE}}).run();
+ assert.equal(disconnect.status,200);
+ assert.ok(disconnect.body.includes('disconnected'));
+ const noAccess=await request('POST','/mcp',{body:{id:8,method:'tools/call',
+  params:{name:'market_status',arguments:{}}},headers:bearer}).run();
+ assert.equal(noAccess.body.result.isError,true,'disconnect must immediately revoke active access tokens');
+ const noRefresh=await request('POST','/ar/oauth/token',{body:{
+  grant_type:'refresh_token',client_id:pending.client_id,resource:M.RESOURCE,
+  refresh_token:renewal.body.refresh_token
+ }}).run();
+ assert.equal(noRefresh.status,400,'disconnect must revoke active refresh tokens');
  online=false;
  const revoked=await request('POST','/mcp',{body:{id:6,method:'tools/call',params:{name:'market_status'}},headers:bearer}).run();
  assert.equal(revoked.body.result.isError,true,'disabled or rotated account must not authorize');

@@ -27,6 +27,24 @@ const {runMarketReferenceSweep,persistObservations,MAX_OBSERVATIONS_PER_MARKET_S
   assert.equal(sourceFingerprint([sample]),sourceFingerprint([{...sample}]));
   assert.notEqual(sourceFingerprint([sample]),sourceFingerprint([{...sample,observedAt:'2026-10-11T12:00:00Z'}]));
 
+  // A public dataset often changes ordering while its released facts stay the
+  // same. Such reorderings must not force an hourly checkpoint write or repeat
+  // document-create attempts for up to 100 unchanged records per market.
+  const two=[sample,{marketId:'fl-broward',sourceId:'independent',observedAt:'2026-10-10T14:00:00Z',attributes:{a:1,b:2}}];
+  const reordered=[{attributes:{b:2,a:1},observedAt:'2026-10-10T14:00:00Z',sourceId:'independent',marketId:'fl-broward'},sample];
+  assert.equal(sourceFingerprint(two),sourceFingerprint(reordered),
+    'row and JSON-key order changes are not new evidence');
+  assert.notEqual(sourceFingerprint(two),sourceFingerprint([...two,sample]),
+    'real evidence multiplicity must not silently disappear');
+  assert.notEqual(sourceFingerprint(two),sourceFingerprint([sample,{...two[1],attributes:{a:1,b:3}}]),
+    'changed source values must remain observable');
+  const nationalSample=Array.from({length:100},(_,i)=>({...sample,observation:i,attrs:{class:'standard',value:i}}));
+  assert.equal(sourceFingerprint(nationalSample),sourceFingerprint([...nationalSample].reverse().map(x=>({
+    attrs:{value:x.attrs.value,class:x.attrs.class},observation:x.observation,
+    observedAt:x.observedAt,sourceId:x.sourceId,marketId:x.marketId
+  }))), 'a reordered nationwide bounded source sample must not create 100 new work units');
+
+
   assert.equal(MAX_OBSERVATIONS_PER_MARKET_SWEEP,100);
   const rows=Array.from({length:1000},(_,i)=>({
     marketId:'il-chicago',sourceId:'chicago-tnp-open-data',

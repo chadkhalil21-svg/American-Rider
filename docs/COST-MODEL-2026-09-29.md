@@ -1,6 +1,6 @@
 # American Rider Cost Model — 29 September 2026
 
-Status: **current verified cost map; corporate unknowns remain explicitly unpriced**.
+Status: **HISTORICAL 29 September cost inventory; not today's pricing contract.** The current minimum Platform Fee is **$2.50**, not the historical $2.00 shown in section 9. **Use `backend/economics.js` for live prices and `docs/FULL-COST-COVERAGE-AUDIT-2026-10-11.md` for latest verified-vs-unpriced cost coverage.** The 25c risk and operating amounts are allocations, not payments to providers. Historical provider rates and proposed infrastructure have not necessarily been purchased or deployed.
 
 This document separates (a) cash transaction costs, (b) internal provisions, (c) fixed/scale
 infrastructure, and (d) unresolved corporate costs. A provision is not an invoice.

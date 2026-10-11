@@ -128,6 +128,7 @@ const { sweepMonitor, sweepAssignments } = require('./monitor');
 const { notify } = require('./push');
 const { handleEvent, webhookReady } = require('./webhook');
 const { enqueueProviderEvent, processProviderEvent, sweepProviderEvents, replayDeadEvent } = require('./providerqueue');
+const { verifyResendWebhook, sanitizeResendEvent, applyResendDeliveryEvent } = require('./resend-delivery');
 const { acquireLease, renewLease, releaseLease, DEFAULT_LEASE_MS } = require('./schedulerlease');
 const { singleFlight } = require('./sweep-singleflight');
 const { createSweepCadence, createQuotaBackoff, quotaError } = require('./sweepcadence');
@@ -180,7 +181,9 @@ app.set('trust proxy', 1);
 // A signature is computed over the EXACT bytes Stripe sent. Once express.json() has parsed and
 // re-serialised the body, those bytes are gone and every event fails verification — which is
 // the classic way this endpoint ends up either broken or, worse, "fixed" by skipping the check.
-const PROVIDER_HANDLERS = { stripe: handleEvent };
+const PROVIDER_HANDLERS = { stripe: handleEvent,
+  resend: event => applyResendDeliveryEvent({ db: adminDb(), event }),
+};
 
 async function acceptDurableProviderEvent(provider, event, res) {
   const queued = await enqueueProviderEvent({ provider, event });
@@ -215,6 +218,31 @@ app.post('/stripe/connect-webhook', express.raw({ type: 'application/json' }), a
     return res.status(400).json({ error: `Signature verification failed: ${e.message}` });
   }
   return acceptDurableProviderEvent('stripe', event, res);
+});
+
+
+/** Resend signs Svix headers against raw bytes; NEVER treat mail transport as policy proof.
+ * Do not register a provider subscription until this signed route and secret are commissioned.
+ */
+app.post('/resend/webhook', express.raw({ type: 'application/json', limit: '32kb' }), async (req, res) => {
+  const secret = readKey('RESEND_WEBHOOK_SECRET');
+  if (!secret) return res.status(503).json({ error: 'Resend webhook is not commissioned' });
+  let verified;
+  try {
+    verified = verifyResendWebhook({
+      raw: req.body, headers: req.headers, secret,
+    });
+  } catch {
+    return res.status(400).json({ error: 'Invalid Resend webhook' });
+  }
+  let event;
+  try {
+    event = sanitizeResendEvent(verified.id, verified.event);
+  } catch {
+    return res.status(400).json({ error: 'Invalid Resend event' });
+  }
+  if (!event) return res.json({ received: true, ignored: true });
+  return acceptDurableProviderEvent('resend', event, res);
 });
 
 

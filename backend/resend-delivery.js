@@ -67,7 +67,10 @@ async function applyResendDeliveryEvent({ db, event, now = Date.now() }) {
   const q = await db.collection('insurance_status_requests')
     .where('providerMessageId', '==', event.emailId).limit(2).get();
   if (q.docs.length > 1) return { ok: false, reason: 'provider message is not unique' };
-  if (!q.docs.length) return { ok: true, unmatched: true };
+  // Provider callbacks can outrun the send handler's save of providerMessageId.
+  // Keep the already-signed event in our durable queue until that save completes.
+  // A failed handler receives capped retries and, ultimately, an auditable dead letter.
+  if (!q.docs.length) return { ok: false, reason: 'insurance_request_not_correlated_yet' };
   const ref = q.docs[0].ref;
   return db.runTransaction(async tx => {
     const snap = await tx.get(ref);

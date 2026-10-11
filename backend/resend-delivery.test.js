@@ -162,13 +162,35 @@ async function main() {
   assert.equal(h3.records.users.op.insuranceMonitoring.verificationIssue, undefined,
     'already-confirmed request cannot create a new Operator action');
   const h4 = database();
+  const beforeCorrelated = await applyResendDeliveryEvent({ db: h4.db, event: event('email.delivered', 10,
+    { emailId: 'late-message-id' }) });
+  assert.equal(beforeCorrelated.ok, false, 'provider event stays retryable until outbound send correlation is persisted');
+  assert.equal(beforeCorrelated.reason, 'insurance_request_not_correlated_yet');
+  assert.equal(h4.writes, 0, 'race must not invent an email request');
+  // Simulate outbound Resend HTTP returning after the signed webhook already arrived:
+  // the normal send path now stores its providerMessageId against the existing request.
+  h4.records.insurance_status_requests.req.providerMessageId = 'late-message-id';
+  const recovered = await applyResendDeliveryEvent({ db: h4.db,
+    event: event('email.delivered', 10, { emailId: 'late-message-id' }), now: 20 });
+  assert.equal(recovered.updated, true, 'durable retry recovers once the request ID is stored');
+  assert.equal(h4.records.insurance_status_requests.req.deliveryStatus, 'email.delivered');
   assert.equal((await applyResendDeliveryEvent({ db: h4.db, event: event('email.delivered', 10,
-    { emailId: 'unrelated-receipt-id' }) })).unmatched, true);
-  assert.equal((await applyResendDeliveryEvent({ db: h4.db, event: event('email.delivered', 10,
-    { recipient: 'unrelated@example.test' }) })).unmatched, true);
-  assert.equal(h4.writes, 0);
+    { emailId: 'late-message-id', recipient: 'unrelated@example.test' }) })).unmatched, true);
+  assert.equal(h4.writes, 1, 'unmatched recipient cannot create a second write');
+
+  // Cross-module ordering contract: the outgoing request stamp must be durable
+  // before a message ID is exposed to the asynchronous webhook listener.
+  const server = require('node:fs').readFileSync(require('node:path').join(__dirname, 'server.js'), 'utf8');
+  const requestStart = server.indexOf('async function issueInsuranceConfirmationRequest');
+  const requestEnd = server.indexOf('// --- Continuing Operator insurance status.', requestStart);
+  assert(requestStart >= 0 && requestEnd > requestStart, 'find the actual insurance send workflow');
+  const sendFlow = server.slice(requestStart, requestEnd);
+  const stampPos = sendFlow.lastIndexOf('insuranceMonitoring: nextMonitoring');
+  const correlatePos = sendFlow.lastIndexOf('providerMessageId: sent.id || null');
+  assert(stampPos >= 0 && correlatePos > stampPos,
+    'the current user request stamp must be persisted before exposing providerMessageId');
 
   console.log('PASS Resend published Svix signature vector, tampering, timestamp, size and event minimization');
-  console.log('PASS insurance email delivery, bounce, duplicate/out-of-order safety, stale/confirmed request and zero policy-approval effects');
+  console.log('PASS insurance email delivery, race recovery, bounce, duplicates, stale/confirmed request and zero policy-approval effects');
 }
 main().catch(e => { console.error(e); process.exitCode = 1; });

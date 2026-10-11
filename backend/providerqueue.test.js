@@ -10,7 +10,7 @@ const server=fs.readFileSync(path.join(__dirname,'server.js'),'utf8');
 const a=server.indexOf('async function acceptDurableProviderEvent');
 const b=server.indexOf("app.post('/stripe/webhook'",a);
 const block=server.slice(a,b);
-check('ACK follows durable enqueue',block.indexOf('await enqueueProviderEvent')>=0&&block.indexOf('res.json')>block.indexOf('await enqueueProviderEvent'));
+check('ACK follows bounded durable enqueue',block.indexOf('await enqueueWithDeadline(')>=0&&block.indexOf('enqueueProviderEvent({ provider, event })')>0&&block.indexOf('res.json({ received: true')>block.indexOf('await enqueueWithDeadline('));
 check('queue outage returns 503',/!queued\.ok[\s\S]{0,120}status\(503\)/.test(block));
 check('pending provider events are swept',/sweepProviderEvents/.test(server));
 for(const r of R)console.log(`${r.ok?'PASS':'FAIL'}  ${r.l}${r.ok?'':' — '+r.d}`);

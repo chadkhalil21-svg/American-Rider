@@ -58,12 +58,16 @@ async function recomputeMarket(db,marketId,{now=Date.now(),lookbackDays=90}={}){
   return out;
 }
 
-async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false,enabledMarketIds=[]}={}){
+// An evidence catalog entry is not a configured service market.
+function eligibleEvidenceMarkets(enabledMarketIds=[]) {
   const plans=require('./market-evidence').MARKET_EVIDENCE_PLANS;
+  const permitted=new Set(Array.isArray(enabledMarketIds)?enabledMarketIds:[]);
+  return Object.keys(plans).filter(id=>plans[id]?.admissionOnly!==true&&permitted.has(id));
+}
+async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false,enabledMarketIds=[]}={}){
   // Research/catalog entries must not trigger production Firestore ingestion.
   // Only explicit, configured service markets are eligible for scheduled collection.
-  const permitted=new Set(Array.isArray(enabledMarketIds)?enabledMarketIds:[]);
-  const markets=Object.keys(plans).filter(id=>plans[id]?.admissionOnly!==true&&permitted.has(id));
+  const markets=eligibleEvidenceMarkets(enabledMarketIds);
   if(!markets.length)return{ok:true,markets:{},skipped:'no_enabled_service_markets'};
   const db=adminDb();
   if(!db)return{ok:false,reason:'no database'};
@@ -88,4 +92,4 @@ async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false
   return report;
 }
 async function currentReference(marketId){const db=adminDb();if(!db)return null;const s=await db.collection(SNAP).doc(marketId).get();return s.exists?s.data():null;}
-module.exports={median,distanceBand,durationBand,cellKey,persistObservations,recomputeMarket,runMarketReferenceSweep,currentReference,firestoreReady,MAX_OBSERVATIONS_PER_MARKET_SWEEP};
+module.exports={median,distanceBand,durationBand,cellKey,persistObservations,recomputeMarket,runMarketReferenceSweep,currentReference,firestoreReady,MAX_OBSERVATIONS_PER_MARKET_SWEEP,eligibleEvidenceMarkets};

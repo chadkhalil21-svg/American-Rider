@@ -72,6 +72,8 @@ const LIMITS = {
   waitlist: perAccount({ name: 'waitlist', limit: 5, windowMs: 24 * 60 * 60 * 1000 }),
   quoteIp: perIp({ name: 'quote', limit: 300, windowMs: 60 * 60 * 1000 }),
   routeIp: perIp({ name: 'route', limit: 300, windowMs: 60 * 60 * 1000 }),
+  founderOauthIp: perIp({ name: 'founder-oauth', limit: 60, windowMs: 60 * 60 * 1000 }),
+  founderMcpIp: perIp({ name: 'founder-mcp', limit: 300, windowMs: 60 * 60 * 1000 }),
   placeSearchIp: perIp({ name: 'place-search', limit: 600, windowMs: 60 * 60 * 1000 }),
 };
 const { authoritativeFare } = require('./fareauthority');
@@ -3383,6 +3385,7 @@ mountFounderMcp(app, express, {
   isProduction: () => DEPLOYMENT_MODE === 'production' && keyMode === 'live',
   markets: allMarkets, regions: REGIONS, inspectMarket, manifestFor, activateRegion,
   pauseMarket, proposeMarket, productionReadiness, deactivateMarketFleet, invalidatePublicMarkets,
+  oauthLimit: LIMITS.founderOauthIp, mcpLimit: LIMITS.founderMcpIp,
 });
 
 app.get('/scheduled/sweep', runSweep);

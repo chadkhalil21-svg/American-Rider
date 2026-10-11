@@ -82,7 +82,9 @@ function request(method,path,{body={},query={},headers={}}={}){
  const tools=await request('POST','/mcp',{body:{jsonrpc:'2.0',id:1,method:'tools/list'}}).run();
  assert.equal(tools.body.result.tools.length,4);
  const unauthorized=await request('POST','/mcp',{body:{id:1,method:'tools/call',params:{name:'open_region',arguments:{regionId:'fl-southeast',confirmation:'OPEN fl-southeast'}}}}).run();
- assert.equal(unauthorized.status,401);
+ assert.equal(unauthorized.status,200);
+ assert.equal(unauthorized.body.result.isError,true);
+ assert.ok(unauthorized.body.result._meta['mcp/www_authenticate'][0].includes('resource_metadata'));
  const bad=await request('GET','/ar/oauth/authorize',{query:{client_id:M.BASE,redirect_uri:M.BASE}}).run();
  assert.equal(bad.status,400);
  const verifier='v'.repeat(52);
@@ -141,6 +143,7 @@ function request(method,path,{body={},query={},headers={}}={}){
  assert.equal(again.status,400,'refresh token must rotate');
  online=false;
  const revoked=await request('POST','/mcp',{body:{id:6,method:'tools/call',params:{name:'market_status'}},headers:bearer}).run();
- assert.equal(revoked.status,401,'disabled or rotated account must not authorize');
+ assert.equal(revoked.body.result.isError,true,'disabled or rotated account must not authorize');
+ assert.ok(revoked.body.result._meta['mcp/www_authenticate']);
  console.log('PASS founder OAuth: PKCE, signed consent, scope, replay/revocation, admission/fleet delegation');
 })().catch(e=>{console.error(e);process.exitCode=1}).finally(()=>{ if(prev===undefined) delete process.env.OPS_SESSION_SECRET; else process.env.OPS_SESSION_SECRET=prev; });

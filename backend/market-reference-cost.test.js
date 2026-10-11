@@ -1,16 +1,11 @@
 'use strict';
 const assert=require('node:assert/strict');
-const {runMarketReferenceSweep,persistObservations,MAX_OBSERVATIONS_PER_MARKET_SWEEP}=require('./market-reference-service');
+const {runMarketReferenceSweep,persistObservations,MAX_OBSERVATIONS_PER_MARKET_SWEEP,eligibleEvidenceMarkets}=require('./market-reference-service');
 (async()=>{
   let collectorCalled=false;
-  const noop=await runMarketReferenceSweep({
-    collectors:{'chicago-tnp-open-data':async()=>{collectorCalled=true;return[];}},
-    now:Date.parse('2026-10-10T12:00:00Z'),
-    enabledMarketIds:['fl-miami-dade','fl-broward','fl-palm-beach'],
-  });
-  // Without Admin DB, Florida configured market sweeps cannot run. Critical:
-  // Chicago still cannot be chosen just because its public research plan exists.
-  assert.equal(collectorCalled,false,'uncommissioned Chicago must not fetch external data');
+  const configured=eligibleEvidenceMarkets(['fl-miami-dade','fl-broward','fl-palm-beach']);
+  assert.deepEqual(configured,['fl-miami-dade','fl-broward','fl-palm-beach']);
+  assert.ok(!configured.includes('il-chicago'));
   const empty=await runMarketReferenceSweep({
     collectors:{'chicago-tnp-open-data':async()=>{collectorCalled=true;return[];}},
     enabledMarketIds:[],

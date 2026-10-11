@@ -116,7 +116,7 @@ function initialData({ teen = false } = {}) {
       bookingFingerprint: 'fixture-booking', createdAt: NOW - 5000,
       pickupLat: PICKUP.lat, pickupLng: PICKUP.lng,
       destinationLat: DEST.lat, destinationLng: DEST.lng,
-      ...(teen ? { party: { teen: true }, teenPickup: {} } : {}),
+      ...(teen ? { party: { teen: true }, teenPickup: { required: true, verifiedAt: null } } : {}),
     } },
   };
 }

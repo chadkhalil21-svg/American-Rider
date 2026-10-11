@@ -32,6 +32,7 @@ Realtime requirements cannot be reduced to a once-per-hour price polling or a on
 - PR #101: future markets in catalog are not automatically ingested; candidate source records capped.
 - This PR: for a configured market, **zero active authorized collectors causes zero Firestore operations**, identical source batch digest skips ingestion, append-only create skips writing duplicate historical trips, empty/no-new sample does not recompute up to 10,000 documents or rewrite pricing snapshots. Explicit `force` recalibration remains available.
 - Existing active-safety and finance recovery sweeps untouched. **Do not call this a full queue/real-time migration.**
+- A once-hourly stdout-only aggregated workload summary now reports each scheduler job's available counts, skipped or failed state without any personal fields or extra Firestore writes. These are **logical results, not billable read/write counts**; reconcile with Google's collection-level Usage Insights.
 
 ## Cost and capacity model: measured vs illustrative
 Firestore Standard is billed for docs/index reads, writes/deletes, storage, bandwidth and listener fanout. Official free quota *per day* is 50,000 doc reads/20,000 doc writes/20,000 deletes; it is not a guarantee for launch. Source: https://firebase.google.com/docs/firestore/pricing .

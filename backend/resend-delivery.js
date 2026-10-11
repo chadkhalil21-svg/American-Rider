@@ -45,6 +45,10 @@ function verifyResendWebhook({ raw, headers, secret, now = Date.now() }) {
 function sanitizeResendEvent(id, payload) {
   const type = String(payload?.type || '');
   if (!TYPES.has(type)) return null;
+  // Only insurance confirmation mail is actionable. Skip ordinary receipts and support
+  // notices BEFORE durable queue writes; never turn nationwide mail into idle DB work.
+  const sender = String(payload?.data?.from || '').toLowerCase();
+  if (!/(?:^|[<\s])insurance@americanrider\.app(?:>|\s|$)/.test(sender)) return null;
   const emailId = String(payload?.data?.email_id || '');
   if (!validId(id) || !validId(emailId)) throw Error('invalid email event');
   const to = Array.isArray(payload?.data?.to) ? payload.data.to : [];

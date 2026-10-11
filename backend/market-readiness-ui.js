@@ -1,6 +1,7 @@
 // Internal Operations control: no evidence is approved by rendering a green checklist.
 const { page } = require('./shell');
 const { REQUIRED_EVIDENCE } = require('./market-readiness');
+const { regionById } = require('./regions');
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c]);
 const title = (id) => id.replaceAll('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 function marketChecklistPage(items, { production = false, expansion = null } = {}) {
@@ -68,6 +69,28 @@ function marketChecklistPage(items, { production = false, expansion = null } = {
     <button type="button" id="open-south-florida" ${!production || !southFlorida.length || southActive ? 'disabled' : ''}>Open South Florida</button>
     <p id="south-florida-result" role="status" aria-live="polite">One action. The server rechecks all counties and either opens them together or tells you exactly what remains. No partial launch.</p>
   </section>`;
+  // All future commissioned regions reuse the same protected endpoint. Never
+  // display a launch action for an unconfigured jurisdiction or expansion plan.
+  const otherRegionActions = [...new Set(items.map(({market}) => market.regionId).filter(Boolean))]
+    .filter(id => id !== 'fl-southeast')
+    .map(id => {
+      const region = regionById(id);
+      if (!region) return '';
+      const entries = items.filter(({market}) => market.regionId === id);
+      const versions = Object.fromEntries(entries.map(({market,state}) =>
+        [market.id, state.manifestVersion || '']));
+      const active = entries.length > 0 && entries.every(({state}) => state.status === 'active');
+      const ready = entries.length > 0 && entries.every(({state}) => state.readyToActivate);
+      const status = active ? 'Open' : ready ? 'Ready to open' : 'Not yet cleared for paid Travel';
+      return `<section class="region-launch" aria-label="${esc(region.name)} launch">
+        <h2>${esc(region.name)}</h2>
+        <p><strong>Status: ${esc(status)}</strong> · ${entries.filter(({state}) => state.status === 'active').length} of ${entries.length} counties open</p>
+        <button type="button" class="open-other-region" data-region="${esc(id)}"
+          data-versions="${esc(JSON.stringify(versions))}"
+          ${!production || !entries.length || active ? 'disabled' : ''}>Open ${esc(region.name)}</button>
+        <p class="region-result" role="status" aria-live="polite">One action; all included counties must pass the current server checks.</p>
+      </section>`;
+    }).join('');
   const cards = items.map(({ market, state }) => {
     const localMissing = (state.missing || []).filter(m => !m.id?.startsWith('provider:'));
     const id = esc(market.id);
@@ -107,11 +130,11 @@ function marketChecklistPage(items, { production = false, expansion = null } = {
   }).join('');
   return page('Market readiness · Operations', `<style>
 section[data-market] { margin-top:18px; }
-#south-florida-launch { margin:16px 0; padding:16px; border:1px solid var(--hairline); border-radius:12px; }
-#south-florida-launch button { min-height:48px; width:100%; border-radius:10px; font:600 16px Arial,sans-serif; background:var(--blue); color:#fff; border:0; cursor:pointer; }
-#south-florida-launch button:disabled { background:#F1F1EF; color:#555; cursor:not-allowed; }
-#south-florida-launch button:focus-visible { outline:3px solid var(--blue); outline-offset:3px; }
-#south-florida-result { white-space:pre-wrap; }
+#south-florida-launch, .region-launch { margin:16px 0; padding:16px; border:1px solid var(--hairline); border-radius:12px; }
+#south-florida-launch button, .region-launch button { min-height:48px; width:100%; border-radius:10px; font:600 16px Arial,sans-serif; background:var(--blue); color:#fff; border:0; cursor:pointer; }
+#south-florida-launch button:disabled, .region-launch button:disabled { background:#F1F1EF; color:#555; cursor:not-allowed; }
+#south-florida-launch button:focus-visible, .region-launch button:focus-visible { outline:3px solid var(--blue); outline-offset:3px; }
+#south-florida-result, .region-result { white-space:pre-wrap; }
 
 #expansion { margin-top:12px; }
 #expansion form { display:grid; gap:12px; }
@@ -158,6 +181,7 @@ section[data-market] select:focus-visible,section[data-market] summary:focus-vis
 <h1>Markets</h1>
 <p class="lede"><a href="/ops">← Operations</a> · Commission markets here, not in Operator screening.</p>
 ${quickAction}
+${otherRegionActions}
 <details id="other-markets"><summary>Plan another city or state</summary>
 ${planner}
 </details>
@@ -206,6 +230,40 @@ if (southButton) southButton.addEventListener('click',async()=>{
     southButton.disabled=false;
   }
 });
+// Every future configured service region uses the same existing transactional
+// backend, authentication and manifest version checks as South Florida.
+document.querySelectorAll('.open-other-region').forEach(button=>button.addEventListener('click',async()=>{
+  if(button.disabled)return;
+  const output=button.parentElement.querySelector('.region-result');
+  const id=button.dataset.region;
+  let manifestVersions;
+  try { manifestVersions=JSON.parse(button.dataset.versions); }
+  catch { output.textContent='Unable to verify regional manifest versions.';return; }
+  button.disabled=true;
+  output.textContent='Checking all counties together…';
+  try {
+    const r=await fetch('/ops/markets/regions/'+encodeURIComponent(id)+'/activate',{
+      method:'POST',credentials:'same-origin',
+      headers:{'content-type':'application/json','x-ar-ops-action':'1'},
+      body:JSON.stringify({manifestVersions}),
+    });
+    const result=await r.json();
+    if(!r.ok){
+      const issues=Array.isArray(result.missing)?result.missing:[];
+      output.textContent='Region not opened. '+(issues.length ?
+        issues.slice(0,16).map(x=>String(x.id||'requirement').replaceAll('_',' ')).join('; ') :
+        String(result.code||'Not yet authorized'))+'. See commissioning details below.';
+      button.disabled=false;
+      return;
+    }
+    output.textContent=result.code==='already_active'?'This region is already open.':
+      'Region opened. Refreshing authoritative market status…';
+    location.reload();
+  } catch {
+    output.textContent='Activation not confirmed. Check live status before retrying.';
+    button.disabled=false;
+  }
+}));
 const expansionForm=document.getElementById('expansion-plan');
 const expansionState=document.getElementById('expansion-state');
 const expansionCounty=document.getElementById('expansion-county');

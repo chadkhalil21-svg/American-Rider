@@ -49,7 +49,7 @@ let online=true, actor='founder', production=true;
 const market={id:'fl-miami-dade',regionId:'fl-southeast'},region={id:'fl-southeast'};
 const deps={
  db:()=>db,opsSignedIn:()=>actor,authMode:()=>online?'named':'off',
- actorFingerprint:()=>online?'fingerprint123':null,isProduction:()=>production,
+ actorFingerprint:(identity)=>identity==='founder' && online?'fingerprint123':null,isProduction:()=>production,
  markets:()=>[market], regions:[region], productionReadiness:()=>({missing:['screening_provider']}),
  inspectMarket:async()=>({status:'waitlist',readyToActivate:false,missing:[{id:'screening_agreement',reference:'secret-must-not-appear'}]}),
  manifestFor:()=>({version:'v1'}),

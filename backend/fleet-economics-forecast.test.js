@@ -2,11 +2,11 @@
 const assert=require('node:assert/strict');
 const {computeOperatorFleetEconomics: forecast}=require('./fleet-economics-forecast');
 const expected={
-  50:{travels:3000,remainder:1701,expense:6309},
-  100:{travels:6000,remainder:5042,expense:10978},
-  200:{travels:12000,remainder:11703,expense:20337},
-  500:{travels:30000,remainder:31674,expense:48426},
-  1000:{travels:60000,remainder:64965,expense:95235},
+  50:{travels:3000,remainder:1701,expense:6369},
+  100:{travels:6000,remainder:5042,expense:11098},
+  200:{travels:12000,remainder:11703,expense:20577},
+  500:{travels:30000,remainder:31674,expense:49026},
+  1000:{travels:60000,remainder:64965,expense:96435},
 };
 for(const [label,row] of Object.entries(expected)){
   const n=Number(label),r=forecast(n);

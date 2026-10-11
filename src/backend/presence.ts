@@ -58,7 +58,7 @@ if (Platform.OS !== 'web') {
   // policy that lapses at midnight takes the operator out of service at 00:01 even with the
   // phone locked, rather than at the end of a shift they should not have been driving.
   try {
-    await fetch(`${PAYMENT_SERVER_URL}/operator/online`, {
+    const response = await fetch(`${PAYMENT_SERVER_URL}/operator/online`, {
       method: 'POST',
       headers: await authHeaders(),
       body: JSON.stringify({
@@ -69,6 +69,13 @@ if (Platform.OS !== 'web') {
         background: true,
       }),
     });
+    if (!response.ok) {
+      // A resolved fetch is not necessarily an accepted renewal. Do not log
+      // Operator identity, coordinates, tokens or provider evidence.
+      const result = await response.json().catch(() => null);
+      const code = typeof result?.code === 'string' ? result.code.slice(0, 48) : 'no_code';
+      console.warn('[operator-presence] renewal_refused', response.status, code);
+    }
   } catch {
     // A failed renewal is a missed heartbeat, not an emergency. PRESENCE_STALE_MS tolerates
     // two, and the next location delivery tries again. Throwing here would have iOS treat the
@@ -116,9 +123,9 @@ export async function startBackgroundPresence(): Promise<boolean> {
     if (!granted) return false;
     await Location.startLocationUpdatesAsync(PRESENCE_TASK, {
       accuracy: Location.Accuracy.Balanced,
-      // Renew on either signal, whichever comes first. Distance alone would leave a stationary
-      // operator waiting at a rank to go stale; time alone would wake the radio needlessly on
-      // a phone that has not moved.
+      // Expo SDK 57 timeInterval is Android-only. iOS Core Location may
+      // not deliver an update while the vehicle is stationary, even when
+      // pausesUpdatesAutomatically is false; physical-device evidence is mandatory.
       timeInterval: 60_000,
       distanceInterval: 150,
       // WHAT THE OPERATOR SEES WHILE THIS RUNS. iOS requires a persistent indicator for

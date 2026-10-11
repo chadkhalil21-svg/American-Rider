@@ -11,7 +11,7 @@ const { planForRegion }=require('./market-evidence');
 const OBS='market_reference_observations';
 const SNAP='market_reference_snapshots';
 const STATE='market_reference_state';
-const MAX_OBSERVATIONS_PER_SOURCE=5000;
+const MAX_OBSERVATIONS_PER_MARKET_SWEEP=100;
 const HOUR=60*60*1000;
 
 function firestoreReady(){return !!adminDb();}
@@ -23,7 +23,7 @@ function cellKey(o){return [o.serviceClass,distanceBand(o.routedMiles),durationB
 
 async function persistObservations(db,rows){
   let written=0;
-  for(const raw of rows.slice(0,MAX_OBSERVATIONS_PER_SOURCE)){
+  for(const raw of rows.slice(0,MAX_OBSERVATIONS_PER_MARKET_SWEEP)){
     const o=normalizeObservation(raw);
     const id=require('node:crypto').createHash('sha256').update([o.marketId,o.sourceId,o.observedAt,o.routedMiles,o.routedMinutes,o.travelerTotalCents].join('|')).digest('hex');
     await db.collection(OBS).doc(id).set(o,{merge:false});
@@ -58,21 +58,31 @@ async function recomputeMarket(db,marketId,{now=Date.now(),lookbackDays=90}={}){
   return out;
 }
 
-async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false}={}){
+// An evidence catalog entry is not a configured service market.
+function eligibleEvidenceMarkets(enabledMarketIds=[]) {
+  const plans=require('./market-evidence').MARKET_EVIDENCE_PLANS;
+  const permitted=new Set(Array.isArray(enabledMarketIds)?enabledMarketIds:[]);
+  return Object.keys(plans).filter(id=>plans[id]?.admissionOnly!==true&&permitted.has(id));
+}
+async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false,enabledMarketIds=[]}={}){
+  // Research/catalog entries must not trigger production Firestore ingestion.
+  // Only explicit, configured service markets are eligible for scheduled collection.
+  const markets=eligibleEvidenceMarkets(enabledMarketIds);
+  if(!markets.length)return{ok:true,markets:{},skipped:'no_enabled_service_markets'};
   const db=adminDb();
   if(!db)return{ok:false,reason:'no database'};
-  const plans=require('./market-evidence').MARKET_EVIDENCE_PLANS;
-  const markets=Object.keys(plans).filter(id=>plans[id]?.admissionOnly!==true);
   const report={ok:true,markets:{}};
   for(const marketId of markets){
     const plan=planForRegion(marketId);
     const stateRef=db.collection(STATE).doc(marketId),stateSnap=await stateRef.get(),state=stateSnap.exists?stateSnap.data():{};
     if(!force&&state.lastSweepAt&&now-Number(state.lastSweepAt)<HOUR){report.markets[marketId]={skipped:'cadence',lastSweepAt:state.lastSweepAt};continue;}
     let written=0;const results=[];
+    const activeSourceCount=plan.sources.filter(sourceId=>typeof collectors[sourceId]==='function').length;
+    const perSourceCap=activeSourceCount?Math.max(1,Math.floor(MAX_OBSERVATIONS_PER_MARKET_SWEEP/activeSourceCount)):0;
     for(const sourceId of plan.sources){
       const collect=collectors[sourceId];
       if(typeof collect!=='function'){results.push({sourceId,ok:false,reason:'collector not configured'});continue;}
-      try{const rows=await collect({marketId,now});const n=await persistObservations(db,Array.isArray(rows)?rows:[]);written+=n;results.push({sourceId,ok:true,observations:n});}
+      try{const rows=await collect({marketId,now});const n=await persistObservations(db,Array.isArray(rows)?rows.slice(0,perSourceCap):[]);written+=n;results.push({sourceId,ok:true,observations:n});}
       catch(e){results.push({sourceId,ok:false,reason:e.message});}
     }
     const reference=await recomputeMarket(db,marketId,{now});
@@ -82,4 +92,4 @@ async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false
   return report;
 }
 async function currentReference(marketId){const db=adminDb();if(!db)return null;const s=await db.collection(SNAP).doc(marketId).get();return s.exists?s.data():null;}
-module.exports={median,distanceBand,durationBand,cellKey,persistObservations,recomputeMarket,runMarketReferenceSweep,currentReference,firestoreReady};
+module.exports={median,distanceBand,durationBand,cellKey,persistObservations,recomputeMarket,runMarketReferenceSweep,currentReference,firestoreReady,MAX_OBSERVATIONS_PER_MARKET_SWEEP,eligibleEvidenceMarkets};

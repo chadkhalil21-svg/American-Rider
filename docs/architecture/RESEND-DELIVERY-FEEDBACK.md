@@ -1,0 +1,27 @@
+# Resend insurance delivery feedback — research-first integration
+Date: 2026-10-11. Scope: existing low-cost American Rider Render/Firestore/Resend stack.
+
+## Primary research and decision
+1. Resend [event definitions](https://resend.com/docs/webhooks/event-types): `email.sent` indicates send API acceptance; `email.delivered` means delivery to the recipient's mail server, not reading, policy confirmation or guarantee of inbox display. Bounce, complaint, suppression and failed sending are separate states.
+2. [Resend signed requests](https://resend.com/docs/webhooks/verify-webhooks-requests) and [Svix HMAC/headers](https://docs.svix.com/receiving/verifying-payloads/how-manual): receive raw request bytes; validate `svix-id`, `svix-timestamp`, `svix-signature` with HMAC SHA256; constant-time compare and replay expiry.
+3. Google [reliability testing](https://sre.google/sre-book/testing-reliability/), [launch checks](https://sre.google/sre-book/launch-checklist/): test the real failure paths and mark missing live evidence explicitly.
+4. Existing implementation: `backend/server.js` already persists `insurance_status_requests.providerMessageId` and handles authenticated policy confirmation separately; `backend/providerqueue.js` is a durable deduplicated provider inbox. The connected Resend account had **no subscription** on this audit.
+
+## Minimal implementation, not a new insurance authority
+- The only new listener is `POST /resend/webhook` on the existing backend, with a 32 KiB raw body limit and a dedicated `RESEND_WEBHOOK_SECRET`; an unconfigured listener returns HTTP 503.
+- Reuse the durable `provider_events` queue, idempotent by verified Svix message ID; never acknowledge a failed durable write. Filter by the verified message sender `insurance@americanrider.app` **before** queuing so Travel receipts and unrelated account mail do not add Firestore writes.
+- Correlate the signed event with the already-saved Resend message ID and recipient; use an indexed equality lookup and a Firestore transaction. Delivery transitions never regress (late `sent` cannot override `delivered`; delayed delivery cannot override permanent bounce).
+- Permanent transport failure only creates an Operator-facing address correction/alternate-channel issue on the exact **most recent** outstanding request. Do not change insurer policy status, `lastVerifiedAt`, screening, document acceptance, authority to drive, market admissions, or payments.
+- Data minimization: store type, provider ID, email message ID, destination email and provider event time (already in the request), not email content, policies or report PDFs. Never include raw tokens in webhook URLs or logs.
+
+## Executed deterministic scope versus live missing evidence
+Test `backend/resend-delivery.test.js` includes the Svix **independently published signature vector**, tampered body/version, stale timestamp, invalid header, oversized body, provider payload minimization, irrelevant sender, delivery-before-sent, bounce/retry, changed/current/confirmed request and no eligibility mutation.
+The standard Release Gate and both twice-run stress/exhaustive campaigns are mandatory on the exact candidate SHA. CI proves code behavior only.
+
+**Not yet commissioned by this PR:** a live Resend webhook subscription, active Render signing secret, real verified callback delivered to the live endpoint, verified actual recipient mailbox receipt, consented real carrier/broker policy confirmation. For live commissioning, first verify exact deployed SHA, set the signing secret securely (never in Git, issues or chat), register only the needed delivery event types, perform one provider-owned test message including a real replay/bounce, inspect request and durable queue evidence, and then verify one authorized insurance response through the separate policy-status channel.
+
+## Economics and operational acceptance
+No new package/dependency, paid subscription or periodic email scan. One signed email event results in one deduplicated queue create, provider transaction and at most two correlated document updates. A burst of irrelevant receipts creates **zero** new provider queue records. Actual Firestore charged reads/index operations and Resend quota usage are **unmeasured** and must be reported from Firebase/Resend before national cost claims. Do not issue routine broker verification requests at fleet scale merely to test this endpoint.
+
+## Council rubric
+Ford: one event-driven mechanism, no separate county workflow. Rockefeller: existing services and sender-based zero-work fast path. Jobs/Apple: concise self-service contact correction instead of an invisible email failure. Institutional/Google: independent signature and exact-head release evidence. First-class hospitality: truthful delivery states and composed recovery. These are design criteria, not personal endorsements.

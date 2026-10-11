@@ -2745,13 +2745,17 @@ async function issueInsuranceConfirmationRequest({ uid, user, contact, now = Dat
     return { ok: false, reason: sent.reason || 'Confirmation request could not be sent.' };
   }
 
+  // Save the Operator's current request stamp BEFORE exposing the providerMessageId.
+  // A signed bounce can arrive immediately after the outbound API returns. If the
+  // provider ID were saved first, that bounce could correlate while the user
+  // still held the prior request and would not create an actionable contact issue.
+  await db.collection('users').doc(String(uid)).set({
+    insuranceMonitoring: nextMonitoring,
+  }, { merge: true });
   await requestRef.set({
     deliveryStatus: 'accepted',
     deliveryAcceptedAt: now,
     providerMessageId: sent.id || null,
-  }, { merge: true });
-  await db.collection('users').doc(String(uid)).set({
-    insuranceMonitoring: nextMonitoring,
   }, { merge: true });
   await db.collection('audit_log').add({
     at: now,

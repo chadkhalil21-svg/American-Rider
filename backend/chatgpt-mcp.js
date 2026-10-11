@@ -152,7 +152,7 @@ function mount(app, express, deps) {
       return res.redirect(303, callback.toString());
     } catch { return res.status(503).send('Could not authorize connection. Retry securely.'); }
   });
-  app.post('/ar/oauth/token', express.urlencoded({extended: false}), async (req, res) => {
+  app.post('/ar/oauth/token', deps.oauthLimit || ((_req,_res,next)=>next()), express.urlencoded({extended: false}), async (req, res) => {
     res.set('Cache-Control', 'no-store');
     const q = req.body || {}, kind = q.grant_type;
     if (q.client_id !== CLIENT || q.resource !== RESOURCE || !operational() || !db()) {
@@ -223,7 +223,7 @@ function mount(app, express, deps) {
       return res.type('html').send('<h1>ChatGPT disconnected</h1><p>Existing access and refresh tokens are now invalid.</p><p><a href="/ops">Operations</a></p>');
     } catch { return res.status(503).send('Disconnection not confirmed. Retry from Operations.'); }
   });
-  app.post('/mcp', async (req, res) => {
+  app.post('/mcp', deps.mcpLimit || ((_req,_res,next)=>next()), async (req, res) => {
     res.set('Cache-Control', 'no-store');
     const data = req.body;
     if (!data || typeof data !== 'object' || Array.isArray(data) || JSON.stringify(data).length > 10000) {

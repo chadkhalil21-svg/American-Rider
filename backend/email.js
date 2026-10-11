@@ -18,7 +18,14 @@ const T = {
   muted: '#8A8A82', faint: '#B4B3AB', blue: '#2E5FE0',
 };
 
-const money = (cents) => `$${((Number(cents) || 0) / 100).toFixed(2)}`;
+const money = (cents) => `${((Number(cents) || 0) / 100).toFixed(2)}`;
+ 
+// OWASP HTML text-node encoding. Route labels, names and Travel identifiers
+// are data, not trusted markup. Escape only at the HTML output boundary: the
+// plain-text alternative and subject preserve their ordinary readable values.
+const escapeHtmlText = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#x27;',
+})[char]);
 
 /** Is email configured at all? `/health` reports this so a silent outage is impossible. */
 const emailReady = () => !!(readKey('RESEND_API_KEY') && readKey('MAIL_FROM'));
@@ -65,8 +72,8 @@ function shell(bodyHtml) {
 
 const row = (k, v, mono) =>
   `<tr>
-     <td style="padding:13px 0;border-top:1px solid ${T.hairline};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:14.5px;color:${T.muted};">${k}</td>
-     <td align="right" style="padding:13px 0;border-top:1px solid ${T.hairline};font-family:${mono ? "ui-monospace,'SF Mono',Menlo,monospace" : "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif"};font-size:15px;color:${T.ink};">${v}</td>
+     <td style="padding:13px 0;border-top:1px solid ${T.hairline};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:14.5px;color:${T.muted};">${escapeHtmlText(k)}</td>
+     <td align="right" style="padding:13px 0;border-top:1px solid ${T.hairline};font-family:${mono ? "ui-monospace,'SF Mono',Menlo,monospace" : "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif"};font-size:15px;color:${T.ink};">${escapeHtmlText(v)}</td>
    </tr>`;
 
 /**

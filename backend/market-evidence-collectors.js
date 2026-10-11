@@ -17,7 +17,8 @@ async function collectChicago({marketId='il-chicago'}={}){
   // remains attached so calibration can weight it appropriately.
   const base='https://data.cityofchicago.org/resource/6dvr-xwnh.json';
   const params=new URLSearchParams({
-    '$limit':'1000',
+    // Cost-capped when explicitly commissioned; never pull 1,000 raw rows hourly.
+    '$limit':'100',
     '$order':'trip_start_timestamp DESC',
     '$where':"trip_start_timestamp IS NOT NULL AND trip_seconds > 0 AND trip_miles > 0 AND trip_total > 0",
   });

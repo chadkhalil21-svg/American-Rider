@@ -2,13 +2,18 @@
 // REAL Firestore emulator + backend Admin SDK; no real Firebase, Stripe,
 // customers, payouts or paid travel. Runs after existing Firestore rule suite.
 const assert=require('node:assert/strict');
-const admin=require('../../backend/node_modules/firebase-admin');
-// The Admin SDK loaded below exposes Firestore through admin.firestore().
+const path=require('node:path');
+const {createRequire}=require('node:module');
+// Resolve package export subpaths relative to backend's installed dependencies,
+// not through a guessed node_modules filesystem path.
+const backendRequire=createRequire(path.join(__dirname,'../../backend/package.json'));
+const {initializeApp,getApps}=backendRequire('firebase-admin/app');
+const {getFirestore}=backendRequire('firebase-admin/firestore');
 const {sweepBookingRecovery,PREPARED_TTL_MS,BATCH_LIMIT}=
   require('../../backend/bookingrecovery');
 if(!process.env.FIRESTORE_EMULATOR_HOST)throw Error('Firestore emulator is required');
-if(!admin.apps.length)admin.initializeApp({projectId:'demo-american-rider'});
-const db=admin.firestore();
+if(!getApps().length)initializeApp({projectId:'demo-american-rider'});
+const db=getFirestore();
 const now=Date.now();
 async function main(){
   const batch=db.batch();

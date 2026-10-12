@@ -7,12 +7,22 @@ const { adminDb }=require('./firebase-admin');
 const { normalizeObservation }=require('./market-evidence-ingest');
 const { targetTotalCents }=require('./pricing-policy');
 const { planForRegion }=require('./market-evidence');
+const { createReferenceCache }=require('./market-reference-cache');
 
 const OBS='market_reference_observations';
 const SNAP='market_reference_snapshots';
 const STATE='market_reference_state';
 const MAX_OBSERVATIONS_PER_MARKET_SWEEP=100;
 const HOUR=60*60*1000;
+const cachedReference=createReferenceCache({
+  load:async marketId=>{
+    const db=adminDb();
+    if(!db)return null;
+    const snapshot=await db.collection(SNAP).doc(marketId).get();
+    return snapshot.exists?snapshot.data():null;
+  },
+  ttlMs:30_000,maxEntries:128,
+});
 
 function firestoreReady(){return !!adminDb();}
 
@@ -63,6 +73,7 @@ async function recomputeMarket(db,marketId,{now=Date.now(),lookbackDays=90}={}){
   // explicit promotion record proves holdout, economics and router gates for this exact snapshot.
   const out={marketId,asOf:new Date(now).toISOString(),latestObservedAt,lookbackDays,observations:snap.size,sourceCount:sources.size,evidenceFamilies:[...families],promotion:{status:'candidate'},cells};
   await db.collection(SNAP).doc(marketId).set(out);
+  cachedReference.invalidate(marketId); // local candidate overwrite revokes cached promoted authority.
   return out;
 }
 
@@ -145,5 +156,5 @@ async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false
   }
   return report;
 }
-async function currentReference(marketId){const db=adminDb();if(!db)return null;const s=await db.collection(SNAP).doc(marketId).get();return s.exists?s.data():null;}
+async function currentReference(marketId){return cachedReference.read(marketId);}
 module.exports={median,distanceBand,durationBand,cellKey,persistObservations,recomputeMarket,runMarketReferenceSweep,currentReference,firestoreReady,MAX_OBSERVATIONS_PER_MARKET_SWEEP,eligibleEvidenceMarkets,sourceFingerprint};

@@ -26,7 +26,7 @@ const server = read('server.js');
 
 // ---- The guards that were already there, asserted rather than assumed -------------------
 for (const [label, re] of [
-  ['a refund cannot exceed what remains refundable', /only \$\{?refundable\}?c of that payment remains refundable|amountCents > refundable/],
+  ['a refund cannot exceed what remains refundable', /only \$\{?balance\.cents\}?c of that payment remains refundable|amountCents > balance\.cents/],
   ['a refund cannot touch another account\'s payment', /that payment belongs to a different account/],
   ['a refund cannot be issued against an uncompleted charge', /not a completed charge/],
   ['a refund must be a positive whole number of cents', /must be a positive whole number of cents/],

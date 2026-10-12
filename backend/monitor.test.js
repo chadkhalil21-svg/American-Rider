@@ -167,6 +167,62 @@ const check = (l, c, d) => results.push({ l, ok: !!c, d });
       report.emergencyDeliveryFailures[0].operatorNotified===true &&
       report.emergencyDeliveryFailures[0].caseFiled===true,JSON.stringify(report));
   }
+  {
+    tickets.length=0;
+    const h=makeDb({rides:{r1:ride({monitor:{
+      state:'escalated',caseNo:'AR-PREVIOUS-SUPPORT',
+      askedOperatorAt:now-5*MIN,travelerReply:'help',
+    }})}});
+    const result=await inject(h.db).sweepMonitor({now});
+    check('new Traveler emergency overrides earlier nonurgent escalation',
+      h.data.rides.r1.monitor.state==='emergency' &&
+      result.emergencies.length===1 && tickets.length===1 &&
+      tickets[0].kind==='emergency',JSON.stringify(result));
+  }
+  {
+    tickets.length=0;
+    const h=makeDb({rides:{r1:ride({monitor:{
+      state:'escalated',caseNo:'AR-PREVIOUS-SUPPORT',
+      askedOperatorAt:now-5*MIN,operatorReply:'Traveler is hurt, needs emergency help',
+    }})}});
+    const result=await inject(h.db).sweepMonitor({now});
+    check('new Operator emergency overrides earlier nonurgent escalation',
+      h.data.rides.r1.monitor.state==='emergency' &&
+      result.emergencies.some(x=>x.from==='operator') &&
+      tickets.length===1,JSON.stringify(result));
+  }
+  {
+    tickets.length=0;
+    const h=makeDb({rides:{r1:ride({monitor:{
+      state:'emergency',caseNo:'AR-EXISTING',travelerReply:'help',
+    }})}});
+    const result=await inject(h.db).sweepMonitor({now});
+    check('already active emergency is not repeatedly opened',
+      result.activeEscalations===1 && tickets.length===0 &&
+      h.data.rides.r1.monitor.caseNo==='AR-EXISTING',JSON.stringify(result));
+  }
+  {
+    tickets.length=0;
+    const h=makeDb({rides:{r1:ride({monitor:{
+      state:'asked_traveler',askedOperatorAt:now-5*MIN,
+      travelerReply:'help',
+    }})}});
+    const service=inject(h.db);
+    const first=await service.sweepMonitor({now});
+    const firstKey=tickets[0]?.idempotencyKey;
+    // Simulate an authorized review clearing the earlier emergency, followed
+    // by a genuinely new request on the same Travel.
+    h.data.rides.r1.monitor={
+      state:'clear',clearedAt:now+5*MIN,travelerReply:'help',
+    };
+    const second=await service.sweepMonitor({now:now+6*MIN});
+    const secondKey=tickets[1]?.idempotencyKey;
+    check('new incident after documented clearance receives a new case key',
+      first.emergencies.length===1 && second.emergencies.length===1 &&
+      typeof firstKey==='string' && typeof secondKey==='string' &&
+      firstKey!==secondKey && firstKey.length<=100 &&
+      secondKey.length<=100,JSON.stringify({firstKey,secondKey}));
+  }
   // Safety emergency messages must not depend on availability of GPS.
   {
     tickets.length=0;

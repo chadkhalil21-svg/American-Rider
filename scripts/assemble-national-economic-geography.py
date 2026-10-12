@@ -25,6 +25,7 @@ SOURCES = {
     "blsAreaDefinitions": "https://www.bls.gov/oes/area_definitions_m2025.xlsx",
     "blsWages": "https://www.bls.gov/oes/special-requests/oesm25ma.zip",
 }
+TERRITORIES_OUT_OF_SCOPE = {"60", "66", "69", "72", "78"}  # publisher island-area additions, not state markets
 STATES = set("01 02 04 05 06 08 09 10 11 12 13 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 44 45 46 47 48 49 50 51 53 54 55 56".split())
 N = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
 PKG = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
@@ -80,8 +81,8 @@ def fips(state: str, county: str) -> str:
     if not (s.isdigit() and 1 <= len(s) <= 2 and c.isdigit() and 1 <= len(c) <= 3):
         raise ValueError("invalid state/county FIPS")
     code = s.zfill(2) + c.zfill(3)
-    if code[:2] == "72":
-        return None  # publisher includes Puerto Rico; intentionally out of scope
+    if code[:2] in TERRITORIES_OUT_OF_SCOPE:
+        return None  # separately admitted island jurisdictions never become US-state rates
     if code[:2] not in STATES:
         raise ValueError("county outside the configured 50 states + DC")
     return code
@@ -176,8 +177,8 @@ def county_roster(raw: bytes) -> dict:
     counties = {}
     for row in csv_rows(raw):
         code = col(row, "GEOID", "COUNTYFIPS", "COUNTY_FIPS")
-        if code[:2] == "72" and len(code) == 5 and code.isdigit():
-            continue  # Census 2025 national publisher ZIP includes Puerto Rico
+        if code[:2] in TERRITORIES_OUT_OF_SCOPE and len(code) == 5 and code.isdigit():
+            continue  # Census 2025 national ZIP includes Puerto Rico; other island areas are distinct
         if not (len(code) == 5 and code.isdigit() and code[:2] in STATES):
             raise ValueError("invalid national county GEOID")
         name = col(row, "NAME", "COUNTYNAME")

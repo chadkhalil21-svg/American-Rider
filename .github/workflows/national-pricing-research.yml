@@ -5,6 +5,10 @@ on:
     paths:
       - 'scripts/collect-national-pricing-evidence.py'
       - 'scripts/collect-national-pricing-evidence.test.py'
+      - 'scripts/assemble-national-economic-geography.py'
+      - 'scripts/assemble-national-economic-geography.test.py'
+      - 'backend/national-regional-pricing.js'
+      - 'backend/national-regional-pricing.test.js'
       - '.github/workflows/national-pricing-research.yml'
   workflow_dispatch:
   schedule:
@@ -31,6 +35,8 @@ jobs:
         run: |
           python scripts/collect-national-pricing-evidence.test.py
           python scripts/collect-national-pricing-evidence.test.py
+          python scripts/assemble-national-economic-geography.test.py
+          python scripts/assemble-national-economic-geography.test.py
       - name: Generate a dated IRS benchmark without invented BLS wages or market quotes
         run: |
           python scripts/collect-national-pricing-evidence.py \

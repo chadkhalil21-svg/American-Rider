@@ -50,13 +50,14 @@ async function main() {
       cursor=snap.docs.at(-1).id;
       assert.ok(pages<=Math.ceil(RECORDS/PAGE_SIZE)+1,'Scan must terminate');
     }
-    assert.equal(seen.size,RECORDS,'Read all active records, including the last page');
-    assert.equal(pages,Math.ceil(RECORDS/PAGE_SIZE),'Expected page count');
+    assert.equal([...seen].filter(id=>id.startsWith('synthetic_monitor_')).length,RECORDS,
+      'Read all seeded active records despite other active fixtures in the shared emulator');
+    assert.equal(pages,Math.ceil(seen.size/PAGE_SIZE),'Expected page count including existing active fixtures');
     const row={pass,activeDocs:seen.size,queryPages:pages,elapsedMs:Math.round(performance.now()-start)};
     passes.push(row);
     console.log('PASS Firestore emulator active-Travel scan '+JSON.stringify(row));
   }
-  assert.equal(passes[0].activeDocs+passes[1].activeDocs,2*RECORDS);
+  assert.ok(passes.every(p=>p.activeDocs>=RECORDS));
   console.log('BOUNDARY: test uses local Firestore emulator only; cloud billed reads, index-entry reads, p95/p99 latency, peak concurrency, write contention and provider throughput NOT measured.');
   console.log('RISK: a full scan every minute costs >= '+(RECORDS*1440).toLocaleString()+' returned-document reads/day at this steady active-Travel population, excluding other operations.');
 }

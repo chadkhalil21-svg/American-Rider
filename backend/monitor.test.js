@@ -56,7 +56,7 @@ const tickets = [];
 function inject(dbHandle, { aiKey = false, caseFails = false, pushFails = [] } = {}) {
   for (const [rel, exports] of [
     ['./firebase-admin.js', { adminDb: () => dbHandle, adminStatus: () => ({ ok: true, reason: null }) }],
-    ['./tickets.js', { fileTicket: async (t) => { if (caseFails) return { ok:false }; tickets.push(t); return { caseNo: `AR-C${tickets.length}` }; } }],
+    ['./tickets.js', { fileTicket: async (t) => { if (caseFails) return { ok:false }; tickets.push(t); return { ok:true, caseNo: `AR-C${tickets.length}` }; } }],
     ['./env.js', { readKey: (k) => (k === 'ANTHROPIC_API_KEY' && aiKey ? 'fake' : '') }],
     ['./push.js', { notify: async ({ uid }) => ({ ok: !pushFails.includes(uid) }) }],
   ]) {
@@ -232,6 +232,35 @@ const check = (l, c, d) => results.push({ l, ok: !!c, d });
       rep.activeTravelsRead===10000 && rep.activeReadPages===51 &&
       rep.watching===10000 && rep.emergencies.length===0,
       JSON.stringify({read:rep.activeTravelsRead,pages:rep.activeReadPages,watching:rep.watching}));
+  }
+  // The monitor must use the ticket service's stable incident identity.
+  // During a quota write failure, a second tick may redrive the same incident.
+  // Resend and ticket storage can deduplicate only if the key is unchanged.
+  {
+    tickets.length=0;
+    const h=makeDb({rides:{r1:ride({monitor:{travelerReply:'help'}})}});
+    const originalCollection=h.db.collection;
+    h.db.collection=(name)=>{
+      const c=originalCollection(name);
+      if(name==='rides'){
+        const baseDoc=c.doc;
+        c.doc=id=>{
+          const d=baseDoc(id);
+          d.set=async f=>{if(f?.monitor?.state==='emergency')throw Error('synthetic exhausted quota');};
+          return d;
+        };
+      }
+      return c;
+    };
+    const instance=inject(h.db);
+    const p1=await instance.sweepMonitor({now});
+    const p2=await instance.sweepMonitor({now:now+MIN});
+    check('two emergency redrives keep the same incident idempotency key',
+      p1.ok===false&&p2.ok===false&&tickets.length===2&&
+      typeof tickets[0].idempotencyKey==='string'&&
+      tickets[0].idempotencyKey===tickets[1].idempotencyKey&&
+      tickets[0].category==='safety'&&tickets[1].kind==='emergency',
+      JSON.stringify(tickets.map(t=>({key:t.idempotencyKey,kind:t.kind}))));
   }
   // 1. Moving normally: nothing said.
   {

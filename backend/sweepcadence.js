@@ -7,7 +7,7 @@ const PERIOD_MS = Object.freeze({
   insuranceMonitoring: 30 * 60_000,
   operatorFees: 6 * 60 * 60_000,
   familyAgeOut: 60 * 60_000,
-  marketReference: 60 * 60_000,
+  marketReference: 24 * 60 * 60_000,
   accountDeletion: 60 * 60_000,
 });
 function createSweepCadence(periods = PERIOD_MS) {

@@ -84,6 +84,40 @@ function stateDb(){
   assert.equal(poison.obs.length,0);
   assert.match(wrongType.markets['il-chicago'].collectors[0].reason,/mismatch/);
 
+  // A database outage must not be interpreted as a successful source check:
+  // retain immediate retry eligibility rather than bury the event for a week.
+  const quota=stateDb();
+  const failedDB={
+    collection(name){
+      const base=quota.collection(name);
+      if(name==='market_reference_observations'){
+        return {...base,doc(id){return {
+          async create(){throw new Error('8 RESOURCE_EXHAUSTED: quota exceeded');},
+        };}};
+      }
+      return base;
+    },
+  };
+  const validRow={
+    marketId:'il-chicago',sourceId:'chicago-tnp-open-data',
+    sourceType:'government-trips',observedAt:'2026-10-09T00:00:00Z',
+    serviceClass:'standard',routedMiles:4,routedMinutes:12,travelerTotalCents:1800,
+  };
+  const firstFailure=await runMarketReferenceSweep({
+    testDb:failedDB,now:start,enabledMarketIds:['il-chicago'],
+    collectors:{'chicago-tnp-open-data':async()=>[validRow]},
+  });
+  assert.match(firstFailure.markets['il-chicago'].collectors[0].reason,/quota/);
+  assert.equal(quota.state.has('market_reference_state|il-chicago'),false,
+    'failed evidence writes cannot declare source checked');
+  const afterRecovery=await runMarketReferenceSweep({
+    testDb:quota,now:start+DAY,enabledMarketIds:['il-chicago'],
+    collectors:{'chicago-tnp-open-data':async()=>[validRow]},
+  });
+  assert.equal(afterRecovery.markets['il-chicago'].collectors[0].ok,true,
+    'successful retry must not be suppressed by failed prior attempt');
+  assert.equal(quota.obs.length,1);
+
   // Release of a new candidate may never overwrite a previous promoted
   // live snapshot even if the sample/data are empty or suspect.
   const candidateDb=stateDb();

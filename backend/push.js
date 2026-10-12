@@ -15,6 +15,7 @@
 // NEVER THROWS. A notification that cannot be sent must not take down the dispatch, the
 // charge or the sweep that was sending it. Every failure is returned, not raised.
 const { adminDb } = require('./firebase-admin');
+const { recordAcceptedTicket } = require('./pushreceipts');
 
 const EXPO_PUSH = 'https://exp.host/--/api/v2/push/send';
 
@@ -107,7 +108,13 @@ async function notify({ uid, kind, title, body, data }) {
     if (ticket?.status !== 'ok' || typeof ticket.id !== 'string' || !ticket.id.trim()) {
       return { ok: false, reason: 'push acceptance ticket missing' };
     }
-    // Expo acceptance is not a device delivery receipt.
+    // Safety tickets MUST be durable before declaring notification tracking
+    // successful. A valid Expo ticket is still not a phone delivery result.
+    if(kind==='check_in'){
+      const tracked=await recordAcceptedTicket({uid:String(uid),kind,token,ticketId:ticket.id});
+      if(!tracked.ok)return {ok:false,reason:tracked.reason,id:ticket.id};
+    }
+    // 'ok' here means accepted by Expo (and for safety, saved for receipt check).
     return { ok: true, id: ticket.id };
   } catch (e) {
     return { ok: false, reason: e.message };

@@ -42,6 +42,8 @@ def download(url: str, limit: int = 5_000_000) -> bytes:
 def xlsx_rows(raw: bytes):
     if len(raw) > 4_000_000:
         raise ValueError("Census delineation file too large")
+    if not zipfile.is_zipfile(io.BytesIO(raw)):
+        raise ValueError('Invalid official XLSX archive')
     with zipfile.ZipFile(io.BytesIO(raw)) as z:
         names = set(z.namelist())
         if "xl/worksheets/sheet1.xml" not in names:
@@ -124,6 +126,8 @@ def census_cbsa_map(raw: bytes):
 def county_rows(raw: bytes):
     if len(raw) > 4_000_000:
         raise ValueError("County Gazetteer archive too large")
+    if not zipfile.is_zipfile(io.BytesIO(raw)):
+        raise ValueError('Invalid official county ZIP archive')
     with zipfile.ZipFile(io.BytesIO(raw)) as z:
         files = [n for n in z.namelist() if n.lower().endswith(".txt")]
         if len(files) != 1:

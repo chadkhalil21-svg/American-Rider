@@ -20,7 +20,8 @@ const {PERIOD_MS,createSweepCadence,quotaError,createQuotaBackoff}=require('./sw
   assert.equal((await clock.run('operatorFees',f,now+5*60*60_000)).skipped,'cadence');
   assert.equal((await clock.run('operatorFees',f,now+6*60*60_000+60_000)).ok,true);
   assert.equal((await clock.run('marketReference',f,now+60_000)).ok,true);
-  assert.equal((await clock.run('marketReference',f,now+60*60_000+60_000)).ok,true);
+  assert.equal((await clock.run('marketReference',f,now+60*60_000+60_000)).skipped,'cadence');
+  assert.equal((await clock.run('marketReference',f,now+24*60*60_000+60_000)).ok,true);
   assert.equal(clock.due('familyAgeOut',now),true);
   assert.equal(clock.due('familyAgeOut',now-60_000),true,'time moved back: allow recovery');
   assert.rejects(async()=>clock.run('bogus',f,now));

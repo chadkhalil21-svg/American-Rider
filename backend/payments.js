@@ -597,7 +597,7 @@ async function chargeRide({ travelCostCents, travelerPaymentMethod, uid, tripNo,
 function refundBalanceFromVerifiedIntent(pi) {
   const charge = pi?.latest_charge;
   const charged = Number(pi?.amount_received);
-  const refunded = charge && typeof charge === 'object' ? Number(charge.amount_refunded) : NaN;
+  const refunded = charge && typeof charge === 'object' ? charge.amount_refunded : NaN;
   if (pi?.status !== 'succeeded' || !charge || typeof charge !== 'object' ||
       (charge.payment_intent && charge.payment_intent !== pi.id) ||
       !Number.isSafeInteger(charged) || charged <= 0 ||

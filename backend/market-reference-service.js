@@ -14,6 +14,9 @@ const CANDIDATE='market_reference_candidates';
 const STATE='market_reference_state';
 const MAX_OBSERVATIONS_PER_MARKET_SWEEP=100;
 const HOUR=60*60*1000;
+const DAY=24*HOUR;
+// Historical city datasets are published in batches. Do not poll hourly.
+const SOURCE_RECHECK_MS=Object.freeze({'chicago-tnp-open-data':7*DAY});
 
 function firestoreReady(){return !!adminDb();}
 
@@ -109,21 +112,29 @@ async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false
     if(!force&&state.lastSweepAt&&now-Number(state.lastSweepAt)<HOUR){report.markets[marketId]={skipped:'cadence',lastSweepAt:state.lastSweepAt};continue;}
     let written=0;const results=[];
     const fingerprints={...(state.sourceFingerprints||{})};
+    const sourceCheckedAt={...(state.sourceCheckedAt||{})};
     const activeSourceCount=plan.sources.filter(sourceId=>typeof collectors[sourceId]==='function').length;
     const perSourceCap=activeSourceCount?Math.max(1,Math.floor(MAX_OBSERVATIONS_PER_MARKET_SWEEP/activeSourceCount)):0;
     for(const sourceId of plan.sources){
       const collect=collectors[sourceId];
       if(typeof collect!=='function'){results.push({sourceId,ok:false,reason:'collector not configured'});continue;}
+      const last=Number(sourceCheckedAt[sourceId]);
+      const interval=SOURCE_RECHECK_MS[sourceId]||DAY;
+      if(!force&&Number.isFinite(last)&&last>0&&now>=last&&now-last<interval){
+        results.push({sourceId,ok:true,observations:0,skipped:'source_not_due'});continue;
+      }
       try {
         const observed=await collect({marketId,now});
         if(!Array.isArray(observed))throw new Error('collector returned an invalid batch');
         const rows=observed.slice(0,perSourceCap);
         const fingerprint=sourceFingerprint(rows);
         if(!force && fingerprints[sourceId]===fingerprint) {
+          sourceCheckedAt[sourceId]=now;
           results.push({sourceId,ok:true,observations:0,skipped:'unchanged_source'});
           continue;
         }
         const n=await persistObservations(db,rows);
+        sourceCheckedAt[sourceId]=now; // mark checked only after successful persistence
         written+=n;
         fingerprints[sourceId]=fingerprint;
         results.push({sourceId,ok:true,observations:n});
@@ -137,9 +148,10 @@ async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false
     // records actual evidence changes rather than charging once per market/hour.
     const fingerprintsChanged=Object.keys(fingerprints).some(
       id=>fingerprints[id]!==((state.sourceFingerprints||{})[id]));
-    if (written>0 || fingerprintsChanged || force) {
+    const checksChanged=Object.keys(sourceCheckedAt).some(id=>sourceCheckedAt[id]!==((state.sourceCheckedAt||{})[id]));
+    if (written>0 || fingerprintsChanged || checksChanged || force) {
       await stateRef.set({lastSweepAt:now,lastSweepIso:new Date(now).toISOString(),
-        sourceFingerprints:fingerprints,lastWritten:written,
+        sourceFingerprints:fingerprints,sourceCheckedAt,lastWritten:written,
         ...(reference?{lastReferenceAsOf:reference.asOf}:{}),collectorResults:results},{merge:true});
     }
     report.markets[marketId]={written,reference,

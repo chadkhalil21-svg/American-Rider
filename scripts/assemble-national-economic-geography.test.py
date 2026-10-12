@@ -96,6 +96,25 @@ class NationalCrosswalkTests(unittest.TestCase):
             self.assertEqual(r["profiles"]["12029"]["blsAreaCode"],"12440")
             self.assertEqual(r["profiles"]["12029"]["blsEmployeeMedianHourlyUSD"],19.5)
 
+    def test_real_publisher_container_shapes_zip_pipe_and_bls_xlsx(self):
+        for _ in range(2):
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf,"w",zipfile.ZIP_DEFLATED) as z:
+                z.writestr("2025_Gaz_counties_national.txt",
+                           "USPS|GEOID|NAME\\nFL|12086|Miami-Dade\\nFL|12011|Broward\\n")
+            roster = mod.county_roster(buf.getvalue())
+            self.assertEqual(set(roster), {"12086","12011"})
+            wage_workbook=workbook(
+                ["AREA","AREA_TITLE","OCC_CODE","NAICS","I_GROUP","H_MEDIAN"],
+                [["33100","Miami Metro","53-3054","000000","cross-industry","18.50"],
+                 ["33100","Miami Metro","53-3053","000000","cross-industry","*"]])
+            outer=io.BytesIO()
+            with zipfile.ZipFile(outer,"w",zipfile.ZIP_DEFLATED) as z:
+                z.writestr("oesm25ma.xlsx",wage_workbook)
+            wages=mod.official_wages(outer.getvalue())
+            self.assertEqual(wages["33100:53-3054"]["hourlyMedianUSD"],18.5)
+            self.assertEqual(len(wages),1)
+
     def test_source_pinning_and_future_revisions_fail(self):
         raw,manifest=fixture()
         for updated in (

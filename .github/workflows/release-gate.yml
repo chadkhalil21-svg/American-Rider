@@ -24,6 +24,10 @@ jobs:
       - name: Audit production backend dependencies
         run: npm audit --omit=dev --prefix backend
       - run: npm run check
+      - name: Offline Census/BLS geographic source-integrity and 51-jurisdiction tests twice
+        run: |
+          python3 scripts/assemble-national-economic-geography.test.py
+          python3 scripts/assemble-national-economic-geography.test.py
       - name: Export Expo web bundle
         run: npx expo export --platform web --output-dir dist-ci-web
       - name: Export Expo iOS bundle

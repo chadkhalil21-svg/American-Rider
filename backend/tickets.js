@@ -41,7 +41,10 @@ async function notifyByEmail(ticket) {
   try {
     const r = await fetch('https://api.resend.com/emails', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json',
+        // Resend deduplicates equal requests for 24h; stable incident/case ID
+        // prevents a one-minute monitor retry from spamming emergency email.
+        'Idempotency-Key': `case-alert/${ticket.caseNo}` },
       body: JSON.stringify({
         from: 'American Rider <support@americanrider.app>',
         to: [to],
@@ -192,7 +195,10 @@ async function notifyLocationByEmail(ticket) {
   try {
     const r = await fetch('https://api.resend.com/emails', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json',
+        // Resend deduplicates equal requests for 24h; stable incident/case ID
+        // prevents a one-minute monitor retry from spamming emergency email.
+        'Idempotency-Key': `case-location/${ticket.caseNo}` },
       body: JSON.stringify({
         from: 'American Rider <support@americanrider.app>',
         to: [to],

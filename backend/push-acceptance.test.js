@@ -3,11 +3,20 @@ const assert = require('node:assert/strict');
 const firebasePath = require.resolve('./firebase-admin');
 const previous = require.cache[firebasePath];
 let dropped = false;
+let currentToken = 'SYNTHETIC-TOKEN';
+const userRef = {
+  async get() { return { exists: true, data: () => ({ pushToken: currentToken }) }; },
+  async set(value) { if (Object.hasOwn(value, 'pushToken')) { currentToken = value.pushToken; dropped = true; } },
+};
+const db = {
+  collection: () => ({ doc: () => userRef }),
+  runTransaction: async (fn) => fn({
+    get: (ref) => ref.get(),
+    set: (ref, values, opts) => ref.set(values, opts),
+  }),
+};
 require.cache[firebasePath] = { id: firebasePath, filename: firebasePath, loaded: true, exports: {
-  adminDb: () => ({ collection: () => ({ doc: () => ({
-    get: async () => ({ exists: true, data: () => ({ pushToken: 'SYNTHETIC-TOKEN' }) }),
-    set: async () => { dropped = true; },
-  }) }) }),
+  adminDb: () => db,
 } };
 const { notify } = require('./push');
 const originalFetch = global.fetch;
@@ -29,8 +38,25 @@ async function main() {
   }
   assert.deepEqual(await send(200, { data: { status: 'ok', id: 'valid-ticket' } }),
     { ok: true, id: 'valid-ticket' });
+  // The phone registered a fresh token while the old push was in flight.
+  // A late DeviceNotRegistered reply must NOT erase the current token.
+  currentToken = 'SYNTHETIC-TOKEN';
+  dropped = false;
+  global.fetch = async () => {
+    currentToken = 'ROTATED-TOKEN';
+    return { ok: true, status: 200, json: async () =>
+      ({ data: { status: 'error', details: { error: 'DeviceNotRegistered' } } }) };
+  };
+  assert.equal((await notify({ uid: 'synthetic', kind: 'insurance_verification_due' })).ok, false);
+  assert.equal(currentToken, 'ROTATED-TOKEN');
+  assert.equal(dropped, false, 'never overwrite a newer push registration');
+
+  // But the genuinely rejected token is cleared if it is still current.
+  currentToken = 'SYNTHETIC-TOKEN';
   assert.equal((await send(200, { data: { status: 'error', details: { error: 'DeviceNotRegistered' } } })).ok, false);
   assert.equal(dropped, true);
+  assert.equal(currentToken, null);
+  currentToken = 'SYNTHETIC-TOKEN';
   global.fetch = async () => { throw new Error('timeout'); };
   assert.equal((await notify({ uid: 'synthetic', kind: 'insurance_verification_due' })).ok, false);
   global.fetch = async () => ({ ok: true, status: 200, json: async () => { throw new Error('invalid JSON'); } });

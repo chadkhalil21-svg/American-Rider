@@ -534,7 +534,7 @@ async function raiseEmergency(db, ride, { now, caseNo, note, from }) {
   ]);
   return {
     recorded, notifications: results.map(r =>
-      r.status === 'fulfilled' && r.value?.ok !== false),
+      r.status === 'fulfilled' && r.value?.ok === true),
   };
 }
 

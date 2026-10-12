@@ -389,6 +389,9 @@ const check = (l, c, d) => results.push({ l, ok: !!c, d });
     const rep = await inject(h.db).sweepMonitor({ now });
     check('traveler asks for help: emergency lane at once',
       tickets.length === 1 && tickets[0].kind === 'emergency'
+      && tickets[0].trip?.no === 'AR-2048-MIA'
+      && tickets[0].trip?.dep === 'Brickell'
+      && tickets[0].trip?.arr === 'South Beach'
       && h.data.rides.r1.monitor.state === 'emergency' && rep.emergencies.length === 1,
       JSON.stringify({ k: tickets[0]?.kind, s: h.data.rides.r1.monitor.state }));
   }

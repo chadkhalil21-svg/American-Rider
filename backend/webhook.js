@@ -77,6 +77,32 @@ async function handleEvent(event) {
       return { ok: true, action: `dispute ${obj.status}` };
     }
 
+    // Stripe can accept a refund request and then fail it asynchronously.
+    // No money is reissued here: create a durable, retry-safe exception so
+    // support can reconcile the original refund before promising a new one.
+    case 'refund.failed':
+    case 'refund.updated': {
+      if (event.type === 'refund.updated' && !['failed', 'canceled'].includes(obj.status))
+        return { ok: true, action: 'nonfailed refund update' };
+      if (!obj.id) throw new Error('refund event missing provider refund ID');
+      const ride = await rideByPaymentIntent(db, obj.payment_intent);
+      const caseNo = await open(db, ride, {
+        kind: 'support',
+        reason: 'Traveler refund failed or was canceled',
+        description: `Stripe reported refund ${obj.id} status ${obj.status || event.type}.\n` +
+          `Refund amount: ${money(obj.amount)}. Reason: ${obj.failure_reason || 'not supplied'}.\n` +
+          `Travel: ${ride?.tripNo || '(unmatched)'}; PaymentIntent: ${obj.payment_intent || '(unavailable)'}.\n` +
+          'Do not reissue money automatically. Verify the original refund and contact the Traveler.',
+      }, event, { dedupeIdentity: `refund-exception:${String(obj.id)}` });
+      if (ride) await mark(db, ride.id, {
+        refundFailureReviewRequired: true,
+        refundFailureId: String(obj.id),
+        refundFailureCaseNo: caseNo,
+        refundFailureReason: String(obj.failure_reason || obj.status || 'provider_reported_failure').slice(0, 180),
+      });
+      return { ok: true, action: 'refund failure flagged for review', caseNo };
+    }
+
     // ---- The charge failed, or was pulled back after it settled. ---------------------
     case 'payment_intent.payment_failed': {
       const ride = await rideByPaymentIntent(db, obj.id);
@@ -175,13 +201,14 @@ async function uidByStripeAccount(db, accountId) {
   return snap.docs[0]?.id || null;
 }
 
-async function open(db, ride, { kind, reason, description }, providerEvent) {
-  const idempotencyKey = createHash('sha256').update(String(providerEvent?.id ||
+async function open(db, ride, { kind, reason, description }, providerEvent, { dedupeIdentity = null } = {}) {
+  const idempotencyKey = createHash('sha256').update(String(dedupeIdentity || providerEvent?.id ||
     `${providerEvent?.type}:${providerEvent?.data?.object?.id}`)).digest('hex');
   const filed = await fileTicket({
     uid: ride?.travelerUid || 'stripe-system',
     email: ride?.travelerEmail || '',
-    kind, reason, trip: ride?.tripNo || '', description, idempotencyKey,
+    kind, reason, trip: ride ? { no: ride.tripNo || null, dep: ride.dep || null, arr: ride.dest || null } : null,
+    description, idempotencyKey,
   });
   if (!filed?.stored || !filed?.emailed) throw new Error('Stripe exception case not stored and alerted');
   return filed.caseNo;

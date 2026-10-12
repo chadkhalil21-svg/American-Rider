@@ -151,13 +151,16 @@ async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false
             throw new Error('collector observation market/source/type mismatch');
           return o;
         });
-        sourceCheckedAt[sourceId]=now;
         const fingerprint=sourceFingerprint(rows);
         if(!force && fingerprints[sourceId]===fingerprint) {
+          sourceCheckedAt[sourceId]=now; // completed successful no-change check
           results.push({sourceId,ok:true,observations:0,skipped:'unchanged_source'});
           continue;
         }
         const n=await persistObservations(db,rows);
+        // A quota/database failure must NOT postpone the next retry by seven
+        // days. Only checkpoint a source after its observations are persisted.
+        sourceCheckedAt[sourceId]=now;
         written+=n;
         fingerprints[sourceId]=fingerprint;
         results.push({sourceId,ok:true,observations:n});

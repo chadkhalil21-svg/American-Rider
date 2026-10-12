@@ -15,7 +15,7 @@ const key = keyForQuote({ serviceClass: 'standard', routedMiles: 7, routedMinute
 const stamp = '2026-10-10T14:00:00.000Z';
 const cell = {
   referenceTotalCents: 2000, targetTotalCents: 1800,
-  travelerTotalComparable: true,
+  travelerTotalComparable: true, observations: 40,
   latestObservedAt: stamp,
   evidenceFamilies: ['government-trips', 'independent-audit'],
   sources: ['government-city', 'audit-independent'],

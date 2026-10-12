@@ -536,6 +536,11 @@ async function openCase(db, ride, { now, why, urgent }) {
       uid: ride.travelerUid,
       email: ride.travelerEmail || '',
       kind: urgent ? 'emergency' : 'support',
+      // The ticket service already supports stable incident keys. Use it so a
+      // failed monitor-state write/retry reuses the SAME case, rather than
+      // opening another case for each one-minute safety sweep.
+      idempotencyKey: `route-monitor-incident-${String(ride.id)}-${urgent ? 'emergency' : 'support'}`,
+      category: 'safety',
       reason: 'Route monitoring',
       trip: ride.tripNo || '',
       description:
@@ -546,7 +551,7 @@ async function openCase(db, ride, { now, why, urgent }) {
         `${new Date(Number(ride.opAt) || now).toISOString()}.\n` +
         `Route: ${ride.dep || '—'} to ${ride.dest || '—'}.`,
     });
-    return filed?.caseNo || null;
+    return filed?.ok === true ? (filed.caseNo || null) : null;
   } catch {
     return null;
   }

@@ -20,10 +20,10 @@ import zipfile
 import xml.etree.ElementTree as ET
 
 SOURCES = {
-    "censusCounties": "https://www.census.gov/geographies/reference-files/time-series/geo/gazetteer-files.html",
+    "censusCounties": "https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2025_Gazetteer/2025_Gaz_counties_national.zip",
     "censusCbsa": "https://www2.census.gov/programs-surveys/metro-micro/geographies/reference-files/2023/delineation-files/list1_2023.xlsx",
     "blsAreaDefinitions": "https://www.bls.gov/oes/area_definitions_m2025.xlsx",
-    "blsWages": "https://www.bls.gov/oes/tables.htm",
+    "blsWages": "https://www.bls.gov/oes/special-requests/oesm25ma.zip",
 }
 STATES = set("01 02 04 05 06 08 09 10 11 12 13 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 44 45 46 47 48 49 50 51 53 54 55 56".split())
 N = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
@@ -243,6 +243,37 @@ def bls_county_definitions(raw: bytes) -> dict:
 
 
 def official_wages(raw: bytes) -> dict:
+    """Read a publisher ZIP, XLSX, native tab TXT or CSV; never all-data 331MB scrape."""
+    if zipfile.is_zipfile(io.BytesIO(raw)):
+        with zipfile.ZipFile(io.BytesIO(raw)) as z:
+            names = set(z.namelist())
+            if "[Content_Types].xml" not in names:
+                members = [n for n in names if n.lower().endswith((".xlsx", ".txt", ".csv"))
+                           and not n.startswith("/") and ".." not in n]
+                if len(members) != 1 or z.getinfo(members[0]).file_size > 40_000_000:
+                    raise ValueError("unsupported or oversized BLS occupation archive")
+                raw = z.read(members[0])
+    if zipfile.is_zipfile(io.BytesIO(raw)):
+        rows = table(xlsx_rows(raw), [
+            ["AREA", "Area Code"], ["AREA_TITLE", "Area Title"],
+            ["OCC_CODE", "Occupation Code"], ["H_MEDIAN", "Median Hourly Wage"],
+        ])
+        # The production BLS wage validator remains the authority for filtering
+        # occupations, suppressed cells and duplicate data.
+        data = io.StringIO()
+        keys = ["AREA", "AREA_TITLE", "OCC_CODE", "NAICS", "I_GROUP", "H_MEDIAN"]
+        writer = csv.DictWriter(data, fieldnames=keys, delimiter="\\t")
+        writer.writeheader()
+        for r in rows:
+            writer.writerow({
+                "AREA": col(r, "AREA", "Area Code"),
+                "AREA_TITLE": col(r, "AREA_TITLE", "Area Title"),
+                "OCC_CODE": col(r, "OCC_CODE", "Occupation Code"),
+                "NAICS": col(r, "NAICS", required=False) or "000000",
+                "I_GROUP": col(r, "I_GROUP", required=False) or "cross-industry",
+                "H_MEDIAN": col(r, "H_MEDIAN", "Median Hourly Wage", required=False) or "*",
+            })
+        raw = data.getvalue().encode()
     spec = importlib.util.spec_from_file_location(
         "national_wage_importer", Path(__file__).with_name("collect-national-pricing-evidence.py"))
     mod = importlib.util.module_from_spec(spec)

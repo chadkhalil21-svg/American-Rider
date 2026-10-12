@@ -167,6 +167,72 @@ const check = (l, c, d) => results.push({ l, ok: !!c, d });
       report.emergencyDeliveryFailures[0].operatorNotified===true &&
       report.emergencyDeliveryFailures[0].caseFiled===true,JSON.stringify(report));
   }
+  // Safety emergency messages must not depend on availability of GPS.
+  {
+    tickets.length=0;
+    const h=makeDb({rides:{r1:ride({opAt:now-30*MIN,
+      monitor:{travelerReply:'help'}})}});
+    const rep=await inject(h.db).sweepMonitor({now});
+    check('stale GPS cannot suppress explicit Traveler help',
+      h.data.rides.r1.monitor.state==='emergency' &&
+      rep.emergencies.length===1 && rep.watching===0,JSON.stringify(rep));
+  }
+  {
+    tickets.length=0;
+    const h=makeDb({rides:{r1:ride({opLat:undefined,opLng:undefined,
+      monitor:{travelerReply:'help'}})}});
+    const rep=await inject(h.db).sweepMonitor({now});
+    check('missing GPS cannot suppress explicit Traveler help',
+      h.data.rides.r1.monitor.state==='emergency' &&
+      rep.emergencies.length===1,JSON.stringify(rep));
+  }
+  {
+    tickets.length=0;
+    const h=makeDb({rides:{r1:ride({stillSince:now-20*1000,opAt:now-30*MIN,
+      monitor:{operatorReply:'Passenger is injured, needs ambulance'}})}});
+    const rep=await inject(h.db).sweepMonitor({now});
+    check('urgent Operator warning is independent of GPS and stop timer',
+      h.data.rides.r1.monitor.state==='emergency' &&
+      rep.emergencies.some(x=>x.from==='operator'),JSON.stringify(rep));
+  }
+  {
+    tickets.length=0;
+    const h=makeDb({rides:{r1:ride({monitor:{travelerReply:'help'}})}});
+    const originalCollection=h.db.collection;
+    h.db.collection=(name)=>{
+      const c=originalCollection(name);
+      if(name==='rides'){
+        const d=c.doc;
+        c.doc=(id)=>{
+          const doc=d(id), originalSet=doc.set;
+          doc.set=async (fields,options)=>{
+            if(fields?.monitor?.state==='emergency') throw new Error('synthetic database quota exhausted');
+            return originalSet(fields,options);
+          };
+          return doc;
+        };
+      }
+      return c;
+    };
+    const rep=await inject(h.db).sweepMonitor({now});
+    check('emergency Firestore persistence failure is reported as degraded',
+      rep.ok===false && rep.emergencyDeliveryFailures.length===1 &&
+      rep.emergencyDeliveryFailures[0].emergencyStored===false &&
+      rep.emergencyDeliveryFailures[0].caseFiled===true,JSON.stringify(rep));
+  }
+  // 10k active Travels: page EVERY active ride, not only first 200/500.
+  {
+    const many={};
+    for(let i=0;i<10000;i++)many['scale'+String(i).padStart(5,'0')]=
+      ride({status:'onboard',operatorId:'op'+i,travelerUid:'u'+i,
+        stillSince:now-1000,monitorSeen:{lat:P.lat,lng:P.lng,at:now-1000}});
+    const h=makeDb({rides:many});
+    const rep=await inject(h.db).sweepMonitor({now});
+    check('10k simultaneous synthetic active Travels are all paginated',
+      rep.activeTravelsRead===10000 && rep.activeReadPages===51 &&
+      rep.watching===10000 && rep.emergencies.length===0,
+      JSON.stringify({read:rep.activeTravelsRead,pages:rep.activeReadPages,watching:rep.watching}));
+  }
   // 1. Moving normally: nothing said.
   {
     const h = makeDb({ rides: { r1: ride({ stillSince: now - 30 * 1000, monitorSeen: { lat: FAR.lat, lng: FAR.lng, at: now - MIN } }) } });

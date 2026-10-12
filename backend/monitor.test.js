@@ -53,12 +53,13 @@ function makeDb(seed) {
 }
 
 const tickets = [];
-function inject(dbHandle, { aiKey = false, caseFails = false, pushFails = [] } = {}) {
+function inject(dbHandle, { aiKey = false, caseFails = false, pushFails = [], pushResults = {} } = {}) {
   for (const [rel, exports] of [
     ['./firebase-admin.js', { adminDb: () => dbHandle, adminStatus: () => ({ ok: true, reason: null }) }],
     ['./tickets.js', { fileTicket: async (t) => { if (caseFails) return { ok:false }; tickets.push(t); return { ok:true, caseNo: `AR-C${tickets.length}` }; } }],
     ['./env.js', { readKey: (k) => (k === 'ANTHROPIC_API_KEY' && aiKey ? 'fake' : '') }],
-    ['./push.js', { notify: async ({ uid }) => ({ ok: !pushFails.includes(uid) }) }],
+    ['./push.js', { notify: async ({ uid }) => Object.prototype.hasOwnProperty.call(pushResults, uid)
+      ? pushResults[uid] : { ok: !pushFails.includes(uid) } }],
   ]) {
     const p = require.resolve(path.join(ROOT, rel));
     require.cache[p] = { id: p, filename: p, loaded: true, exports, children: [], paths: [] };
@@ -166,6 +167,18 @@ const check = (l, c, d) => results.push({ l, ok: !!c, d });
       report.emergencyDeliveryFailures[0].travelerNotified===false &&
       report.emergencyDeliveryFailures[0].operatorNotified===true &&
       report.emergencyDeliveryFailures[0].caseFiled===true,JSON.stringify(report));
+  }
+  // A fulfilled promise without an explicit {ok:true} is NOT a verified
+  // push acceptance. Expo's actual device delivery still requires receipts.
+  for (const ambiguous of [undefined, null, {}, {ok:null}, {ok:0}]) {
+    tickets.length=0;
+    const h=makeDb({rides:{r1:ride({monitor:{travelerReply:'help'}})}});
+    const result=await inject(h.db,{pushResults:{u1:ambiguous}}).sweepMonitor({now});
+    check('ambiguous emergency push never counts as successful delivery',
+      result.ok===false && result.emergencyDeliveryFailures.length===1 &&
+      result.emergencyDeliveryFailures[0].travelerNotified===false &&
+      result.emergencyDeliveryFailures[0].operatorNotified===true &&
+      h.data.rides.r1.monitor.state==='emergency',JSON.stringify(result));
   }
   {
     tickets.length=0;

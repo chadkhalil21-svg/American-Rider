@@ -1,6 +1,8 @@
 # American Rider — evidence-led safety and capacity review (12 October 2026)
 
-**Candidate:** review branch `fix/emergency-push-unknown-result-failclosed-20261012`; base `68c55154ae176b83d99f431335da74d56a74e51b` (merged docs PR #153). This record distinguishes what was inspected, what code was changed and what STILL NEEDS real-world verification. The founder's insurance funding model and market gates are unchanged.
+**Verified result (21:06 UTC, 12 October 2026):** PR #154 merged; all six exact-head workflows passed at `fa7861647cc15c449e5b2d957e1d86778770006d`. Real Firestore emulator scanned 1,205 active documents in seven pages on BOTH passes (476 ms, 265 ms). Render backend, main website and preview independently confirmed **LIVE** on merge revision `06a991ab422dcbd27f95c240828e9e128ace1b08`; backend start log confirms production server running. These facts do NOT establish real iOS/Android delivery, production Firestore throughput or Stripe callback delivery.
+
+**Original candidate:** review branch `fix/emergency-push-unknown-result-failclosed-20261012`; base `68c55154ae176b83d99f431335da74d56a74e51b` (merged docs PR #153). This record distinguishes what was inspected, what code was changed and what STILL NEEDS real-world verification. The founder's insurance funding model and market gates are unchanged.
 
 ## Starting references — independently published, not Council endorsements
 

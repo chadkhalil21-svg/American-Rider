@@ -165,7 +165,7 @@ def table(rows: list[list[str]], required: list[list[str]]) -> list[dict]:
 def county_roster(raw: bytes) -> dict:
     # Census 2025 national Gazetteer is usually ZIP containing pipe-delimited
     # TXT. Verify the outer archive's checksum BEFORE extracting any member.
-    if raw[:4] == b"PK\\x03\\x04":
+    if zipfile.is_zipfile(io.BytesIO(raw)):
         with zipfile.ZipFile(io.BytesIO(raw)) as z:
             members = [n for n in z.namelist() if n.lower().endswith(".txt") and "/" not in n]
             if len(members) != 1 or z.getinfo(members[0]).file_size > 5_000_000:

@@ -542,7 +542,9 @@ async function openCase(db, ride, { now, why, urgent }) {
       idempotencyKey: `route-monitor-incident-${String(ride.id)}-${urgent ? 'emergency' : 'support'}`,
       category: 'safety',
       reason: 'Route monitoring',
-      trip: ride.tripNo || '',
+      // Support stores one structured Travel reference; a bare string makes
+      // the emergency email incorrectly display 'no travel number'.
+      trip: { no: ride.tripNo || null, dep: ride.dep || null, arr: ride.dest || null },
       description:
         `Route monitoring opened this case on travel ${ride.tripNo || '(no travel number)'}.\n` +
         `${why}\n` +

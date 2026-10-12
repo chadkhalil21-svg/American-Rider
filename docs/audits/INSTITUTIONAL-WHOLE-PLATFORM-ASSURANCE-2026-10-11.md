@@ -25,7 +25,7 @@ This is a structured application of **published** guidance, not literal consulta
 |---|---|---|---|
 | AR-01 | Single server-authoritative Traveler Total; Operator receives 99% of Fare | `backend/fareauthority.js`, `payments.js`, `economics.js` | P: `payments.test.js`, `idempotency.test.js`; E: final live Stripe objects, toll and payout reconciliation |
 | AR-02 | Every charge mapped to a real owned Travel | `backend/booking.js`, `travelmoney.js` | P: `travelmoney.test.js`, `payments.test.js`; E: sandbox processing/transfer/refund proofs |
-| AR-03 | Unserved paid Travel cancelled/refunded; eligible refund cannot starve | `backend/bookingrecovery.js` | **F:** former refundPending query scanned unrelated statuses then ignored them after limit; draft filters `status=cancelled` at query, with composite index and >100-invalid-row synthetic regression; must deploy index before code |
+| AR-03 | Unserved paid Travel cancelled/refunded; eligible refund cannot starve | `backend/bookingrecovery.js` | **F:** former refundPending query scanned unrelated statuses then ignored them after limit; draft filters `status=cancelled` at query, with a >100-invalid-row synthetic regression and no new composite index; must deploy index before code |
 | AR-04 | Every external webhook verified, stored durably, retried without duplication | `providerqueue.js`, `webhook.js`, `resend-delivery.js` | P: `providerqueue.durability.test.js`; E: ledger notes signed Resend callback still resulted in 503 due to Firestore write deadline; investigate capacity before saying commissioned |
 | AR-05 | Authenticated object access and money ownership | `auth.js`, `booking.js`, `trustboundaries.js`, `server.js` | P: existing adversarial trace suite; R: OWASP object/property-level endpoint-by-endpoint red-team review and actual Auth identities not covered by source scan |
 | AR-06 | Operator screening held, renewal enforced, never silent eligibility bypass | `screening.js`, `qualification.js` | P: `screening.test.js`, renewal cursor logic; E: actual provider reports, licensing and adverse-action workflow records |
@@ -52,7 +52,7 @@ This is a structured application of **published** guidance, not literal consulta
 
 Before this change, `sweepBookingRecovery()` queried **all** `refundPending=true` records with `.limit(100)`, then skipped those whose status was not `cancelled`. With 125 irrelevant pending records ahead of a legitimate cancelled paid Travel, a healthy refund could remain outside the batch indefinitely. Each minute also re-read the irrelevant records. This violates AWS bounded-queue/drain guidance, Stripe financial recovery, and our own operator/traveler service promise.
 
-**Draft correction:** add `where('status', '==', 'cancelled')` before `.limit(100)`, add the exact composite Firestore index in `firestore.indexes.json`, and test the backlog using a query double that actually applies *both* filters. This is an error-recovery correction only: no refund is executed by this PR. Deploying server before index builds is unsafe because Firestore may reject the compound query; stage/index-confirm first.
+**Draft correction:** add `where('status', '==', 'cancelled')` before `.limit(100)`, use automatic index merging for the two equality filters, and test the backlog using a query double that actually applies *both* filters. This is an error-recovery correction only: no refund is executed by this PR. Per Google's Firestore guidance, two equality predicates can use existing single-field index merging. No composite index deployment is required; check actual query performance after release.
 
 The existing test only verified three eligible records. The new regression adds 125 irrelevant flags before the eligible refund and checks it is recovered, the scan is under capacity, and no second refund happens.
 
@@ -65,7 +65,7 @@ The existing test only verified three eligible records. The new regression adds 
 ## Recommended next independent gates
 
 1. Complete exact-head six-workflow CI **on this separate PR**, including emulator rules and the new recovery starvation test. Do not conflate it with pricing PR #124, already six-green but **draft and not deployed**.
-2. Provision Firestore's new composite index and confirm its building state before any merged/backend release using the compound refund query.
+2. Confirm the equality-only recovery query works after deployment and assess its actual read cost. Add a composite index only if measured performance warrants it.
 3. Measure real Firestore billed reads/writes by collection and type under idle and controlled load; test sustained 1K/10K concurrent duty/rides, not just one million in-process math iterations.
 4. Commission payment/provider callbacks and prove actual signed queue acknowledgments, Stripe sandbox transfer/refund reconciliation and physical iOS/Android critical flows before approving commercial scale.
 5. Independently resolve the legal/insurance/airport evidence and national pricing source-rights gaps; never treat synthetic testing as an operating permit.

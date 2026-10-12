@@ -1,0 +1,61 @@
+name: Verified Public Pricing Research (No Fare Changes)
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/collect-national-pricing-evidence.py'
+      - 'scripts/collect-national-pricing-evidence.test.py'
+      - '.github/workflows/national-pricing-research.yml'
+  workflow_dispatch:
+  schedule:
+    # One public-source batch audit a month, not per town/trip/hour.
+    - cron: '24 10 6 * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verified-economic-research-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Offline evidence and fail-closed tests twice
+        run: |
+          python scripts/collect-national-pricing-evidence.test.py
+          python scripts/collect-national-pricing-evidence.test.py
+      - name: Generate a dated IRS benchmark without invented BLS wages or market quotes
+        run: |
+          python scripts/collect-national-pricing-evidence.py \
+            --out /tmp/national-pricing-evidence.json
+      - name: Verify one bounded real City of Chicago TNC research sample
+        run: |
+          python scripts/collect-national-pricing-evidence.py \
+            --fetch-chicago --out /tmp/national-pricing-evidence.json
+      - name: Ensure no bogus national price certification
+        run: |
+          python - <<'PY'
+          import json
+          e=json.load(open('/tmp/national-pricing-evidence.json'))
+          assert e['status']=='research-only'
+          assert e['bookable'] is False
+          assert e['farePromotionAllowed'] is False
+          assert e['nationalPricingCertified'] is False
+          assert e['tenPercentBelowMarketVerified'] is False
+          assert e['wages']['operatorNetHourlyTargetVerified'] is False
+          assert e['vehicle']['actualCostsVerified'] is False
+          print('Research evidence validated; production pricing unchanged')
+          PY
+      - name: Save only short-lived research artifact, zero Firestore writes
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-pricing-research-${{ github.run_id }}
+          path: /tmp/national-pricing-evidence.json
+          retention-days: 30

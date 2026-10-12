@@ -48,6 +48,7 @@ function qualification(snapshot,plan,cell=null,now=Date.now()){
     return {ok:false,reason:'condition-cell provider concentration unverified or excessive'};
   const observed=Date.parse(cell.latestObservedAt||'');
   if(!Number.isFinite(observed))return {ok:false,reason:'condition-cell evidence timestamp missing'};
+  if(observed>now+5*60_000)return {ok:false,reason:'condition-cell evidence future-dated'};
   const maxAgeDays=Number(plan?.maxObservationAgeDays||90);
   if(now-observed>maxAgeDays*86400000)return {ok:false,reason:'condition-cell evidence stale'};
   return {ok:true};

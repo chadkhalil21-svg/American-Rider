@@ -78,7 +78,7 @@ const {refundableFor,refundTravel,__refundBalanceFromVerifiedIntent:balance}=mon
     assert.equal((await refundableFor({paymentIntentId:paymentId,expectUid:'traveler_1'})).cents,0);
     prior.latest_charge={id:'ch_ar_synthetic',payment_intent:paymentId,amount_refunded:400};
   }
-  for(const v of [NaN,-1,1001,undefined]){
+  for(const v of [NaN,-1,1001,undefined,null,'400']){
     const pi=structuredClone(intents.get(paymentId));pi.latest_charge.amount_refunded=v;
     assert.equal(balance(pi).ok,false,'invalid refund history fails closed');
   }

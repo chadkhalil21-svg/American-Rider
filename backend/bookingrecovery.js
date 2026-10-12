@@ -20,7 +20,14 @@ async function sweepBookingRecovery({ db, deps, stripeConfigured, now = Date.now
   ];
   for (const group of groups) {
     let snap;
-    try { snap = await db.collection('rides').where(group.field, '==', group.value).limit(BATCH_LIMIT).get(); }
+    try {
+      // A malformed/stale refundPending flag on a non-cancelled Travel must not
+      // occupy the first 100 recovery slots indefinitely. Filter at Firestore,
+      // not *after* the bounded query. Paid cancelled Travels retain priority.
+      let query = db.collection('rides').where(group.field, '==', group.value);
+      if (group.field === 'refundPending') query = query.where('status', '==', 'cancelled');
+      snap = await query.limit(BATCH_LIMIT).get();
+    }
     catch (e) { out.ok = false; out.errors.push(String(e.message || e)); continue; }
     if (snap.docs.length >= BATCH_LIMIT) out.overCapacity = true;
     out.scanned += snap.docs.length;

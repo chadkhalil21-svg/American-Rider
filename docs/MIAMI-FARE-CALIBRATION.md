@@ -140,8 +140,7 @@ Prefer independent transaction/audit evidence. Use field observations and platfo
 as validation, with source weights and freshness decay. Never allow one source, one OD pair, or one
 instantaneous quote to set production.
 
-A planning competitive band can be evaluated around 93–100% of the robust reference, but **93% is
-not a production constant**. NBER's matched audit found ~14% average absolute cross-platform
+The founder's **current national planning target is 90% of a validated comparable local\nTraveler Total** (10% below). The legacy 93–100% planning band and the original\n95% Miami research fixture were superseded on 11 October 2026. The 85–90% diagnostic\nreview band is NOT a second fare rule; materially larger discounts require scrutiny.\nThe 14 published historical averages below remain a single-source *diagnostic*,\nnot approved live evidence and not grounds for automatically raising the production Fare. NBER's matched audit found ~14% average absolute cross-platform
 dispersion, so false penny-level parity is neither necessary nor evidence-based.
 
 ## Required sample before a market is promoted

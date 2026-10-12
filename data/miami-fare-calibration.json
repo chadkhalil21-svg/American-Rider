@@ -2,7 +2,7 @@
   "asOf": "2026-09-29",
   "market": "South Florida / Miami launch calibration",
   "doctrine": "Observed Traveler Total is the calibration variable. Airport-origin observations are retained as validation but excluded from the ordinary Standard fit because permit/surcharge economics differ.",
-  "targetFraction": 0.95,
+  "targetFraction": 0.90,
   "observations": [
     [
       "Coral Gables → Miami",

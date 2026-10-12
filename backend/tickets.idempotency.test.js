@@ -18,7 +18,20 @@ const fakeDb={
             const old=merge?(data.get(id)||{}):{};
             data.set(id,{...old,...fields});
           },
-          async update(fields){data.set(id,{...data.get(id),...fields});},
+          async update(fields){
+            const doc={...data.get(id)};
+            for(const [key,value] of Object.entries(fields)){
+              const parts=key.split('.');
+              if(parts.length===1){doc[key]=value;continue;}
+              let target=doc;
+              for(const part of parts.slice(0,-1)){
+                target[part]={...(target[part]||{})};
+                target=target[part];
+              }
+              target[parts.at(-1)]=value;
+            }
+            data.set(id,doc);
+          },
         };
       },
     };

@@ -11,7 +11,7 @@ const REQUIREMENTS = Object.freeze({
     state: 'FL',
     stateName: 'Florida',
     statute: 'Fla. Stat. §627.748(7)',
-    source: 'https://www.flsenate.gov/Laws/Statutes/2025/627.748',
+    source: 'https://www.flsenate.gov/Laws/Statutes/2026/627.748',
     loggedOn: Object.freeze({ statute: 'Fla. Stat. §627.748(7)(b)', perPerson: 50000, perIncident: 100000, propertyDamage: 25000 }),
     ride: Object.freeze({ statute: 'Fla. Stat. §627.748(7)(c)', primaryLiabilityMinDollars: 1000000 }),
     pipRequired: true,

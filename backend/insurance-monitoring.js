@@ -93,9 +93,36 @@ function continuingStatus(user, now = Date.now()) {
     return { ok: false, code: `insurance_${status}`, status, reason, nextVerificationDueAt: m.nextVerificationDueAt || null };
   }
 
-  const verifiedAt = Number(m.lastVerifiedAt) || 0;
-  const age = verifiedAt ? now - verifiedAt : Number.POSITIVE_INFINITY;
-  if (!verifiedAt || age > STATUS_MAX_AGE_MS) {
+  // A future-dated or malformed independent confirmation is not evidence
+  // that a carrier verified an Operator today. Never allow a negative age to
+  // masquerade as a fresh carrier verification after a bad clock/import.
+  const verifiedAt = Number(m.lastVerifiedAt);
+  if (!Number.isSafeInteger(verifiedAt) || verifiedAt <= 0 || verifiedAt > now) {
+    return {
+      ok: false, code: 'insurance_status_unverified', status: 'unverified',
+      reason: 'Independent insurance verification has an invalid or future date.',
+      nextVerificationDueAt: m.nextVerificationDueAt || null,
+    };
+  }
+
+  // The documented policy end-date is a hard stop even when a recent broker
+  // confirmation was recorded. Do not confuse a fresh *message* with a policy
+  // that is still in force; qualification also checks document expiry.
+  const expiryText = String(m.expirationDate || '').trim();
+  if (expiryText) {
+    const expiryAt = /^\d{4}-\d{2}-\d{2}$/.test(expiryText)
+      ? Date.parse(`${expiryText}T23:59:59.999Z`) : NaN;
+    if (!Number.isFinite(expiryAt) || expiryAt < now) {
+      return {
+        ok: false, code: 'insurance_policy_expired', status: 'unverified',
+        reason: 'The recorded insurance policy has expired or its expiry date is invalid.',
+        nextVerificationDueAt: m.nextVerificationDueAt || null,
+      };
+    }
+  }
+
+  const age = now - verifiedAt;
+  if (age > STATUS_MAX_AGE_MS) {
     return {
       ok: false,
       code: 'insurance_status_stale',

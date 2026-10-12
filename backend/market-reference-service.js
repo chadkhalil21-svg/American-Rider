@@ -7,6 +7,7 @@ const { adminDb }=require('./firebase-admin');
 const { normalizeObservation }=require('./market-evidence-ingest');
 const { targetTotalCents }=require('./pricing-policy');
 const { planForRegion, source: sourceCatalogEntry }=require('./market-evidence');
+const { createMarketReferenceCache }=require('./market-reference-cache');
 
 const OBS='market_reference_observations';
 const SNAP='market_reference_snapshots';
@@ -165,5 +166,10 @@ async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false
   }
   return report;
 }
-async function currentReference(marketId){const db=adminDb();if(!db)return null;const s=await db.collection(SNAP).doc(marketId).get();return s.exists?s.data():null;}
+const referenceCache=createMarketReferenceCache({load:async marketId=>{
+  const db=adminDb();if(!db)return null;
+  const snapshot=await db.collection(SNAP).doc(marketId).get();
+  return snapshot.exists?snapshot.data():null;
+}});
+async function currentReference(marketId){return referenceCache.read(marketId);}
 module.exports={median,distanceBand,durationBand,cellKey,persistObservations,recomputeMarket,runMarketReferenceSweep,currentReference,firestoreReady,MAX_OBSERVATIONS_PER_MARKET_SWEEP,eligibleEvidenceMarkets,sourceFingerprint};

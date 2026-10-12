@@ -6,7 +6,7 @@
 const { adminDb }=require('./firebase-admin');
 const { normalizeObservation }=require('./market-evidence-ingest');
 const { targetTotalCents }=require('./pricing-policy');
-const { planForRegion }=require('./market-evidence');
+const { planForRegion, source: sourceCatalogEntry }=require('./market-evidence');
 
 const OBS='market_reference_observations';
 const SNAP='market_reference_snapshots';
@@ -94,7 +94,7 @@ function sourceFingerprint(rows) {
   const canonical=rows.map(row => JSON.stringify(canonicalEvidence(row))).sort();
   return crypto.createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
 }
-async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false,enabledMarketIds=[]}={}){
+async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false,enabledMarketIds=[],testDb=null}={}){
   // A public research catalog does NOT create a live hourly workload.
   // Even when a market is configured, zero active licensed collectors means
   // zero Firestore reads/writes and no meaningless snapshot recomputation.
@@ -103,7 +103,7 @@ async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false
   const markets=eligible.filter(id=>
     planForRegion(id).sources.some(sourceId=>typeof collectors[sourceId]==='function'));
   if(!markets.length)return{ok:true,markets:{},skipped:'no_active_market_collectors'};
-  const db=adminDb();
+  const db=testDb||adminDb();
   if(!db)return{ok:false,reason:'no database'};
   const report={ok:true,markets:{}};
   for(const marketId of markets){
@@ -126,7 +126,13 @@ async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false
       try {
         const observed=await collect({marketId,now});
         if(!Array.isArray(observed))throw new Error('collector returned an invalid batch');
-        const rows=observed.slice(0,perSourceCap);
+        const rows=observed.slice(0,perSourceCap).map(raw=>{
+          const row=normalizeObservation(raw);
+          if(row.marketId!==marketId||row.sourceId!==sourceId||
+             row.sourceType!==sourceCatalogEntry(sourceId)?.type)
+            throw new Error('source/market/type mismatch');
+          return row;
+        });
         const fingerprint=sourceFingerprint(rows);
         if(!force && fingerprints[sourceId]===fingerprint) {
           sourceCheckedAt[sourceId]=now;

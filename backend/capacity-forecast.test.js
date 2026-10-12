@@ -5,9 +5,9 @@ const populations=[10000,100000,1000000];
 for(let pass=0;pass<2;pass++){
  const seen=[];
  for(const users of populations){
-  const p=forecast({registeredUsers:users,dailyTravelRate:0.02,
+  const p=forecast({registeredUsers:users,dailyTravelRate:0.04,
    activeMinutes:25,peakMultiplier:6,assignmentCandidatesPerTravel:3});
-  assert.equal(p.dailyTravels,users*0.02);
+  assert.equal(p.dailyTravels,users*0.04);
   assert.equal(p.monitorDocumentReadsLowerBound,p.dailyTravels*25);
   assert.equal(p.estimatedPeakConcurrent,Math.ceil(p.averageConcurrent*6));
   assert.equal(p.firestoreIndexReadsIncluded,false);

@@ -17,6 +17,8 @@ assert.equal(qualification(promoted,plan,{...cell,evidenceFamilies:['government-
 assert.equal(qualification(promoted,plan,{...cell,sources:['only-one']},now).ok,false);
 assert.equal(qualification(promoted,plan,{...cell,maxProviderShare:0.71},now).ok,false);
 assert.equal(qualification(promoted,plan,{...cell,latestObservedAt:'2026-01-01T00:00:00Z'},now).ok,false);
+assert.equal(qualification(promoted,plan,{...cell,latestObservedAt:'2026-10-01T12:06:00Z'},now).ok,false);
+assert.equal(qualification(promoted,plan,{...cell,latestObservedAt:'2026-10-01T12:05:00Z'},now).ok,true);
 assert.equal(referenceScopeForPickup({lat:25.7959,lng:-80.287}),'fl-miami-dade');
 assert.equal(referenceScopeForPickup({lat:26.0742,lng:-80.1506}),'fl-broward');
 assert.equal(referenceScopeForPickup({lat:26.6832,lng:-80.0956}),'fl-palm-beach');

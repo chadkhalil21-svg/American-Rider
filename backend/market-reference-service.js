@@ -172,7 +172,7 @@ async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false
     const fingerprintsChanged=Object.keys(fingerprints).some(
       id=>fingerprints[id]!==((state.sourceFingerprints||{})[id]));
     const checksChanged=Object.keys(sourceCheckedAt).some(
-      id=>sourceCheckedAt[id]!==((state.sourceCheckedAt||{})[id]);
+      id=>sourceCheckedAt[id]!==((state.sourceCheckedAt||{})[id]));
     if (written>0 || fingerprintsChanged || checksChanged || force) {
       await stateRef.set({lastSweepAt:now,lastSweepIso:new Date(now).toISOString(),
         sourceFingerprints:fingerprints,sourceCheckedAt,lastWritten:written,

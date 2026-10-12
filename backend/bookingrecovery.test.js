@@ -12,10 +12,18 @@ function store() {
         set: async (fields) => rows.set(key, { ...rows.get(key), ...fields }),
         update: async (fields) => rows.set(key, { ...rows.get(key), ...fields }),
       }; },
-      where(field, _, value) { return { limit(max) { return { async get() {
-        return { docs: [...rows.entries()].filter(([id,row]) => id.startsWith(`${name}/`) && row[field] === value)
-          .slice(0,max).map(([id]) => ({ id: id.slice(name.length+1), data: () => ({ ...rows.get(id) }) })) };
-      } }; } }; },
+      where(field, _, value) {
+        const constraints = [[field, value]];
+        const query = {
+          where(nextField, _op, nextValue) { constraints.push([nextField,nextValue]); return query; },
+          limit(max) { return { async get() {
+            return { docs: [...rows.entries()].filter(([id,row]) =>
+              id.startsWith(`${name}/`) && constraints.every(([key,v]) => row[key] === v))
+              .slice(0,max).map(([id]) => ({ id: id.slice(name.length+1), data: () => ({ ...rows.get(id) }) })) };
+          } }; },
+        };
+        return query;
+      },
     }; },
     runTransaction(fn) { return fn({
       get: (ref) => ref.get(), update: (ref, fields) => ref.update(fields),
@@ -56,6 +64,25 @@ async function main() {
     now:now+PAID_UNMATCHED_TTL_MS+1000 });
   assert(later.closed.includes('scheduled'));
   assert.equal(refunds.length,3,'the scheduled orphan was automatically refunded');
+  // Adversarial regression: 125 unrelated records occupy the natural scan
+  // order with refundPending=true but are NOT legally eligible for this cancel
+  // refund path. A post-query .continue used to starve the valid paid refund.
+  const flood=store();
+  for(let i=0;i<125;i++)flood.rows.set(`rides/irrelevant-${i}`,{
+    status:'assigned',travelerUid:'u',refundPending:true,createdAt:now-60_000,
+  });
+  flood.rows.set('rides/eligible-refund',{
+    travelerUid:'u',status:'cancelled',refundPending:true,
+    paymentIntentId:'pi_eligible',cancelledFrom:'assigned',costCents:2350,
+    createdAt:now-900000,
+  });
+  const beforeCount=refunds.length;
+  const recovered=await sweepBookingRecovery({ db:flood,deps,stripeConfigured:true,now });
+  assert.equal(recovered.ok,true,JSON.stringify(recovered));
+  assert.ok(recovered.closed.includes('eligible-refund'),'valid paid refund cannot be starved by irrelevant flags');
+  assert.equal(recovered.overCapacity,false,'query must not bill 100 irrelevant refund documents');
+  assert.equal(refunds.length,beforeCount+1);
+  assert.equal(flood.rows.get('rides/eligible-refund').refundPending,false);
   console.log('PASS unattended prepared-booking closure, paid-unmatched refund and pending retry');
 }
 main().catch((e) => { console.error(e); process.exitCode=1; });

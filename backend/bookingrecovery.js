@@ -4,6 +4,15 @@ const { paymentMatches } = require('./booking');
 const PREPARED_TTL_MS = 15 * 60 * 1000;
 const PAID_UNMATCHED_TTL_MS = 2 * 60 * 1000;
 const BATCH_LIMIT = 100;
+const CURSOR_COLLECTION = 'recovery_cursors';
+const CURSOR_DOCUMENT = 'booking_recovery';
+// One checkpoint read per leased sweep and at most one merge write when
+// a query's first page cannot cover all outstanding recovery work.
+const CURSOR_FIELDS = Object.freeze({
+  awaiting_payment: 'preparedAfterId',
+  awaiting_assignment: 'assignmentAfterId',
+  refund_pending: 'refundAfterId',
+});
 
 /**
  * Every confirmed charge without a served Travel needs either an Operator or an owed refund.
@@ -13,10 +22,21 @@ const BATCH_LIMIT = 100;
 async function sweepBookingRecovery({ db, deps, stripeConfigured, now = Date.now() }) {
   if (!db) return { ok: false, reason: 'Firestore unavailable' };
   const out = { ok: true, scanned: 0, closed: [], pending: [], errors: [], overCapacity: false };
+  const cursorRef = db.collection(CURSOR_COLLECTION).doc(CURSOR_DOCUMENT);
+  let previous = {};
+  try {
+    const cursorSnap = await cursorRef.get();
+    previous = cursorSnap.exists ? (cursorSnap.data() || {}) : {};
+  } catch (e) {
+    // Do not silently fall back to the same first page forever.
+    return { ...out, ok: false,
+      errors: [`Recovery checkpoint unavailable: ${String(e.message || e)}`] };
+  }
+  const advances = {};
   const groups = [
-    { field: 'status', value: 'awaiting_payment', ttl: PREPARED_TTL_MS },
-    { field: 'status', value: 'awaiting_assignment', ttl: PAID_UNMATCHED_TTL_MS },
-    { field: 'refundPending', value: true, ttl: 0 },
+    { field: 'status', value: 'awaiting_payment', ttl: PREPARED_TTL_MS, cursor: CURSOR_FIELDS.awaiting_payment },
+    { field: 'status', value: 'awaiting_assignment', ttl: PAID_UNMATCHED_TTL_MS, cursor: CURSOR_FIELDS.awaiting_assignment },
+    { field: 'refundPending', value: true, ttl: 0, cursor: CURSOR_FIELDS.refund_pending },
   ];
   for (const group of groups) {
     let snap;
@@ -26,7 +46,22 @@ async function sweepBookingRecovery({ db, deps, stripeConfigured, now = Date.now
       // not *after* the bounded query. Paid cancelled Travels retain priority.
       let query = db.collection('rides').where(group.field, '==', group.value);
       if (group.field === 'refundPending') query = query.where('status', '==', 'cancelled');
+      // Cursor on the indexed Firestore document name avoids costly offsets
+      // and reaches past the 100 oldest unresolved cases.
+      query = query.orderBy('__name__');
+      const saved = previous[group.cursor];
+      const validCursor = typeof saved === 'string' && saved.length > 0 &&
+        saved.length <= 200 && !saved.includes('/');
+      if (validCursor) query = query.startAfter(saved);
       snap = await query.limit(BATCH_LIMIT).get();
+      if (!snap.docs.length && validCursor) {
+        // End reached. Wrap only once, keeping scans bounded.
+        let first = db.collection('rides').where(group.field, '==', group.value);
+        if (group.field === 'refundPending') first = first.where('status', '==', 'cancelled');
+        snap = await first.orderBy('__name__').limit(BATCH_LIMIT).get();
+      }
+      const next = snap.docs.length >= BATCH_LIMIT ? snap.docs.at(-1).id : null;
+      if ((previous[group.cursor] ?? null) !== next) advances[group.cursor] = next;
     }
     catch (e) { out.ok = false; out.errors.push(String(e.message || e)); continue; }
     if (snap.docs.length >= BATCH_LIMIT) out.overCapacity = true;
@@ -63,6 +98,16 @@ async function sweepBookingRecovery({ db, deps, stripeConfigured, now = Date.now
         else if (result.status === 202 || result.body.pending) out.pending.push(doc.id);
         else { out.ok = false; out.errors.push(`${doc.id}: ${result.body.code || result.body.error}`); }
       } catch (e) { out.ok = false; out.errors.push(`${doc.id}: ${String(e.message || e)}`); }
+    }
+  }
+  if (Object.keys(advances).length) {
+    try {
+      // Save AFTER processing; crashed workers may repeat safely thanks to
+      // existing Travel cancellation idempotency and the single-leader lease.
+      await cursorRef.set(advances, { merge: true });
+    } catch (e) {
+      out.ok = false;
+      out.errors.push(`Recovery checkpoint not persisted: ${String(e.message || e)}`);
     }
   }
   return out;

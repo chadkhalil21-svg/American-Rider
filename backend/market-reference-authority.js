@@ -31,7 +31,21 @@ function qualification(snapshot,plan,cell=null,now=Date.now()){
   const families=new Set(cell.evidenceFamilies||[]);
   if(families.size<(plan?.minimumIndependentFamilies||2))return {ok:false,reason:'condition-cell independent evidence insufficient'};
   if((cell.sources||[]).length<2)return {ok:false,reason:'condition-cell source diversity insufficient'};
-  if(Number(cell.maxProviderShare)>0.70)return {ok:false,reason:'condition-cell provider concentration excessive'};
+  // A market reference must be a full, comparable passenger Total, not merely
+  // a published Fare or a rate-card estimate. Existing historical collectors
+  // do not supply this approval, so cannot silently set live prices.
+  if(cell.travelerTotalComparable!==true)return {ok:false,reason:'full traveler total not independently harmonized'};
+  if(!Number.isSafeInteger(cell.referenceTotalCents)||cell.referenceTotalCents<=0||
+     cell.targetTotalCents!==require('./pricing-policy').targetTotalCents(cell.referenceTotalCents))
+    return {ok:false,reason:'reference total or target invalid'};
+  // Two single observations are not a reliable market distribution. A plan can
+  // raise the threshold but cannot weaken the national minimum without a PR.
+  const observations=Number(cell.observations);
+  const required=Math.max(20,Number(plan?.minimumMatchedObservationsPerCell)||20);
+  if(!Number.isSafeInteger(observations)||observations<required)
+    return {ok:false,reason:'insufficient matched market observations'};
+  if(!Number.isFinite(cell.maxProviderShare)||cell.maxProviderShare>0.70)
+    return {ok:false,reason:'condition-cell provider concentration unverified or excessive'};
   const observed=Date.parse(cell.latestObservedAt||'');
   if(!Number.isFinite(observed))return {ok:false,reason:'condition-cell evidence timestamp missing'};
   const maxAgeDays=Number(plan?.maxObservationAgeDays||90);

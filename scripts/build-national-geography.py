@@ -13,6 +13,7 @@ import argparse
 import csv
 import hashlib
 import io
+import itertools
 import json
 import re
 import sys
@@ -48,7 +49,9 @@ def parse_counties(raw):
             raise ValueError("Expected one county Gazetteer TXT")
         with z.open(names[0]) as stream:
             lines = io.TextIOWrapper(stream, encoding="utf-8-sig")
-            reader = csv.DictReader(lines, delimiter="\t")
+            first = lines.readline()
+            delimiter = "|" if first.count("|") >= 5 else "\t"
+            reader = csv.DictReader(itertools.chain([first], lines), delimiter=delimiter)
             result = {}
             for row in reader:
                 fips = (row.get("GEOID") or "").strip()

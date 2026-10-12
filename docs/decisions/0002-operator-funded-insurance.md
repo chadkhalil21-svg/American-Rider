@@ -2,6 +2,11 @@
 
 **Status:** Accepted founder business policy; Florida TNC statutory sufficiency **unresolved**. **Recorded:** 2026-10-10.
 
+## Founder-confirmed current position — October 12, 2026
+**American Rider currently has no automobile/TNC insurance policy and does not itself provide, sell, purchase, or underwrite insurance for Operators or Travelers.** Operators are responsible for procuring and paying for their own qualifying commercial/TNC-use policies. This statement describes the founder-confirmed **present position** and the accepted business policy. It is **not an independently audited insurance-inventory certificate**, a legal conclusion that no company coverage is required, or a promise that a claim could never reach the TNC.
+
+**Do not silently relabel American Rider as insured, invent an existing company policy, enroll it in a product, or change its business model.** The separate Florida 2026 §627.748(7)(d) TNC-maintained contingent coverage/duty-to-defend question remains unresolved. Because the company currently has no such confirmed coverage, do not mark `company_insurance_bound` or Florida commercial admission as fulfilled. Obtain a qualified legal determination and any required binding evidence or authorized change in company policy *before* opening paid operations; maintain the launch gate meanwhile.
+
 ## Context
 Operators must have valid coverage appropriate to their state, vehicle, registered insured, TNC use and periods. Carrier cancellations may occur mid-term. The founder explicitly rejects American Rider providing, selling or purchasing Operator automobile insurance, and wants no recurring founder review or mass monthly broker emails.
 

@@ -57,7 +57,8 @@ def csv_rows(raw: bytes) -> list[dict]:
     text = raw.decode("utf-8-sig")
     if not text.strip():
         raise ValueError("empty CSV")
-    delimiter = "\t" if "\t" in text.splitlines()[0] else ","
+    first = text.splitlines()[0]
+    delimiter = "|" if "|" in first else "\t" if "\t" in first else ","
     reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
     if not reader.fieldnames:
         raise ValueError("no CSV headers")
@@ -162,6 +163,14 @@ def table(rows: list[list[str]], required: list[list[str]]) -> list[dict]:
 
 
 def county_roster(raw: bytes) -> dict:
+    # Census 2025 national Gazetteer is usually ZIP containing pipe-delimited
+    # TXT. Verify the outer archive's checksum BEFORE extracting any member.
+    if raw[:4] == b"PK\\x03\\x04":
+        with zipfile.ZipFile(io.BytesIO(raw)) as z:
+            members = [n for n in z.namelist() if n.lower().endswith(".txt") and "/" not in n]
+            if len(members) != 1 or z.getinfo(members[0]).file_size > 5_000_000:
+                raise ValueError("unsafe or ambiguous Census counties archive")
+            raw = z.read(members[0])
     counties = {}
     for row in csv_rows(raw):
         code = col(row, "GEOID", "COUNTYFIPS", "COUNTY_FIPS")

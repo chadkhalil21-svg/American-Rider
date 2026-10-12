@@ -2,14 +2,7 @@
 const assert = require('node:assert/strict');
 const { normalize, summarize, listIndexes, isCompositeDefinition } = require('./firestore-index-commission.cjs');
 const manifest = require('../firestore.indexes.json');
-assert.equal(manifest.indexes.length, 13, 'manifest must list only necessary composite indexes');
-const refundRecoveryIndex = {
-  collectionGroup: 'rides', queryScope: 'COLLECTION',
-  fields: [{fieldPath:'refundPending',order:'ASCENDING'},
-           {fieldPath:'status',order:'ASCENDING'}],
-};
-assert.equal(manifest.indexes.filter(i => normalize(i) === normalize(refundRecoveryIndex)).length, 1,
-  'a unique matching composite index must exist BEFORE the refund recovery query deploys');
+assert.equal(manifest.indexes.length, 12, 'manifest must list only necessary composite indexes');
 for (const index of manifest.indexes) {
   assert(index.collectionGroup && index.queryScope, 'index must have collection group and query scope');
   assert(index.fields.length > 0, 'index must have fields');

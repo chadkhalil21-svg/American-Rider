@@ -7,7 +7,7 @@ const { governmentFeesFor, permitRequired, permitRequiredMessage } = require('./
 const { resolveTollsCostAware } = require('./tolls');
 const { routeCar } = require('./streets');
 const { referenceForQuote } = require('./market-reference-authority');
-const { fareForMarketTarget } = require('./market-reference-fare');
+const { fareForMarketTarget, controlledTargetFromAllIn } = require('./market-reference-fare');
 
 function priceRoute(body, selectedRoute = null) {
   const withClass = (cents) => applyTravelClass(cents, body?.travelClass || body?.cls);
@@ -96,14 +96,23 @@ async function authoritativeFare({ body, uid = null, email = null, db = null, ca
   route.tollReason = toll.reason || null;
   const tollForQuote=toll.status === 'unknown' ? 0 : toll.tollCents;
   let marketPricing={applied:false,reason:marketReference.reason||'reference unavailable'};
-  if(!journey&&marketReference.ok){
-    const solved=fareForMarketTarget({
-      floorFareCents:route.travelCostCents,
-      targetControlledTotalCents:marketReference.targetTotalCents,
-      quoteForFare:(fare)=>quote(fare,null,route.governmentFees,cardCountry,tollForQuote),
+  if(!journey&&marketReference.ok&&selectedRoute&&toll.status!=='unknown'){
+    const quoteForFare=(fare)=>quote(fare,null,route.governmentFees,cardCountry,tollForQuote);
+    // Published comparable market reference is the full Traveler Total.
+    // Only Fare+Platform Fee is controlled here; deduct pass-throughs once.
+    const passThroughCents=quoteForFare(route.travelCostCents).passThroughCents;
+    const targetControlledTotalCents=controlledTargetFromAllIn({
+      targetTravelerTotalCents:marketReference.targetTotalCents,passThroughCents,
     });
-    route.travelCostCents=solved.fareCents;
-    marketPricing={applied:solved.reason==='market reference',reason:solved.reason,regionId:marketReference.regionId,marketId:marketReference.marketId,referenceAsOf:marketReference.referenceAsOf,referenceTotalCents:marketReference.referenceTotalCents,targetControlledTotalCents:marketReference.targetTotalCents,referenceCell:marketReference.key,sources:marketReference.sources};
+    if(targetControlledTotalCents!==null){
+      const solved=fareForMarketTarget({
+        floorFareCents:route.travelCostCents,targetControlledTotalCents,quoteForFare,
+      });
+      route.travelCostCents=solved.fareCents;
+      marketPricing={applied:solved.reason==='market reference',reason:solved.reason,regionId:marketReference.regionId,marketId:marketReference.marketId,referenceAsOf:marketReference.referenceAsOf,referenceTotalCents:marketReference.referenceTotalCents,targetControlledTotalCents,referenceCell:marketReference.key,sources:marketReference.sources};
+    } else marketPricing={applied:false,reason:'market total insufficient for verified pass-throughs'};
+  } else if(!journey&&marketReference.ok){
+    marketPricing={applied:false,reason:!selectedRoute?'route not verified':'toll not resolved'};
   } else if(journey) marketPricing={applied:false,reason:'smart-journey combined economics'};
   const breakdown = quote(route.travelCostCents,journey,route.governmentFees,cardCountry,tollForQuote);
   return { ...route, ...breakdown, marketPricing, journey, cardCountry: cardCountry || null };

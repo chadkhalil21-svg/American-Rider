@@ -13,4 +13,13 @@ function fareForMarketTarget({floorFareCents,targetControlledTotalCents,quoteFor
   }
   return {fareCents:lo,reason:'market reference',controlledTotalCents:controlledTotal(quoteForFare(lo))};
 }
-module.exports={controlledTotal,fareForMarketTarget};
+// Convert a full comparable passenger Total to the fare+platform-fee component.
+// The published market reference is all-in; treating that as controlled fare
+// would overcharge a toll/airport traveler by the pass-through amount.
+function controlledTargetFromAllIn({targetTravelerTotalCents,passThroughCents}) {
+  if(!Number.isSafeInteger(targetTravelerTotalCents)||targetTravelerTotalCents<=0||
+     !Number.isSafeInteger(passThroughCents)||passThroughCents<0||
+     targetTravelerTotalCents<=passThroughCents) return null;
+  return targetTravelerTotalCents-passThroughCents;
+}
+module.exports={controlledTotal,fareForMarketTarget,controlledTargetFromAllIn};

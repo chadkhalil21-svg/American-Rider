@@ -6,13 +6,18 @@
 const { adminDb }=require('./firebase-admin');
 const { normalizeObservation }=require('./market-evidence-ingest');
 const { targetTotalCents }=require('./pricing-policy');
-const { planForRegion }=require('./market-evidence');
+const { planForRegion, source: sourceCatalogEntry }=require('./market-evidence');
+const { createMarketReferenceCache }=require('./market-reference-cache');
 
 const OBS='market_reference_observations';
 const SNAP='market_reference_snapshots';
+const CANDIDATE='market_reference_candidates';
 const STATE='market_reference_state';
 const MAX_OBSERVATIONS_PER_MARKET_SWEEP=100;
 const HOUR=60*60*1000;
+const DAY=24*HOUR;
+// Historical city datasets are published in batches. Do not poll hourly.
+const SOURCE_RECHECK_MS=Object.freeze({'chicago-tnp-open-data':7*DAY});
 
 function firestoreReady(){return !!adminDb();}
 
@@ -62,7 +67,8 @@ async function recomputeMarket(db,marketId,{now=Date.now(),lookbackDays=90}={}){
   // Recompute produces a CANDIDATE. It is deliberately not production authority until an
   // explicit promotion record proves holdout, economics and router gates for this exact snapshot.
   const out={marketId,asOf:new Date(now).toISOString(),latestObservedAt,lookbackDays,observations:snap.size,sourceCount:sources.size,evidenceFamilies:[...families],promotion:{status:'candidate'},cells};
-  await db.collection(SNAP).doc(marketId).set(out);
+  // Research recomputation must not overwrite an independently promoted live snapshot.
+  await db.collection(CANDIDATE).doc(marketId).set(out);
   return out;
 }
 
@@ -89,7 +95,7 @@ function sourceFingerprint(rows) {
   const canonical=rows.map(row => JSON.stringify(canonicalEvidence(row))).sort();
   return crypto.createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
 }
-async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false,enabledMarketIds=[]}={}){
+async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false,enabledMarketIds=[],testDb=null}={}){
   // A public research catalog does NOT create a live hourly workload.
   // Even when a market is configured, zero active licensed collectors means
   // zero Firestore reads/writes and no meaningless snapshot recomputation.
@@ -98,7 +104,7 @@ async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false
   const markets=eligible.filter(id=>
     planForRegion(id).sources.some(sourceId=>typeof collectors[sourceId]==='function'));
   if(!markets.length)return{ok:true,markets:{},skipped:'no_active_market_collectors'};
-  const db=adminDb();
+  const db=testDb||adminDb();
   if(!db)return{ok:false,reason:'no database'};
   const report={ok:true,markets:{}};
   for(const marketId of markets){
@@ -107,21 +113,35 @@ async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false
     if(!force&&state.lastSweepAt&&now-Number(state.lastSweepAt)<HOUR){report.markets[marketId]={skipped:'cadence',lastSweepAt:state.lastSweepAt};continue;}
     let written=0;const results=[];
     const fingerprints={...(state.sourceFingerprints||{})};
+    const sourceCheckedAt={...(state.sourceCheckedAt||{})};
     const activeSourceCount=plan.sources.filter(sourceId=>typeof collectors[sourceId]==='function').length;
     const perSourceCap=activeSourceCount?Math.max(1,Math.floor(MAX_OBSERVATIONS_PER_MARKET_SWEEP/activeSourceCount)):0;
     for(const sourceId of plan.sources){
       const collect=collectors[sourceId];
       if(typeof collect!=='function'){results.push({sourceId,ok:false,reason:'collector not configured'});continue;}
+      const last=Number(sourceCheckedAt[sourceId]);
+      const interval=SOURCE_RECHECK_MS[sourceId]||DAY;
+      if(!force&&Number.isFinite(last)&&last>0&&now>=last&&now-last<interval){
+        results.push({sourceId,ok:true,observations:0,skipped:'source_not_due'});continue;
+      }
       try {
         const observed=await collect({marketId,now});
         if(!Array.isArray(observed))throw new Error('collector returned an invalid batch');
-        const rows=observed.slice(0,perSourceCap);
+        const rows=observed.slice(0,perSourceCap).map(raw=>{
+          const row=normalizeObservation(raw);
+          if(row.marketId!==marketId||row.sourceId!==sourceId||
+             row.sourceType!==sourceCatalogEntry(sourceId)?.type)
+            throw new Error('source/market/type mismatch');
+          return row;
+        });
         const fingerprint=sourceFingerprint(rows);
         if(!force && fingerprints[sourceId]===fingerprint) {
+          sourceCheckedAt[sourceId]=now;
           results.push({sourceId,ok:true,observations:0,skipped:'unchanged_source'});
           continue;
         }
         const n=await persistObservations(db,rows);
+        sourceCheckedAt[sourceId]=now; // mark checked only after successful persistence
         written+=n;
         fingerprints[sourceId]=fingerprint;
         results.push({sourceId,ok:true,observations:n});
@@ -135,9 +155,10 @@ async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false
     // records actual evidence changes rather than charging once per market/hour.
     const fingerprintsChanged=Object.keys(fingerprints).some(
       id=>fingerprints[id]!==((state.sourceFingerprints||{})[id]));
-    if (written>0 || fingerprintsChanged || force) {
+    const checksChanged=Object.keys(sourceCheckedAt).some(id=>sourceCheckedAt[id]!==((state.sourceCheckedAt||{})[id]));
+    if (written>0 || fingerprintsChanged || checksChanged || force) {
       await stateRef.set({lastSweepAt:now,lastSweepIso:new Date(now).toISOString(),
-        sourceFingerprints:fingerprints,lastWritten:written,
+        sourceFingerprints:fingerprints,sourceCheckedAt,lastWritten:written,
         ...(reference?{lastReferenceAsOf:reference.asOf}:{}),collectorResults:results},{merge:true});
     }
     report.markets[marketId]={written,reference,
@@ -145,5 +166,10 @@ async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false
   }
   return report;
 }
-async function currentReference(marketId){const db=adminDb();if(!db)return null;const s=await db.collection(SNAP).doc(marketId).get();return s.exists?s.data():null;}
+const referenceCache=createMarketReferenceCache({load:async marketId=>{
+  const db=adminDb();if(!db)return null;
+  const snapshot=await db.collection(SNAP).doc(marketId).get();
+  return snapshot.exists?snapshot.data():null;
+}});
+async function currentReference(marketId){return referenceCache.read(marketId);}
 module.exports={median,distanceBand,durationBand,cellKey,persistObservations,recomputeMarket,runMarketReferenceSweep,currentReference,firestoreReady,MAX_OBSERVATIONS_PER_MARKET_SWEEP,eligibleEvidenceMarkets,sourceFingerprint};

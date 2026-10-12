@@ -47,9 +47,6 @@ jobs:
           assert all(v['category'] in ('metro','micro','nonmetro') for v in d['counties'].values())
           print('Read-only data audit passed:',len(d['counties']),'counties')
           PY
-      - name: Inspect the free BLS regional wage release (read-only)
-        run: |
-          python scripts/inspect-bls-wages.py
       - name: Save versioned evidence without changing pricing or Firestore
         uses: actions/upload-artifact@v4
         with:

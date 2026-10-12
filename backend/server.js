@@ -133,6 +133,7 @@ const { verifyResendWebhook, sanitizeResendEvent, applyResendDeliveryEvent } = r
 const { acquireLease, renewLease, releaseLease, DEFAULT_LEASE_MS } = require('./schedulerlease');
 const { singleFlight } = require('./sweep-singleflight');
 const { createSweepCadence, createQuotaBackoff, quotaError } = require('./sweepcadence');
+const { settleSweepJobs, createCriticalRecoveryGate } = require('./critical-sweep-recovery');
 const { createBackgroundReporter } = require('./workload-summary');
 const { sweepOperatorAccountFees } = require('./operatorfees');
 const { cachedPayoutStatus } = require('./stripe-duty-cache');
@@ -1927,6 +1928,7 @@ app.post('/charge-ride', requireAuth, LIMITS.payments, requireOperationalReadine
 let lastSweep = { at: 0, report: null };
 const maintenanceCadence = createSweepCadence();
 const quotaBackoff = createQuotaBackoff();
+const criticalRecoveryGate = createCriticalRecoveryGate({ intervalMs:60_000 });
 const maintenanceSweep = (name, work) => maintenanceCadence.run(name, work);
 const reportBackgroundWork = createBackgroundReporter();
 
@@ -1938,7 +1940,7 @@ const reportBackgroundWork = createBackgroundReporter();
  * throws must not stop travel being dispatched, and vice versa. Promise.allSettled, not
  * Promise.all.
  */
-async function runAllSweeps() {
+async function runAllSweeps({criticalOnly=false}={}) {
   const marketStatuses = new Map();
   const checkMarket = async (pickup) => {
     const market = marketFor(pickup);
@@ -1946,63 +1948,46 @@ async function runAllSweeps() {
     if (!marketStatuses.has(market.id)) marketStatuses.set(market.id, admittedMarket(market).then((state) => state.status));
     return marketStatuses.get(market.id);
   };
-  const [scheduled, monitor, assignments, screening, settlements, bookingRecovery, providerEvents, operatorFees, familyAgeOut, insuranceMonitoring, marketReference, marketFleet, accountDeletion] = await Promise.allSettled([
-    sweepScheduled({ checkMarket: async (pickup) => {
+  // Work is invoked lazily inside settleSweepJobs: optional tasks are never
+  // started during critical recovery. Each job fails independently.
+  return settleSweepJobs({
+    scheduled: () => sweepScheduled({ checkMarket: async (pickup) => {
       const market = marketFor(pickup);
       return market ? (await admittedMarket(market)).status : 'waitlist';
     } }),
-    sweepMonitor(),
-    sweepAssignments({ checkMarket }),
-    maintenanceSweep('screening', () => sweepScreening()),
-    sweepSettlements(),
-    sweepBookingRecovery({ db: adminDb(), stripeConfigured: keyMode !== 'no-key',
+    monitor: () => sweepMonitor(),
+    assignments: () => sweepAssignments({ checkMarket }),
+    screening: () => maintenanceSweep('screening', () => sweepScreening()),
+    settlements: () => sweepSettlements(),
+    bookingRecovery: () => sweepBookingRecovery({ db: adminDb(), stripeConfigured: keyMode !== 'no-key',
       deps: { refundableFor, refundTravel, cancelUnpaidIntent, verifiedTravelPayment,
         transferFixed, operatorPayoutAccount } }),
-    sweepProviderEvents({ handlers: PROVIDER_HANDLERS, workerId: WORKER_ID }),
-    maintenanceSweep('operatorFees', () => sweepOperatorAccountFees({
+    providerEvents: () => sweepProviderEvents({ handlers: PROVIDER_HANDLERS, workerId: WORKER_ID }),
+    operatorFees: () => maintenanceSweep('operatorFees', () => sweepOperatorAccountFees({
       charge: ({ uid, email, month, amountCents }) =>
         chargeOperatorAccountFee({ uid, email, month, amountCents }),
       cardCountryFor: async (uid) => defaultCardCountry({ uid }),
     })),
-    maintenanceSweep('familyAgeOut', () => family.sweepFamilyAgeOut()),
-    maintenanceSweep('insuranceMonitoring', () => sweepInsuranceMonitoring({ db: adminDb(), requestConfirmation: issueInsuranceConfirmationRequest, notify })),
-
-    maintenanceSweep('marketReference', () => runMarketReferenceSweep({
+    familyAgeOut: () => maintenanceSweep('familyAgeOut', () => family.sweepFamilyAgeOut()),
+    insuranceMonitoring: () => maintenanceSweep('insuranceMonitoring', () => sweepInsuranceMonitoring({ db: adminDb(), requestConfirmation: issueInsuranceConfirmationRequest, notify })),
+    marketReference: () => maintenanceSweep('marketReference', () => runMarketReferenceSweep({
       collectors: marketReferenceCollectors(),
-      // The evidence catalog contains future regions (e.g. Chicago); catalog entries
-      // are not service market authorization. Never import 1,000 trips hourly for
-      // unconfigured markets while the platform is still pre-launch in Florida.
       enabledMarketIds: allMarkets().filter(m => m.regionId && m.status === 'active').map(m => m.id),
     })),
-
-    sweepPausedMarketFleet({ db: adminDb(), marketById: (id) => allMarkets().find((m) => m.id === id) }),
-    maintenanceSweep('accountDeletion', () => sweepAccountDeletion({ db: adminDb(), auth: adminStatus().ok ? require('firebase-admin/auth').getAuth() : null })),
-
-  ]);
-  const unwrap = (r) => (r.status === 'fulfilled' ? r.value : { ok: false, reason: String(r.reason) });
-  const report = {
-    scheduled: unwrap(scheduled),
-    monitor: unwrap(monitor),
-    assignments: unwrap(assignments),
-    screening: unwrap(screening),
-    settlements: unwrap(settlements),
-    bookingRecovery: unwrap(bookingRecovery),
-    providerEvents: unwrap(providerEvents),
-    operatorFees: unwrap(operatorFees),
-    familyAgeOut: unwrap(familyAgeOut),
-    insuranceMonitoring: unwrap(insuranceMonitoring),
-    marketReference: unwrap(marketReference),
-    marketFleet: unwrap(marketFleet),
-    accountDeletion: unwrap(accountDeletion),
-  };
+    marketFleet: () => sweepPausedMarketFleet({ db: adminDb(), marketById: (id) => allMarkets().find((m) => m.id === id) }),
+    accountDeletion: () => maintenanceSweep('accountDeletion', () => sweepAccountDeletion({ db: adminDb(), auth: adminStatus().ok ? require('firebase-admin/auth').getAuth() : null })),
+  }, {criticalOnly});
 }
 
 async function runLeasedSweepsOnce() {
   const name = 'operations_sweep';
-  // A quota-exhausted Firestore rejects writes/transactions. Retrying every minute
-  // wastes provider RPCs for up to 60 seconds each and amplifies the outage.
-  if (quotaBackoff.blocked()) return { ok:false, code:'firestore_quota_backoff',
-    retryInMs:quotaBackoff.remainingMs() };
+  // Optional research stays on long backoff, but an outage must not silence
+  // safety monitoring, refunds and settlement for an unnecessary 5-10 minutes.
+  // A single bounded recovery attempt per process per minute checks the shared
+  // Firestore lease first. If Firestore is truly exhausted, no sweep executes.
+  const recoveryMode=criticalRecoveryGate.mode({blocked:quotaBackoff.blocked()});
+  if (recoveryMode==='wait') return {ok:false,code:'firestore_quota_backoff',
+    retryInMs:quotaBackoff.remainingMs(),criticalRecovery:'waiting_for_next_bounded_probe'};
   const lease = await acquireLease(name, { owner: WORKER_ID, ttlMs: DEFAULT_LEASE_MS });
   if (!lease.ok) {
     if (quotaError(lease.reason)) {
@@ -2022,7 +2007,7 @@ async function runLeasedSweepsOnce() {
   }, Math.max(15_000, Math.floor(DEFAULT_LEASE_MS / 3)));
   heartbeat.unref?.();
   try {
-    const report = await runAllSweeps();
+    const report = await runAllSweeps({criticalOnly:recoveryMode==='critical'});
     if (Object.values(report).some(quotaError)) {
       const retryAt = quotaBackoff.failure();
       console.warn('[scheduler] Firestore quota exhausted during sweeps; retry after', new Date(retryAt).toISOString());

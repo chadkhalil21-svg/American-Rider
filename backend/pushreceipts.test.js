@@ -42,7 +42,7 @@ const db={
        const docs=[...mem[col].entries()].filter(([,d])=>
         Number.isFinite(d[field]) && d[field]<=value)
          .sort((a,b)=>a[1][field]-b[1][field]||a[0].localeCompare(b[0]))
-         .slice(0,q.n).map(([id])=>({...ref(col,id),data:()=>structuredClone(mem[col].get(id))}));
+         .slice(0,q.n).map(([id])=>({id,ref:ref(col,id),data:()=>structuredClone(mem[col].get(id))}));
        return {docs,size:docs.length};
       }};
     return q;

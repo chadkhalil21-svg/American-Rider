@@ -71,6 +71,9 @@ const CONGESTION_MIN_VEHICLES = 2;
 // a car that has stopped, and must never be reported as one.
 const STALE_MIN = 5;
 
+// Deterministic urgent wording must be checked even if live GPS is missing.
+const EMERGENCY_TERMS = /(unwell|not (feeling )?well|not ok|sick|hurt|injur|bleed|unconscious|help|ambulance|911|unsafe|danger|scared|threat|weapon|argu|fight|assault|harass|refus|collision|we (were|got) (in|hit)|hit us|rear.?ended)/i;
+
 /** The stages of a travel where the vehicle is expected to be moving. */
 const MOVING_STAGES = new Set(['accepted', 'onboard']);
 
@@ -139,6 +142,42 @@ async function sweepMonitor({ now = Date.now() } = {}) {
     // A vehicle waiting AT the pickup is doing its job by being stationary. Watching it would
     // generate a check-in on every travel where the traveler takes a moment to come down.
     if (!MOVING_STAGES.has(ride.status)) continue;
+    const m = ride.monitor || {};
+    // Safety takes precedence over inferred congestion and movement. A traffic
+    // hypothesis must NEVER suppress an explicit request for help, and a
+    // previously raised emergency must not be automatically erased because the
+    // phone later reports movement. Review/closure is a separate authority.
+    if (m.state === 'emergency' || m.state === 'escalated') {
+      report.activeEscalations = (report.activeEscalations || 0) + 1;
+      continue;
+    }
+    if (m.travelerReply === 'help') {
+      const caseNo = await openCase(db, ride, {
+        now, why: 'The traveler explicitly requested emergency assistance.', urgent: true,
+      });
+      const delivery = await raiseEmergency(db, ride, {
+        now, caseNo, note: 'The traveler asked for help.', from: 'traveler',
+      });
+      recordEmergencyDelivery(report, ride.id, caseNo, delivery);
+      report.emergencies.push({ rideId: ride.id, caseNo, from: 'traveler' });
+      continue;
+    }
+
+    // An Operator's explicit injury/threat report is urgent even if the car
+    // has resumed motion or the phone stopped sending position updates.
+    if (m.operatorReply && !m.operatorReplyReadAt && EMERGENCY_TERMS.test(String(m.operatorReply))) {
+      const caseNo = await openCase(db, ride, {
+        now, why: 'The Operator explicitly reported a safety problem: ' + String(m.operatorReply),
+        urgent: true,
+      });
+      const delivery = await raiseEmergency(db, ride, {
+        now, caseNo, note: 'The Operator reported a problem.', from: 'operator',
+      });
+      recordEmergencyDelivery(report, ride.id, caseNo, delivery);
+      report.emergencies.push({ rideId: ride.id, caseNo, from: 'operator' });
+      continue;
+    }
+
     if (!Number.isFinite(ride.opLat) || !Number.isFinite(ride.opLng)) continue;
     if (minutesSince(ride.opAt, now) > STALE_MIN) continue;
 
@@ -169,27 +208,6 @@ async function sweepMonitor({ now = Date.now() } = {}) {
     }
 
     const stillMin = minutesSince(stillSince, now);
-    const m = ride.monitor || {};
-
-    // Safety takes precedence over inferred congestion and movement. A traffic
-    // hypothesis must NEVER suppress an explicit request for help, and a
-    // previously raised emergency must not be automatically erased because the
-    // phone later reports movement. Review/closure is a separate authority.
-    if (m.state === 'emergency' || m.state === 'escalated') {
-      report.activeEscalations = (report.activeEscalations || 0) + 1;
-      continue;
-    }
-    if (m.travelerReply === 'help') {
-      const caseNo = await openCase(db, ride, {
-        now, why: 'The traveler explicitly requested emergency assistance.', urgent: true,
-      });
-      const delivery = await raiseEmergency(db, ride, {
-        now, caseNo, note: 'The traveler asked for help.', from: 'traveler',
-      });
-      recordEmergencyDelivery(report, ride.id, caseNo, delivery);
-      report.emergencies.push({ rideId: ride.id, caseNo, from: 'traveler' });
-      continue;
-    }
 
     // ---- Moving again. Clear anything outstanding. ------------------------------------
     if (stillMin < STILL_MIN) {
@@ -383,8 +401,7 @@ async function readReply({ reply, stillMin, stage }) {
     // `trouble` is tested FIRST, which is what lets "accident" live in `road`: an accident up
     // ahead is traffic, an accident we were in is not, and only the order tells them apart.
     const road = /(traffic|jam|light|lights|bridge|closed|closure|construction|roadwork|detour|congest|backed up|drawbridge|train|accident|waiting|passenger|rider|fuel|gas|parking|park|delivery|truck|wrong turn|rain|storm|flood)/i;
-    const trouble = /(unwell|not (feeling )?well|not ok|sick|hurt|injur|bleed|unconscious|help|ambulance|911|unsafe|danger|scared|threat|weapon|argu|fight|assault|harass|refus|collision|we (were|got) (in|hit)|hit us|rear.?ended)/i;
-    if (trouble.test(reply)) {
+    if (EMERGENCY_TERMS.test(reply)) {
       return { resolved: false, urgent: true, note: 'The operator reported a problem.' };
     }
     if (road.test(reply)) {

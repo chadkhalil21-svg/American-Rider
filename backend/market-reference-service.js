@@ -10,7 +10,8 @@ const { planForRegion }=require('./market-evidence');
 const { createReferenceCache }=require('./market-reference-cache');
 
 const OBS='market_reference_observations';
-const SNAP='market_reference_snapshots';
+const SNAP='market_reference_snapshots'; // immutable live authority between separately reviewed promotions
+const CANDIDATE='market_reference_candidates'; // new research NEVER rewrites the approved live record
 const STATE='market_reference_state';
 const MAX_OBSERVATIONS_PER_MARKET_SWEEP=100;
 const HOUR=60*60*1000;
@@ -72,8 +73,9 @@ async function recomputeMarket(db,marketId,{now=Date.now(),lookbackDays=90}={}){
   // Recompute produces a CANDIDATE. It is deliberately not production authority until an
   // explicit promotion record proves holdout, economics and router gates for this exact snapshot.
   const out={marketId,asOf:new Date(now).toISOString(),latestObservedAt,lookbackDays,observations:snap.size,sourceCount:sources.size,evidenceFamilies:[...families],promotion:{status:'candidate'},cells};
-  await db.collection(SNAP).doc(marketId).set(out);
-  cachedReference.invalidate(marketId); // local candidate overwrite revokes cached promoted authority.
+  // Candidates must NEVER replace a separately promoted live snapshot. That
+  // would make ordinary dataset updates silently turn off current pricing.
+  await db.collection(CANDIDATE).doc(marketId).set(out);
   return out;
 }
 

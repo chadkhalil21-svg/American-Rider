@@ -1,0 +1,55 @@
+name: Free National Geographic Data Audit
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/import-national-geography.py'
+      - 'scripts/import-national-geography.test.py'
+      - '.github/workflows/national-geography-research.yml'
+  workflow_dispatch:
+  schedule:
+    # One source audit a month; NO hourly city/county lookups.
+    - cron: '19 9 3 * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: national-geography-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  geography-source-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Offline synthetic schema and geographic test twice
+        run: |
+          python scripts/import-national-geography.test.py
+          python scripts/import-national-geography.test.py
+      - name: Download the two official Census files once, no database calls
+        run: |
+          python scripts/import-national-geography.py --out /tmp/national-geography.json
+      - name: Verify research-only output and source coverage
+        run: |
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/national-geography.json'))
+          assert d['status']=='research-only'
+          assert d['bookable'] is False and d['promoted'] is False
+          assert d['marketPricesVerified'] is False
+          assert 3000<=len(d['counties'])<=3400
+          assert len({x[:2] for x in d['counties']})==51
+          assert all(v['category'] in ('metro','micro','nonmetro') for v in d['counties'].values())
+          print('Read-only data audit passed:',len(d['counties']),'counties')
+          PY
+      - name: Save versioned evidence without changing pricing or Firestore
+        uses: actions/upload-artifact@v4
+        with:
+          name: national-geography-research-${{ github.run_id }}
+          path: /tmp/national-geography.json
+          retention-days: 30

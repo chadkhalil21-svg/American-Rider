@@ -96,6 +96,18 @@ class NationalCrosswalkTests(unittest.TestCase):
             self.assertEqual(r["profiles"]["12029"]["blsAreaCode"],"12440")
             self.assertEqual(r["profiles"]["12029"]["blsEmployeeMedianHourlyUSD"],19.5)
 
+    def test_official_national_gazetteer_includes_puerto_rico_out_of_scope(self):
+        text = chr(10).join([
+            "USPS|GEOID|NAME","FL|12086|Miami-Dade","PR|72001|Adjuntas",""])
+        roster = mod.county_roster(text.encode())
+        self.assertEqual(set(roster), {"12086"})
+        cbsa = workbook(HEADER1,[
+            ["33100","Miami","Metropolitan Statistical Area","12","086"],
+            ["99999","PR metro","Metropolitan Statistical Area","72","001"]])
+        self.assertEqual(set(mod.cbsa_membership(cbsa)), {"12086"})
+        bls = workbook(HEADER2,[["12","086","33100"],["72","001","99999"]])
+        self.assertEqual(set(mod.bls_county_definitions(bls)), {"12086"})
+
     def test_real_publisher_container_shapes_zip_pipe_and_bls_xlsx(self):
         for _ in range(2):
             buf = io.BytesIO()

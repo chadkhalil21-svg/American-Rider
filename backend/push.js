@@ -101,7 +101,7 @@ async function notify({ uid, kind, title, body, data }) {
     if (ticket?.status === 'error') {
       // DeviceNotRegistered means the app was deleted or the token rotated. Dropped, so we
       // stop sending into the void — and so a reinstall re-registers cleanly.
-      if (ticket?.details?.error === 'DeviceNotRegistered') await dropToken(uid);
+      if (ticket?.details?.error === 'DeviceNotRegistered') await dropToken(uid, token);
       return { ok: false, reason: ticket.message || 'push rejected' };
     }
     if (ticket?.status !== 'ok' || typeof ticket.id !== 'string' || !ticket.id.trim()) {
@@ -114,13 +114,20 @@ async function notify({ uid, kind, title, body, data }) {
   }
 }
 
-async function dropToken(uid) {
+async function dropToken(uid, rejectedToken) {
   const db = adminDb();
-  if (!db) return;
+  if (!db || !rejectedToken) return;
   try {
-    await db.collection('users').doc(String(uid)).set({ pushToken: null }, { merge: true });
+    // Expo may reject an old token after the phone re-registered a fresh one.
+    // The compare-and-set must be atomic across multiple backend instances.
+    await db.runTransaction(async (tx) => {
+      const ref = db.collection('users').doc(String(uid));
+      const snap = await tx.get(ref);
+      if (!snap.exists || snap.data()?.pushToken !== rejectedToken) return;
+      tx.set(ref, { pushToken: null }, { merge: true });
+    });
   } catch {
-    /* see the header */
+    // Never discard a current token or block an unrelated Travel on failure.
   }
 }
 

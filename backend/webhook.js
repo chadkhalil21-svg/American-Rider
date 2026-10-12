@@ -36,22 +36,45 @@ async function handleEvent(event) {
 
   switch (event.type) {
     case 'payment_intent.succeeded': {
+      // Operators also pay a separate account cost. Those charges deliberately
+      // have no Travel id, and must not be misclassified as Traveler payments.
+      if (obj.metadata?.product === 'American Rider operator account cost') {
+        return { ok: true, action: 'operator account cost (not a Travel)' };
+      }
+      if (!obj.id) throw new Error('successful Stripe payment has no PaymentIntent ID');
       const rideId = String(obj.metadata?.rideId || '');
-      if (!rideId) return { ok: true, action: 'no booking reference' };
-      const ref = db.collection('rides').doc(rideId);
-      const outcome = await db.runTransaction(async (tx) => {
-        const snap = await tx.get(ref);
-        if (!snap.exists) return 'booking not found';
-        const ride = snap.data();
-        if (String(ride.travelerUid) !== String(obj.metadata?.uid) ||
-            Number(ride.costCents) !== Number(obj.amount_received) ||
-            String(obj.currency || '').toLowerCase() !== 'usd' ||
-            (ride.paymentIntentId && ride.paymentIntentId !== obj.id)) return 'booking mismatch';
-        tx.update(ref, { paymentIntentId: obj.id, paidAt: ride.paidAt || Date.now(),
-          ...(ride.status === 'cancelled' ? { refundPending: true } : {}) });
-        return 'booking reconciled';
-      });
-      return { ok: outcome === 'booking reconciled', action: outcome };
+      let outcome = 'booking reference missing';
+      if (rideId) {
+        const ref = db.collection('rides').doc(rideId);
+        outcome = await db.runTransaction(async (tx) => {
+          const snap = await tx.get(ref);
+          if (!snap.exists) return 'booking not found';
+          const ride = snap.data();
+          if (String(ride.travelerUid) !== String(obj.metadata?.uid) ||
+              Number(ride.costCents) !== Number(obj.amount_received) ||
+              String(obj.currency || '').toLowerCase() !== 'usd' ||
+              (ride.paymentIntentId && ride.paymentIntentId !== obj.id)) return 'booking mismatch';
+          tx.update(ref, { paymentIntentId: obj.id, paidAt: ride.paidAt || Date.now(),
+            ...(ride.status === 'cancelled' ? { refundPending: true } : {}) });
+          return 'booking reconciled';
+        });
+      }
+      if (outcome === 'booking reconciled') return { ok: true, action: outcome };
+
+      // Stripe has recorded money, but we cannot safely identify its Travel.
+      // Do not discard the event, invent a Travel, pay an Operator, or refund
+      // automatically. The durable provider queue retries support failures;
+      // a stable PI-based key prevents duplicate tickets across event replays.
+      const caseNo = await open(db, null, {
+        kind: 'support',
+        reason: 'Successful Stripe payment not reconciled to Travel',
+        description: `Stripe PaymentIntent ${obj.id} succeeded but could not be linked to a valid Travel.\n` +
+          `Condition: ${outcome}. Candidate Travel: ${rideId || '(missing)'}.\n` +
+          `Amount received: ${Number.isSafeInteger(obj.amount_received) ? obj.amount_received : '(invalid)'} cents; ` +
+          `currency: ${String(obj.currency || '(missing)')}.\n` +
+          'Reconcile against Stripe and the authoritative Travel ledger before taking any financial action.',
+      }, event, { dedupeIdentity: `unreconciled-paid-intent:${obj.id}` });
+      return { ok: true, action: 'successful payment flagged for reconciliation', caseNo };
     }
     // ---- The traveler's bank took the money back. -----------------------------------
     case 'charge.dispute.created': {

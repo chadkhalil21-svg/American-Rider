@@ -35,8 +35,7 @@ jobs:
         run: |
           python scripts/collect-national-pricing-evidence.py \
             --out /tmp/national-pricing-evidence.json
-      - name: One bounded City of Chicago sample only on scheduled/manual audit
-        if: github.event_name != 'pull_request'
+      - name: Verify one bounded real City of Chicago TNC research sample
         run: |
           python scripts/collect-national-pricing-evidence.py \
             --fetch-chicago --out /tmp/national-pricing-evidence.json

@@ -262,7 +262,7 @@ def official_wages(raw: bytes) -> dict:
         # occupations, suppressed cells and duplicate data.
         data = io.StringIO()
         keys = ["AREA", "AREA_TITLE", "OCC_CODE", "NAICS", "I_GROUP", "H_MEDIAN"]
-        writer = csv.DictWriter(data, fieldnames=keys, delimiter="\\t")
+        writer = csv.DictWriter(data, fieldnames=keys, delimiter=chr(9))
         writer.writeheader()
         for r in rows:
             writer.writerow({

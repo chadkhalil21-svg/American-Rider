@@ -205,7 +205,12 @@ async function run(pass){
     id:'acct_fake_operator',metadata:{uid:'op'},payouts_enabled:false,
     charges_enabled:false,requirements:{disabled_reason:'synthetic restriction'},
   },{connect:true});
-  assert.throws(()=>verify(restricted),/signature/i,
+  const connectRaw=JSON.stringify(restricted);
+  const connectHeader=stripe.webhooks.generateTestHeaderString({
+    payload:connectRaw,secret:connectSecret,timestamp:Math.floor(Date.now()/1000),
+  });
+  assert.throws(()=>stripe.webhooks.constructEvent(
+    Buffer.from(connectRaw),connectHeader,normalSecret),/signature/i,
     'Connect event may never pass the general account secret');
   const shut=await deliver(restricted,{connect:true});
   check(shut.handled.ok && data.operators.op.available===false,

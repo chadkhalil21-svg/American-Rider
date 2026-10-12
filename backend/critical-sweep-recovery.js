@@ -3,11 +3,11 @@
 // When Firestore is unavailable even the shared lease fails, and no task runs.
 // If it recovers, resume critical queues first and defer discretionary work.
 const NAMES=Object.freeze([
- 'scheduled','monitor','assignments','screening','settlements','bookingRecovery',
+ 'scheduled','monitor','pushReceipts','assignments','screening','settlements','bookingRecovery',
  'providerEvents','operatorFees','familyAgeOut','insuranceMonitoring',
  'marketReference','marketFleet','accountDeletion',
 ]);
-const OPTIONAL=Object.freeze(['operatorFees','marketReference','marketFleet','accountDeletion']);
+const OPTIONAL=Object.freeze(['pushReceipts','operatorFees','marketReference','marketFleet','accountDeletion']);
 const OPTIONAL_SET=new Set(OPTIONAL);
 async function settleSweepJobs(jobs,{criticalOnly=false}={}){
  if(!jobs||typeof jobs!=='object')throw new TypeError('jobs required');

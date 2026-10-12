@@ -63,6 +63,8 @@ def parse_counties(raw):
                                 "stateFips": fips[:2], "category": "nonmetro",
                                 "cbsaCode": None, "cbsaTitle": None,
                                 "economicAreaId": None}
+            if not result:
+                raise ValueError('Official gazetteer parsed zero US counties; header=' + repr(reader.fieldnames))
             return result
 
 

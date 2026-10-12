@@ -10,6 +10,7 @@ const { planForRegion }=require('./market-evidence');
 
 const OBS='market_reference_observations';
 const SNAP='market_reference_snapshots';
+const CANDIDATE='market_reference_candidates';
 const STATE='market_reference_state';
 const MAX_OBSERVATIONS_PER_MARKET_SWEEP=100;
 const HOUR=60*60*1000;
@@ -62,7 +63,8 @@ async function recomputeMarket(db,marketId,{now=Date.now(),lookbackDays=90}={}){
   // Recompute produces a CANDIDATE. It is deliberately not production authority until an
   // explicit promotion record proves holdout, economics and router gates for this exact snapshot.
   const out={marketId,asOf:new Date(now).toISOString(),latestObservedAt,lookbackDays,observations:snap.size,sourceCount:sources.size,evidenceFamilies:[...families],promotion:{status:'candidate'},cells};
-  await db.collection(SNAP).doc(marketId).set(out);
+  // Research recomputation must not overwrite an independently promoted live snapshot.
+  await db.collection(CANDIDATE).doc(marketId).set(out);
   return out;
 }
 

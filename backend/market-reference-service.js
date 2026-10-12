@@ -6,7 +6,7 @@
 const { adminDb }=require('./firebase-admin');
 const { normalizeObservation }=require('./market-evidence-ingest');
 const { targetTotalCents }=require('./pricing-policy');
-const { planForRegion }=require('./market-evidence');
+const { planForRegion, source: evidenceSource }=require('./market-evidence');
 const { createReferenceCache }=require('./market-reference-cache');
 
 const OBS='market_reference_observations';
@@ -15,6 +15,12 @@ const CANDIDATE='market_reference_candidates'; // new research NEVER rewrites th
 const STATE='market_reference_state';
 const MAX_OBSERVATIONS_PER_MARKET_SWEEP=100;
 const HOUR=60*60*1000;
+const DAY=24*HOUR;
+// Public city trip datasets are released in batches, not once per hour.
+// Even if an active Chicago market is introduced later, do not repeat the
+// old per-hour network + Firestore quota amplifier.
+const SOURCE_MIN_RECHECK_MS=Object.freeze({'chicago-tnp-open-data':7*DAY});
+const DEFAULT_SOURCE_RECHECK_MS=DAY;
 const cachedReference=createReferenceCache({
   load:async marketId=>{
     const db=adminDb();
@@ -120,15 +126,32 @@ async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false
     if(!force&&state.lastSweepAt&&now-Number(state.lastSweepAt)<HOUR){report.markets[marketId]={skipped:'cadence',lastSweepAt:state.lastSweepAt};continue;}
     let written=0;const results=[];
     const fingerprints={...(state.sourceFingerprints||{})};
+    const sourceCheckedAt={...(state.sourceCheckedAt||{})};
     const activeSourceCount=plan.sources.filter(sourceId=>typeof collectors[sourceId]==='function').length;
     const perSourceCap=activeSourceCount?Math.max(1,Math.floor(MAX_OBSERVATIONS_PER_MARKET_SWEEP/activeSourceCount)):0;
     for(const sourceId of plan.sources){
       const collect=collectors[sourceId];
       if(typeof collect!=='function'){results.push({sourceId,ok:false,reason:'collector not configured'});continue;}
+      const lastChecked=Number(sourceCheckedAt[sourceId]);
+      const minDelay=SOURCE_MIN_RECHECK_MS[sourceId]||DEFAULT_SOURCE_RECHECK_MS;
+      if(!force&&Number.isFinite(lastChecked)&&lastChecked>0&&now>=lastChecked&&now-lastChecked<minDelay){
+        results.push({sourceId,ok:true,observations:0,skipped:'source_release_cadence'});
+        continue;
+      }
       try {
         const observed=await collect({marketId,now});
         if(!Array.isArray(observed))throw new Error('collector returned an invalid batch');
-        const rows=observed.slice(0,perSourceCap);
+        // Reject a buggy vendor adapter BEFORE a single billed write.
+        // Cross-market pollution or a source-type mismatch can invalidate
+        // a whole region's purportedly independent reference.
+        const rows=observed.slice(0,perSourceCap).map(raw=>{
+          const o=normalizeObservation(raw);
+          const catalog=evidenceSource(sourceId);
+          if(o.marketId!==marketId||o.sourceId!==sourceId||o.sourceType!==catalog?.type)
+            throw new Error('collector observation market/source/type mismatch');
+          return o;
+        });
+        sourceCheckedAt[sourceId]=now;
         const fingerprint=sourceFingerprint(rows);
         if(!force && fingerprints[sourceId]===fingerprint) {
           results.push({sourceId,ok:true,observations:0,skipped:'unchanged_source'});
@@ -143,14 +166,16 @@ async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false
     // No new observations => do not scan up to 10k old documents and do
     // not rewrite a snapshot just to change its asOf timestamp.
     const reference=(force || written>0)?await recomputeMarket(db,marketId,{now}):null;
-    // No source changes and no recalibration? No database write at all.
-    // Periodic scheduling is already handled in-process; the durable checkpoint
-    // records actual evidence changes rather than charging once per market/hour.
+    // One bounded durable checkpoint per actual source check is worthwhile:
+    // identical monthly source results must not be fetched EVERY hourly sweep.
+    // No Firestore writes at all when no source is due.
     const fingerprintsChanged=Object.keys(fingerprints).some(
       id=>fingerprints[id]!==((state.sourceFingerprints||{})[id]));
-    if (written>0 || fingerprintsChanged || force) {
+    const checksChanged=Object.keys(sourceCheckedAt).some(
+      id=>sourceCheckedAt[id]!==((state.sourceCheckedAt||{})[id]);
+    if (written>0 || fingerprintsChanged || checksChanged || force) {
       await stateRef.set({lastSweepAt:now,lastSweepIso:new Date(now).toISOString(),
-        sourceFingerprints:fingerprints,lastWritten:written,
+        sourceFingerprints:fingerprints,sourceCheckedAt,lastWritten:written,
         ...(reference?{lastReferenceAsOf:reference.asOf}:{}),collectorResults:results},{merge:true});
     }
     report.markets[marketId]={written,reference,
@@ -159,4 +184,4 @@ async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false
   return report;
 }
 async function currentReference(marketId){return cachedReference.read(marketId);}
-module.exports={median,distanceBand,durationBand,cellKey,persistObservations,recomputeMarket,runMarketReferenceSweep,currentReference,firestoreReady,MAX_OBSERVATIONS_PER_MARKET_SWEEP,eligibleEvidenceMarkets,sourceFingerprint};
+module.exports={median,distanceBand,durationBand,cellKey,persistObservations,recomputeMarket,runMarketReferenceSweep,currentReference,firestoreReady,MAX_OBSERVATIONS_PER_MARKET_SWEEP,eligibleEvidenceMarkets,sourceFingerprint,SOURCE_MIN_RECHECK_MS,DEFAULT_SOURCE_RECHECK_MS};

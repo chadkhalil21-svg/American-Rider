@@ -108,7 +108,7 @@ function sourceFingerprint(rows) {
   const canonical=rows.map(row => JSON.stringify(canonicalEvidence(row))).sort();
   return crypto.createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
 }
-async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false,enabledMarketIds=[]}={}){
+async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false,enabledMarketIds=[],testDb=null}={}){
   // A public research catalog does NOT create a live hourly workload.
   // Even when a market is configured, zero active licensed collectors means
   // zero Firestore reads/writes and no meaningless snapshot recomputation.
@@ -117,7 +117,7 @@ async function runMarketReferenceSweep({collectors={},now=Date.now(),force=false
   const markets=eligible.filter(id=>
     planForRegion(id).sources.some(sourceId=>typeof collectors[sourceId]==='function'));
   if(!markets.length)return{ok:true,markets:{},skipped:'no_active_market_collectors'};
-  const db=adminDb();
+  const db=testDb||adminDb();
   if(!db)return{ok:false,reason:'no database'};
   const report={ok:true,markets:{}};
   for(const marketId of markets){

@@ -68,8 +68,8 @@ class ResearchEvidence(unittest.TestCase):
 
     def test_invalid_city_data_fails_closed(self):
         for rows in (
-            [], [{}], [{"trip_total": "NaN", **SAMPLE[0]}],
-            [{"trip_total": "1600", **SAMPLE[0]}],
+            [], [{}], [dict(SAMPLE[0], trip_total="NaN")],
+            [dict(SAMPLE[0], trip_total="1600")],
             [dict(SAMPLE[0],trip_start_timestamp="2030-01-01T00:00:00")],
         ):
             with self.subTest(rows=rows):

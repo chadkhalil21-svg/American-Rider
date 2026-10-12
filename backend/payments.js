@@ -593,16 +593,32 @@ async function chargeRide({ travelCostCents, travelerPaymentMethod, uid, tripNo,
  * naming an amount it guessed. The ownership check is the same one and rests on Stripe's copy
  * of the intent, never on the request body.
  */
+// Only the Charge has the cumulative refunded cents. PaymentIntent does not.
+function refundBalanceFromVerifiedIntent(pi) {
+  const charge = pi?.latest_charge;
+  const charged = Number(pi?.amount_received);
+  const refunded = charge && typeof charge === 'object' ? Number(charge.amount_refunded) : NaN;
+  if (pi?.status !== 'succeeded' || !charge || typeof charge !== 'object' ||
+      (charge.payment_intent && charge.payment_intent !== pi.id) ||
+      !Number.isSafeInteger(charged) || charged <= 0 ||
+      !Number.isSafeInteger(refunded) || refunded < 0 || refunded > charged) {
+    return { ok: false, cents: 0, alreadyRefunded: 0,
+      reason: 'Verified Stripe charge and refund history unavailable', retryable: true };
+  }
+  return { ok: true, cents: charged - refunded, alreadyRefunded: refunded };
+}
+
 async function refundableFor({ paymentIntentId, expectUid }) {
   if (!paymentIntentId) return { cents: 0, reason: 'no payment on record' };
   try {
-    const pi = await getStripe().paymentIntents.retrieve(paymentIntentId);
+    const pi = await getStripe().paymentIntents.retrieve(paymentIntentId, { expand: ['latest_charge'] });
     if (expectUid && pi.metadata?.uid !== String(expectUid)) {
       return { cents: 0, reason: 'that payment belongs to a different account' };
     }
     if (pi.status !== 'succeeded') return { cents: 0, reason: `payment is ${pi.status}`, retryable: pi.status === 'processing' };
-    const cents = (pi.amount_received || pi.amount || 0) - (pi.amount_refunded || 0);
-    return { cents, reason: cents > 0 ? null : 'nothing left to refund' };
+    const balance = refundBalanceFromVerifiedIntent(pi);
+    if (!balance.ok) return { cents: 0, reason: balance.reason, retryable: true };
+    return { cents: balance.cents, reason: balance.cents > 0 ? null : 'nothing left to refund' };
   } catch (e) {
     return { cents: 0, reason: e.message, retryable: true };
   }
@@ -629,7 +645,7 @@ async function refundTravel({ paymentIntentId, amountCents, expectUid, idempoten
     // keep asking. Stripe's own copy of the intent is the only trustworthy record of who
     // paid, so the ownership test and the ceiling both come from there, never from the body
     // of the request.
-    const pi = await getStripe().paymentIntents.retrieve(paymentIntentId);
+    const pi = await getStripe().paymentIntents.retrieve(paymentIntentId, { expand: ['latest_charge'] });
     if (expectUid && pi.metadata?.uid !== expectUid) {
       return { ok: false, error: 'that payment belongs to a different account' };
     }
@@ -637,10 +653,11 @@ async function refundTravel({ paymentIntentId, amountCents, expectUid, idempoten
       return { ok: false, error: `payment is ${pi.status}, not a completed charge` };
     }
     // Never refund more than was actually taken, whatever the request claimed the travel cost.
-    const alreadyRefunded = pi.amount_refunded || 0;
-    const refundable = (pi.amount_received || pi.amount || 0) - alreadyRefunded;
-    if (amountCents > refundable) {
-      return { ok: false, error: `only ${refundable}c of that payment remains refundable` };
+    const balance = refundBalanceFromVerifiedIntent(pi);
+    if (!balance.ok) return { ok: false, error: balance.reason, retryable: true };
+    const { alreadyRefunded } = balance;
+    if (amountCents > balance.cents) {
+      return { ok: false, error: `only ${balance.cents}c of that payment remains refundable` };
     }
 
     // ——— WHAT THIS REFUND ACTUALLY COSTS US ———————————————————————————————————
@@ -1148,4 +1165,5 @@ module.exports = {
   // Exported under an underscored name for idempotency.test.js only. It is an internal detail
   // of how a charge is keyed, not part of the module's interface.
   __idempotencyForTravel: idempotencyForTravel,
+  __refundBalanceFromVerifiedIntent: refundBalanceFromVerifiedIntent,
 };

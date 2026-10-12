@@ -150,7 +150,10 @@ def parse_cbsa(raw):
 def compile_geography(gazetteer, cbsa, *, production_validation=True):
     counties, groups = parse_counties(gazetteer), parse_cbsa(cbsa)
     if not set(groups).issubset(counties):
-        raise ValueError("CBSA references unknown county FIPS")
+        missing = sorted(set(groups) - set(counties))
+        raise ValueError("CBSA references unknown county FIPS: " + ",".join(missing[:20]) +
+                         " (count=" + str(len(missing)) + ", counties=" + str(len(counties)) +
+                         ", cbsaCounties=" + str(len(groups)) + ")")
     for fips, area in groups.items():
         counties[fips].update(area)
     states = {f[:2] for f in counties}

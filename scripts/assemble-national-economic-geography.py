@@ -80,6 +80,8 @@ def fips(state: str, county: str) -> str:
     if not (s.isdigit() and 1 <= len(s) <= 2 and c.isdigit() and 1 <= len(c) <= 3):
         raise ValueError("invalid state/county FIPS")
     code = s.zfill(2) + c.zfill(3)
+    if code[:2] == "72":
+        return None  # publisher includes Puerto Rico; intentionally out of scope
     if code[:2] not in STATES:
         raise ValueError("county outside the configured 50 states + DC")
     return code
@@ -174,6 +176,8 @@ def county_roster(raw: bytes) -> dict:
     counties = {}
     for row in csv_rows(raw):
         code = col(row, "GEOID", "COUNTYFIPS", "COUNTY_FIPS")
+        if code[:2] == "72" and len(code) == 5 and code.isdigit():
+            continue  # Census 2025 national publisher ZIP includes Puerto Rico
         if not (len(code) == 5 and code.isdigit() and code[:2] in STATES):
             raise ValueError("invalid national county GEOID")
         name = col(row, "NAME", "COUNTYNAME")
@@ -197,6 +201,8 @@ def cbsa_membership(raw: bytes) -> dict:
         if not (len(code) == 5 and code.isdigit()):
             continue  # total/footnote; never silently classify as a county
         county = fips(col(row, "FIPS State Code"), col(row, "FIPS County Code"))
+        if county is None:
+            continue
         typ = col(row, "Metropolitan/Micropolitan Statistical Area")
         if norm(typ) == "metropolitanstatisticalarea":
             category = "metro"
@@ -232,6 +238,8 @@ def bls_county_definitions(raw: bytes) -> dict:
         if not (s and c and code):
             continue
         county = fips(s, c)
+        if county is None:
+            continue
         if not (code.isdigit() and 2 <= len(code) <= 7):
             raise ValueError("invalid BLS area code")
         if county in out:

@@ -126,6 +126,7 @@ const { sweepScheduled, sweepSettlements } = require('./scheduler');
 const { sweepBookingRecovery } = require('./bookingrecovery');
 const { sweepMonitor, sweepAssignments } = require('./monitor');
 const { notify } = require('./push');
+const { sweepPushReceipts } = require('./pushreceipts');
 const { handleEvent, webhookReady } = require('./webhook');
 const { enqueueProviderEvent, processProviderEvent, sweepProviderEvents, replayDeadEvent } = require('./providerqueue');
 const { enqueueWithDeadline } = require('./provider-ack');
@@ -1956,6 +1957,7 @@ async function runAllSweeps({criticalOnly=false}={}) {
       return market ? (await admittedMarket(market)).status : 'waitlist';
     } }),
     monitor: () => sweepMonitor(),
+    pushReceipts: () => maintenanceSweep('pushReceipts', () => sweepPushReceipts()),
     assignments: () => sweepAssignments({ checkMarket }),
     screening: () => maintenanceSweep('screening', () => sweepScreening()),
     settlements: () => sweepSettlements(),

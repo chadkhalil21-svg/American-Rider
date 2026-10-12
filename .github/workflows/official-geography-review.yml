@@ -1,0 +1,27 @@
+name: Official US Geography Research Validation
+on:
+  pull_request:
+    paths:
+      - 'scripts/build-national-geography.py'
+      - '.github/workflows/official-geography-review.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-source-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Synthetic county, metro and rural checks
+        run: python3 scripts/build-national-geography.py --self-test
+      - name: Download and verify official nationwide Census source coverage once
+        run: python3 scripts/build-national-geography.py --fetch --output "${RUNNER_TEMP}/county-economic-areas.json"
+      - name: Review-only federal geography artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: official-national-geography-research
+          path: ${{ runner.temp }}/county-economic-areas.json
+          retention-days: 7

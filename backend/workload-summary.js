@@ -2,7 +2,7 @@
 // Low-cost, privacy-preserving snapshot of background activity.
 // These are logical-work counters, NOT billed Firestore reads/writes.
 // Do not log ride/operator IDs, documents, coordinates, replies or names.
-const KEYS = Object.freeze(['considered','scanned','watching','activeTravelsRead','written','lastWritten','overCapacity','pendingCount']);
+const KEYS = Object.freeze(['considered','scanned','watching','activeTravelsRead','written','lastWritten','overCapacity','pendingCount','checked','providerAccepted','providerRejected','unverified','purged']);
 function summarizeBackgroundWork(report) {
   const out = {};
   for (const [name, raw] of Object.entries(report || {})) {

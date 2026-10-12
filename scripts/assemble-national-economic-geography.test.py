@@ -101,7 +101,7 @@ class NationalCrosswalkTests(unittest.TestCase):
             buf = io.BytesIO()
             with zipfile.ZipFile(buf,"w",zipfile.ZIP_DEFLATED) as z:
                 z.writestr("2025_Gaz_counties_national.txt",
-                           "USPS|GEOID|NAME\\nFL|12086|Miami-Dade\\nFL|12011|Broward\\n")
+                           chr(10).join(["USPS|GEOID|NAME","FL|12086|Miami-Dade","FL|12011|Broward",""]))
             roster = mod.county_roster(buf.getvalue())
             self.assertEqual(set(roster), {"12086","12011"})
             wage_workbook=workbook(

@@ -6,12 +6,13 @@ const ALLOWED_SOURCE_TYPES=new Set([
   'government-trips','independent-audit','licensed-market-data','field-panel','platform-publication',
 ]);
 
-function normalizeObservation(raw){
+function normalizeObservation(raw,now=Date.now()){
   if(!raw||typeof raw!=='object')throw new TypeError('observation required');
   const required=['marketId','sourceId','sourceType','observedAt','serviceClass','routedMiles','routedMinutes','travelerTotalCents'];
   for(const k of required)if(raw[k]===undefined||raw[k]===null||raw[k]==='')throw new TypeError(`missing ${k}`);
   if(!ALLOWED_SOURCE_TYPES.has(raw.sourceType))throw new TypeError('unsupported sourceType');
   if(!Number.isFinite(Date.parse(raw.observedAt)))throw new TypeError('invalid observedAt');
+  if(Date.parse(raw.observedAt)>now+5*60_000)throw new TypeError('future-dated observedAt');
   if(!Number.isFinite(raw.routedMiles)||raw.routedMiles<0)throw new TypeError('invalid routedMiles');
   if(!Number.isFinite(raw.routedMinutes)||raw.routedMinutes<0)throw new TypeError('invalid routedMinutes');
   if(!Number.isInteger(raw.travelerTotalCents)||raw.travelerTotalCents<0)throw new TypeError('invalid travelerTotalCents');

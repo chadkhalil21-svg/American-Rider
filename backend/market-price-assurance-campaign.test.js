@@ -22,7 +22,7 @@ function snapshotFor(marketId) {
     },
     cells: {
       [key]: {
-        travelerTotalComparable: true,
+        travelerTotalComparable: true, observations: 40,
         referenceTotalCents: 2000, targetTotalCents: 1800,
         latestObservedAt: observed,
         evidenceFamilies: ['government-trips','independent-audit'],

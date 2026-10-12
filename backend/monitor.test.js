@@ -53,12 +53,12 @@ function makeDb(seed) {
 }
 
 const tickets = [];
-function inject(dbHandle, { aiKey = false } = {}) {
+function inject(dbHandle, { aiKey = false, caseFails = false, pushFails = [] } = {}) {
   for (const [rel, exports] of [
     ['./firebase-admin.js', { adminDb: () => dbHandle, adminStatus: () => ({ ok: true, reason: null }) }],
-    ['./tickets.js', { fileTicket: async (t) => { tickets.push(t); return { caseNo: `AR-C${tickets.length}` }; } }],
+    ['./tickets.js', { fileTicket: async (t) => { if (caseFails) return { ok:false }; tickets.push(t); return { caseNo: `AR-C${tickets.length}` }; } }],
     ['./env.js', { readKey: (k) => (k === 'ANTHROPIC_API_KEY' && aiKey ? 'fake' : '') }],
-    ['./push.js', { notify: async () => ({ ok: true }) }],
+    ['./push.js', { notify: async ({ uid }) => ({ ok: !pushFails.includes(uid) }) }],
   ]) {
     const p = require.resolve(path.join(ROOT, rel));
     require.cache[p] = { id: p, filename: p, loaded: true, exports, children: [], paths: [] };
@@ -96,6 +96,77 @@ const results = [];
 const check = (l, c, d) => results.push({ l, ok: !!c, d });
 
 (async () => {
+  // Critical priority regression: an explicit safety request outranks the
+  // inference that a cluster of slow cars must be ordinary congestion.
+  const nearbyStopped=(p,operatorId,travelerUid) => ride({
+    opLat:p.lat, opLng:p.lng, operatorId, travelerUid,
+    monitorSeen:{lat:p.lat,lng:p.lng,at:now-12*MIN},
+  });
+  {
+    tickets.length=0;
+    const h=makeDb({rides:{
+      r1:ride({monitor:{state:'asked_traveler',askedOperatorAt:now-6*MIN,
+        askedTravelerAt:now-2*MIN,travelerReply:'help'}}),
+      r2:nearbyStopped(NEAR,'op2','u2'),r3:nearbyStopped(NEAR2,'op3','u3'),
+    }});
+    const report=await inject(h.db).sweepMonitor({now});
+    check('explicit Traveler emergency is never classified as traffic',
+      h.data.rides.r1.monitor.state==='emergency' &&
+      report.emergencies.some(x=>x.rideId==='r1') &&
+      tickets.filter(t=>t.kind==='emergency').length===1,
+      JSON.stringify(report));
+  }
+  {
+    tickets.length=0;
+    const h=makeDb({rides:{
+      r1:ride({monitor:{state:'asked_operator',askedOperatorAt:now-2*MIN,
+        operatorReply:'Passenger is hurt and needs ambulance'}}),
+      r2:nearbyStopped(NEAR,'op2','u2'),r3:nearbyStopped(NEAR2,'op3','u3'),
+    }});
+    const report=await inject(h.db).sweepMonitor({now});
+    check('operator emergency outranks congestion inference',
+      h.data.rides.r1.monitor.state==='emergency' &&
+      report.emergencies.some(x=>x.rideId==='r1'), JSON.stringify(report));
+  }
+  {
+    tickets.length=0;
+    const h=makeDb({rides:{r1:ride({stillSince:now-15*1000,
+      monitor:{state:'emergency',caseNo:'AR-E-1',raisedAt:now-2*MIN}})}});
+    const report=await inject(h.db).sweepMonitor({now});
+    check('movement never automatically closes an existing emergency',
+      h.data.rides.r1.monitor.state==='emergency' &&
+      h.data.rides.r1.monitor.caseNo==='AR-E-1' &&
+      tickets.length===0 && report.activeEscalations===1,
+      JSON.stringify(report));
+  }
+  {
+    tickets.length=0;
+    const h=makeDb({rides:{r1:ride({stillSince:now-20000,
+      monitor:{travelerReply:'help'}})}});
+    const report=await inject(h.db).sweepMonitor({now});
+    check('Traveler help gets immediate emergency treatment even before stop timer',
+      h.data.rides.r1.monitor.state==='emergency' &&
+      report.emergencies.length===1,JSON.stringify(report));
+  }
+  {
+    tickets.length=0;
+    const h=makeDb({rides:{r1:ride({monitor:{travelerReply:'help'}})}});
+    const report=await inject(h.db,{caseFails:true}).sweepMonitor({now});
+    check('failed emergency case filing is reported, not claimed successful',
+      report.ok===false && report.emergencyDeliveryFailures.length===1 &&
+      report.emergencyDeliveryFailures[0].caseFiled===false &&
+      h.data.rides.r1.monitor.state==='emergency',JSON.stringify(report));
+  }
+  {
+    tickets.length=0;
+    const h=makeDb({rides:{r1:ride({monitor:{travelerReply:'help'}})}});
+    const report=await inject(h.db,{pushFails:['u1']}).sweepMonitor({now});
+    check('failed Traveler emergency push does not prevent Operator notification',
+      report.ok===false && report.emergencyDeliveryFailures.length===1 &&
+      report.emergencyDeliveryFailures[0].travelerNotified===false &&
+      report.emergencyDeliveryFailures[0].operatorNotified===true &&
+      report.emergencyDeliveryFailures[0].caseFiled===true,JSON.stringify(report));
+  }
   // 1. Moving normally: nothing said.
   {
     const h = makeDb({ rides: { r1: ride({ stillSince: now - 30 * 1000, monitorSeen: { lat: FAR.lat, lng: FAR.lng, at: now - MIN } }) } });

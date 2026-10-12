@@ -30,6 +30,7 @@
 // settles it; "she's not answering me" does not. It never invents a position, a delay or a
 // reason: every fact it is given comes from the record. With no key configured the ladder
 // still runs on the thresholds alone, and says less.
+const { createHash } = require('node:crypto');
 const { distanceMiles, matchOperator, coverageLapsed } = require('./matching');
 const { nearbyOperatorCandidates } = require('./geooperators');
 const { screeningReady } = require('./screening');
@@ -147,7 +148,9 @@ async function sweepMonitor({ now = Date.now() } = {}) {
     // hypothesis must NEVER suppress an explicit request for help, and a
     // previously raised emergency must not be automatically erased because the
     // phone later reports movement. Review/closure is a separate authority.
-    if (m.state === 'emergency' || m.state === 'escalated') {
+    // An existing emergency is already on the emergency lane, but a merely
+    // escalated non-emergency case MUST NOT suppress a later request for help.
+    if (m.state === 'emergency') {
       report.activeEscalations = (report.activeEscalations || 0) + 1;
       continue;
     }
@@ -175,6 +178,11 @@ async function sweepMonitor({ now = Date.now() } = {}) {
       });
       recordEmergencyDelivery(report, ride.id, caseNo, delivery);
       report.emergencies.push({ rideId: ride.id, caseNo, from: 'operator' });
+      continue;
+    }
+
+    if (m.state === 'escalated') {
+      report.activeEscalations = (report.activeEscalations || 0) + 1;
       continue;
     }
 
@@ -530,6 +538,19 @@ async function raiseEmergency(db, ride, { now, caseNo, note, from }) {
   };
 }
 
+// A stable case per *incident*, not per ride forever. A new monitored episode
+// after clearance gets a fresh case, while a quota-failed retry retains the
+// same key. SHA keeps long/untrusted identifiers within the ticket key bound.
+function monitorIncidentKey(ride, urgent) {
+  const m = ride.monitor || {};
+  const anchor = [m.clearedAt, m.askedOperatorAt, m.askedTravelerAt, ride.createdAt]
+    .map(Number).find(v => Number.isSafeInteger(v) && v > 0) || 0;
+  const digest = createHash('sha256').update(JSON.stringify([
+    String(ride.id), urgent ? 'emergency' : 'support', anchor,
+  ])).digest('hex').slice(0, 40);
+  return `route-monitor-${digest}`;
+}
+
 async function openCase(db, ride, { now, why, urgent }) {
   try {
     const filed = await fileTicket({
@@ -539,7 +560,7 @@ async function openCase(db, ride, { now, why, urgent }) {
       // The ticket service already supports stable incident keys. Use it so a
       // failed monitor-state write/retry reuses the SAME case, rather than
       // opening another case for each one-minute safety sweep.
-      idempotencyKey: `route-monitor-incident-${String(ride.id)}-${urgent ? 'emergency' : 'support'}`,
+      idempotencyKey: monitorIncidentKey(ride, urgent),
       category: 'safety',
       reason: 'Route monitoring',
       // Support stores one structured Travel reference; a bare string makes

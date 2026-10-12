@@ -310,6 +310,7 @@ const check = (l, c, d) => results.push({ l, ok: !!c, d });
 
   // 7. The operator explains it: settled, no case.
   {
+    tickets.length = 0; // isolate this expectation from preceding emergency fixtures
     const h = makeDb({ rides: { r1: ride({ monitor: { state: 'asked_operator', askedOperatorAt: now - 2 * MIN, operatorReply: 'Drawbridge is up on Venetian.' } }) } });
     await inject(h.db).sweepMonitor({ now });
     check('operator explains a road cause: settled',

@@ -3,12 +3,12 @@
 // customers, payouts or paid travel. Runs after existing Firestore rule suite.
 const assert=require('node:assert/strict');
 const admin=require('../../backend/node_modules/firebase-admin');
-const {getFirestore}=require('../../backend/node_modules/firebase-admin/firestore');
+// The Admin SDK loaded below exposes Firestore through admin.firestore().
 const {sweepBookingRecovery,PREPARED_TTL_MS,BATCH_LIMIT}=
   require('../../backend/bookingrecovery');
 if(!process.env.FIRESTORE_EMULATOR_HOST)throw Error('Firestore emulator is required');
 if(!admin.apps.length)admin.initializeApp({projectId:'demo-american-rider'});
-const db=getFirestore();
+const db=admin.firestore();
 const now=Date.now();
 async function main(){
   const batch=db.batch();

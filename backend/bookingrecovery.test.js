@@ -14,11 +14,16 @@ function store() {
       }; },
       where(field, _, value) {
         const constraints = [[field, value]];
+        let after = null;
         const query = {
           where(nextField, _op, nextValue) { constraints.push([nextField,nextValue]); return query; },
+          orderBy(field) { assert.equal(field,'__name__'); return query; },
+          startAfter(id) { assert.equal(typeof id,'string'); after = id; return query; },
           limit(max) { return { async get() {
             return { docs: [...rows.entries()].filter(([id,row]) =>
               id.startsWith(`${name}/`) && constraints.every(([key,v]) => row[key] === v))
+              .sort(([a],[b]) => a < b ? -1 : a > b ? 1 : 0)
+              .filter(([id]) => after === null || id.slice(name.length+1) > after)
               .slice(0,max).map(([id]) => ({ id: id.slice(name.length+1), data: () => ({ ...rows.get(id) }) })) };
           } }; },
         };
@@ -83,6 +88,65 @@ async function main() {
   assert.equal(recovered.overCapacity,false,'query must not bill 100 irrelevant refund documents');
   assert.equal(refunds.length,beforeCount+1);
   assert.equal(flood.rows.get('rides/eligible-refund').refundPending,false);
+  // Repeated full first pages must not indefinitely hide a later cancellation.
+  // This was possible with .limit(100) and no cursor: the first 250 recent
+  // payments were ineligible, so the overdue payment at the end never appeared.
+  for(let pass=0;pass<2;pass++){
+    const fair=store();
+    for(let i=0;i<250;i++){
+      fair.rows.set(`rides/a${String(i).padStart(4,'0')}`,{
+        travelerUid:'u',status:'awaiting_payment',createdAt:now-60_000,
+      });
+    }
+    fair.rows.set('rides/zz_overdue',{
+      travelerUid:'u',status:'awaiting_payment',
+      createdAt:now-PREPARED_TTL_MS-1,
+    });
+    for(let tick=0;tick<3;tick++){
+      const out=await sweepBookingRecovery({db:fair,deps,stripeConfigured:true,now:now+tick*1000});
+      assert.equal(out.ok,true,JSON.stringify(out));
+      assert.ok(out.scanned<=300, 'bounded at 100 documents per recovery group');
+      if(tick<2)assert.equal(out.overCapacity,true);
+    }
+    assert.equal(fair.rows.get('rides/zz_overdue').status,'cancelled',
+      'a later overdue Travel must not be permanently hidden by 250 recent records');
+    const cursor=fair.rows.get('recovery_cursors/booking_recovery');
+    assert.ok(cursor,'checkpoint must be durable between independent sweeps');
+    assert.equal(cursor.preparedAfterId,null,'end of recovery list wraps to first page');
+    const restarted=await sweepBookingRecovery({db:fair,deps,stripeConfigured:true,now:now+5_000});
+    assert.equal(restarted.ok,true,JSON.stringify(restarted));
+    assert.equal(fair.rows.get('rides/zz_overdue').status,'cancelled');
+  }
+  // No silent fallback to first-page starvation if the persisted checkpoint
+  // cannot be read or saved. The release logs the error and recovery can retry.
+  {
+    const broken=store();
+    const original=broken.collection;
+    broken.collection=(name)=>{
+      if(name!=='recovery_cursors')return original(name);
+      return {doc:()=>({async get(){throw Error('synthetic quota exhausted')}})};
+    };
+    const result=await sweepBookingRecovery({db:broken,deps,stripeConfigured:true,now});
+    assert.equal(result.ok,false);
+    assert.ok(result.errors.some(e=>e.includes('checkpoint unavailable')));
+  }
+  {
+    const broken=store();
+    for(let i=0;i<101;i++)broken.rows.set(`rides/p${String(i).padStart(4,'0')}`,{
+      travelerUid:'u',status:'awaiting_payment',createdAt:now-1000,
+    });
+    const original=broken.collection;
+    broken.collection=(name)=>{
+      if(name!=='recovery_cursors')return original(name);
+      return {doc:(id)=>({
+        get:()=>original(name).doc(id).get(),
+        async set(){throw Error('synthetic checkpoint write outage')},
+      })};
+    };
+    const result=await sweepBookingRecovery({db:broken,deps,stripeConfigured:true,now});
+    assert.equal(result.ok,false);
+    assert.ok(result.errors.some(e=>e.includes('checkpoint not persisted')));
+  }
   console.log('PASS unattended prepared-booking closure, paid-unmatched refund and pending retry');
 }
 main().catch((e) => { console.error(e); process.exitCode=1; });

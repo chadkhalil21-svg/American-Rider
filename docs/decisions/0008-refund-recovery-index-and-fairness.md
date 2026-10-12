@@ -16,11 +16,11 @@ The applicable Council interpretations are Ford (do no pointless repeat work), R
 
 ## Changed files
 - `backend/bookingrecovery.js`: conjunctive query; preserve `BATCH_LIMIT=100`, all present payment ownership and idempotent refund checks.
-- `firestore.indexes.json`: add `rides(refundPending, status)` composite index. **MUST deploy/confirm index READY before the server query is deployed.** A passing rules emulator is not proof the production index is built.
+- No new composite index is required for the two equality predicates. Firestore's built-in single-field index merging supports conjunctive equality filters. Preserve the current index manifest; test the actual query after deployment and add a composite index only if Query Explain or measured high-volume performance requires it. Source: https://firebase.google.com/docs/firestore/query-data/index-overview#use_index_merging
 - `backend/bookingrecovery.test.js`: faithful multi-where mock and adversarial 125 irrelevant flags preceding one real cancelled payment refund.
 - `docs/audits/INSTITUTIONAL-WHOLE-PLATFORM-ASSURANCE-2026-10-11.md`: 24-category whole-platform standards and evidence matrix.
 
 ## Limitations
 No real money used; no claim of verified production refund backlog or completed end-to-end physical-device test. This stops one starvation mechanism, not every problem under provider outages, index errors, or 1M accounts. Existing processing idempotency and legal coverage must remain intact. Monitor separate active-Travel read amplification and production billing evidence; do not trade safety-monitor completeness for a small bill.
 
-**Release gate:** exact SHA six workflow suites including backend double stress plus Firestore rule tests, review, provision composite index, independently verify index readiness, then controlled deployment with rollback. Until then draft, no live action.
+**Release gate:** exact SHA six workflow suites including backend double stress and Firestore rules, query-behavior review, then controlled deployment and rollback verification. No Firestore index commission required for this equality-only change. Until then draft, no live action.

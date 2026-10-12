@@ -88,7 +88,7 @@ async function sweepMonitor({ now = Date.now() } = {}) {
 
   const report = {
     ok: true, watching: 0, moving: 0, congestion: 0,
-    asked: [], cases: [], emergencies: [], reoffered: [],
+    asked: [], cases: [], emergencies: [], emergencyDeliveryFailures: [], reoffered: [],
   };
 
   let live;
@@ -171,6 +171,26 @@ async function sweepMonitor({ now = Date.now() } = {}) {
     const stillMin = minutesSince(stillSince, now);
     const m = ride.monitor || {};
 
+    // Safety takes precedence over inferred congestion and movement. A traffic
+    // hypothesis must NEVER suppress an explicit request for help, and a
+    // previously raised emergency must not be automatically erased because the
+    // phone later reports movement. Review/closure is a separate authority.
+    if (m.state === 'emergency' || m.state === 'escalated') {
+      report.activeEscalations = (report.activeEscalations || 0) + 1;
+      continue;
+    }
+    if (m.travelerReply === 'help') {
+      const caseNo = await openCase(db, ride, {
+        now, why: 'The traveler explicitly requested emergency assistance.', urgent: true,
+      });
+      const delivery = await raiseEmergency(db, ride, {
+        now, caseNo, note: 'The traveler asked for help.', from: 'traveler',
+      });
+      recordEmergencyDelivery(report, ride.id, caseNo, delivery);
+      report.emergencies.push({ rideId: ride.id, caseNo, from: 'traveler' });
+      continue;
+    }
+
     // ---- Moving again. Clear anything outstanding. ------------------------------------
     if (stillMin < STILL_MIN) {
       report.moving++;
@@ -202,7 +222,7 @@ async function sweepMonitor({ now = Date.now() } = {}) {
     }
     const alsoStopped = neighbours.filter((v) => v.stillMin >= STILL_MIN / 2).length;
 
-    if (alsoStopped >= CONGESTION_MIN_VEHICLES) {
+    if (alsoStopped >= CONGESTION_MIN_VEHICLES && !(m.operatorReply && !m.operatorReplyReadAt)) {
       report.congestion++;
       // Reported to both, asked of neither. A delay with a known cause is information, not a
       // question — and this is the branch that stops the whole feature from crying wolf.
@@ -248,7 +268,8 @@ async function sweepMonitor({ now = Date.now() } = {}) {
         urgent: verdict.urgent,
       });
       if (verdict.urgent) {
-        await raiseEmergency(db, ride, { now, caseNo, note: verdict.note, from: 'operator' });
+        const delivery = await raiseEmergency(db, ride, { now, caseNo, note: verdict.note, from: 'operator' });
+        recordEmergencyDelivery(report, ride.id, caseNo, delivery);
         report.emergencies.push({ rideId: ride.id, caseNo, from: 'operator' });
       } else {
         await write(db, ride.id, {
@@ -447,8 +468,18 @@ async function readReply({ reply, stillMin, stage }) {
  * WHAT IS NOT DONE, DELIBERATELY: no automatic call is placed. A platform that dials 911 on a
  * misread word sends police to a traveler who said the word "accident" about the traffic.
  */
+function recordEmergencyDelivery(report, rideId, caseNo, delivery) {
+  if (caseNo && delivery.recorded && delivery.notifications.every(Boolean)) return;
+  report.ok = false;
+  report.emergencyDeliveryFailures.push({
+    rideId, caseFiled: !!caseNo, emergencyStored: !!delivery.recorded,
+    travelerNotified: !!delivery.notifications[0],
+    operatorNotified: !!delivery.notifications[1],
+  });
+}
+
 async function raiseEmergency(db, ride, { now, caseNo, note, from }) {
-  await write(db, ride.id, {
+  const recorded = await write(db, ride.id, {
     monitor: {
       state: 'emergency',
       caseNo: caseNo || null,
@@ -464,20 +495,22 @@ async function raiseEmergency(db, ride, { now, caseNo, note, from }) {
   const body = 'Open American Rider to call 911. Your location and vehicle details are on screen.';
   // BOTH PARTIES, whichever of them raised it. The one who did not raise it is the one who may
   // not know yet, and in the case where they cannot use their own phone the other can.
-  await notify({
-    uid: ride.travelerUid,
-    kind: 'check_in',
-    title: 'Emergency assistance',
-    body,
-    data: { screen: '/emergency', rideId: ride.id, tripNo: ride.tripNo || '', emergency: true },
-  });
-  await notify({
-    uid: ride.operatorId,
-    kind: 'check_in',
-    title: 'Emergency assistance',
-    body,
-    data: { screen: '/emergency', rideId: ride.id, tripNo: ride.tripNo || '', emergency: true },
-  });
+  // Always attempt both independently. A failed push for one party must not
+  // prevent trying the other. Provider acceptance is not proof of delivery.
+  const results = await Promise.allSettled([
+    notify({
+      uid: ride.travelerUid, kind: 'check_in', title: 'Emergency assistance', body,
+      data: { screen: '/emergency', rideId: ride.id, tripNo: ride.tripNo || '', emergency: true },
+    }),
+    notify({
+      uid: ride.operatorId, kind: 'check_in', title: 'Emergency assistance', body,
+      data: { screen: '/emergency', rideId: ride.id, tripNo: ride.tripNo || '', emergency: true },
+    }),
+  ]);
+  return {
+    recorded, notifications: results.map(r =>
+      r.status === 'fulfilled' && r.value?.ok !== false),
+  };
 }
 
 async function openCase(db, ride, { now, why, urgent }) {
@@ -505,8 +538,10 @@ async function openCase(db, ride, { now, why, urgent }) {
 async function write(db, rideId, fields) {
   try {
     await db.collection('rides').doc(rideId).set(fields, { merge: true });
+    return true;
   } catch {
-    /* a lost note must not stop the sweep */
+    // Ordinary notes are best-effort; emergency callers inspect this boolean.
+    return false;
   }
 }
 

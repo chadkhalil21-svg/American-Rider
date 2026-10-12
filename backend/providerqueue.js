@@ -73,6 +73,20 @@ async function claim(ref, workerId, now = Date.now()) {
 
 const backoffMs = (attempts) => Math.min(15 * 60_000, Math.max(5_000, 5_000 * 2 ** Math.min(8, Math.max(0, attempts - 1))));
 
+// Amazon Builders' Library recommends spreading delayed retries rather than
+// allowing a fleet of failed provider events to wake up at the same instant.
+// A stable event+attempt hash needs no database reads, new vendor or random
+// state; unique events naturally receive different bounded retry times.
+// Never apply jitter to the immediate handling of an initial urgent event.
+const jitteredBackoffMs = (attempts, eventId) => {
+  const ceiling = backoffMs(attempts);
+  const digest = crypto.createHash('sha256')
+    .update(String(eventId || 'unknown') + ':' + String(attempts)).digest();
+  const fraction = digest.readUInt32BE(0) / 0x1_0000_0000;
+  return Math.max(1, Math.floor(ceiling * (0.5 + 0.5 * fraction)));
+};
+
+
 async function finishClaim(ref, rec, patch) {
   const db = adminDb();
   return db.runTransaction(async (tx) => {
@@ -86,7 +100,7 @@ async function finishClaim(ref, rec, patch) {
 async function failEvent(ref, rec, error) {
   const dead=rec.attempts>=MAX_ATTEMPTS;
   const saved = await finishClaim(ref, rec, {status:dead?'dead':'pending',leaseUntil:0,claimNonce:null,
-    nextAttemptAt:dead?0:Date.now()+backoffMs(rec.attempts),
+    nextAttemptAt:dead?0:Date.now()+jitteredBackoffMs(rec.attempts,rec.id),
     ...(dead?{deadAt:Date.now()}:{}),
     lastError:String(error||'provider handler failed').slice(0,1000)});
   if (!saved) return {ok:false,skipped:true,superseded:true,reason:'provider claim expired or was superseded'};
@@ -179,6 +193,6 @@ async function replayDeadEvent({id,actor}) {
 
 module.exports = {
   COLLECTION, LEASE_MS, MAX_ATTEMPTS, MAX_BATCH, MAX_TICK_EVENTS, MAX_PARALLEL,
-  eventDocId, backoffMs,
+  eventDocId, backoffMs, jitteredBackoffMs,
   enqueueProviderEvent, processProviderEvent, sweepProviderEvents,replayDeadEvent,
 };

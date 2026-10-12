@@ -71,6 +71,9 @@ const CONGESTION_MIN_VEHICLES = 2;
 // a car that has stopped, and must never be reported as one.
 const STALE_MIN = 5;
 
+// Deterministic urgent wording must be checked even if live GPS is missing.
+const EMERGENCY_TERMS = /(unwell|not (feeling )?well|not ok|sick|hurt|injur|bleed|unconscious|help|ambulance|911|unsafe|danger|scared|threat|weapon|argu|fight|assault|harass|refus|collision|we (were|got) (in|hit)|hit us|rear.?ended)/i;
+
 /** The stages of a travel where the vehicle is expected to be moving. */
 const MOVING_STAGES = new Set(['accepted', 'onboard']);
 
@@ -88,7 +91,7 @@ async function sweepMonitor({ now = Date.now() } = {}) {
 
   const report = {
     ok: true, watching: 0, moving: 0, congestion: 0,
-    asked: [], cases: [], emergencies: [], reoffered: [],
+    asked: [], cases: [], emergencies: [], emergencyDeliveryFailures: [], reoffered: [],
   };
 
   let live;
@@ -139,6 +142,42 @@ async function sweepMonitor({ now = Date.now() } = {}) {
     // A vehicle waiting AT the pickup is doing its job by being stationary. Watching it would
     // generate a check-in on every travel where the traveler takes a moment to come down.
     if (!MOVING_STAGES.has(ride.status)) continue;
+    const m = ride.monitor || {};
+    // Safety takes precedence over inferred congestion and movement. A traffic
+    // hypothesis must NEVER suppress an explicit request for help, and a
+    // previously raised emergency must not be automatically erased because the
+    // phone later reports movement. Review/closure is a separate authority.
+    if (m.state === 'emergency' || m.state === 'escalated') {
+      report.activeEscalations = (report.activeEscalations || 0) + 1;
+      continue;
+    }
+    if (m.travelerReply === 'help') {
+      const caseNo = await openCase(db, ride, {
+        now, why: 'The traveler explicitly requested emergency assistance.', urgent: true,
+      });
+      const delivery = await raiseEmergency(db, ride, {
+        now, caseNo, note: 'The traveler asked for help.', from: 'traveler',
+      });
+      recordEmergencyDelivery(report, ride.id, caseNo, delivery);
+      report.emergencies.push({ rideId: ride.id, caseNo, from: 'traveler' });
+      continue;
+    }
+
+    // An Operator's explicit injury/threat report is urgent even if the car
+    // has resumed motion or the phone stopped sending position updates.
+    if (m.operatorReply && !m.operatorReplyReadAt && EMERGENCY_TERMS.test(String(m.operatorReply))) {
+      const caseNo = await openCase(db, ride, {
+        now, why: 'The Operator explicitly reported a safety problem: ' + String(m.operatorReply),
+        urgent: true,
+      });
+      const delivery = await raiseEmergency(db, ride, {
+        now, caseNo, note: 'The Operator reported a problem.', from: 'operator',
+      });
+      recordEmergencyDelivery(report, ride.id, caseNo, delivery);
+      report.emergencies.push({ rideId: ride.id, caseNo, from: 'operator' });
+      continue;
+    }
+
     if (!Number.isFinite(ride.opLat) || !Number.isFinite(ride.opLng)) continue;
     if (minutesSince(ride.opAt, now) > STALE_MIN) continue;
 
@@ -169,7 +208,6 @@ async function sweepMonitor({ now = Date.now() } = {}) {
     }
 
     const stillMin = minutesSince(stillSince, now);
-    const m = ride.monitor || {};
 
     // ---- Moving again. Clear anything outstanding. ------------------------------------
     if (stillMin < STILL_MIN) {
@@ -202,7 +240,7 @@ async function sweepMonitor({ now = Date.now() } = {}) {
     }
     const alsoStopped = neighbours.filter((v) => v.stillMin >= STILL_MIN / 2).length;
 
-    if (alsoStopped >= CONGESTION_MIN_VEHICLES) {
+    if (alsoStopped >= CONGESTION_MIN_VEHICLES && !(m.operatorReply && !m.operatorReplyReadAt)) {
       report.congestion++;
       // Reported to both, asked of neither. A delay with a known cause is information, not a
       // question — and this is the branch that stops the whole feature from crying wolf.
@@ -248,7 +286,8 @@ async function sweepMonitor({ now = Date.now() } = {}) {
         urgent: verdict.urgent,
       });
       if (verdict.urgent) {
-        await raiseEmergency(db, ride, { now, caseNo, note: verdict.note, from: 'operator' });
+        const delivery = await raiseEmergency(db, ride, { now, caseNo, note: verdict.note, from: 'operator' });
+        recordEmergencyDelivery(report, ride.id, caseNo, delivery);
         report.emergencies.push({ rideId: ride.id, caseNo, from: 'operator' });
       } else {
         await write(db, ride.id, {
@@ -362,8 +401,7 @@ async function readReply({ reply, stillMin, stage }) {
     // `trouble` is tested FIRST, which is what lets "accident" live in `road`: an accident up
     // ahead is traffic, an accident we were in is not, and only the order tells them apart.
     const road = /(traffic|jam|light|lights|bridge|closed|closure|construction|roadwork|detour|congest|backed up|drawbridge|train|accident|waiting|passenger|rider|fuel|gas|parking|park|delivery|truck|wrong turn|rain|storm|flood)/i;
-    const trouble = /(unwell|not (feeling )?well|not ok|sick|hurt|injur|bleed|unconscious|help|ambulance|911|unsafe|danger|scared|threat|weapon|argu|fight|assault|harass|refus|collision|we (were|got) (in|hit)|hit us|rear.?ended)/i;
-    if (trouble.test(reply)) {
+    if (EMERGENCY_TERMS.test(reply)) {
       return { resolved: false, urgent: true, note: 'The operator reported a problem.' };
     }
     if (road.test(reply)) {
@@ -447,8 +485,18 @@ async function readReply({ reply, stillMin, stage }) {
  * WHAT IS NOT DONE, DELIBERATELY: no automatic call is placed. A platform that dials 911 on a
  * misread word sends police to a traveler who said the word "accident" about the traffic.
  */
+function recordEmergencyDelivery(report, rideId, caseNo, delivery) {
+  if (caseNo && delivery.recorded && delivery.notifications.every(Boolean)) return;
+  report.ok = false;
+  report.emergencyDeliveryFailures.push({
+    rideId, caseFiled: !!caseNo, emergencyStored: !!delivery.recorded,
+    travelerNotified: !!delivery.notifications[0],
+    operatorNotified: !!delivery.notifications[1],
+  });
+}
+
 async function raiseEmergency(db, ride, { now, caseNo, note, from }) {
-  await write(db, ride.id, {
+  const recorded = await write(db, ride.id, {
     monitor: {
       state: 'emergency',
       caseNo: caseNo || null,
@@ -464,20 +512,22 @@ async function raiseEmergency(db, ride, { now, caseNo, note, from }) {
   const body = 'Open American Rider to call 911. Your location and vehicle details are on screen.';
   // BOTH PARTIES, whichever of them raised it. The one who did not raise it is the one who may
   // not know yet, and in the case where they cannot use their own phone the other can.
-  await notify({
-    uid: ride.travelerUid,
-    kind: 'check_in',
-    title: 'Emergency assistance',
-    body,
-    data: { screen: '/emergency', rideId: ride.id, tripNo: ride.tripNo || '', emergency: true },
-  });
-  await notify({
-    uid: ride.operatorId,
-    kind: 'check_in',
-    title: 'Emergency assistance',
-    body,
-    data: { screen: '/emergency', rideId: ride.id, tripNo: ride.tripNo || '', emergency: true },
-  });
+  // Always attempt both independently. A failed push for one party must not
+  // prevent trying the other. Provider acceptance is not proof of delivery.
+  const results = await Promise.allSettled([
+    notify({
+      uid: ride.travelerUid, kind: 'check_in', title: 'Emergency assistance', body,
+      data: { screen: '/emergency', rideId: ride.id, tripNo: ride.tripNo || '', emergency: true },
+    }),
+    notify({
+      uid: ride.operatorId, kind: 'check_in', title: 'Emergency assistance', body,
+      data: { screen: '/emergency', rideId: ride.id, tripNo: ride.tripNo || '', emergency: true },
+    }),
+  ]);
+  return {
+    recorded, notifications: results.map(r =>
+      r.status === 'fulfilled' && r.value?.ok !== false),
+  };
 }
 
 async function openCase(db, ride, { now, why, urgent }) {
@@ -505,8 +555,10 @@ async function openCase(db, ride, { now, why, urgent }) {
 async function write(db, rideId, fields) {
   try {
     await db.collection('rides').doc(rideId).set(fields, { merge: true });
+    return true;
   } catch {
-    /* a lost note must not stop the sweep */
+    // Ordinary notes are best-effort; emergency callers inspect this boolean.
+    return false;
   }
 }
 

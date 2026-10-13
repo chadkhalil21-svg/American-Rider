@@ -1724,7 +1724,7 @@ app.post('/fare-quote', attachAuth, LIMITS.quoteIp, requireOperationalReadiness,
     });
   }
   if (!priced) {
-    return res.status(400).json({ error: 'Need either pickup+dest coordinates or a known destination' });
+    return res.status(400).json({ error: 'Provide both pickup and destination locations for an accurate Travel Total.', code: 'route_geometry_required' });
   }
   if (String(priced.pricedBy || '').endsWith('-distance') && priced.tollStatus === 'unknown') {
     return res.status(503).json({ error: 'Toll cost could not be verified for this route.', code: 'toll_unavailable' });
@@ -1950,7 +1950,7 @@ app.post('/charge-ride', requireAuth, LIMITS.payments, requireOperationalReadine
     return res.status(409).json({ error: priced.reason, code: 'outside_market', where: priced.outsideMarket });
   }
   if (!priced) {
-    return res.status(400).json({ error: 'Need either pickup+dest coordinates or a known destination' });
+    return res.status(400).json({ error: 'Provide both pickup and destination locations for an accurate Travel Total.', code: 'route_geometry_required' });
   }
   if (String(priced.pricedBy || '').endsWith('-distance') && priced.tollStatus === 'unknown') {
     return res.status(503).json({ error: 'Toll cost could not be verified for this route.', code: 'toll_unavailable' });

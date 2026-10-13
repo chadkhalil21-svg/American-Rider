@@ -143,6 +143,15 @@ async function run(pass){
   const duplicate=await deliver(paymentEvent);
   check(duplicate.queued.duplicate===true && duplicate.handled.skipped,
     'duplicate Stripe delivery neither re-processes nor updates payment');
+
+  const contradictory=verify({...paymentEvent,data:{object:{
+    ...payment,amount_received:1,
+  }}});
+  const changed=await inbox.enqueueProviderEvent({provider:'stripe',event:contradictory});
+  check(changed.ok===false && /conflicting/.test(changed.reason),
+    'signed synthetic event reused with altered amount must not ACK as a replay');
+  check(data.rides[rideId].paymentIntentId===payment.id,
+    'untrusted changed amount never rewrites original paid Travel');
   const raced=event('payment_intent.succeeded',{...payment,id:'pi_race_'+pass});
   const raceId=inbox.eventDocId('stripe',raced.id);
   const raceEnqueued=await inbox.enqueueProviderEvent({provider:'stripe',event:verify(raced)});

@@ -19,6 +19,7 @@ export type Coords = { lat: number; lng: number };
 
 export type Quote = {
   travelerPays: number; // cents — the ONE price shown to the traveler (fare + platform fee)
+  researchQuoteToken?: string; // optional signed research reference; no fare authority
   /** The journey time the fare was computed from, when the server priced by coordinates. */
   minutes?: number;
   operatorGets: number; // cents — 99% of the fare
@@ -173,6 +174,7 @@ export async function fetchQuote(args: {
     if (typeof d?.travelerPays !== 'number') return null;
     return {
       travelerPays: d.travelerPays,
+      ...(typeof d.researchQuoteToken==='string'&&d.researchQuoteToken.length<=450?{researchQuoteToken:d.researchQuoteToken}:{}),
       minutes: typeof d.minutes === 'number' ? d.minutes : undefined,
       operatorGets: d.operatorGets,
       travelCostCents: d.travelCostCents,

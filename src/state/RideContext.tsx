@@ -401,29 +401,43 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   // charged amount are the same number or they are a defect; this keeps them the same.
   const repriceSeq = useRef(0);
   useEffect(() => {
-    if (!pickupPin || rideActiveRef.current) return; // a travel underway is already priced
+    // Invalidate outstanding pin quotes even when the pin is REMOVED. Otherwise
+    // a late old-pin response can overwrite a fresh named-pickup server quote.
+    const seq = ++repriceSeq.current;
+    if (!pickupPin || rideActiveRef.current) {
+      setRepricing(false);
+      return undefined;
+    }
     const dest =
       tripCoordsRef.current?.dest ??
       (arrival.lat != null && arrival.lng != null ? { lat: arrival.lat, lng: arrival.lng } : null);
-    if (!dest) return;
-    const seq = ++repriceSeq.current;
-    // The old pickup's quote ceases to be true the instant the pickup changes.
+    if (!dest) { setRepricing(false); return undefined; }
+    let live = true;
     setQuotedFareCents(null);
     setQuotedFeeLines([]);
     setResearchQuoteToken(null);
     setRepricing(true);
     fetchQuote({ pickup: pickupPin, dest, destination: arrival.short, travelClass })
       .then((q) => {
-        if (seq !== repriceSeq.current) return; // a newer pin superseded this quote
+        if (!live || seq !== repriceSeq.current) return;
         if (q && !isUnavailable(q)) {
-          setQuotedServerPrice(q.travelCostCents,q.travelerPays,travelClass);
+          setQuotedServerPrice(q.travelCostCents, q.travelerPays, travelClass);
           setQuotedFeeLines(q.feeLines);
-          setResearchQuoteToken(q.researchQuoteToken??null);
+          setResearchQuoteToken(q.researchQuoteToken ?? null);
+        }
+      })
+      .catch(() => {
+        // No fallback fee arithmetic and no unhandled rejection on a failed quote.
+        if (live && seq === repriceSeq.current) {
+          setQuotedFareCents(null);
+          setQuotedFeeLines([]);
+          setResearchQuoteToken(null);
         }
       })
       .finally(() => {
-        if (seq === repriceSeq.current) setRepricing(false);
+        if (live && seq === repriceSeq.current) setRepricing(false);
       });
+    return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pickupPin, arrival.short, travelClass]);
   // Read from runDispatch, which must not re-create itself when the traveler moves the pin.

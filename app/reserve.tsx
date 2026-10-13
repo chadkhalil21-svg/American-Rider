@@ -639,6 +639,20 @@ export default function TravelConfirmation() {
                   key={p.id}
                   accessibilityRole="button"
                   onPress={() => {
+                    // Replacing the pickup changes the route, not just its label.
+                    // Invalidate the old price before the booking can be accepted.
+                    const oldCoords = ride.tripCoords;
+                    const currentPickup = ride.pickupPin ?? oldCoords?.pickup;
+                    const pickupChanged = !currentPickup ||
+                      currentPickup.lat !== p.lat || currentPickup.lng !== p.lng;
+                    if (pickupChanged) {
+                      ride.setQuotedFareCents(null);
+                      ride.setQuotedFeeLines([]);
+                      ride.setResearchQuoteToken(null);
+                      ride.setTripCoords(oldCoords
+                        ? { pickup: { lat: p.lat, lng: p.lng }, dest: oldCoords.dest }
+                        : null);
+                    }
                     ride.setDeparture({ name: p.title, short: p.title, lat: p.lat, lng: p.lng });
                     ride.setPickupPin(null); // a named pickup replaces any dropped pin
                     setSearchingDep(false);

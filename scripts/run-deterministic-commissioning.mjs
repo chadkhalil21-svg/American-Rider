@@ -9,6 +9,7 @@ const cases = [
   ['fare / charge reconciliation', 'backend/payments.test.js'],
   ['source-checked South Florida public tariff audit and weekly fail-closed updates', 'backend/south-florida-public-rates.test.js'],
   ['authorized ordinary-price feed across all three Florida counties without scraping', 'backend/south-florida-authorized-panel.test.js'],
+  ['distinct authorized price observations and immutable replay identity', 'backend/south-florida-panel-identity.test.js'],
   ['Travel money authority', 'backend/travelmoney.test.js'],
   ['settlement after client loss / restart', 'backend/settle.test.js'],
   ['real-SDK synthetic signed payments / refunds / dispute / Connect provider chain', 'backend/synthetic-provider-chain.test.js'],

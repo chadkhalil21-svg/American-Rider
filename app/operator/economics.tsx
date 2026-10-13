@@ -24,6 +24,9 @@ export default function OperatorEconomics() {
         <Text style={styles.backText}>{t('common.back')}</Text>
       </Pressable>
       <Title>{t('operator.econTitle')}</Title>
+      <Pressable accessibilityRole="button" onPress={() => router.navigate('/operator/market-research')} style={{ paddingVertical: 14 }}>
+        <Text>{t('operator.fareResearchLink')} ›</Text>
+      </Pressable>
       <Text style={styles.lead}>{t('operator.econIntro')}</Text>
       <Card style={styles.ruleCard}>
         <Text style={styles.rule}>{t('operator.econShare')}</Text>

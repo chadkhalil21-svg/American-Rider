@@ -287,6 +287,9 @@ export default function OperatorHome() {
             </Pressable>
           ))}
           <WalletCard todayOps={op.todayOps} onPress={() => router.navigate('/operator/revenue')} />
+          <Pressable accessibilityRole="button" onPress={() => router.navigate('/operator/market-research')} style={{ paddingVertical: 12 }}>
+            <Text style={{ fontSize: 14 }}>{t('operator.fareResearchLink')} ›</Text>
+          </Pressable>
           <View style={{ marginTop: 'auto' }}>
             {/* Going available can be refused — Stripe has not cleared payouts, or this
                 device will not give a position to be matched against. The switch used to

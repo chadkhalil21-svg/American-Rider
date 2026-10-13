@@ -33,6 +33,7 @@ const { readKey } = require('./env');
 const { requireAuth, requireFreshAuth, attachAuth, requireVerifiedEmail } = require('./auth');
 const { perAccount, countOnly, perIp } = require('./ratelimit');
 const { marketFor, servesPoint, listMarkets, markets: allMarkets } = require('./markets');
+const { validateVoluntaryPrice, receiveVoluntaryPrice } = require('./voluntary-market-prices');
 const { forMarket: insuranceForMarket, publicConfig: publicInsuranceConfig } = require('./insurance-jurisdictions');
 const { manifestFor, inspectMarket, recordEvidence, activateMarket, activateRegion, authorizeOnboarding, pauseMarket } = require('./market-readiness');
 const { setAdmittedFleetOnline, setFleetOnlineIfOpen, deactivateMarketFleet, sweepPausedMarketFleet } = require('./market-fleet');
@@ -1747,6 +1748,32 @@ app.post('/fare-quote', attachAuth, LIMITS.quoteIp, requireOperationalReadiness,
 // ——— SAVED PAYMENT METHODS — the traveler's own, read from and written to their Stripe
 // Customer record. Without a key there is nothing to read, and the app is told so plainly
 // rather than shown an empty list it might mistake for "none saved".
+// Only the configured county names and stable IDs; no protected admission,
+// prices, precise boundaries or operational secrets are returned.
+app.get('/market-price/research/markets', requireAuth, requireVerifiedEmail, LIMITS.market, (_req,res)=>{
+  const markets=listMarkets().map(({id,name,state})=>({id,name,state}));
+  res.json({markets});
+});
+
+// Voluntary historical fare observations from ordinary Travelers/Operators.
+// Explicit consent, verified email and per-account rate limiting; no scraper,
+// no screenshot storage, no exact pickup persisted, no price-setting authority.
+// This is research, not a quote or an offer to match a competing price.
+app.post('/market-price/research', requireAuth, requireVerifiedEmail, LIMITS.support, async (req,res)=>{
+  const db=adminDb();
+  if(!db)return res.status(503).json({code:'research_store_unavailable',error:'Research intake is unavailable.'});
+  try { validateVoluntaryPrice({body:req.body,uid:String(req.uid)}); }
+  catch(e){ return res.status(400).json({code:'invalid_research_observation',error:String(e.message||'Invalid observation')}); }
+  try{
+    const out=await receiveVoluntaryPrice({db,uid:String(req.uid),body:req.body});
+    return res.status(out.reused?200:202).json(out);
+  }catch(e){
+    if(/observation ID reused/.test(String(e?.message||'')))
+      return res.status(409).json({code:'research_observation_conflict',error:'This observation ID was already submitted with different details.'});
+    return res.status(503).json({code:'research_intake_unavailable',error:'Research intake is unavailable.'});
+  }
+});
+
 app.get('/payment-methods', requireAuth, async (req, res) => {
   if (keyMode === 'no-key') return res.json({ methods: [], unavailable: 'no-key' });
   try {

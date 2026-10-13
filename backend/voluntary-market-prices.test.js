@@ -13,7 +13,7 @@ const normal=()=>({
   serviceClass:'standard',ordinaryNoPromotion:true,
   sourceKind:'my-receipt',
   providerCode:'other-leading-platform-a',
-  consentToAnonymousResearch:true,
+  consentToResearch:true,
 });
 const pick=p=>({id:'fl-miami-dade',regionId:'fl-southeast'});
 const plain=validateVoluntaryPrice({body:normal(),uid:UID,now:NOW,marketForPoint:pick});
@@ -28,12 +28,21 @@ assert.equal(JSON.stringify(plain.document).includes(UID),false);
 assert.equal(JSON.stringify(plain.document).includes('25.795'),false);
 assert.equal(plain.id.length,64);
 assert.equal(MAX_AGE_MS,14*86400000);
+const countyBody={...normal(),marketId:'fl-broward'};
+delete countyBody.pickup;
+const byCounty=validateVoluntaryPrice({body:countyBody,uid:UID,now:NOW,
+  marketList:()=>[{id:'fl-broward',regionId:'fl-southeast'}]});
+assert.equal(byCounty.document.marketId,'fl-broward');
+assert.equal(byCounty.document.marketEvidence,'contributor-declared-county');
+assert.throws(()=>validateVoluntaryPrice({body:countyBody,uid:UID,now:NOW,marketList:()=>[]}),/known source market/);
+assert.throws(()=>validateVoluntaryPrice({body:{...normal(),marketId:'fl-broward'},uid:UID,now:NOW}),/one pickup market method/);
+
 assert.deepEqual(plain,validateVoluntaryPrice({body:normal(),uid:UID,now:NOW,marketForPoint:pick}));
 assert.notEqual(plain.id,validateVoluntaryPrice({body:{...normal(),observationId:'own-price-receipt-0002'},uid:UID,now:NOW,marketForPoint:pick}).id);
 assert.notEqual(plain.id,validateVoluntaryPrice({body:normal(),uid:UID+'different',now:NOW,marketForPoint:pick}).id);
 assert.notEqual(plain.id,validateVoluntaryPrice({body:normal(),uid:UID,now:NOW,marketForPoint:()=>({id:'fl-broward'})}).id);
 const fails=[
-  [{consentToAnonymousResearch:false},/consent/],
+  [{consentToResearch:false},/consent/],
   [{ordinaryNoPromotion:false},/ordinary/],
   [{serviceClass:'premium'},/ordinary/],
   [{sourceKind:'platform-scraped'},/source kind/],

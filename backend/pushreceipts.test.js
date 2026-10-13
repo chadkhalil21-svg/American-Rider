@@ -159,7 +159,7 @@ async function run(){
  }});
  assert.equal(sweep.unverified,1);
  assert.equal(entries()[0].status,'unverified_expired');
- assert.equal(entries()[0].nextAttemptAt,null);
+ assert.equal(entries()[0].nextAttemptAt,Number.MAX_SAFE_INTEGER);
 
  clear();
  // Many due records across two sweeps must not starve later receipts.
@@ -183,7 +183,7 @@ async function run(){
  // Expired audit entries removed by bounded cleanup query.
  await db.collection('push_receipts').doc(
   require('node:crypto').createHash('sha256').update('expo-receipt:quota-ticket').digest('hex')
- ).set({purgeAt:NOW-1,nextAttemptAt:null,status:'provider_accepted'},{merge:true});
+ ).set({purgeAt:NOW-1,nextAttemptAt:Number.MAX_SAFE_INTEGER,status:'provider_accepted'},{merge:true});
  const purged=await sweepPushReceipts({db,now:NOW,fetchFn:()=>{
   throw Error('must not send no-due queries to Expo');
  }});

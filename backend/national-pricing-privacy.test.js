@@ -37,7 +37,7 @@ assert.equal(discovery.assessPublicSource({...schema,hasAllInTotalComparable:tru
  .fitness.includes('fare-reference'),true,
  'only proven full ordinary consumer Total may qualify as market reference evidence');
 const collector=read('backend/market-evidence-collectors.js');
-assert.match(collector,/resource\/8bbv-xwnh\.json/,'verify latest official 2026 Chicago source');
+assert.match(collector,/resource\/8bbv-3wbe\.json/,'verify latest official 2026 Chicago source');
 assert.match(collector,/r\.trip_total/,'do not quietly substitute base Fare for Trip Total');
 assert.match(collector,/structural evidence only/,'trip totals with tips cannot directly set quote prices');
 const marketPricing=read('backend/market-pricing.js');

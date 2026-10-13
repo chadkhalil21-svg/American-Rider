@@ -18,11 +18,10 @@ function feedResponse(marketId,changes={},responseOpts={}){
  const body=JSON.stringify({approvalReference:'signed-rights-review-001',
   marketId,pricingResearchUseApproved:true,
   observations:[{...normal(marketId),...changes}]});
- return {
-  ok:responseOpts.error?false:true,status:responseOpts.error?403:200,
-  headers:{get:()=>responseOpts.oversize?'120001':String(Buffer.byteLength(body))},
-  text:async()=>body,
- };
+ return new Response(responseOpts.undeclaredOversize?'X'.repeat(120001):body,{
+  status:responseOpts.error?403:200,
+  headers:responseOpts.undeclaredOversize?{}:{'content-length':responseOpts.oversize?'120001':String(Buffer.byteLength(body))}
+ });
 }
 async function run(){
  assert.deepEqual(authorizedMarketPanelCollectors({env:{}}),{});
@@ -79,6 +78,10 @@ async function run(){
  }
  const oversized=authorizedMarketPanelCollectors({env,fetchFn:async()=>feedResponse('fl-miami-dade',{}, {oversize:true})});
  await assert.rejects(oversized['controlled-public-price-panel']({marketId:'fl-miami-dade',now:NOW}),/oversized/);
+ const streamOversized=authorizedMarketPanelCollectors({env,fetchFn:async()=>feedResponse('fl-miami-dade',{}, {undeclaredOversize:true})});
+ await assert.rejects(streamOversized['controlled-public-price-panel']({marketId:'fl-miami-dade',now:NOW}),/oversized/);
+ const noStream=authorizedMarketPanelCollectors({env,fetchFn:async()=>({ok:true,status:200,headers:{get:()=>null},text:async()=>''})});
+ await assert.rejects(noStream['controlled-public-price-panel']({marketId:'fl-miami-dade',now:NOW}),/stream unavailable/);
  const unavailable=authorizedMarketPanelCollectors({env,fetchFn:async()=>feedResponse('fl-miami-dade',{}, {error:true})});
  await assert.rejects(unavailable['controlled-public-price-panel']({marketId:'fl-miami-dade',now:NOW}),/unavailable/);
  console.log('PASS approval/access denial, out-of-scope, stale, promo, incomplete price, private-person data and provider failures');

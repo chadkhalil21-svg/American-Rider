@@ -6,6 +6,11 @@
 //
 // Only Florida is configured today because American Rider's active markets are in Florida.
 // An expansion state fails closed until its verified requirements are added here.
+// FOUNDER POLICY (2026-10-13): Operators, not American Rider, obtain and pay for
+// independently verified commercial livery / for-hire passenger coverage that satisfies
+// every applicable jurisdictional TNC period. Known expiry, cancellation, lost eligibility,
+// or unverified required coverage blocks operations and new dispatch. This operational
+// rule does not purport to waive separate statutory TNC insurance duties.
 const REQUIREMENTS = Object.freeze({
   FL: Object.freeze({
     state: 'FL',
@@ -18,9 +23,9 @@ const REQUIREMENTS = Object.freeze({
     pipMinDollars: 10000,
     umUim: 'as required by Fla. Stat. §627.727',
     umRejectionAccepted: () => process.env.INSURANCE_UM_REJECTION_ACCEPTED === '1',
-    policyUse: 'transportation-network / for-hire passenger transportation',
+    policyUse: 'commercial livery / for-hire passenger transportation recognized for TNC use',
     script:
-      "I use my vehicle for prearranged passenger transportation through a transportation network company in Florida. American Rider's current onboarding policy asks me to provide my own standalone commercial for-hire passenger policy recognizing this use across all platform periods. Please assess available policies against that operating policy and Florida Statute 627.748; the statute itself allows the driver, the company, or both to maintain required coverage. Please confirm the required $50,000/$100,000/$25,000 logged-on liability, $1,000,000 primary liability during a prearranged ride, applicable PIP and UM/UIM treatment, carrier eligibility, deductibles, exclusions, vehicle and airport/private-livery use. Explain in writing how cancellation, nonrenewal and coverage changes can be verified by American Rider. I will submit the declarations page for American Rider review before operating.",
+      "I use my vehicle for prearranged passenger transportation through a transportation network company in Florida. American Rider's current onboarding policy asks me to provide my own commercial livery or equivalent standalone commercial for-hire passenger policy, with written confirmation of qualifying TNC coverage during every required logged-on and prearranged-ride period. Please assess available policies against that operating policy and Florida Statute 627.748; the statute itself allows the driver, the company, or both to maintain required coverage. Please confirm the required $50,000/$100,000/$25,000 logged-on liability, $1,000,000 primary liability during a prearranged ride, applicable PIP and UM/UIM treatment, carrier eligibility, deductibles, exclusions, vehicle and airport/private-livery use. Explain in writing how cancellation, nonrenewal and coverage changes can be verified by American Rider. I will submit the declarations page for American Rider review before operating.",
   }),
 });
 

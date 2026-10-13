@@ -42,7 +42,10 @@ const NATIONAL_SOURCE_CATALOG=Object.freeze({
     authority:'City of Chicago',
     coverage:'Chicago, IL',
     public:true,
-    primaryEligible:true,
+    // 2026 dataset full Trip Total includes tips and rounded fees. It can
+    // validate historical trip shapes, but is NOT an upfront fare authority.
+    primaryEligible:false,
+    caveat:'2026 public trip_total mixes tips, rounded fares and ancillary charges; no independently harmonized untipped current quoted Total.',
   }),
   'california-cpuc-tnc-public':Object.freeze({
     type:SOURCE_TYPES.GOVERNMENT_TRIPS,

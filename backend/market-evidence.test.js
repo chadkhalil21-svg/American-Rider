@@ -9,7 +9,7 @@ for(const id of ['fl-miami-dade','fl-broward','fl-palm-beach']){
   assert.deepEqual(E.planProblems(id),[]);
   assert.equal(E.planForRegion(id).regionId,'fl-southeast');
 }
-assert.ok(E.source('chicago-tnp-open-data').primaryEligible);
+assert.equal(E.source('chicago-tnp-open-data').primaryEligible,false,'rounded historical totals with tips do not prove market quotes');
 assert.equal(E.source('nyc-tlc-hvfhv').primaryEligible,false);
 assert.equal(E.source('california-cpuc-tnc-public').primaryEligible,false);
 assert.equal(E.source('american-rider-field-panel').primaryEligible,false);

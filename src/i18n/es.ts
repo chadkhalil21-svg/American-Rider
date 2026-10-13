@@ -259,6 +259,7 @@ export default {
   },
 
   traveler: {
+    pricingResearchOptIn: 'Ayude a mejorar los precios futuros usando este importe. Es opcional y no cambia el precio de su viaje.',
     pleaseWait: 'Espere',
     beginTravel: 'Iniciar Viaje',
     departure: 'Salida',

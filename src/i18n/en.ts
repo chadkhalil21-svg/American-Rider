@@ -260,6 +260,7 @@ export default {
   // Traveler surfaces speak human. Same restraint, plainer words — and the same refusal to
   // reassure: the price is stated, never defended.
   traveler: {
+    pricingResearchOptIn: 'Help improve future prices using this displayed Total. Optional; it does not change your Travel price.',
     pleaseWait: 'Please wait',
     beginTravel: 'Begin Travel',
     departure: 'Departure',

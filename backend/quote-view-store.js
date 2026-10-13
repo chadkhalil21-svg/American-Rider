@@ -7,12 +7,13 @@ const ERASE_PAGE=25;
 // The Firebase UID is never persisted in research, yet withdrawals remain queryable.
 // This stable per-feature pseudonym MUST be treated as personal, linkable information.
 const ownerKey=uid=>createHash('sha256').update('ar-price-view-owner-v1:'+String(uid)).digest('hex');
-async function record({db,uid,token,now=Date.now(),env=process.env}){
+async function record({db,uid,token,consentToResearch=false,consentVersion=null,now=Date.now(),env=process.env}){
+ if(consentToResearch!==true||consentVersion!=='quote-study-v1')return {ok:false,code:'research_consent_required'};
  const v=verify(token,{uid,now,env});
  if(!v)return {ok:false,code:'invalid_view'};
  if(!db)return {ok:false,code:'research_unavailable'};
  const ref=db.collection(C).doc(v.id),owner=ownerKey(uid);
- const data={ownerKey:owner,marketId:v.marketId,distanceBand:v.distanceBand,
+ const data={consentVersion:'quote-study-v1',consentedAt:new Date(now),ownerKey:owner,marketId:v.marketId,distanceBand:v.distanceBand,
   totalCents:v.totalCents,viewedAt:new Date(now),
   expiresAt:new Date(now+7*86400000),preparedRideId:null};
  // Share the account-closure fence's transaction ordering with real bookings:

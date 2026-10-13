@@ -242,6 +242,7 @@ export default {
     lostNotFound: "Oggetto non trovato",
   },
   traveler: {
+    pricingResearchOptIn: 'Aiuti a migliorare i prezzi futuri con il totale mostrato. È facoltativo e non cambia il prezzo del viaggio.',
     pleaseWait: 'Attenda',
     beginTravel: 'Iniziare il Viaggio',
     departure: 'Partenza',

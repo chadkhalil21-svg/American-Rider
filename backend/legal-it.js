@@ -126,6 +126,17 @@ di calcolo dei percorsi.</li>
 il suo account e i suoi dati vengano eliminati? Lo richieda tramite l’Assistenza Viaggiatori
 nell’applicazione e sarà fatto.</p></section>
 
+<section><h2>4A · Ricerca facoltativa sui prezzi</h2>
+<p>Solo se acconsente espressamente quando viene mostrato il prezzo, registriamo la contea,
+una categoria generale della distanza, il totale visualizzato, l'ora della scelta
+e se viene preparata una prenotazione. Il registro di ricerca non conserva il suo nome
+né gli indirizzi esatti. Un riferimento alla prenotazione può essere associato al suo
+account dal personale autorizzato. Non vendiamo questi dati e non li usiamo per pubblicità.
+La partecipazione è facoltativa e non cambia il prezzo o l'accesso al servizio.
+L'eliminazione è prevista dopo sette giorni, con eventuale ulteriore tempo di elaborazione.
+L'eliminazione dell'account rimuove prima i dati collegati. Può anche chiedere il ritiro
+all'Assistenza Viaggiatori.</p></section>
+
 <section><h2>5 · Minori</h2>
 <p>Gli account American Rider sono riservati agli adulti dai 18 anni in su. Non raccogliamo
 consapevolmente dati di minori.</p></section>

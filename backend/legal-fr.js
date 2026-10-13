@@ -134,6 +134,17 @@ publicité.</p></section>
 souhaitez la suppression de votre compte et de ses données ? Demandez-le via l’Assistance
 Voyageurs dans l’application et cela sera fait.</p></section>
 
+<section><h2>4A · Étude facultative des tarifs</h2>
+<p>Uniquement si vous acceptez expressément lorsque le prix est affiché, nous enregistrons
+le comté, une catégorie générale de distance, le total affiché, la date de votre choix
+et si une réservation a été préparée. L'étude ne conserve ni votre nom ni les adresses
+exactes. Une référence de réservation peut être reliée à votre compte par le personnel
+autorisé. Ces données ne sont ni vendues ni utilisées pour la publicité. Le choix est
+facultatif et ne modifie ni le prix ni l'accès aux trajets. La suppression est programmée
+après sept jours, avec un délai de traitement supplémentaire possible. La suppression
+du compte retire plus tôt les données liées. Vous pouvez aussi demander le retrait
+auprès de l'Assistance Voyageurs.</p></section>
+
 <section><h2>5 · Mineurs</h2>
 <p>Les comptes American Rider sont réservés aux adultes de 18 ans et plus. Nous ne collectons
 pas sciemment de données concernant des mineurs.</p></section>

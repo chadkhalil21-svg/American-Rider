@@ -10,6 +10,7 @@
 // of the styling in the wrong tokens, under a tagline the app does not use.
 
 const UPDATED = 'August 6, 2026';
+const PRIVACY_UPDATED = 'October 13, 2026';
 
 const { page } = require('./shell');
 
@@ -88,7 +89,7 @@ const PRIVACY_HTML = page(
   'Privacy Policy',
   `
 <h1>Privacy Policy</h1>
-<p class="updated">Last updated ${UPDATED}</p>
+<p class="updated">Last updated ${PRIVACY_UPDATED}</p>
 
 <div class="panel"><strong>The short version:</strong> we collect what's needed to arrange
 your rides — your email and your trip locations. We don't sell your data, we don't run
@@ -122,6 +123,17 @@ store a full card number.</li>
 <section><h2>4 · How long we keep it</h2>
 <p>Trip history stays on your account so your receipts exist. Want your account and its
 data deleted? Ask through Patron Support in the app and it will be done.</p></section>
+
+<section><h2>4A · Optional pricing research</h2>
+<p>Only if you actively choose to participate when a Travel price is displayed, we record
+the county, broad journey-length category, Total quoted, time of your choice, and whether
+the quote led to preparing a booking. The research record does not hold your name or exact
+pickup and destination. A booking reference may be connected to your account by our
+authorized staff. We do not sell or advertise with this information. Participation is
+optional and does not change your price or access to Travel. Research records are scheduled
+for deletion seven days after recording, with additional processing time under the
+database provider's deletion service. Deleting your account removes linked research
+earlier; you may also ask Patron Support to withdraw your participation.</p></section>
 
 <section><h2>5 · Children</h2>
 <p>American Rider accounts are for adults 18 and over. We don't knowingly collect data

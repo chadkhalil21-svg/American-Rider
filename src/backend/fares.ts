@@ -219,7 +219,7 @@ export async function recordVisibleStandardQuote(token:string):Promise<boolean>{
   const response=await fetch(`${PAYMENT_SERVER_URL}/pricing/research/view`,{
     method:'POST',
     headers:{'Content-Type':'application/json',Authorization:`Bearer ${id}`},
-    body:JSON.stringify({researchQuoteToken:token}),
+    body:JSON.stringify({researchQuoteToken:token,consentToResearch:true,consentVersion:'quote-study-v1'}),
   });
   return response.ok;
  }catch{return false;}

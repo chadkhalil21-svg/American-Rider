@@ -243,6 +243,7 @@ export default {
     lostNotFound: "Gegenstand nicht gefunden",
   },
   traveler: {
+    pricingResearchOptIn: 'Helfen Sie, künftige Preise anhand des angezeigten Gesamtbetrags zu verbessern. Freiwillig; Ihr Fahrpreis bleibt gleich.',
     pleaseWait: 'Bitte warten',
     beginTravel: 'Fahrt Beginnen',
     departure: 'Abfahrt',

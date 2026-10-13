@@ -16,7 +16,7 @@ function chicagoWeekend(iso){return ['Sat','Sun'].includes(chicagoParts(iso).wee
 async function collectChicago({marketId='il-chicago'}={}){
   // City of Chicago 2026 TNP dataset. Fare and total are rounded by the publisher; provenance
   // remains attached so calibration can weight it appropriately.
-  const base='https://data.cityofchicago.org/resource/6dvr-xwnh.json';
+  const base='https://data.cityofchicago.org/resource/8bbv-3wbe.json';
   const params=new URLSearchParams({
     // Cost-capped when explicitly commissioned; never pull 1,000 raw rows hourly.
     '$limit':'100',
@@ -29,9 +29,9 @@ async function collectChicago({marketId='il-chicago'}={}){
     return normalizeObservation({
       marketId,sourceId:'chicago-tnp-open-data',sourceType:'government-trips',observedAt,
       serviceClass:'standard',routedMiles:Number(r.trip_miles),routedMinutes:Number(r.trip_seconds)/60,
-      travelerTotalCents:Math.round(Number(r.fare)*100),daypart:chicagoDaypart(observedAt),
+      travelerTotalCents:Math.round(Number(r.trip_total)*100),daypart:chicagoDaypart(observedAt),
       weekdayWeekend:chicagoWeekend(observedAt),calendarClass:'ordinary',regulatedLocationClass:'ordinary',
-      provenance:'City of Chicago TNP Trips 2025+, dataset 6dvr-xwnh; market-controlled reference = published fare; excludes tip and additional_charges because those mix taxes/fees/other charges; fare rounded by publisher',
+      provenance:'City of Chicago 2026 TNP Trips dataset 8bbv-3wbe; published trip_total includes rounded fare, rounded tips and other charges, so this is historical structural evidence only, NOT a contemporaneous ordinary upfront all-in quoted Traveler Total',
     });
   });
 }

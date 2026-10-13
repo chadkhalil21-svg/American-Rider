@@ -33,10 +33,17 @@ const token=issue({uid,now,env,id:'a'.repeat(32),marketId:'fl-miami-dade',
    return result;
   },
  };
- assert.equal((await record({db,token,uid,now,env})).ok,true);
- assert.equal((await record({db,token,uid,now,env})).duplicate,true);
+ assert.equal((await record({db,token,uid,now,env})).code,'research_consent_required',
+   'unconsented quote views must never be stored');
+ assert.equal(creates,0,'no writes before an explicit affirmative choice');
+ assert.equal((await record({db,token,uid,now,env,consentToResearch:true,consentVersion:'bad'})).ok,false);
+ assert.equal(creates,0,'unrecognized notice cannot authorize research');
+ const approval={consentToResearch:true,consentVersion:'quote-study-v1'};
+ assert.equal((await record({db,token,uid,now,env,...approval})).ok,true);
+ assert.equal((await record({db,token,uid,now,env,...approval})).duplicate,true);
  assert.equal(creates,1);
- assert.equal((await record({db,token,uid:'attacker',now,env})).ok,false);
+ assert.equal(items.get('a'.repeat(32)).consentVersion,'quote-study-v1');
+ assert.equal((await record({db,token,uid:'attacker',now,env,...approval})).ok,false);
  const view=verify(token,{uid,now,env}),ride='b'.repeat(40);
  const txDB={collection:()=>({doc:id=>({id})})};
  const tx={updates:[],get:async ref=>({exists:items.has(ref.id),

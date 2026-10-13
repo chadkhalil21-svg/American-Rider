@@ -13,4 +13,6 @@ const t=Date.parse('2026-10-12T00:00:00Z');
 assert.throws(()=>normalizeObservation({...base,observedAt:'2027-10-12T00:00:00Z'},t),/future-dated/);
 assert.throws(()=>normalizeObservation({...base,observedAt:'2026-10-12T00:06:00Z'},t),/future-dated/);
 assert.ok(normalizeObservation({...base,observedAt:'2026-10-12T00:05:00Z'},t));
+assert.equal(normalizeObservation(normalizeObservation(base)).sourceObservationId,null,'legacy published records remain safely re-normalizable');
+assert.throws(()=>normalizeObservation({...base,sourceObservationId:'user@example.com'}),/anonymous/);
 console.log('market evidence ingestion boundary tests passed');

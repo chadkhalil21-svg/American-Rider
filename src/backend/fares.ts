@@ -119,6 +119,7 @@ export async function fetchQuote(args: {
   dest?: Coords | null;
   destination?: string | null;
   travelClass?: string | null;
+  journeyNo?: string | null;
 }): Promise<Quote | Unavailable | null> {
   const base =
     args.pickup && args.dest
@@ -128,7 +129,11 @@ export async function fetchQuote(args: {
         : null;
   if (!base) return null;
   // The class is a NAME, never a price — the server applies the multiplier.
-  const body = args.travelClass ? { ...base, travelClass: args.travelClass } : base;
+  const body = {
+    ...base,
+    ...(args.travelClass ? {travelClass:args.travelClass} : {}),
+    ...(args.journeyNo ? {journeyNo:args.journeyNo} : {}),
+  };
 
   try {
     // SIGNED IN, SO THE QUOTE IS ON THE RIGHT FEE SCHEDULE. The platform fee depends on the
@@ -171,7 +176,11 @@ export async function fetchQuote(args: {
       };
     }
     if (!res.ok) return null;
-    if (typeof d?.travelerPays !== 'number') return null;
+    // The app will display this EXACT amount; reject incomplete/fractional
+    // quotes instead of deriving an apparently plausible lower total locally.
+    if(!Number.isSafeInteger(d?.travelerPays)||d.travelerPays<=0||
+       !Number.isSafeInteger(d?.travelCostCents)||d.travelCostCents<=0||
+       d.travelerPays<d.travelCostCents)return null;
     return {
       travelerPays: d.travelerPays,
       ...(typeof d.researchQuoteToken==='string'&&d.researchQuoteToken.length<=450?{researchQuoteToken:d.researchQuoteToken}:{}),

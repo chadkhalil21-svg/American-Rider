@@ -5,36 +5,46 @@
 // No screenshots, receipts, precise coordinates, IDs, names or source credentials
 // are persisted. Commercial data rights and evidentiary quality require review.
 const {createHash}=require('node:crypto');
-const {marketFor}=require('./markets');
+const {marketFor,listMarkets}=require('./markets');
 
 const COLLECTION='market_price_research_submissions';
 const MAX_AGE_MS=14*24*60*60*1000;
 const ALLOWED_KEYS=new Set([
-  'pickup','observationId','observedAt','routedMiles','routedMinutes',
+  'pickup','marketId','observationId','observedAt','routedMiles','routedMinutes',
   'travelerTotalCents','serviceClass','ordinaryNoPromotion','sourceKind',
-  'consentToAnonymousResearch','providerCode',
+  'consentToResearch','providerCode',
 ]);
 const PROVIDERS=new Set(['other-leading-platform-a','other-leading-platform-b','other']);
 const SOURCE_KINDS=new Set(['my-receipt','my-quote']);
 
-function validateVoluntaryPrice({body,uid,now=Date.now(),marketForPoint=marketFor}={}){
+function validateVoluntaryPrice({body,uid,now=Date.now(),marketForPoint=marketFor,marketList=listMarkets}={}){
   if(typeof uid!=='string'||uid.length<10||uid.length>256)throw Error('authenticated contributor required');
   if(!body||typeof body!=='object'||Array.isArray(body))throw Error('observation required');
   if(Object.keys(body).some(k=>!ALLOWED_KEYS.has(k)))throw Error('unexpected or identifying fields prohibited');
-  if(body.consentToAnonymousResearch!==true)throw Error('research consent required');
+  if(body.consentToResearch!==true)throw Error('research consent required');
   if(body.ordinaryNoPromotion!==true||body.serviceClass!=='standard')
     throw Error('ordinary unpromoted standard price required');
   if(!SOURCE_KINDS.has(body.sourceKind))throw Error('source kind invalid');
   if(!PROVIDERS.has(body.providerCode))throw Error('provider kind invalid');
   if(typeof body.observationId!=='string'||!/^[A-Za-z0-9_.:-]{12,100}$/.test(body.observationId))
     throw Error('anonymous stable observation ID required');
-  if(!body.pickup||typeof body.pickup!=='object'||Array.isArray(body.pickup)||
-    Object.keys(body.pickup).some(x=>!['lat','lng'].includes(x))||
-    !Number.isFinite(body.pickup.lat)||!Number.isFinite(body.pickup.lng)||
-    body.pickup.lat < -90||body.pickup.lat>90||
-    body.pickup.lng < -180||body.pickup.lng>180)
-    throw Error('pickup county cannot be verified');
-  const market=marketForPoint(body.pickup);
+  if(Boolean(body.pickup)===Boolean(body.marketId))throw Error('select one pickup market method');
+  let market,marketEvidence;
+  if(body.marketId){
+    if(typeof body.marketId!=='string'||!/^[a-z]{2}-[a-z0-9-]{2,70}$/.test(body.marketId))
+      throw Error('pickup county invalid');
+    market=(marketList()||[]).find(m=>m.id===body.marketId&&m.regionId)||null;
+    marketEvidence='contributor-declared-county';
+  }else{
+    if(!body.pickup||typeof body.pickup!=='object'||Array.isArray(body.pickup)||
+      Object.keys(body.pickup).some(x=>!['lat','lng'].includes(x))||
+      !Number.isFinite(body.pickup.lat)||!Number.isFinite(body.pickup.lng)||
+      body.pickup.lat < -90||body.pickup.lat>90||
+      body.pickup.lng < -180||body.pickup.lng>180)
+      throw Error('pickup county cannot be verified');
+    market=marketForPoint(body.pickup);
+    marketEvidence='county-verified-from-submitted-point';
+  }
   if(!market?.id||!/^[-a-z0-9]{3,90}$/.test(market.id))throw Error('no known source market');
   const ts=typeof body.observedAt==='string'?Date.parse(body.observedAt):NaN;
   if(!Number.isFinite(ts)||ts>now+5*60*1000||now-ts>MAX_AGE_MS)
@@ -49,6 +59,7 @@ function validateVoluntaryPrice({body,uid,now=Date.now(),marketForPoint=marketFo
     ['ar-optin-v1',market.id,uid,body.observationId])).digest('hex');
   return {id,document:Object.freeze({
     marketId:market.id,
+    marketEvidence,
     sourceType:'voluntary-research',
     sourceKind:body.sourceKind,
     providerKey:body.providerCode,
@@ -66,9 +77,9 @@ function validateVoluntaryPrice({body,uid,now=Date.now(),marketForPoint=marketFo
   })};
 }
 
-async function receiveVoluntaryPrice({db,uid,body,now=Date.now(),marketForPoint=marketFor}={}){
+async function receiveVoluntaryPrice({db,uid,body,now=Date.now(),marketForPoint=marketFor,marketList=listMarkets}={}){
   if(!db||typeof db.collection!=='function')throw Error('price evidence storage unavailable');
-  const {id,document}=validateVoluntaryPrice({body,uid,now,marketForPoint});
+  const {id,document}=validateVoluntaryPrice({body,uid,now,marketForPoint,marketList});
   const ref=db.collection(COLLECTION).doc(id);
   try{
     await ref.create(document);

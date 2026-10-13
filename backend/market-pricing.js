@@ -24,6 +24,20 @@ const PRICING = Object.freeze({
   }),
 });
 
+// First-price cohort safeguard, based on the last schedule that legacy TestFlight
+// clients could book without sending an agreed all-in Traveler Total. If ANY
+// regional coefficient changes, older clients MUST update before a new booking.
+// Future regions also require total confirmation. No network/database work.
+const LEGACY_FL_BOOKING_PRICE = Object.freeze({
+  regionId: 'fl-southeast', baseCents: 100,
+  perMileCents: 85, perMinuteCents: 15, minimumFareCents: 300,
+});
+function requiresAgreedTotalOnBooking(pricing) {
+  return !pricing || Object.keys(LEGACY_FL_BOOKING_PRICE).some(
+    key => pricing[key] !== LEGACY_FL_BOOKING_PRICE[key]
+  );
+}
+
 function pricingForRegion(regionId) {
   return PRICING[String(regionId || '')] || null;
 }
@@ -49,4 +63,4 @@ function pricingProblems(region) {
   return out;
 }
 
-module.exports = { PRICING, pricingForRegion, pricingForTrip, pricingProblems };
+module.exports = { PRICING, pricingForRegion, pricingForTrip, pricingProblems, requiresAgreedTotalOnBooking };

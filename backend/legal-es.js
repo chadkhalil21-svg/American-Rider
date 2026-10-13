@@ -136,6 +136,17 @@ cálculo de rutas.</li>
 eliminen su cuenta y sus datos? Solicítelo a través de Atención al Viajero en la aplicación
 y así se hará.</p></section>
 
+<section><h2>4A · Estudio opcional de precios</h2>
+<p>Solo si usted acepta expresamente al ver el precio de un viaje, registramos el condado,
+una categoría general de distancia, el importe total mostrado, el momento de su elección
+y si se inició una reserva. No guardamos su nombre ni las direcciones exactas en el registro
+del estudio. Una referencia de reserva puede vincularse con su cuenta mediante personal
+autorizado. No vendemos estos datos ni los usamos para publicidad. Participar es opcional
+y no modifica el precio ni el acceso al servicio. Los datos se programan para eliminación
+después de siete días; el proveedor puede tardar más en procesarla. La eliminación de la
+cuenta retira antes los registros vinculados. También puede solicitar la retirada
+a Atención al Viajero.</p></section>
+
 <section><h2>5 · Menores</h2>
 <p>Las cuentas de American Rider son para adultos mayores de 18 años. No recogemos
 conscientemente datos de menores.</p></section>

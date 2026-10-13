@@ -18,16 +18,44 @@ const MAX_ATTEMPTS = 12;
 const safeId = (s) => String(s || '').replace(/[^A-Za-z0-9_.:-]/g, '_').slice(0, 220);
 const eventDocId = (provider, eventId) => safeId(`${provider}:${eventId}`);
 
+// Amazon Builders' Library: a repeated idempotency key with DIFFERENT intent is
+// an error, not a successful replay. Provider JSON may reorder object keys
+// between decoders, so fingerprint the canonical semantic JSON recursively.
+// The parser's depth is bounded to fail closed, avoiding hostile recursion.
+// This fingerprint is stored with the durable inbox, not user-facing data.
+function canonicalEvent(value, depth=0) {
+  if(depth>64) throw Error('provider event nesting exceeds bounded identity depth');
+  if(Array.isArray(value)) return value.map(v=>canonicalEvent(v,depth+1));
+  if(value && typeof value==='object') {
+    const result={};
+    for(const key of Object.keys(value).sort()) result[key]=canonicalEvent(value[key],depth+1);
+    return result;
+  }
+  return value;
+}
+function eventFingerprint(event) {
+  const json=JSON.stringify(canonicalEvent(event));
+  if(typeof json!=='string' || Buffer.byteLength(json,'utf8')>2_000_000)
+    throw Error('invalid or oversized provider event identity');
+  return crypto.createHash('sha256').update(json).digest('hex');
+}
+
+
 async function enqueueProviderEvent({ provider, event }) {
   const db = adminDb();
   if (!db) return { ok: false, reason: adminStatus().reason };
-  const id = eventDocId(provider, event?.id);
   if (!event?.id) return { ok: false, reason: 'provider event has no id' };
+  if (typeof provider!=='string' || !provider || provider.length>100 ||
+      typeof event.id!=='string' || !event.id || event.id.length>1024)
+    return { ok:false, reason:'invalid provider event identity' };
+  const id = eventDocId(provider, event.id);
   const ref = db.collection(COLLECTION).doc(id);
   try {
+    const eventHash=eventFingerprint(event);
     await ref.create({
       provider: String(provider),
       eventId: String(event.id),
+      eventHash,
       event,
       status: 'pending',
       attempts: 0,
@@ -39,9 +67,21 @@ async function enqueueProviderEvent({ provider, event }) {
     });
     return { ok: true, id, duplicate: false };
   } catch (e) {
-    // Firestore ALREADY_EXISTS: provider retries are normal and are acknowledged as duplicates.
+    // A returned ALREADY_EXISTS may be an exact replay OR a different event
+    // that normalizes/truncates to the same Firestore doc ID. Read only on
+    // duplicates (not every provider event), fail closed on mismatch/outage.
     if (e && (e.code === 6 || e.code === 'already-exists' || e.code === 'ALREADY_EXISTS')) {
-      return { ok: true, id, duplicate: true };
+      try {
+        const previous = await ref.get();
+        const existing=previous.exists ? previous.data() : null;
+        if (!existing || existing.provider !== provider ||
+            existing.eventId !== event.id ||
+            (existing.eventHash || eventFingerprint(existing.event))!==eventFingerprint(event))
+          return {ok:false,reason:'provider event ID reused with conflicting payload'};
+        return {ok:true,id,duplicate:true};
+      } catch {
+        return {ok:false,reason:'could not verify duplicate provider event'};
+      }
     }
     return { ok: false, reason: e?.message || String(e) };
   }

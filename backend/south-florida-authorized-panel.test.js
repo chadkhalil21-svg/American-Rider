@@ -1,7 +1,7 @@
 'use strict';
 const Response=globalThis.Response;
 const assert=require('node:assert/strict');
-const {approvedSource,authorizedMarketPanelCollectors}=require('./south-florida-authorized-panel');
+const {approvedSource,approvedMarketIds,authorizedMarketPanelCollectors}=require('./south-florida-authorized-panel');
 const {configuredCollectors}=require('./market-evidence-collectors');
 const NOW=Date.parse('2026-10-12T20:00:00Z');
 const env={AR_PANEL_APPROVED_FOR_MARKET_RESEARCH:'true',
@@ -33,6 +33,32 @@ async function run(){
  assert.equal(approvedSource({...env,AR_PANEL_HTTPS_URL:'https://user:pass@approved.example.org/prices'}),null);
  assert.equal(approvedSource({...env,AR_PANEL_HTTPS_URL:'https://approved.example.org/'}),null);
  assert.equal(typeof configuredCollectors()['chicago-tnp-open-data'],'function');
+ assert.deepEqual([...approvedMarketIds(env)],['fl-miami-dade','fl-broward','fl-palm-beach']);
+ assert.deepEqual([...approvedMarketIds({...env,AR_PANEL_APPROVED_MARKET_IDS:'fl-miami-dade,fl-broward'})],['fl-miami-dade','fl-broward']);
+ for(const invalid of ['fl-miami-dade,ny-nyc','fl-miami-dade,fl-miami-dade','fl-miami-dade,',
+   'fl-miami-dade,../../evil','fl-southeast','il-chicago','', 'a'.repeat(12001)]){
+   assert.equal(approvedMarketIds({...env,AR_PANEL_APPROVED_MARKET_IDS:invalid}),null,
+     'unlicensed or unconfigured market must fail closed: '+invalid.slice(0,35));
+ }
+ const twoMarketEnv={...env,AR_PANEL_APPROVED_MARKET_IDS:'fl-miami-dade,fl-broward'};
+ const countyScoped=authorizedMarketPanelCollectors({env:twoMarketEnv,fetchFn:async()=>feedResponse('fl-miami-dade')});
+ await assert.rejects(countyScoped['controlled-public-price-panel']({marketId:'fl-palm-beach',now:NOW}),/unapproved/);
+ assert.equal((await countyScoped['controlled-public-price-panel']({marketId:'fl-miami-dade',now:NOW})).length,1);
+ // Synthetic future national market: only explicitly supplier-licensed and
+ // separately commissioned evidence-plan ids are allowed; no real network calls.
+ const futureId='tx-houston',fakePlans=id=>id===futureId
+   ?{sources:['controlled-public-price-panel'],admissionOnly:false}
+   :require('./market-evidence').planForRegion(id);
+ const nationwideEnv={...env,AR_PANEL_APPROVED_MARKET_IDS:futureId};
+ const futurePanel=authorizedMarketPanelCollectors({env:nationwideEnv,planFor:fakePlans,
+   fetchFn:async url=>feedResponse(new URL(url).searchParams.get('marketId'))});
+ const gotFuture=await futurePanel['controlled-public-price-panel']({marketId:futureId,now:NOW});
+ assert.equal(gotFuture[0].marketId,futureId);
+ assert.equal(gotFuture[0].travelerTotalCents,1496);
+ await assert.rejects(futurePanel['controlled-public-price-panel']({marketId:'fl-miami-dade',now:NOW}),/unapproved/);
+ const nationalNotCommissioned=authorizedMarketPanelCollectors({env:nationwideEnv});
+ assert.deepEqual(nationalNotCommissioned,{},'national market not registered cannot activate');
+
 
  for(let pass=1;pass<=2;pass++){
    const urls=[],f=async(url,opts)=>{

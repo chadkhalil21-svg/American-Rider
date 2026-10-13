@@ -2,6 +2,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 const {finalizeAccountDeletion,sweepAccountDeletion}=require('./accountdeletion');
+const {ownerKey,ERASE_PAGE}=require('./quote-view-store');
 
 function fixture(){
  const rows=new Map([['users/u',{name:'Example',email:'example.invalid'}],['waitlist/u',{area:'25:-80'}]]);
@@ -60,6 +61,21 @@ function fixture(){
  assert.equal(orphan.rows.get('account_closures/u').state,'auth_deleted');
  const swept=await sweepAccountDeletion({db:orphan.db,auth:orphan.auth,now:64001});
  assert.equal(swept.cleaned,1);assert.equal(orphan.rows.has('users/u'),false);assert.equal(orphan.rows.has('account_closures/u'),false);
+ const research=fixture();
+ for(let i=0;i<ERASE_PAGE+4;i++)research.rows.set('pricing_quote_views/sample'+i,{
+   ownerKey:ownerKey('u'),marketId:'fl-miami-dade',totalCents:1450});
+ research.rows.set('pricing_quote_views/other-account',{ownerKey:ownerKey('other-user')});
+ const firstCleanup=await finalizeAccountDeletion({db:research.db,auth:research.auth,uid:'u',now:7000});
+ assert.equal(firstCleanup.profileCleanupPending,true,
+   'never report fully erased if quote evidence remains');
+ assert.equal(research.rows.has('account_closures/u'),true,'keep durable cleanup fence');
+ assert.equal([...research.rows.keys()].filter(k=>k.startsWith('pricing_quote_views/')).length,5);
+ const secondCleanup=await sweepAccountDeletion({db:research.db,auth:research.auth,now:67001});
+ assert.equal(secondCleanup.cleaned,1);
+ assert.equal(research.rows.has('account_closures/u'),false);
+ assert.deepEqual([...research.rows.keys()].filter(k=>k.startsWith('pricing_quote_views/')),
+   ['pricing_quote_views/other-account'],'other contributor remains private');
+
  const live=fixture();live.rows.set('rides/r1',{travelerUid:'u',status:'awaiting_payment'});
  const refused=await finalizeAccountDeletion({db:live.db,auth:live.auth,uid:'u',now:5000});
  assert.equal(refused.code,'active_travel');assert.equal(live.deletes,0);assert.equal(live.rows.has('users/u'),true);

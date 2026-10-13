@@ -1,4 +1,5 @@
 const { closeOperationalAccount } = require('./accountclosure');
+const {purgeForAccount:erasePriceViews}=require('./quote-view-store');
 
 const RETRY_MS = 60_000;
 const PAGE = 25;
@@ -31,6 +32,13 @@ async function finalizeAccountDeletion({ db, auth, uid, now = Date.now() }) {
   // profile was deleted when only the identity was deleted.
   try {
     await db.collection('users').doc(uid).delete();
+    // Clear optional, linkable quote research before dropping the durable
+    // account-closure fence. Page overflow is resumed by the existing worker.
+    const research=await erasePriceViews({db,uid});
+    if(!research.complete){
+      await fence.set({state:'auth_deleted',nextCheckAt:now+RETRY_MS},{merge:true});
+      return {ok:true,profileRemoved:false,profileCleanupPending:true};
+    }
     await fence.delete();
     return { ok: true, profileRemoved: true };
   } catch (error) {
@@ -71,6 +79,12 @@ async function sweepAccountDeletion({ db, auth, now = Date.now() }) {
     }
     try {
       await db.collection('users').doc(snap.id).delete();
+      const research=await erasePriceViews({db,uid:snap.id});
+      if(!research.complete){
+        pending++;
+        await fence.set({state:'auth_deleted',nextCheckAt:now+RETRY_MS},{merge:true});
+        continue;
+      }
       await fence.delete();
       cleaned++;
     } catch (error) {

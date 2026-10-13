@@ -242,6 +242,9 @@ export default {
     lostNotFound: "Oggetto non trovato",
   },
   traveler: {
+    priceChangedTitle: 'Il costo totale è cambiato',
+    priceChangedBody: 'Il prezzo è cambiato prima della prenotazione. Nessun addebito è stato effettuato. Controlli il totale attuale.',
+    reviewUpdatedTotal: 'Controllare il totale',
     pricingResearchOptIn: 'Aiuti a migliorare i prezzi futuri con il totale mostrato. È facoltativo e non cambia il prezzo del viaggio.',
     pleaseWait: 'Attenda',
     beginTravel: 'Iniziare il Viaggio',

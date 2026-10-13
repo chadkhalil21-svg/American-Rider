@@ -171,6 +171,24 @@ export default function RideScreen() {
     }
   }, [complete, router]);
 
+  // A price change before booking is not an Operator search failure. Nothing
+  // has been charged, so return the Traveler to the newly quoted confirmation.
+  if(ride.dispatchState==='price_changed'){
+    return (
+      <Screen>
+        <LetterheadBar onBack={()=>router.replace('/reserve')}/>
+        <View style={{flex:1,justifyContent:'center',paddingHorizontal:24,gap:14}}>
+          <Text style={styles.searchTitle}>{t('traveler.priceChangedTitle')}</Text>
+          <Text style={styles.searchSub}>{t('traveler.priceChangedBody')}</Text>
+          <PrimaryButton
+            label={t('traveler.reviewUpdatedTotal')}
+            onPress={()=>router.replace('/reserve')}
+          />
+        </View>
+      </Screen>
+    );
+  }
+
   // ---- The demo's searching screen: centered radar, estimate, quiet cancel. ----
   if (searching || noOperator) {
     return (

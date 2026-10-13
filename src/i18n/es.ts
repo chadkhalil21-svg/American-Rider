@@ -259,6 +259,9 @@ export default {
   },
 
   traveler: {
+    priceChangedTitle: 'El costo total cambió',
+    priceChangedBody: 'El precio cambió antes de la reserva. No se realizó ningún cobro. Revise el nuevo total.',
+    reviewUpdatedTotal: 'Revisar el total',
     pricingResearchOptIn: 'Ayude a mejorar los precios futuros usando este importe. Es opcional y no cambia el precio de su viaje.',
     pleaseWait: 'Espere',
     beginTravel: 'Iniciar Viaje',

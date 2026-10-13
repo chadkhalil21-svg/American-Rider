@@ -249,6 +249,9 @@ export default {
   },
 
   traveler: {
+    priceChangedTitle: 'Le Total du trajet a changé',
+    priceChangedBody: 'Le prix a changé avant la réservation. Aucun paiement n’a été effectué. Veuillez vérifier le nouveau Total.',
+    reviewUpdatedTotal: 'Vérifier le nouveau Total',
     pricingResearchOptIn: 'Aidez à améliorer les futurs prix à partir du montant affiché. Facultatif, sans effet sur le prix du trajet.',
     pleaseWait: 'Veuillez patienter',
     beginTravel: 'Commencer le Trajet',

@@ -176,6 +176,7 @@ export async function returnOperator(args: {
 // this file no longer holds operator records of any kind.
 export type PrepareOptions = {
   bookingKey: string;
+  agreedTotalCents?: number | null; // all-in amount the Traveler actually accepted
   researchQuoteToken?: string | null; // research-only; never a fare input
   pickup: { lat: number; lng: number };
   destinationPoint: { lat: number; lng: number };

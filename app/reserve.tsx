@@ -45,11 +45,9 @@ import {
 } from '../src/components/UI';
 import {
   prettyPlace,
-  applyClassCents,
   classNameKey,
   BOOKABLE_CLASSES,
   Place,
-  platformFee,
 } from '../src/data';
 import { modeLine } from '../src/smartLegs';
 import { useCabinPrefs } from '../src/state/cabinPrefs';
@@ -179,6 +177,7 @@ export default function TravelConfirmation() {
       const quote = await fetchQuote({
         pickup,
         dest,
+        travelClass:ride.travelClass,
         destination: place.short, // fallback for web, where there's no OS geocoder
       });
 
@@ -199,8 +198,11 @@ export default function TravelConfirmation() {
         });
         // Remember both ends so the payment can be priced the same way the quote was.
         ride.setTripCoords(pickup && dest ? { pickup, dest } : null);
-        // The standard fare in cents — every class price on this sheet derives from this.
-        ride.setQuotedFareCents(quote.travelCostCents);
+        // This response is current for the requested route and class.
+        classQuoteKey.current=[pickup?.lat,pickup?.lng,dest?.lat,dest?.lng,
+          ride.travelClass,'ordinary',''].join('|');
+        // Both class Fare and the ONE all-in Total must come from the server.
+        ride.setQuotedServerPrice(quote.travelCostCents,quote.travelerPays,ride.travelClass);
         // Government fees the server fenced for this trip — an airport pickup fee, say. They
         // are inside the one price, and the sheet names them.
         ride.setQuotedFeeLines(quote.feeLines);
@@ -231,6 +233,42 @@ export default function TravelConfirmation() {
   // plan (beginSmartLeg), so the route is not editable here, the class is the journey's, and
   // the Smart Travel card — the journey this leg belongs to — is not offered again.
   const smartLeg = !!ride.smartJourney;
+  // Request only the SELECTED class, never five paid/slow routing calls merely
+  // to decorate a list. This re-quotes whenever class/pickup/Smart leg changes.
+  const classQuoteKey=React.useRef<string|null>(null);
+  const {tripCoords:quotedCoords,pickupPin:actualPin}=ride;
+  const smartStage=ride.smartJourney?.stage;
+  const smartFirst=ride.smartJourney?.leg1No;
+  useEffect(()=>{
+    if(!quotedCoords)return undefined;
+    if(ride.quotedForClass===ride.travelClass&&ride.quotedTotalCents!=null)return undefined;
+    const pickup=actualPin??quotedCoords.pickup,dest=quotedCoords.dest;
+    const journeyNo=smartStage==='leg2'?smartFirst??null:null;
+    const key=[pickup.lat,pickup.lng,dest.lat,dest.lng,ride.travelClass,
+      smartStage??'ordinary',journeyNo??''].join('|');
+    if(classQuoteKey.current===key)return undefined;
+    classQuoteKey.current=key;
+    const seq=++priceReq.current;
+    let live=true;
+    ride.setQuotedFareCents(null);
+    ride.setQuotedFeeLines([]);
+    ride.setResearchQuoteToken(null);
+    setPricing(true);setPriceFailed(false);
+    void fetchQuote({pickup,dest,travelClass:ride.travelClass,journeyNo})
+      .then(q=>{
+        if(!live||seq!==priceReq.current)return;
+        if(q&&!isUnavailable(q)){
+          ride.setQuotedServerPrice(q.travelCostCents,q.travelerPays,ride.travelClass);
+          ride.setQuotedFeeLines(q.feeLines);
+          ride.setResearchQuoteToken(q.researchQuoteToken??null);
+        }else setPriceFailed(true);
+      })
+      .catch(()=>{if(live&&seq===priceReq.current)setPriceFailed(true);})
+      .finally(()=>{if(live&&seq===priceReq.current)setPricing(false);});
+    return ()=>{live=false;};
+    // Quote generation, not ride object identity, governs which result may win.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[quotedCoords,actualPin,ride.travelClass,smartStage,smartFirst]);
 
   // SMART TRAVEL IS ALWAYS SHOWN, WITH ITS NUMBERS (Chad, 9 Sept 2026): with the journey's
   // price and time when the planner found a transit route, and greyed — saying which — when
@@ -279,16 +317,14 @@ export default function TravelConfirmation() {
         ? t('traveler.transitUnavailable')
         : t('traveler.noTransitRoute');
 
-  // THE SAME SUM THE SERVER CHARGES, per class: the class fare, the platform fee on it, and
-  // any government fee fenced for this trip. The chosen class's figure is ride.travelerTotal,
-  // the one derivation every money screen reads; these rows use the same three lines.
-  const authoritativePriceReady = ride.quotedFareCents != null && !pricing && !ride.repricing && !priceFailed && !unavailable;
-  const governmentFee = ride.quotedFeeLines.reduce((sum, l) => sum + l.cents, 0) / 100;
-  const allIn = (key: string) => {
-    if (!authoritativePriceReady || ride.quotedFareCents == null) return null;
-    const fare = applyClassCents(ride.quotedFareCents, key) / 100;
-    return +(fare + platformFee(fare) + governmentFee).toFixed(2);
-  };
+  // Never imply that an unquoted vehicle class carries a verified price.
+  // The active class always displays the server's exact all-in Total.
+  const authoritativePriceReady = ride.quotedFareCents != null &&
+    ride.quotedTotalCents != null && ride.quotedForClass===ride.travelClass &&
+    !pricing && !ride.repricing && !priceFailed && !unavailable;
+  const allIn = (key: string) =>
+    authoritativePriceReady&&key===ride.travelClass&&ride.quotedTotalCents!==null
+      ? ride.quotedTotalCents/100 : null;
   const displayClassPrice = (key: string) => {
     const amount = allIn(key);
     return amount == null ? '—' : fmt(amount);
@@ -603,6 +639,21 @@ export default function TravelConfirmation() {
                   key={p.id}
                   accessibilityRole="button"
                   onPress={() => {
+                    // Replacing the pickup changes the route, not just its label.
+                    // Invalidate the old price before the booking can be accepted.
+                    const oldCoords = ride.tripCoords;
+                    const currentPickup = ride.pickupPin ?? oldCoords?.pickup;
+                    const pickupChanged = !oldCoords ||
+                      oldCoords.pickup.lat !== p.lat || oldCoords.pickup.lng !== p.lng ||
+                      !currentPickup || currentPickup.lat !== p.lat || currentPickup.lng !== p.lng;
+                    if (pickupChanged) {
+                      ride.setQuotedFareCents(null);
+                      ride.setQuotedFeeLines([]);
+                      ride.setResearchQuoteToken(null);
+                      ride.setTripCoords(oldCoords
+                        ? { pickup: { lat: p.lat, lng: p.lng }, dest: oldCoords.dest }
+                        : null);
+                    }
                     ride.setDeparture({ name: p.title, short: p.title, lat: p.lat, lng: p.lng });
                     ride.setPickupPin(null); // a named pickup replaces any dropped pin
                     setSearchingDep(false);

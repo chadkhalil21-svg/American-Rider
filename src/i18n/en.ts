@@ -260,6 +260,9 @@ export default {
   // Traveler surfaces speak human. Same restraint, plainer words — and the same refusal to
   // reassure: the price is stated, never defended.
   traveler: {
+    priceChangedTitle: 'Travel Total updated',
+    priceChangedBody: 'The price changed before your booking. No payment was taken. Review the current Total.',
+    reviewUpdatedTotal: 'Review Current Total',
     pricingResearchOptIn: 'Help improve future prices using this displayed Total. Optional; it does not change your Travel price.',
     pleaseWait: 'Please wait',
     beginTravel: 'Begin Travel',

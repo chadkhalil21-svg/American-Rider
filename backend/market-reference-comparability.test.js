@@ -47,8 +47,8 @@ assert.equal(mixed.maxProviderShare,0.5);
 assert.ok(mixed.referenceTotalCents>0);
 assert.equal(mixed.targetTotalCents,Math.round(mixed.referenceTotalCents*0.90));
 
-assert.equal(mixed.oldestObservedAt,stamp);
-assert.equal(mixed.latestObservedAt,stamp);
+assert.equal(mixed.oldestObservedAt,new Date(stamp).toISOString());
+assert.equal(mixed.latestObservedAt,new Date(stamp).toISOString());
 // Adversarial freshness: one new quote must never qualify 19 stale ones.
 const stale=Array.from({length:19},(_,i)=>({
   ...record(i%2?'controlled-public-price-panel':'independent-controlled-audit',
@@ -59,7 +59,7 @@ const singleFresh=buildReferenceCell([...stale,panel[0]],now);
 assert.equal(singleFresh.observations,1);
 assert.equal(singleFresh.researchObservations,20);
 assert.equal(singleFresh.evidenceFamilies.length,1);
-assert.equal(singleFresh.oldestObservedAt,stamp);
+assert.equal(singleFresh.oldestObservedAt,new Date(stamp).toISOString());
 assert.equal(singleFresh.travelerTotalComparable,true);
 assert.equal(buildReferenceCell(stale,now).observations,0);
 const future={...panel[0],observedAt:new Date(now+6*60000).toISOString()};

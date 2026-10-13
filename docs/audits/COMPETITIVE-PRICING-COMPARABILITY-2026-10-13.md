@@ -9,6 +9,7 @@ The existing authorized panel verified source-declared ordinary all-in Totals, b
 The repair:
 - Carries a boolean source-declared `hasAllInTotalComparable` through the already-verified authorized-panel adapter and normalization, without claiming independent verification.
 - During reference recomputation, counts only records both flagged comparable **and** from an explicitly primary-eligible source with matching source family. Public price estimates, historical trips, missing data and incompatible source types remain research-only, cannot establish a reference median, cannot increase the qualified sample size, and cannot meet the two-family rule.
+- Corrects the three Florida county evidence plans to allow a distinct independent-controlled audit and Gridwise-style contracted source alongside the existing authorized field panel. Neither connector is enabled or fetched without separate lawful configuration; this removes the impossible one-eligible-source bottleneck without fabricating an independent data family.
 - Keeps the existing approved reference source, minimum 20 observations per condition cell, at least two independent evidence families/sources, largest provider <=70%, staleness, candidate isolation, independent holdout, server economics, route gates and explicit promotion unchanged.
 - Makes no change to fares, market admissions, supplier credentials, network requests, scheduled polling, Firestore query count, money, insurance, price personalized to a Traveler, or live-source activation. Synthetic source records never enter production.
 

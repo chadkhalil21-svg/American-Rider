@@ -25,7 +25,7 @@ export default function OperatorEconomics() {
       </Pressable>
       <Title>{t('operator.econTitle')}</Title>
       <Pressable accessibilityRole="button" onPress={() => router.navigate('/operator/market-research')} style={{ paddingVertical: 14 }}>
-        <Text>Help keep fares fair ›</Text>
+        <Text>{t('operator.fareResearchLink')} ›</Text>
       </Pressable>
       <Text style={styles.lead}>{t('operator.econIntro')}</Text>
       <Card style={styles.ruleCard}>

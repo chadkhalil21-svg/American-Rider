@@ -171,6 +171,24 @@ export default function RideScreen() {
     }
   }, [complete, router]);
 
+  // When a prepayment rate change requires a newer app, do not mislead the
+  // Traveler with an ordinary Operator-search error. No booking was created.
+  if(ride.dispatchState==='update_required'){
+    return (
+      <Screen>
+        <LetterheadBar onBack={()=>router.replace('/')}/>
+        <View style={{flex:1,justifyContent:'center',paddingHorizontal:24,gap:14}}>
+          <Text style={styles.searchTitle}>{t('traveler.updateRequiredTitle')}</Text>
+          <Text style={styles.searchSub}>{t('traveler.updateRequiredBody')}</Text>
+          <PrimaryButton
+            label={t('support.returnHome')}
+            onPress={()=>router.replace('/')}
+          />
+        </View>
+      </Screen>
+    );
+  }
+
   // A price change before booking is not an Operator search failure. Nothing
   // has been charged, so return the Traveler to the newly quoted confirmation.
   if(ride.dispatchState==='price_changed'){

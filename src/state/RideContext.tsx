@@ -91,7 +91,7 @@ export type PaymentState = {
 };
 // How finding an operator is going: searching → matched, or none available / error (so the
 // live screen can offer a retry instead of spinning on "Finding your operator…" forever).
-export type DispatchState = 'idle' | 'searching' | 'matched' | 'none' | 'error';
+export type DispatchState = 'idle' | 'searching' | 'matched' | 'none' | 'error' | 'price_changed';
 
 const DEFAULT_PREFS: Prefs = { quiet: true, charging: false, luggage: false, pet: false };
 
@@ -926,9 +926,18 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
         setDispatchState('matched'); confirmInFlightRef.current = false;
         refreshMyRides();
         return op;
-      } catch {
-        if (generation === dispatchGenerationRef.current) {
-          setDispatchState('error'); confirmInFlightRef.current = false;
+      } catch(error) {
+        if(generation===dispatchGenerationRef.current){
+          const code=(error as Error & {code?:string})?.code;
+          if(code==='travel_total_changed'){
+            // No prepared booking or payment was created. Show a fresh price on
+            // the confirmation sheet rather than retrying the stale agreement.
+            setQuotedFareCents(null);
+            setRideActive(false);
+            setPayment({status:'idle'});
+            setDispatchState('price_changed');
+          }else setDispatchState('error');
+          confirmInFlightRef.current=false;
         }
         return null;
       }

@@ -243,6 +243,9 @@ export default {
     lostNotFound: "Gegenstand nicht gefunden",
   },
   traveler: {
+    priceChangedTitle: 'Der Gesamtpreis hat sich geändert',
+    priceChangedBody: 'Der Preis wurde vor der Buchung geändert. Es wurde nichts abgebucht. Prüfen Sie den aktuellen Gesamtpreis.',
+    reviewUpdatedTotal: 'Gesamtpreis prüfen',
     pricingResearchOptIn: 'Helfen Sie, künftige Preise anhand des angezeigten Gesamtbetrags zu verbessern. Freiwillig; Ihr Fahrpreis bleibt gleich.',
     pleaseWait: 'Bitte warten',
     beginTravel: 'Fahrt Beginnen',

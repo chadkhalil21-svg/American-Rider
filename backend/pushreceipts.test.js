@@ -167,6 +167,7 @@ async function run(){
  const one=providerResponse(ids=>Object.fromEntries(ids.map(id=>[id,{status:'ok'}])));
  sweep=await sweepPushReceipts({db,now:NOW+FIRST_CHECK_MS,fetchFn:one});
  assert.equal(sweep.providerAccepted,MAX_PER_SWEEP);
+ assert.equal(sweep.overCapacity,true,'100 due receipts signals capacity pressure');
  assert.equal(entries().filter(x=>x.status==='pending').length,47);
  sweep=await sweepPushReceipts({db,now:NOW+FIRST_CHECK_MS,fetchFn:one});
  assert.equal(sweep.providerAccepted,47);

@@ -643,8 +643,9 @@ export default function TravelConfirmation() {
                     // Invalidate the old price before the booking can be accepted.
                     const oldCoords = ride.tripCoords;
                     const currentPickup = ride.pickupPin ?? oldCoords?.pickup;
-                    const pickupChanged = !currentPickup ||
-                      currentPickup.lat !== p.lat || currentPickup.lng !== p.lng;
+                    const pickupChanged = !oldCoords ||
+                      oldCoords.pickup.lat !== p.lat || oldCoords.pickup.lng !== p.lng ||
+                      !currentPickup || currentPickup.lat !== p.lat || currentPickup.lng !== p.lng;
                     if (pickupChanged) {
                       ride.setQuotedFareCents(null);
                       ride.setQuotedFeeLines([]);

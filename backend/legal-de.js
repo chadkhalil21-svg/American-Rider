@@ -125,6 +125,18 @@ Routing-Dienst.</li>
 Konto und dessen Daten löschen lassen? Beantragen Sie es über die Reisendenbetreuung in der
 App, und es wird erledigt.</p></section>
 
+<section><h2>4A · Freiwillige Preisstudie</h2>
+<p>Nur wenn Sie bei Anzeige des Fahrpreises ausdrücklich zustimmen, erfassen wir den
+Landkreis, eine grobe Entfernungskategorie, den angezeigten Gesamtbetrag, den Zeitpunkt
+Ihrer Zustimmung und ob eine Buchung vorbereitet wurde. Ihr Name und genaue Adressen
+werden nicht im Forschungsdatensatz gespeichert. Autorisierte Mitarbeiter können eine
+Buchungsreferenz Ihrem Konto zuordnen. Wir verkaufen diese Daten nicht und verwenden
+sie nicht für Werbung. Die Teilnahme ist freiwillig und beeinflusst weder Preis noch
+Zugang zur Fahrt. Die Löschung ist nach sieben Tagen vorgesehen; die Verarbeitung beim
+Datenbankanbieter kann länger dauern. Beim Löschen des Kontos werden verknüpfte
+Forschungsdaten früher entfernt. Sie können den Widerruf auch beim Kundenservice
+beantragen.</p></section>
+
 <section><h2>5 · Minderjährige</h2>
 <p>American-Rider-Konten sind für Erwachsene ab 18 Jahren bestimmt. Wir erheben nicht
 wissentlich Daten von Kindern.</p></section>

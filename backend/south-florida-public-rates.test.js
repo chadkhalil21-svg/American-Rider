@@ -1,6 +1,6 @@
 'use strict';
 const assert=require('node:assert/strict');
-const {PAGES,WEEK,extractOfficialTaxiRate,compareSources,
+const {PAGES,WEEK,RETRY_AFTER_UNVERIFIED,extractOfficialTaxiRate,compareSources,
  readPublicPage,sweepSouthFloridaPublicRates}=require('./south-florida-public-rates');
 const NOW=Date.parse('2026-10-12T20:00:00Z');
 const miami='<html><body>Taxicabs: The metered rate is calculated at: $2.95 for first 1/6 of a mile, $0.85 for each additional 1/6 mile until 1 mile, $0.40 for each 1/6 mile after that, and $0.40 per minute wait charge.</body></html>';
@@ -25,8 +25,8 @@ function provider(htmls,options={}){
     assert.equal(args.redirect,'error','no redirects to third party');
     if(options.error&&calls===options.error)throw Error('source down');
     const html=htmls[PAGES.findIndex(p=>p.url===url)];
-    return {ok:true,status:200,headers:{get:()=>options.oversize?'300001':String(Buffer.byteLength(html))},
-      text:async()=>html};
+    return new Response(options.undeclaredOversize?'X'.repeat(300001):html,
+      {status:200,headers:options.undeclaredOversize?{}:{'content-length':options.oversize?'300001':String(Buffer.byteLength(html))}});
   };
   f.calls=()=>calls;return f;
 }
@@ -73,8 +73,17 @@ function provider(htmls,options={}){
   assert.equal(result.status,'unverified');
   assert.equal(down.docs.get('fl-miami-dade').rateAuthority,false);
   assert.equal(down.docs.get('fl-miami-dade').failedSources.length,1);
+  assert.equal((await sweepSouthFloridaPublicRates({db:down,fetchFn:offline,now:NOW+RETRY_AFTER_UNVERIFIED-1})).skipped,'weekly_cadence');
+  assert.equal(offline.calls(),2,'failed source check has bounded rather than immediate retry');
+  const recovered=provider([miami,legislative]);
+  result=await sweepSouthFloridaPublicRates({db:down,fetchFn:recovered,now:NOW+RETRY_AFTER_UNVERIFIED});
+  assert.equal(result.status,'source_conflict','retry after outage resumes genuine public-source audit');
+  assert.equal(recovered.calls(),2);
+  assert.equal((await sweepSouthFloridaPublicRates({db:down,fetchFn:recovered,now:NOW+RETRY_AFTER_UNVERIFIED+1})).skipped,'weekly_cadence');
   const empty=await sweepSouthFloridaPublicRates({db:null,now:NOW});
   assert.equal(empty.ok,false);
   await assert.rejects(readPublicPage(PAGES[0],{fetchFn:provider([miami,legislative],{oversize:true})}),/oversized/);
+  await assert.rejects(readPublicPage(PAGES[0],{fetchFn:provider([miami,legislative],{undeclaredOversize:true})}),/oversized/);
+  await assert.rejects(readPublicPage(PAGES[0],{fetchFn:async()=>({ok:true,status:200,headers:{get:()=>null},text:async()=>miami})}),/stream unavailable/);
   console.log('PASS official rate watcher: offline, oversized and source changed fail closed, no live fares');
 })().catch(e=>{console.error(e);process.exitCode=1});

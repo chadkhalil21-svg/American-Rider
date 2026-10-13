@@ -1,12 +1,13 @@
 // Optional, consented market evidence. Never used to change an individual quote.
 // No competing-service API access, screenshots, addresses or names are collected.
 import { useRouter } from 'expo-router';
-import { t } from '../../src/i18n';
+import { useLanguage } from '../../src/state/LanguageContext';
 import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Text } from '../../src/components/AppText';
 import { Card, PrimaryButton, Screen, SectionLabel, Title } from '../../src/components/UI';
 import { marketResearchCounties, volunteerMarketPrice, type ResearchMarket } from '../../src/backend/voluntaryPrices';
+import { prepareResearchAttempt, type PreparedResearchAttempt } from '../../src/backend/voluntaryAttempt';
 
 function Field({title,value,setValue,placeholder}:{
   title:string;value:string;setValue:(value:string)=>void;placeholder?:string;
@@ -22,6 +23,7 @@ function Field({title,value,setValue,placeholder}:{
 }
 export default function VolunteerMarketPrice() {
   const router=useRouter();
+  const {t}=useLanguage();
   const [markets,setMarkets]=useState<ResearchMarket[]>([]);
   const [marketId,setMarketId]=useState('');
   const [sourceName,setSourceName]=useState('');
@@ -33,12 +35,13 @@ export default function VolunteerMarketPrice() {
   const [ordinary,setOrdinary]=useState(false);
   const [consent,setConsent]=useState(false);
   const [busy,setBusy]=useState(false);
-  const [message,setMessage]=useState('');
-  const observationId=useRef('own-price-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,12));
+  const [message,setMessage]=useState<null|'county'|'receipt'|'received'|'unavailable'|'auth'>(null);
+  const pendingAttempt=useRef<PreparedResearchAttempt|null>(null);
+  const sending=useRef(false);
   useEffect(()=>{
     let active=true;
     marketResearchCounties().then(rows=>{if(active)setMarkets(rows);})
-      .catch(()=>{if(active)setMessage(t('operator.fareResearchCountyUnavailable'));});
+      .catch(()=>{if(active)setMessage('county');});
     return()=>{active=false;};
   },[]);
   const amount=price.trim(),mi=miles.trim(),mins=minutes.trim(),hours=hoursAgo.trim();
@@ -51,26 +54,38 @@ export default function VolunteerMarketPrice() {
     routeMiles>=0.2&&routeMiles<=200&&routeMins>=1&&routeMins<=480&&
     age>=0&&age<=335&&routeMiles/(routeMins/60)<=100);
   async function send(){
-    if(busy||!valid)return;
-    setBusy(true);setMessage('');
+    // A ref also rejects double taps before React's disabled state can rerender.
+    if(sending.current||!valid)return;
+    sending.current=true;
+    setBusy(true);setMessage(null);
     const source=sourceName.toLowerCase().trim();
     const providerCode=source.includes('uber')?'other-leading-platform-a':
       source.includes('lyft')?'other-leading-platform-b':'other';
     try{
-      const ok=await volunteerMarketPrice({
-        observationId:observationId.current,
+      const attempt=prepareResearchAttempt({
         marketId,sourceKind:kind,providerCode,
-        observedAt:new Date(Date.now()-age*3600000).toISOString(),
         routedMiles:routeMiles,routedMinutes:routeMins,travelerTotalCents:currency,
-        serviceClass:'standard',ordinaryNoPromotion:true,consentToResearch:true,
-      });
-      if(!ok)throw Error(t('operator.fareResearchReceiptUnconfirmed'));
-      setMessage(t('operator.fareResearchReceived'));
-      observationId.current='own-price-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,12);
+        ageHours:age,serviceClass:'standard',ordinaryNoPromotion:true,consentToResearch:true,
+      },pendingAttempt.current,Date.now(),
+      'own-price-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,12));
+      pendingAttempt.current=attempt;
+      const ok=await volunteerMarketPrice(attempt.body);
+      if(!ok){setMessage('receipt');return;}
+      pendingAttempt.current=null;
+      setMessage('received');
       setPrice('');setMiles('');setMinutes('');setHoursAgo('');
-    }catch(e){setMessage(e instanceof Error?e.message:t('operator.fareResearchUnavailable'));}
-    finally{setBusy(false);}
+      setSourceName('');setKind('my-receipt');setOrdinary(false);setConsent(false);
+    }catch(e){
+      setMessage(e instanceof Error&&e.message==='research_auth_required'?'auth':'unavailable');
+    }finally{sending.current=false;setBusy(false);}
   }
+  const messageKeys={
+    county:'operator.fareResearchCountyUnavailable',
+    receipt:'operator.fareResearchReceiptUnconfirmed',
+    received:'operator.fareResearchReceived',
+    unavailable:'operator.fareResearchUnavailable',
+    auth:'operator.fareResearchSignIn',
+  } as const;
   return <Screen>
     <Pressable accessibilityRole="button" onPress={()=>router.back()}><Text style={styles.back}>‹ {t('common.back')}</Text></Pressable>
     <Title>{t('operator.fareResearchTitle')}</Title>
@@ -112,7 +127,7 @@ export default function VolunteerMarketPrice() {
       <Text style={styles.note}>{t('operator.fareResearchNote')}</Text>
       <PrimaryButton label={busy?t('operator.fareResearchSubmitting'):t('operator.fareResearchShare')} onPress={send}
         disabled={!valid||busy} style={{marginTop:14}}/>
-      {message? <Text accessibilityRole="alert" style={styles.message}>{message}</Text>:null}
+      {message? <Text accessibilityRole="alert" style={styles.message}>{t(messageKeys[message])}</Text>:null}
     </Card>
   </Screen>;
 }

@@ -176,6 +176,9 @@ async function run(){
  clear();
  await accepted('quota-ticket');
  assert.equal((await accepted('quota-ticket')).duplicate,true);
+ const conflicting=await accepted('quota-ticket','operator','ExpoPushToken[synthetic-second]');
+ assert.equal(conflicting.ok,false,
+  'same provider ID with another recipient cannot count as idempotent success');
  failWrites=true;
  const failed=await accepted('quota-unpersisted');
  assert.equal(failed.ok,false,'no false tracking success on quota exhaustion');

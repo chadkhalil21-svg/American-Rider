@@ -4,23 +4,23 @@
 // pricing record cannot be priced. This prevents a newly-added Texas/California region from
 // silently inheriting South Florida coefficients.
 //
-// These are the CURRENT production coefficients, not the unpromoted 29 Sept calibration.
-// Promotion of new coefficients is a separate evidence-gated change.
+// An independently reviewed local starting-price candidate, pending physical-device
+// validation before this PR is eligible for merger. NO national fallback is allowed.
 const PRICING = Object.freeze({
   'fl-southeast': Object.freeze({
     regionId: 'fl-southeast',
     currency: 'USD',
     baseCents: 100,
-    perMileCents: 85,
-    perMinuteCents: 15,
+    perMileCents: 95,
+    perMinuteCents: 32,
     minimumFareCents: 300,
-    calibrationStatus: 'current-production',
-    evidenceAsOf: '2026-09-20',
+    calibrationStatus: 'initial-local-cost-and-public-model',
+    evidenceAsOf: '2026-10-13',
     // Jurisdictional/corporate costs are NOT assumed to be zero merely because the common
     // Stripe solver has no line for them. Market admission must explicitly review them.
     regulatoryEconomicsReviewed: true,
     regulatoryEconomicsNote:
-      'Florida launch-market corporate/regulatory costs remain subject to the commercial-release budget; per-Travel public-body fees are separate pass-through records.',
+      'Florida rates are an independent initial starting-price choice supported by public price models only, not verified live competing quotes. Per-Travel statutory charges remain pass-through; legal/insurance and duty-time economics remain launch gates.',
   }),
 });
 

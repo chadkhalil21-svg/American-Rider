@@ -5,8 +5,9 @@ const read = (p) => fs.readFileSync(path.join(__dirname, '..', p), 'utf8');
 
 const reserve = read('app/reserve.tsx');
 assert.match(reserve, /ride\.setQuotedFareCents\(null\);[\s\S]*ride\.setQuotedFeeLines\(\[\]\);[\s\S]*ride\.setTripCoords\(null\);/);
-assert.match(reserve, /const authoritativePriceReady = ride\.quotedFareCents != null && !pricing && !ride\.repricing && !priceFailed && !unavailable/);
-assert.match(reserve, /if \(!authoritativePriceReady \|\| ride\.quotedFareCents == null\) return null/);
+assert.match(reserve, /const authoritativePriceReady = ride\.quotedFareCents != null &&/);
+assert.match(reserve, /ride\.quotedTotalCents != null && ride\.quotedForClass===ride\.travelClass/);
+assert.match(reserve, /authoritativePriceReady&&key===ride\.travelClass&&ride\.quotedTotalCents!==null/);
 assert.match(reserve, /!authoritativePriceReady \? \(/); // The total must not print a provisional figure.
 assert.doesNotMatch(reserve, /const baseCents = ride\.quotedFareCents \?\? Math\.round\(ride\.arrival\.cost \* 100\)/);
 

@@ -14,7 +14,6 @@ import React, {
 } from 'react';
 import {
   APP_FEE,
-  platformFee,
   DEP_PLACES,
   DepPlace,
   ISSUES,
@@ -23,7 +22,6 @@ import {
   Trip,
   coordinationFee,
   fareFromTotal,
-  applyClassCents,
   operatorClassFor,
 } from '../data';
 import {
@@ -355,21 +353,6 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     if (smartJourney) AsyncStorage.setItem(SMART_JOURNEY_STORAGE_KEY, JSON.stringify(smartJourney)).catch(() => {});
     else AsyncStorage.removeItem(SMART_JOURNEY_STORAGE_KEY).catch(() => {});
   }, [smartJourney]);
-  // The fare of the journey's first car travel, in dollars — what leg 2's fee is computed
-  // against. Zero when the boarding stop was within walking distance and there was no leg 1.
-  const smartLeg1Fare = (j: SmartJourney | null) =>
-    (j?.plan.legs.find((l) => l.kind === 'car')?.cents ?? 0) / 100;
-  // ONE COMBINED FEE REQUIREMENT PER JOURNEY. Leg 1 is charged exactly as any Travel is. Leg 2
-  // pays the difference between the TWO-transaction fee on the combined car fare and the fee
-  // leg 1 already carried — never below zero. backend/payments.js applies the same rule; the two
-  // must never disagree, or the traveler is quoted one amount and charged another.
-  const feeFor = (fare: number, j: SmartJourney | null) => {
-    if (j && j.stage === 'leg2' && j.leg1No) {
-      const leg1 = smartLeg1Fare(j);
-      return Math.max(0, +(platformFee(leg1 + fare, null, 0, 0, 2) - platformFee(leg1, null, 0, 0, 1)).toFixed(2));
-    }
-    return platformFee(fare);
-  };
   const [quotedFareCents, setRawQuotedFareCents] = useState<number | null>(null);
   const [quotedTotalCents, setQuotedTotalCents] = useState<number | null>(null);
   const quotedTotalRef=useRef<number|null>(null);
@@ -396,7 +379,6 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   const [repricing, setRepricing] = useState(false);
   const quotedFeeLinesRef = useRef<FeeLine[]>([]);
   quotedFeeLinesRef.current = quotedFeeLines;
-  const governmentFee = (lines: FeeLine[]) => lines.reduce((sum, l) => sum + l.cents, 0) / 100;
 
   const [arrival, setArrival] = useState<Place>({ name: '', short: '', cost: 0, meta: '' });
 

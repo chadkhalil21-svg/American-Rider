@@ -164,6 +164,7 @@ const { screeningReady, screeningCurrent, sweepScreening } = require('./screenin
 const { screeningPreparationFor } = require('./screening-jurisdictions');
 const { runMarketReferenceSweep, firestoreReady: marketReferenceReady } = require('./market-reference-service');
 const { configuredCollectors: marketReferenceCollectors } = require('./market-evidence-collectors');
+const { sweepSouthFloridaPublicRates } = require('./south-florida-public-rates');
 
 const app = express();
 
@@ -1972,10 +1973,18 @@ async function runAllSweeps({criticalOnly=false}={}) {
     })),
     familyAgeOut: () => maintenanceSweep('familyAgeOut', () => family.sweepFamilyAgeOut()),
     insuranceMonitoring: () => maintenanceSweep('insuranceMonitoring', () => sweepInsuranceMonitoring({ db: adminDb(), requestConfirmation: issueInsuranceConfirmationRequest, notify })),
-    marketReference: () => maintenanceSweep('marketReference', () => runMarketReferenceSweep({
-      collectors: marketReferenceCollectors(),
-      enabledMarketIds: allMarkets().filter(m => m.regionId && m.status === 'active').map(m => m.id),
-    })),
+    marketReference: () => maintenanceSweep('marketReference', async () => {
+      // Public TAXI tariff watch is independent of eligible TNC pricing
+      // observations. Never feed its rates into a Travel quote.
+      const [reference, publicRates] = await Promise.all([
+        runMarketReferenceSweep({
+          collectors: marketReferenceCollectors(),
+          enabledMarketIds: allMarkets().filter(m => m.regionId && m.status === 'active').map(m => m.id),
+        }),
+        sweepSouthFloridaPublicRates(),
+      ]);
+      return {...reference,publicRates,ok:reference.ok!==false && publicRates.ok!==false};
+    }),
     marketFleet: () => sweepPausedMarketFleet({ db: adminDb(), marketById: (id) => allMarkets().find((m) => m.id === id) }),
     accountDeletion: () => maintenanceSweep('accountDeletion', () => sweepAccountDeletion({ db: adminDb(), auth: adminStatus().ok ? require('firebase-admin/auth').getAuth() : null })),
   }, {criticalOnly});

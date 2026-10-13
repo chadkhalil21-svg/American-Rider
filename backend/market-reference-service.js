@@ -30,15 +30,33 @@ async function persistObservations(db,rows){
   let written=0;
   for(const raw of rows.slice(0,MAX_OBSERVATIONS_PER_MARKET_SWEEP)){
     const o=normalizeObservation(raw);
-    const id=require('node:crypto').createHash('sha256').update([o.marketId,o.sourceId,o.observedAt,o.routedMiles,o.routedMinutes,o.travelerTotalCents].join('|')).digest('hex');
-    // Source ingestion is append-only and idempotent. Existing evidence is never
-    // rewritten merely because a scheduled collector returned it again.
+    // Only approved field-panel data uses the supplier's STABLE anonymous
+    // observation ID. A source correcting the monetary amount under the same
+    // identity must raise a conflict, not silently create a new market sample.
+    // Keep legacy published-dataset IDs unchanged to avoid reimporting history.
+    const panel=o.sourceId==='controlled-public-price-panel';
+    if(panel && (!o.sourceObservationId || !o.providerKey))
+      throw new Error('approved panel observation identity missing');
+    const identity=panel
+      ? [o.marketId,o.sourceId,o.providerKey,o.sourceObservationId]
+      : [o.marketId,o.sourceId,o.observedAt,o.routedMiles,o.routedMinutes,o.travelerTotalCents];
+    const id=require('node:crypto').createHash('sha256').update(panel?JSON.stringify(identity):identity.join('|')).digest('hex');
+    const ref=db.collection(OBS).doc(id);
     try {
-      await db.collection(OBS).doc(id).create(o);
+      await ref.create(o);
       written++;
     } catch (error) {
       if (error?.code === 6 || error?.code === 'already-exists' ||
-          error?.code === 'ALREADY_EXISTS' || /already exists/i.test(String(error?.message || ''))) continue;
+          error?.code === 'ALREADY_EXISTS' || /already exists/i.test(String(error?.message || ''))) {
+        // Amazon same-key/different-intent contract. Additional read is charged
+        // ONLY on retry for a panel event; never on ordinary new observations.
+        if(panel){
+          const prior=await ref.get();
+          if(!prior.exists || JSON.stringify(prior.data())!==JSON.stringify(o))
+            throw Error('approved panel observation ID reused with conflicting price or metadata');
+        }
+        continue;
+      }
       throw error;
     }
   }

@@ -249,6 +249,7 @@ export default {
   },
 
   traveler: {
+    pricingResearchOptIn: 'Aidez à améliorer les futurs prix à partir du montant affiché. Facultatif, sans effet sur le prix du trajet.',
     pleaseWait: 'Veuillez patienter',
     beginTravel: 'Commencer le Trajet',
     departure: 'Départ',

@@ -198,6 +198,9 @@ export default function TravelConfirmation() {
         });
         // Remember both ends so the payment can be priced the same way the quote was.
         ride.setTripCoords(pickup && dest ? { pickup, dest } : null);
+        // This response is current for the requested route and class.
+        classQuoteKey.current=[pickup?.lat,pickup?.lng,dest?.lat,dest?.lng,
+          ride.travelClass,'ordinary',''].join('|');
         // Both class Fare and the ONE all-in Total must come from the server.
         ride.setQuotedServerPrice(quote.travelCostCents,quote.travelerPays,ride.travelClass);
         // Government fees the server fenced for this trip — an airport pickup fee, say. They
@@ -265,8 +268,7 @@ export default function TravelConfirmation() {
     return ()=>{live=false;};
     // Quote generation, not ride object identity, governs which result may win.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[quotedCoords,actualPin,ride.travelClass,smartStage,smartFirst,
-     ride.quotedForClass,ride.quotedTotalCents]);
+  },[quotedCoords,actualPin,ride.travelClass,smartStage,smartFirst]);
 
   // SMART TRAVEL IS ALWAYS SHOWN, WITH ITS NUMBERS (Chad, 9 Sept 2026): with the journey's
   // price and time when the planner found a transit route, and greyed — saying which — when

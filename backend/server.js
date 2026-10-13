@@ -1748,6 +1748,13 @@ app.post('/fare-quote', attachAuth, LIMITS.quoteIp, requireOperationalReadiness,
 // ——— SAVED PAYMENT METHODS — the traveler's own, read from and written to their Stripe
 // Customer record. Without a key there is nothing to read, and the app is told so plainly
 // rather than shown an empty list it might mistake for "none saved".
+// Only the configured county names and stable IDs; no protected admission,
+// prices, precise boundaries or operational secrets are returned.
+app.get('/market-price/research/markets', requireAuth, requireVerifiedEmail, LIMITS.market, (_req,res)=>{
+  const markets=listMarkets().map(({id,name,state})=>({id,name,state}));
+  res.json({markets});
+});
+
 // Voluntary historical fare observations from ordinary Travelers/Operators.
 // Explicit consent, verified email and per-account rate limiting; no scraper,
 // no screenshot storage, no exact pickup persisted, no price-setting authority.

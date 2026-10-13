@@ -1,6 +1,7 @@
 // Lawful/public collectors that can run without a commercial credential.
 // Commercial/licensed collectors are registered separately when their contract and schema exist.
 const { normalizeObservation }=require('./market-evidence-ingest');
+const {authorizedMarketPanelCollectors}=require('./south-florida-authorized-panel');
 
 async function json(url){
   const r=await fetch(url,{headers:{'user-agent':'American-Rider/1.0 market-reference'}});
@@ -43,6 +44,9 @@ function configuredCollectors(){
   const out={};
   // Public collectors are enabled only for a market whose evidence plan names the source.
   out['chicago-tnp-open-data']=collectChicago;
+  // Zero additional work unless the founder connects an explicitly approved
+  // independent feed. Never request competitor quotes through restricted apps.
+  Object.assign(out,authorizedMarketPanelCollectors());
   return out;
 }
 module.exports={collectChicago,configuredCollectors};

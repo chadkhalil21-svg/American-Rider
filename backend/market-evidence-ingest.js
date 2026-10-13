@@ -17,7 +17,7 @@ function normalizeObservation(raw,now=Date.now()){
   if(!Number.isFinite(raw.routedMinutes)||raw.routedMinutes<0)throw new TypeError('invalid routedMinutes');
   if(!Number.isInteger(raw.travelerTotalCents)||raw.travelerTotalCents<0)throw new TypeError('invalid travelerTotalCents');
   if(raw.userId||raw.deviceId||raw.income||raw.protectedClass)throw new TypeError('personalized pricing fields prohibited');
-  if(raw.sourceObservationId !== undefined &&
+  if(raw.sourceObservationId != null &&
     (typeof raw.sourceObservationId!=='string' ||
      !/^[A-Za-z0-9_.:-]{8,128}$/.test(raw.sourceObservationId)))
     throw new TypeError('invalid anonymous source observation ID');

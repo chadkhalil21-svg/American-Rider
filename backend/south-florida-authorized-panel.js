@@ -51,6 +51,8 @@ function authorizedMarketPanelCollectors({env=process.env,fetchFn=fetch}={}){
          row.fullOrdinaryTravelerTotal!==true||row.promotionApplied!==false||
          row.routeConditionsConfirmed!==true ||
          !row.providerKey || typeof row.providerKey!=='string'||
+         typeof row.observationId!=='string' ||
+         !/^[A-Za-z0-9_.:-]{8,128}$/.test(row.observationId)||
          !Number.isSafeInteger(row.travelerTotalCents)||
          row.travelerTotalCents<=0)
         throw Error('unmatched or promotional price cannot enter comparison');
@@ -68,7 +70,8 @@ function authorizedMarketPanelCollectors({env=process.env,fetchFn=fetch}={}){
         travelerTotalCents:row.travelerTotalCents,
         daypart:row.daypart,weekdayWeekend:row.weekdayWeekend,
         calendarClass:'ordinary',regulatedLocationClass:'ordinary',
-        providerKey:row.providerKey,confidence:'source_declared_research',
+        providerKey:row.providerKey,sourceObservationId:row.observationId,
+        confidence:'source_declared_research',
         provenance:'approved authorized panel '+source.approvalRef+
           '; validated source-declared full ordinary Traveler Total; not independently verified',
       },now);

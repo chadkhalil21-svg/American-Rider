@@ -88,6 +88,9 @@ function authorizedMarketPanelCollectors({env=process.env,fetchFn=fetch,planFor=
         observedAt:row.observedAt,serviceClass:'standard',
         routedMiles:row.routedMiles,routedMinutes:row.routedMinutes,
         travelerTotalCents:row.travelerTotalCents,
+        // This assertion survives normalization but remains SUPPLIER-DECLARED
+        // until independent source diversity, holdout and promotion review.
+        hasAllInTotalComparable:true,
         daypart:row.daypart,weekdayWeekend:row.weekdayWeekend,
         calendarClass:'ordinary',regulatedLocationClass:'ordinary',
         providerKey:row.providerKey,sourceObservationId:row.observationId,

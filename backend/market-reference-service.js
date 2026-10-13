@@ -63,6 +63,47 @@ async function persistObservations(db,rows){
   return written;
 }
 
+// Historical fares, published estimates and supplier assertions without lawful
+// all-in-price metadata are useful for research but must never supply the
+// production reference, observation quorum or independent-family count.
+function comparableObservation(o){
+  const catalog=sourceCatalogEntry(o?.sourceId);
+  return o?.hasAllInTotalComparable===true &&
+    catalog?.primaryEligible===true && catalog.type===o.sourceType &&
+    Number.isSafeInteger(o?.travelerTotalCents) && o.travelerTotalCents>0 &&
+    Number.isFinite(o?.routedMiles)&&o.routedMiles>=0 &&
+    Number.isFinite(o?.routedMinutes)&&o.routedMinutes>=0;
+}
+function buildReferenceCell(rows,now=Date.now()){
+  const eligible=rows.filter(comparableObservation);
+  const bySource=new Map();
+  for(const row of eligible){
+    if(!bySource.has(row.sourceId))bySource.set(row.sourceId,[]);
+    bySource.get(row.sourceId).push(row.travelerTotalCents);
+  }
+  const sourceMedians=[...bySource.values()].map(median).filter(Number.isSafeInteger);
+  const referenceTotalCents=median(sourceMedians);
+  const providerCounts={};
+  for(const r of eligible){const id=r.providerKey||r.sourceId;providerCounts[id]=(providerCounts[id]||0)+1;}
+  const maxProviderShare=eligible.length?Math.max(...Object.values(providerCounts))/eligible.length:1;
+  // A null reference means there is no legitimate full-Total market reference.
+  // Do not turn a historical fare or taxi estimate into a production target.
+  return {
+    referenceTotalCents,
+    targetTotalCents:referenceTotalCents===null?null:targetTotalCents(referenceTotalCents),
+    travelerTotalComparable:eligible.length>0,
+    observations:eligible.length,
+    researchObservations:rows.length,
+    sources:[...bySource.keys()],
+    sourceMedians,
+    evidenceFamilies:[...new Set(eligible.map(x=>x.sourceType))],
+    providers:Object.keys(providerCounts),
+    maxProviderShare,
+    latestObservedAt:eligible.map(x=>x.observedAt).filter(Boolean).sort().at(-1)||null,
+    asOf:new Date(now).toISOString(),
+  };
+}
+
 async function recomputeMarket(db,marketId,{now=Date.now(),lookbackDays=90}={}){
   const since=new Date(now-lookbackDays*86400000).toISOString();
   const snap=await db.collection(OBS).where('marketId','==',marketId).where('observedAt','>=',since).limit(10000).get();
@@ -70,16 +111,7 @@ async function recomputeMarket(db,marketId,{now=Date.now(),lookbackDays=90}={}){
   snap.forEach(d=>{const o=d.data();const k=cellKey(o);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(o);sources.add(o.sourceId);families.add(o.sourceType);});
   const cells={};
   for(const [key,rows] of groups){
-    // Prevent a high-volume source from numerically overwhelming independent sources: first
-    // reduce each source to its own robust median, then take the median across sources.
-    const bySource=new Map();
-    for(const row of rows){if(!bySource.has(row.sourceId))bySource.set(row.sourceId,[]);bySource.get(row.sourceId).push(Number(row.travelerTotalCents));}
-    const sourceMedians=[...bySource.values()].map(xs=>median(xs.filter(Number.isInteger))).filter(Number.isInteger);
-    const referenceTotalCents=median(sourceMedians);
-    if(referenceTotalCents===null)continue;
-    const providerCounts={};for(const r of rows){const k=r.providerKey||r.sourceId;providerCounts[k]=(providerCounts[k]||0)+1;}
-    const maxProviderShare=rows.length?Math.max(...Object.values(providerCounts))/rows.length:1;
-    cells[key]={referenceTotalCents,targetTotalCents:targetTotalCents(referenceTotalCents),observations:rows.length,sources:[...bySource.keys()],sourceMedians,evidenceFamilies:[...new Set(rows.map(x=>x.sourceType))],providers:Object.keys(providerCounts),maxProviderShare,latestObservedAt:rows.map(x=>x.observedAt).filter(Boolean).sort().at(-1)||null,asOf:new Date(now).toISOString()};
+    cells[key]=buildReferenceCell(rows,now);
   }
   const latestObservedAt=[...groups.values()].flat().map(x=>x.observedAt).sort().at(-1)||null;
   // Recompute produces a CANDIDATE. It is deliberately not production authority until an
@@ -190,4 +222,4 @@ const referenceCache=createMarketReferenceCache({load:async marketId=>{
   return snapshot.exists?snapshot.data():null;
 }});
 async function currentReference(marketId){return referenceCache.read(marketId);}
-module.exports={median,distanceBand,durationBand,cellKey,persistObservations,recomputeMarket,runMarketReferenceSweep,currentReference,firestoreReady,MAX_OBSERVATIONS_PER_MARKET_SWEEP,eligibleEvidenceMarkets,sourceFingerprint};
+module.exports={median,distanceBand,durationBand,cellKey,persistObservations,recomputeMarket,runMarketReferenceSweep,currentReference,firestoreReady,MAX_OBSERVATIONS_PER_MARKET_SWEEP,eligibleEvidenceMarkets,sourceFingerprint,comparableObservation,buildReferenceCell};

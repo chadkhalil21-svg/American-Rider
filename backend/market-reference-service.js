@@ -40,7 +40,7 @@ async function persistObservations(db,rows){
     const identity=panel
       ? [o.marketId,o.sourceId,o.providerKey,o.sourceObservationId]
       : [o.marketId,o.sourceId,o.observedAt,o.routedMiles,o.routedMinutes,o.travelerTotalCents];
-    const id=require('node:crypto').createHash('sha256').update(JSON.stringify(identity)).digest('hex');
+    const id=require('node:crypto').createHash('sha256').update(panel?JSON.stringify(identity):identity.join('|')).digest('hex');
     const ref=db.collection(OBS).doc(id);
     try {
       await ref.create(o);

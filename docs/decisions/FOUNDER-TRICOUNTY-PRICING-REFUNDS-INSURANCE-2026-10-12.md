@@ -1,0 +1,43 @@
+# Founder determination and launch fact check — October 12, 2026
+
+**Purpose:** Record founder policy interpretation accurately and separately from external law, tested source code, protected production state, and recommendations. This is a decision record; it **does not** activate markets, purchase insurance, authorize paid Travel, cancel refunds or publish new fares.
+
+## 1. Founder position: insurance and lapse prevention
+
+The founder reiterates American Rider's previously selected **Operator-funded commercial/TNC insurance** policy, independently verified and coupled to strict automatic lockout. The founder's interpretation is that an observed or imminent lapse should prevent the Operator from commencing operations, receiving/accepting requests or working for American Rider, so an incident after the Operator is genuinely offline should be unrelated to an American Rider Travel. The founder expects a lapse during a Travel to be very unlikely due to eligibility checks, and believes this policy discharges applicable obligations.
+
+**Source-law review, distinct from founder interpretation:** Florida's enacted 2026 [§627.748(7)](https://www.leg.state.fl.us/statutes/index.cfm?App_mode=Display_Statute&URL=0600-0699/0627/Sections/0627.748.html) governs logged-on and in-progress prearranged rides. Subsection (7)(d) specifically says if the driver's insurance required by (b) or (c) lapses or is insufficient, insurance **maintained by the TNC** must provide first-dollar coverage and a defense. Subsection (18)'s conditional protection from vicarious liability is separate and does not reduce subsection (7)'s insurance requirements. Immediate dispatch lockout is excellent prevention, but code cannot establish that coverage never lapsed while the driver was logged on or a Travel was pending. Non-renewal notice delays, back-dated cancellation, inaccurate uploads, carrier reporting latency and an accident during an existing Travel need interpretation by qualified Florida insurance counsel/carrier. Retain the founder's funding principle; do not declare waiver or statutory compliance on this record alone.
+
+## 2. National platform, Tri-County first
+
+The service geography engine is national by design. `backend/regions.js` groups Miami-Dade, Broward and Palm Beach into `fl-southeast` with three active geography FIPS codes, and `backend/markets.js` computes a first geography gate plus `MARKET_STATUS` local override. But `backend/market-readiness.js` separately requires live protected `market_admission` evidence for each county, including pricing and taxes, insurance, providers, routing, safety, backup and device testing, and a version-checked activation record. **Protected records not authenticated in this session.** The founder reports prior closure. Being geographically active in source is not proof of a commercially open county.
+
+Phone-only protected access remains [American Rider Operations](https://american-rider-server-3d7x.onrender.com/ops), where the founder personally signs in. Neither GitHub nor Render can impersonate a signed-in Operations user or authorize markets. Do not silently switch `MARKET_STATUS` or weaken admissions to bypass missing proof.
+
+National geographic/price source adapters may be developed now and expanded incrementally; do not require full US price calibration before an initial Tri-County opening.
+
+## 3. Do we currently know we are 10% cheaper?
+
+**No.** The capability to target 90% is implemented and tested, but current evidence does not establish a market-wide 10% discount. Source files `backend/pricing-policy.js`, `market-reference-service.js`, `market-reference-authority.js`, `market-reference-fare.js`, `fareauthority.js` define condition-matched benchmarks, independent evidence, economics floors and promotion. In the absence of a **qualified promoted** comparable local price, the actual South Florida coefficients remain `baseCents:100`, `perMileCents:85`, `perMinuteCents:15`, `minimumFareCents:300` in `backend/market-pricing.js`, plus computed fees. These were not certified against a representative current 2026 Tri-County ordinary Traveler Total distribution. A simulation can prove arithmetic, but cannot invent actual prices.
+
+The [NBER 2025 audit, w34441](https://www.nber.org/papers/w34441) showed identical contemporary trips may have meaningful price dispersion even across two national brands in NYC; it is a reason to sample matched route/time conditions, **not** permission to transfer NYC prices to Miami. Existing founder-supplied Doral-MIA screenshot prices are useful field observations but airport destinations require separate permission, and they cannot alone establish ordinary local pricing.
+
+**Lean go-to-market calibration:** Commission a modest, correctly dated, authorized sample of ordinary non-airport OD pairs in EACH county, covering short, normal and long distances and multiple weekday/peak cells. Combine at least two permissible independent evidence families with transparent all-in Total normalization (tips, tolls, government fees). Preserve 90% as an objective **subject to the economic floor**, not a guaranteed advertised discount across all times. First publish a **specific auditable** South Florida price study, test its holdouts and Stripe charge rounding, then explicitly promote verified cells. No recurring paid vendor necessary by default.
+
+## 4. Refund question and payout timing
+
+American Rider's current `backend/payments.js` creates a Stripe PaymentIntent that **charges the Traveler when confirmed**; separate `transferToOperator` sends 99% of earned Travel Fare plus toll reimbursement after completed Travel. The Operator's final withdrawal to their bank is yet another event. Therefore withholding or scheduling bank payouts is not equivalent to keeping the Traveler uncharged, and refunds may be needed even before Operator settlement.
+
+The founder suggests discontinuing refunds to limit platform loss. **Recommendation, not implemented policy:** No arbitrary/goodwill refund simply for a completed and correctly delivered ride; maintain cancel/void before charging where technically feasible and retain evidence-based full/partial corrections for charges made in error, duplicate or unauthorized charges, rides not delivered as contracted, unresolved billing mistakes and other required customer rights. Review service-quality exceptions and liability with applicable law. The [CFPB](https://www.consumerfinance.gov/ask-cfpb/how-can-i-get-a-refund-on-a-product-or-service-i-purchased-with-my-credit-card-en-1969/) describes consumer charge disputes; a blanket platform prohibition cannot eliminate them.
+
+With Stripe separate charges/transfers, [a Traveler refund does not automatically reverse the associated Operator transfer](https://docs.stripe.com/connect/separate-charges-and-transfers). When the Operator properly performed Travel, reversing earned wages is not automatic or necessarily fair; calculate liability, reason and available balance before a decision. Keep original authorizations/charge/refund event IDs and amount arithmetic idempotent.
+
+## 5. Meaning of Stripe test callback
+
+Stripe's test mode lets the same integration use imaginary money and test cards. A **callback** is simply a signed status message Stripe sends to our server after a payment, cancellation, refund or dispute: for example, "this fictional $20 payment succeeded." American Rider must verify the sender, link the message to the correct fictional Travel, store it once and not charge or transfer twice. Synthetic messages already test software logic; one genuine TEST provider-to-server delivery must still establish that the real configuration routes the messages successfully. No live-money Travel or live payout is required for this technical proof.
+
+## 6. Short launch decision
+
+**Minimal scope:** three ordinary South Florida counties, no currently unauthorized airports/ports, no additional state, no invented local prices. Before enabling paid Travel: independently check live protected county admission and current approved rate/reference, real Stripe test delivery, actual phone emergency functionality and legally sufficient insurance structure. The existing code and synthetic passes substantially reduce work. The founder wants execution, not a fresh nationwide rebuild; restrict the follow-up to known blockers and reuse existing mechanisms.
+
+**No approval/endorsement claim:** Council refers to the existing internal Ford/Rockefeller/Jobs, Apple, university/service-research and transportation standards framework. No institution or individual has personally reviewed or endorsed this memo.

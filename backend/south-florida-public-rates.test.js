@@ -1,4 +1,5 @@
 'use strict';
+const Response=globalThis.Response;
 const assert=require('node:assert/strict');
 const {PAGES,WEEK,RETRY_AFTER_UNVERIFIED,extractOfficialTaxiRate,compareSources,
  readPublicPage,sweepSouthFloridaPublicRates}=require('./south-florida-public-rates');

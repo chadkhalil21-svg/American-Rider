@@ -5,8 +5,29 @@
 const {isIP}=require('node:net');
 const {normalizeObservation}=require('./market-evidence-ingest');
 const {boundedSourceText}=require('./bounded-source-response');
+const {planForRegion}=require('./market-evidence');
 const MARKETS=new Set(['fl-miami-dade','fl-broward','fl-palm-beach']);
 const MAX_ROWS=50, MAX_BYTES=120000;
+// Legacy configuration is explicitly limited to three South Florida markets.
+// A supplier licensed for other US markets may opt into an exact, audited list.
+// Never infer a nationwide license from one Florida approval reference; every
+// new market must also have an approved local evidence plan in the registry.
+function approvedMarketIds(env=process.env,planFor=planForRegion){
+  const raw=env.AR_PANEL_APPROVED_MARKET_IDS;
+  if(raw===undefined)return new Set(MARKETS);
+  if(typeof raw!=='string'||!raw.trim()||raw.length>12000)return null;
+  const ids=raw.split(',').map(s=>s.trim());
+  if(ids.length>200||ids.some(id=>!id||!/^[a-z]{2}-[a-z0-9-]{2,70}$/.test(id)))return null;
+  const unique=new Set(ids);
+  if(unique.size!==ids.length)return null;
+  for(const id of unique){
+    const plan=planFor(id);
+    if(!plan||plan.admissionOnly===true||
+       !Array.isArray(plan.sources)||!plan.sources.includes('controlled-public-price-panel'))return null;
+  }
+  return unique;
+}
+
 function approvedSource(env=process.env){
   if(env.AR_PANEL_APPROVED_FOR_MARKET_RESEARCH!=='true' ||
      !env.AR_PANEL_APPROVAL_REFERENCE ||
@@ -21,11 +42,12 @@ function approvedSource(env=process.env){
      !url.pathname||url.pathname==='/')return null;
   return {url,token:String(env.AR_PANEL_READ_TOKEN),approvalRef:String(env.AR_PANEL_APPROVAL_REFERENCE)};
 }
-function authorizedMarketPanelCollectors({env=process.env,fetchFn=fetch}={}){
+function authorizedMarketPanelCollectors({env=process.env,fetchFn=fetch,planFor=planForRegion}={}){
   const source=approvedSource(env);
-  if(!source)return {};
+  const marketIds=approvedMarketIds(env,planFor);
+  if(!source||!marketIds||!marketIds.size)return {};
   return {'controlled-public-price-panel':async({marketId,now=Date.now()})=>{
-    if(!MARKETS.has(marketId))throw Error('unapproved market id');
+    if(!marketIds.has(marketId))throw Error('unapproved market id');
     const requestUrl=new URL(source.url);
     requestUrl.searchParams.set('marketId',marketId);
     const res=await fetchFn(requestUrl.href,{
@@ -76,4 +98,4 @@ function authorizedMarketPanelCollectors({env=process.env,fetchFn=fetch}={}){
     });
   }};
 }
-module.exports={approvedSource,authorizedMarketPanelCollectors,MARKETS,MAX_ROWS};
+module.exports={approvedSource,approvedMarketIds,authorizedMarketPanelCollectors,MARKETS,MAX_ROWS};

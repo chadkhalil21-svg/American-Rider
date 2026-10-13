@@ -86,6 +86,7 @@ async function sweepPushReceipts({
     const snap=await db.collection(COLLECTION).where('nextAttemptAt','<=',now)
       .orderBy('nextAttemptAt').limit(MAX_PER_SWEEP).get();
     report.scanned=snap.size ?? snap.docs.length;
+    report.overCapacity=report.scanned===MAX_PER_SWEEP; // possible backlog: inspect before scaling
     const rows=snap.docs.map(doc=>({ref:doc.ref,...doc.data()}))
       .filter(row=>row.status==='pending');
     report.pendingCount=rows.length;
@@ -163,7 +164,7 @@ async function sweepPushReceipts({
       await batch.commit();
       report.purged=old.docs.length;
     }
-    if(report.providerRejected || report.unverified || !report.ok){
+    if(report.providerRejected || report.unverified || report.overCapacity || !report.ok){
       // Aggregate only. Never log UID, Expo ticket IDs, phone tokens or Travel IDs.
       console.warn('[push-receipts] safety delivery not verified',JSON.stringify(report));
     }

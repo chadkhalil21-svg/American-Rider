@@ -208,3 +208,19 @@ export async function quoteForPlace(args: {
   ]);
   return fetchQuote({ pickup, dest, destination: args.fallbackName ?? null });
 }
+
+// Optional, best-effort signed-in quote-view research. No amount or coordinates are
+// supplied by the app; only the server-issued signed reference is accepted.
+export async function recordVisibleStandardQuote(token:string):Promise<boolean>{
+ if(!token||token.length>450)return false;
+ try{
+  const id=await auth.currentUser?.getIdToken().catch(()=>null);
+  if(!id)return false;
+  const response=await fetch(`${PAYMENT_SERVER_URL}/pricing/research/view`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json',Authorization:`Bearer ${id}`},
+    body:JSON.stringify({researchQuoteToken:token}),
+  });
+  return response.ok;
+ }catch{return false;}
+}

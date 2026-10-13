@@ -1,0 +1,30 @@
+# Founder decision — market-benchmarked competitive pricing before launch
+**Decision date:** 13 October 2026
+**Status:** Governing launch objective. External evidence and market-price calibration are NOT yet commissioned. Supersedes treating the $1 + $0.85/mile + $0.15/minute fallback as a target selling price.
+
+## Business intent
+American Rider should be a differentiated, profitable first-class transportation platform, with competitive local **complete Traveler Totals**, not an intentionally maximally cheap fare. Underpricing can destroy both value perception and opportunity for Operators to earn more. Keep the already-settled **99% of Travel Fare paid to Operators**, the single displayed Traveler Total, the independently modeled $2.50-minimum Platform Fee and margin/processor/reserve protections. A target near 90% of comparable observed full ordinary market Totals is an *initial hypothesis*, never a universal 10% discount order; 90%–100% may be the right commercial range depending on local demand and evidence. Seek minimum discount consistent with competitive bookings, not a race to the bottom. Consider convenience, wait times, pickup/operator availability, safety and service quality as part of consumer value.
+
+## What is actually built versus missing
+Built: national county/jurisdiction registry, route-and-time fare calculation, server quotation and booking parity, unit-economics fee solver, market-reference authority (local condition cells/quality gates), market evidence registry, licensed panel adapter that can be generalized nationally, opt-in self-reporting, historic Chicago dataset collector, first-party booked-Travel report and a currently OFF voluntary quote-view pilot.
+
+**Missing: current, legally usable, representative, actual ordinary all-in competing TNC quote observations delivered for each launch county/market.** No live national feed and no commissioned Tri-County price basket established. The panel needs an approved supplier endpoint and contract/use rights (credentials alone are insufficient); opt-in entries remain unverified quarantined research; historical Chicago fares and regulated taxi tariffs are NOT current comparable all-in ride-hail quotes; own transactions reveal willingness to book at our current price, not the entire market's price.
+
+## Concrete published directional evidence, discovered 13 Oct 2026
+- [TaxiFare.org Miami](https://taxifare.org/us/miami), last updated Feb 24 2026: standard local observed-trip *estimate* $27.73 for ~8mi/~21min, medium confidence, approx 352 observed routes. Our fallback-only nominal $1+(.85×8)+(.15×21)+$2.50 minimum Platform Fee = **$13.45**, before tolls/government fees. These aren't identical route/time/fees/observation dates; **not permission to set 90% of $27.73 as a production fare**.
+- [TaxiFare.org Cutler Bay](https://taxifare.org/us/cutler-bay), updated Feb 23 2026: estimated standard local $30.74 for 8.5mi/22min, medium confidence based on 224 routes. Fallback mathematical illustrative ≈$14.03 before pass-throughs; also *not* a verified matched quote.
+- [TaxiFare.org methodology](https://taxifare.org/methodology) expressly characterizes such prices as statistical route-planning estimates, not transaction-level or guaranteed live bookings.
+These estimates show that treating our low fallback formula as proven competitively positioned is unsafe; they are discovery/signals for a current genuinely matched panel, not sufficient for automatic fare promotions.
+
+## Go-live pricing work ordered by founder
+1. **Market check now, not another measurement-system redesign.** Select a fixed basket of ordinary local routes and realistic time windows in Miami-Dade, Broward and Palm Beach, with several lengths and non-airport baseline routes; later replicate per newly commissioned US market.
+2. Obtain current volunteered, rights-permitted full competing Standard-class totals for those same routes/time windows or a modest licensed representative market dataset. Avoid bulk competitor app scraping, assumptions that public pages allow commercial automated use, or an unsolicited supplier fee. Record date, county, route metrics, service class, promotions, tolls/taxes and source rights. Track missing evidence instead of guessing.
+3. Compare our **actual server quote** (not only the mental arithmetic formula) against these comparable totals. Detect when our market position is **too low**, recommend rational upward changes to regional coefficients/quoted total while preserving the current fare/fee/toll economic solver and operator 99%. Avoid prematurely enforcing a formulaic 10% under market; test multiple alternatives for bookings and unit economics.
+4. Once an adequate local sample exists, select sustainable production coefficients through a reviewed exact-SHA PR and no-money sandbox tests; do not unilaterally change money-moving live fares using this ADR alone.
+5. After genuine business activity, learn from our own displayed Totals, accepted/cancelled/completed records and quality/Operator availability, with **occasional voluntary cross-platform price observations** as an external anchor. First-party results are not an independent price feed.
+
+## Council and research discipline
+[MIT Sloan Pricing](https://ocw.mit.edu/courses/15-818-pricing-spring-2010/) emphasizes elasticity/platform markets, not simplistic cost-plus; [Harvard Business School pricing field-experiment Q&A](https://www.alumni.hbs.edu/stories/Pages/story-bulletin.aspx?num=5172) describes balancing exploratory pricing and economic return. Ford/Rockefeller/Jobs institutional lenses mean simplicity, economical reliability and careful value positioning; these are our study lenses, **not actual endorsements or consulted historical people**.
+
+## Release decision
+Commercial launch is a separate broader decision. This ADR authorizes a *pricing evidence and calibration focus*, not a new paid feed, personal-data collection, live fare changes, insurance changes, or waiver of mandated launch requirements. Do not report the national benchmark engine as producing verified current prices unless a real eligible ongoing dataset is present.

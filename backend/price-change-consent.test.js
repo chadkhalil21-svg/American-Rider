@@ -39,6 +39,20 @@ assert.match(prepare,/res\.status\(428\)/);
 assert.match(prepare,/code: 'travel_price_confirmation_required'/);
 assert.match(prepare,/code:'travel_total_changed'/);
 assert.match(prepare,/!Number\.isSafeInteger\(b\.agreedTotalCents\)/);
+
+const rideContext=fs.readFileSync(path.join(__dirname,'../src/state/RideContext.tsx'),'utf8');
+const riderScreen=fs.readFileSync(path.join(__dirname,'../app/ride.tsx'),'utf8');
+assert.match(rideContext,/code==='travel_price_confirmation_required'/);
+assert.match(rideContext,/setDispatchState\('update_required'\)/);
+assert.match(riderScreen,/ride\.dispatchState==='update_required'/);
+assert.match(riderScreen,/t\('traveler\.updateRequiredTitle'\)/);
+assert.match(riderScreen,/t\('traveler\.updateRequiredBody'\)/);
+for(const lang of ['en','es','fr','it','de']){
+ const strings=fs.readFileSync(path.join(__dirname,'../src/i18n',lang+'.ts'),'utf8');
+ assert.match(strings,/updateRequiredTitle:/,'update message title missing: '+lang);
+ assert.match(strings,/updateRequiredBody:/,'update explanation missing: '+lang);
+}
+
 // Exercise identical cents for a current-app Traveler and refusal paths for a
 // hypothetical old app. Compare domestic/foreign cards, tolls and fees.
 // No provider service call, account data, or money can occur.

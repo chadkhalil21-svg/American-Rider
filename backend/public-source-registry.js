@@ -1,43 +1,17 @@
-// Verified public-source metadata. This registry is expandable without changing pricing logic.
-const {assessPublicSource}=require('./public-source-discovery');
-const SOURCES=Object.freeze({
-  'chicago-tnp-open-data':Object.freeze({
-    authority:'City of Chicago',endpoint:'https://data.cityofchicago.org/resource/6dvr-xwnh.json',
-    geography:'Chicago, IL',publicationCadence:'rolling',publicationLagDays:31,
-    hasPassengerCharge:true,hasAllInTotalComparable:false,
-    hasTripDistance:true,hasTripDuration:true,hasTripCount:true,
-    selfReported:true,regulatorReview:true,roundedFareCents:250,roundedTimeMinutes:15,
-    notes:'City TNP trip_total contains rounded Fare, Tip and Additional Charges. Not equivalent to a contemporaneous untipped upfront Traveler quote; structural and cross-check evidence only.',
-  }),
-  'nyc-tlc-hvfhv':Object.freeze({
-    authority:'NYC Taxi & Limousine Commission',endpoint:'https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page',
-    geography:'New York City, NY',publicationCadence:'monthly',publicationLagDays:60,
-    hasPassengerCharge:true,hasAllInTotalComparable:false,
-    hasTripDistance:true,hasTripDuration:true,hasTripCount:true,
-    selfReported:true,regulatorReview:true,
-    notes:'TLC 2025 HVFHV dictionary includes base_passenger_fare BEFORE tolls, tips, taxes and fees; not comparable to ordinary all-in quoted Total without documented reconciliation.',
-  }),
-  'nyc-tlc-aggregate-fares':Object.freeze({
-    authority:'NYC Taxi & Limousine Commission',endpoint:'https://www.nyc.gov/site/tlc/about/aggregated-reports.page',
-    geography:'New York City, NY',publicationCadence:'monthly',publicationLagDays:31,
-    hasPassengerCharge:true,hasAllInTotalComparable:false,hasTripDistance:false,hasTripDuration:false,hasTripCount:true,
-    selfReported:true,regulatorReview:true,
-    notes:'Monthly aggregates include amount of fares collected; suitable for aggregate cross-check, not condition-matched trip fare alone.',
-  }),
-  'nyc-hvfhv-driver-pay':Object.freeze({
-    authority:'NYC Taxi & Limousine Commission',endpoint:'https://www.nyc.gov/site/tlc/about/driver-pay-rates.page',
-    geography:'New York City, NY',publicationCadence:'regulatory update',publicationLagDays:0,
-    hasPassengerCharge:false,hasAllInTotalComparable:false,hasTripDistance:true,hasTripDuration:true,hasTripCount:false,
-    isRegulatoryRate:true,selfReported:false,regulatorReview:true,
-    notes:'Driver minimum payment standard; explicitly not passenger fare.',
-  }),
-  'massachusetts-tnc-report':Object.freeze({
-    authority:'Massachusetts TNC Division',endpoint:'https://www.mass.gov/orgs/transportation-network-company-division',
-    geography:'Massachusetts',publicationCadence:'annual',publicationLagDays:365,
-    hasPassengerCharge:false,hasTripDistance:true,hasTripDuration:false,hasTripCount:true,
-    selfReported:true,regulatorReview:true,
-    notes:'Regulator collects/analyzes TNC data; structural/demand evidence unless current report exposes passenger charges.',
-  }),
-});
-function verifiedSource(id){const meta=SOURCES[id];return meta?Object.freeze({...meta,assessment:assessPublicSource(meta)}):null;}
-module.exports={SOURCES,verifiedSource};
+const assert=require('node:assert/strict');
+const {assessPublicSource,FITNESS}=require('./public-source-discovery');
+const {verifiedSource}=require('./public-source-registry');
+const chi=verifiedSource('chicago-tnp-open-data');
+assert.ok(!chi.assessment.fitness.includes(FITNESS.FARE_REFERENCE),'tip-inclusive rounded published trip total is not an upfront quote');
+assert.ok(chi.assessment.problems.some(x=>x.includes('250 cents')));
+assert.equal(chi.endpoint,'https://data.cityofchicago.org/resource/8bbv-3wbe.json');
+const ny=verifiedSource('nyc-tlc-hvfhv');
+assert.ok(!ny.assessment.fitness.includes(FITNESS.FARE_REFERENCE));
+assert.ok(ny.assessment.fitness.includes(FITNESS.TRIP_SHAPE));
+const pay=verifiedSource('nyc-hvfhv-driver-pay');
+assert.ok(pay.assessment.fitness.includes(FITNESS.REGULATORY_FLOOR));
+assert.ok(!pay.assessment.fitness.includes(FITNESS.FARE_REFERENCE));
+const aggregate=verifiedSource('nyc-tlc-aggregate-fares');
+assert.ok(!aggregate.assessment.fitness.includes(FITNESS.FARE_REFERENCE));
+assert.deepEqual(assessPublicSource({}).fitness,[]);
+console.log('national public-source fitness tests passed');

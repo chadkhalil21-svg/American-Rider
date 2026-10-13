@@ -3643,6 +3643,16 @@ app.post('/travel/prepare', requireAuth, LIMITS.dispatch, requireFreshAuth, requ
       return res.status(409).json({ error: 'The road distance cannot be verified', code: 'route_geometry_required' });
     }
     if (priced.tollStatus === 'unknown') return res.status(503).json({ error: 'Toll price unavailable', code: 'toll_unavailable' });
+    // When the current client supplies the all-in amount shown on its booking
+    // sheet, never silently create or charge a Travel at a different Total.
+    // The quote remains server-computed; this is a CONSENT comparison only.
+    // Older clients without the field retain existing behavior until retired.
+    if(b.agreedTotalCents!==undefined && b.agreedTotalCents!==null &&
+       (!Number.isSafeInteger(b.agreedTotalCents)||
+        b.agreedTotalCents!==priced.travelerPays)){
+      return res.status(409).json({error:'The Travel Total changed. Review the current price before confirming.',
+        code:'travel_total_changed',currentTotalCents:priced.travelerPays});
+    }
     const partyResult = priced.journey?.party
       ? { ok: true, party: priced.journey.party }
       : await normalizeParty(b, { uid: req.uid, name: req.name || b.bookerName || b.travelerName || '' });

@@ -26,6 +26,13 @@ This branch contains the **actual change to `backend/market-pricing.js`** and up
 
 Require actual county-specific Operator licensing/insurance/livery overhead, real road routing and airport/port permissions, known Stripe PaymentIntent flows and refund recovery, an actual test-device accepted Total under changed-price 409 and old-client 428, and at least a defensible founder-approved evidence statement for chosen starting Fare. No existing sandbox CI can certify those facts. No state outside existing admitted tri-county area can inherit rates; `backend/markets.js` and `backend/market-readiness.js` stay unchanged. Preserve one final Total, no additional API calls or Firestore reads.
 
+
+## Hidden second-price authority found during the exhaustive campaign
+
+Initial CI exposed a legitimate contradiction: **fixed Brickell-based named-destination fares** (e.g., MIA $10.20) continued to disagree with the new routed pricing (approximately $14.31 in the synthetic geometry example), even though the real booking requires two coordinates. A client quoting by the legacy name could mislead the Traveler before the server charged a separately computed route. We removed the named-only fallback from the authoritative quote path, now requiring a real pickup and destination for the same full Total that `/travel/prepare` will independently recompute. Archived named values may remain in `backend/fares.js` for old records, but cannot set a new Quote. Missing location fails with a plain `route_geometry_required` response. Neither local-area promises nor genuine airport authorization may be inferred from a location name.
+
+**Test audit:** The old `backend/faremodel.test.js` had pinned obsolete $7.53 / 5.04 mile prices, historical named fare matches, and a 20-cent maximum tenth-mile increase based on a much smaller 15-cent/minute rate. The new regression checks the actual revised cent prices, increased 32-cent time component, rounding continuity against a 25-cent tenth-mile bound, proper old named-only refusal, and 99% Operator payout. This is correction to reflect the genuinely changed product, not relaxing payment consent, eligibility, toll reimbursement or permit checks.
+
 ## If approved
 
 Once all six exact-head CI suites pass AND real-device/reconciliation and commercial release criteria documented, a single merge/deploy changes the one Florida record with a reversible Git history. Monitor initial completed bookings and Operator wait-times; if margins or demand are poor, independently adjust based on actual data, no manipulative personalized profile pricing. Never assume external market-model estimates prove current prices.

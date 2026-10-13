@@ -12,6 +12,11 @@ const fareClient=txt('src/backend/fares.ts'),server=txt('backend/server.js');
 const dispatch=txt('src/backend/dispatch.ts');
 assert.match(ctx,/quotedForClass===travelClass&&quotedTotalCents!==null/);
 assert.match(ctx,/quotedTotalCents\/100/);
+// Named pickup and mapped pin must never keep an earlier route's displayed Total.
+assert.match(reserve,/const pickupChanged = !oldCoords/);
+assert.match(reserve,/ride\.setTripCoords\(oldCoords/);
+assert.match(ctx,/const seq = \+\+repriceSeq\.current/);
+assert.match(ctx,/if \(!live \|\| seq !== repriceSeq\.current\) return/);
 assert.match(ctx,/const costN=quotedFareCents\/100/);
 assert.doesNotMatch(ctx,/const fare = applyClassCents\(baseCents, travelClass\)/);
 assert.match(reserve,/ride\.quotedForClass===ride\.travelClass/);

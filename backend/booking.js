@@ -5,13 +5,14 @@ const { marketFor } = require('./markets');
 const { regionById } = require('./regions');
 const { readinessFor } = require('./market-readiness');
 const { readKey } = require('./env');
+const {link:linkPriceView}=require('./quote-view-store');
 
 const deny = (status, code, error) => ({ status, body: { ok: false, code, error } });
 const digest = (value) => createHash('sha256').update(String(value)).digest('hex');
 const bookingId = (uid, key) => digest(`ar-booking-v1:${uid}:${key}`).slice(0, 40);
 
 /** Persist the server's quote and party BEFORE giving the device a payment secret. */
-async function prepareBooking({ db, uid, key, fingerprint, record, now = Date.now() }) {
+async function prepareBooking({ db, uid, key, fingerprint, record, quoteView=null, now = Date.now() }) {
   if (typeof key !== 'string' || !/^[\w-]{16,100}$/.test(key)) {
     return deny(400, 'booking_key_required', 'A booking key is required');
   }
@@ -28,6 +29,11 @@ async function prepareBooking({ db, uid, key, fingerprint, record, now = Date.no
         return deny(409, 'booking_conflict', 'This booking key belongs to a different Travel');
       }
       return { status: 200, body: { rideId: id, tripNo: previous.tripNo, status: previous.status, reused: true } };
+    }
+    // Research-only view link; failure never blocks or changes a real Travel.
+    if(quoteView){
+      try{await linkPriceView({tx,db,view:quoteView,rideId:id,now});}
+      catch{ /* Analytics cannot prevent safe booking */ }
     }
     tx.create(ref, {
       ...record,

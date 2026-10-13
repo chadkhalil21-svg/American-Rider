@@ -1,7 +1,7 @@
 'use strict';
 // A recorded view is research, never proof of payment and never fare authority.
 const C='pricing_quote_views',SAMPLE=120,MAX_AGE=1800000;
-const {verify,enabled,matchesBooking}=require('./quote-view-contract');
+const {verify,enabled}=require('./quote-view-contract');
 async function record({db,uid,token,now=Date.now(),env=process.env}){
  const v=verify(token,{uid,now,env});
  if(!v)return {ok:false,code:'invalid_view'};
@@ -26,7 +26,7 @@ async function link({tx,db,view,rideId,now=Date.now()}){
   expires=d.expiresAt?.toMillis?.()??d.expiresAt?.getTime?.();
  if(!Number.isFinite(at)||at>now||now-at>MAX_AGE||
    !Number.isFinite(expires)||expires<=now||
-   !matchesBooking(view,{marketId:d.marketId,distanceBand:d.distanceBand,totalCents:d.totalCents})||
+   (d.marketId!==view.marketId||d.distanceBand!==view.distanceBand||d.totalCents!==view.totalCents)||
    (d.preparedRideId&&d.preparedRideId!==rideId))return false;
  if(!d.preparedRideId)tx.update(ref,{preparedRideId:rideId,preparedAt:new Date(now)});
  return true;

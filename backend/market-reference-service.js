@@ -69,7 +69,7 @@ async function persistObservations(db,rows){
 function comparableObservation(o){
   const catalog=sourceCatalogEntry(o?.sourceId);
   return o?.hasAllInTotalComparable===true &&
-    catalog?.primaryEligible===true &&
+    catalog?.primaryEligible===true && catalog.type===o.sourceType &&
     Number.isSafeInteger(o?.travelerTotalCents) && o.travelerTotalCents>0 &&
     Number.isFinite(o?.routedMiles)&&o.routedMiles>=0 &&
     Number.isFinite(o?.routedMinutes)&&o.routedMinutes>=0;

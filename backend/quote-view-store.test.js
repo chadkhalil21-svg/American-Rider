@@ -1,12 +1,13 @@
 'use strict';
 const assert=require('node:assert/strict');
-const {issue,verify}=require('./quote-view-contract');
+const {issue,verify,routeTag}=require('./quote-view-contract');
 const {record,link,report,C,SAMPLE}=require('./quote-view-store');
 const now=Date.UTC(2026,9,13,18),uid='synthetic-uid',
  env={PRICE_VIEWS_PILOT:'1',PRICE_VIEWS_PRIVACY_OK:'1',PRICE_VIEWS_TTL_READY:'1',
  PRICE_VIEWS_KEY:'synthetic-separate-key-32-chars-minimum'};
+const fingerprint=routeTag({uid,env,pickup:{lat:25.7,lng:-80.2},dest:{lat:25.8,lng:-80.1}});
 const token=issue({uid,now,env,id:'a'.repeat(32),marketId:'fl-miami-dade',
- distanceBand:'3-7',totalCents:1450});
+ distanceBand:'3-7',totalCents:1450,routeFingerprint:fingerprint});
 (async()=>{
  const items=new Map();let creates=0,reads=0;
  const db={collection:n=>{assert.equal(n,C);return {doc:id=>({

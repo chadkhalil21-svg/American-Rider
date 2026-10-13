@@ -1,6 +1,7 @@
 // Optional, consented market evidence. Never used to change an individual quote.
 // No competing-service API access, screenshots, addresses or names are collected.
 import { useRouter } from 'expo-router';
+import { t } from '../../src/i18n';
 import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Text } from '../../src/components/AppText';
@@ -37,7 +38,7 @@ export default function VolunteerMarketPrice() {
   useEffect(()=>{
     let active=true;
     marketResearchCounties().then(rows=>{if(active)setMarkets(rows);})
-      .catch(()=>{if(active)setMessage('County list unavailable. Please try again.');});
+      .catch(()=>{if(active)setMessage(t('operator.fareResearchCountyUnavailable'));});
     return()=>{active=false;};
   },[]);
   const amount=price.trim(),mi=miles.trim(),mins=minutes.trim(),hours=hoursAgo.trim();
@@ -63,19 +64,18 @@ export default function VolunteerMarketPrice() {
         routedMiles:routeMiles,routedMinutes:routeMins,travelerTotalCents:currency,
         serviceClass:'standard',ordinaryNoPromotion:true,consentToResearch:true,
       });
-      if(!ok)throw Error('Research receipt not confirmed.');
-      setMessage('Research received. Thank you. This does not change Traveler prices.');
+      if(!ok)throw Error(t('operator.fareResearchReceiptUnconfirmed'));
+      setMessage(t('operator.fareResearchReceived'));
       observationId.current='own-price-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,12);
       setPrice('');setMiles('');setMinutes('');setHoursAgo('');
-    }catch(e){setMessage(e instanceof Error?e.message:'Research intake unavailable.');}
+    }catch(e){setMessage(e instanceof Error?e.message:t('operator.fareResearchUnavailable'));}
     finally{setBusy(false);}
   }
   return <Screen>
-    <Pressable accessibilityRole="button" onPress={()=>router.back()}><Text style={styles.back}>‹ Back</Text></Pressable>
-    <Title>Help keep fares fair</Title>
-    <Text style={styles.intro}>You may share a genuine, ordinary standard Travel price you saw or paid.
-      This optional research helps American Rider assess local prices. No screenshots or passenger details are required.</Text>
-    <SectionLabel>Where did the journey begin?</SectionLabel>
+    <Pressable accessibilityRole="button" onPress={()=>router.back()}><Text style={styles.back}>‹ {t('common.back')}</Text></Pressable>
+    <Title>{t('operator.fareResearchTitle')}</Title>
+    <Text style={styles.intro}>{t('operator.fareResearchIntro')}</Text>
+    <SectionLabel>{t('operator.fareResearchCountyPrompt')}</SectionLabel>
     <View style={styles.choices}>
       {markets.map(m=><Pressable key={m.id}
         accessibilityRole="button" accessibilityState={{selected:marketId===m.id}}
@@ -84,33 +84,33 @@ export default function VolunteerMarketPrice() {
       </Pressable>)}
     </View>
     <Card style={styles.card}>
-      <Text style={styles.label}>Your source</Text>
+      <Text style={styles.label}>{t('operator.fareResearchSource')}</Text>
       <View style={styles.choices}>
-        {([['my-receipt','Completed Travel receipt'],['my-quote','Upfront Travel quote']] as const)
+        {([['my-receipt',t('operator.fareResearchReceipt')],['my-quote',t('operator.fareResearchQuote')]] as const)
           .map(([key,label])=><Pressable key={key} accessibilityRole="button"
             onPress={()=>setKind(key)} style={[styles.choice,kind===key&&styles.selected]}>
             <Text>{label}</Text>
           </Pressable>)}
       </View>
-      <Text style={styles.label}>Travel service shown on the receipt or quote</Text>
+      <Text style={styles.label}>{t('operator.fareResearchServicePrompt')}</Text>
       <TextInput value={sourceName} onChangeText={setSourceName} maxLength={40}
         autoCapitalize="words" style={styles.input}
-        placeholder="Service name" accessibilityLabel="Travel service name"/>
-      <Field title="Total price paid or quoted (USD)" value={price} setValue={setPrice} placeholder="e.g. 15.50"/>
-      <Field title="Journey distance (miles)" value={miles} setValue={setMiles} placeholder="e.g. 6.3"/>
-      <Field title="Journey duration (minutes)" value={minutes} setValue={setMinutes} placeholder="e.g. 19"/>
-      <Field title="Hours since this price was observed (0 means just now)"
+        placeholder={t('operator.fareResearchServicePlaceholder')} accessibilityLabel={t('operator.fareResearchServicePrompt')}/>
+      <Field title={t('operator.fareResearchTotal')} value={price} setValue={setPrice} placeholder="15.50"/>
+      <Field title={t('operator.fareResearchMiles')} value={miles} setValue={setMiles} placeholder="6.3"/>
+      <Field title={t('operator.fareResearchMinutes')} value={minutes} setValue={setMinutes} placeholder="19"/>
+      <Field title={t('operator.fareResearchHours')}
         value={hoursAgo} setValue={setHoursAgo} placeholder="0–335"/>
       <Pressable accessibilityRole="checkbox" accessibilityState={{checked:ordinary}}
         onPress={()=>setOrdinary(x=>!x)} style={styles.check}>
-        <Text>{ordinary?'☑':'☐'} This was an ordinary standard Travel, with no promotional discount or unusual event pricing.</Text>
+        <Text>{ordinary?'☑':'☐'} {t('operator.fareResearchOrdinary')}</Text>
       </Pressable>
       <Pressable accessibilityRole="checkbox" accessibilityState={{checked:consent}}
         onPress={()=>setConsent(x=>!x)} style={styles.check}>
-        <Text>{consent?'☑':'☐'} I choose to share these price facts for American Rider's internal research. I have the right to share them.</Text>
+        <Text>{consent?'☑':'☐'} {t('operator.fareResearchConsent')}</Text>
       </Pressable>
-      <Text style={styles.note}>We retain county-level and price details for review, not precise pickup coordinates. Reports are not independently verified and do not set live fares.</Text>
-      <PrimaryButton label={busy?'Submitting…':'Share price information'} onPress={send}
+      <Text style={styles.note}>{t('operator.fareResearchNote')}</Text>
+      <PrimaryButton label={busy?t('operator.fareResearchSubmitting'):t('operator.fareResearchShare')} onPress={send}
         disabled={!valid||busy} style={{marginTop:14}}/>
       {message? <Text accessibilityRole="alert" style={styles.message}>{message}</Text>:null}
     </Card>

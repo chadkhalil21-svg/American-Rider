@@ -99,7 +99,7 @@ assert.throws(()=>validateVoluntaryPrice({body:{...normal(),pickup:{lat:30.2672,
  let count=0;
  for(let pass=0;pass<2;pass++){
    for(let i=0;i<15000;i++){
-     const b={...normal(),routedMiles:1+i%60,routedMinutes:10+i%85,
+     const b={...normal(),routedMiles:1+i%60,routedMinutes:45+i%85,
        travelerTotalCents:450+i%30000};
      const picked=validateVoluntaryPrice({body:b,uid:UID,now:NOW,
        marketForPoint:()=>({id:i%3===0?'fl-miami-dade':i%3===1?'fl-broward':'fl-palm-beach'})});

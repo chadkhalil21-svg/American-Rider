@@ -12,6 +12,7 @@ const cases = [
   ['real-SDK synthetic signed payments / refunds / dispute / Connect provider chain', 'backend/synthetic-provider-chain.test.js'],
   ['emergency route-monitor priority and failure visibility', 'backend/monitor.test.js'],
   ['push errors / acceptance / token-rotation protection', 'backend/push-acceptance.test.js'],
+  ['Expo receipt tracking / quota / token rotation and bounded backlog', 'backend/pushreceipts.test.js'],
   ['provider durable receipt / crash replay', 'backend/providerqueue.durability.test.js'],
   ['provider queue retry / idempotency', 'backend/providerqueue.test.js'],
   ['refund exposure', 'backend/refundexposure.test.js'],

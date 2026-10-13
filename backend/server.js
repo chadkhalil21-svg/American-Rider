@@ -1754,8 +1754,10 @@ app.post('/pricing/research/view',requireAuth,LIMITS.priceView,async(req,res)=>{
   if(!quoteViewContract.enabled())return res.status(204).end();
   try{
     const out=await quoteViewStore.record({db:adminDb(),uid:req.uid,
-      token:req.body?.researchQuoteToken});
-    if(!out.ok)return res.status(out.code==='invalid_view'?400:503).json({code:out.code});
+      token:req.body?.researchQuoteToken,
+      consentToResearch:req.body?.consentToResearch===true,
+      consentVersion:req.body?.consentVersion});
+    if(!out.ok)return res.status(['invalid_view','research_consent_required','account_closing','quote_view_conflict'].includes(out.code)?400:503).json({code:out.code});
     return res.status(out.duplicate?200:202).json({ok:true,duplicate:out.duplicate});
   }catch{return res.status(503).json({code:'research_unavailable'});}
 });

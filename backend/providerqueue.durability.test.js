@@ -34,6 +34,41 @@ Module._load=original;
   out=await q.enqueueProviderEvent({provider:'stripe',event});
   assert.equal(out.ok,true);assert.equal(out.duplicate,true,'provider retry must not create a second durable event');
 
+  // Amazon idempotency contract: same provider event id must mean same event.
+  out=await q.enqueueProviderEvent({provider:'stripe',event:{id:'evt_1',type:'different'}});
+  assert.equal(out.ok,false,'same ID with changed event type cannot be ACKed');
+  assert.match(out.reason,/conflicting/);
+  assert.equal(db.data.provider_events[q.eventDocId('stripe','evt_1')].event.type,'x',
+    'existing durable event never overwritten by conflict');
+
+  const originalEvent={id:'evt_immutable',type:'payment_intent.succeeded',
+    data:{object:{id:'pi_original',amount_received:1900,currency:'usd'}}};
+  out=await q.enqueueProviderEvent({provider:'stripe',event:originalEvent});
+  assert.equal(out.ok,true);
+  const reordered={data:{object:{currency:'usd',amount_received:1900,id:'pi_original'}},
+    type:'payment_intent.succeeded',id:'evt_immutable'};
+  out=await q.enqueueProviderEvent({provider:'stripe',event:reordered});
+  assert.equal(out.ok,true,'reordering JSON fields preserves semantic equality');
+  assert.equal(out.duplicate,true);
+  out=await q.enqueueProviderEvent({provider:'stripe',event:{
+    ...originalEvent,data:{object:{...originalEvent.data.object,amount_received:2900}},
+  }});
+  assert.equal(out.ok,false,'same ID with changed monetary amount must fail closed');
+
+  const sanitized={id:'evt/a',type:'refund.failed'};
+  assert.equal((await q.enqueueProviderEvent({provider:'stripe',event:sanitized})).ok,true);
+  out=await q.enqueueProviderEvent({provider:'stripe',event:{id:'evt_a',type:'refund.failed'}});
+  assert.equal(out.ok,false,'different provider IDs must not collide after replacing / with _');
+  assert.equal((await q.enqueueProviderEvent({provider:'stripe',event:sanitized})).duplicate,true);
+  const longId='evt_'+'x'.repeat(240);
+  assert.equal((await q.enqueueProviderEvent({provider:'stripe',event:{id:longId,type:'safe'}})).ok,true);
+  out=await q.enqueueProviderEvent({provider:'stripe',event:{id:longId+'-different',type:'safe'}});
+  assert.equal(out.ok,false,'IDs identical before Firestore 220-char truncation cannot be conflated');
+  assert.equal((await q.enqueueProviderEvent({provider:'stripe',event:{
+    id:'evt_'+'x'.repeat(1300),type:'too-long',
+  }})).ok,false,'unbounded provider IDs must not be accepted');
+
+
   const id=q.eventDocId('stripe','evt_1');
   let calls=0;
   out=await q.processProviderEvent({id,workerId:'w1',handlers:{stripe:async()=>{calls++;throw new Error('temporary');}}});

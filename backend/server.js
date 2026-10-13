@@ -34,6 +34,9 @@ const { requireAuth, requireFreshAuth, attachAuth, requireVerifiedEmail } = requ
 const { perAccount, countOnly, perIp } = require('./ratelimit');
 const { marketFor, servesPoint, listMarkets, markets: allMarkets } = require('./markets');
 const { validateVoluntaryPrice, receiveVoluntaryPrice } = require('./voluntary-market-prices');
+const quoteViewContract=require('./quote-view-contract');
+const quoteViewStore=require('./quote-view-store');
+const {distanceBand:quoteDistanceBand}=require('./market-reference-service');
 const { forMarket: insuranceForMarket, publicConfig: publicInsuranceConfig } = require('./insurance-jurisdictions');
 const { manifestFor, inspectMarket, recordEvidence, activateMarket, activateRegion, authorizeOnboarding, pauseMarket } = require('./market-readiness');
 const { setAdmittedFleetOnline, setFleetOnlineIfOpen, deactivateMarketFleet, sweepPausedMarketFleet } = require('./market-fleet');
@@ -68,6 +71,7 @@ const LIMITS = {
   announce: perAccount({ name: 'announce', limit: 60, windowMs: 60 * 60 * 1000 }),
   voice: perAccount({ name: 'voice', limit: 30, windowMs: 60 * 60 * 1000 }),
   market: perAccount({ name: 'market', limit: 20, windowMs: 60 * 60 * 1000 }),
+  priceView: perAccount({ name: 'price-view', limit: 30, windowMs: 60 * 60 * 1000 }),
   // Each status check asks Firebase Auth and Stripe; the review screen polls every 30 seconds.
   qualification: perAccount({ name: 'qualification', limit: 240, windowMs: 60 * 60 * 1000 }),
   waitlist: perAccount({ name: 'waitlist', limit: 5, windowMs: 24 * 60 * 60 * 1000 }),
@@ -1734,8 +1738,28 @@ app.post('/fare-quote', attachAuth, LIMITS.quoteIp, requireOperationalReadiness,
     governmentFeeCents: priced.governmentFeeCents, tollCents: priced.tollCents || 0, tollStatus: priced.tollStatus, feeLines: priced.feeLines,
     travelCostCents: priced.travelCostCents, miles: priced.miles, minutes: priced.minutes,
     timedBy: priced.timedBy, pricedBy: priced.pricedBy,
+    // Identity-bound research token. No write occurs on quote computation.
+    ...(req.uid&&priced.pricedBy==='routed-distance'&&!req.body?.journeyNo&&
+       String(req.body?.travelClass||'standard').toLowerCase()==='standard'
+     ? (()=>{const v=quoteViewContract.issue({uid:req.uid,
+         marketId:marketFor(req.body?.pickup)?.id,
+         distanceBand:quoteDistanceBand(priced.miles),totalCents:priced.travelerPays,
+         routeFingerprint:quoteViewContract.routeTag({uid:req.uid,pickup:req.body.pickup,dest:req.body.dest})});
+       return v?{researchQuoteToken:v}:{};})() : {}),
   });
 });
+
+// Private, optional and create-only. A price computation is NOT an impression.
+app.post('/pricing/research/view',requireAuth,LIMITS.priceView,async(req,res)=>{
+  if(!quoteViewContract.enabled())return res.status(204).end();
+  try{
+    const out=await quoteViewStore.record({db:adminDb(),uid:req.uid,
+      token:req.body?.researchQuoteToken});
+    if(!out.ok)return res.status(out.code==='invalid_view'?400:503).json({code:out.code});
+    return res.status(out.duplicate?200:202).json({ok:true,duplicate:out.duplicate});
+  }catch{return res.status(503).json({code:'research_unavailable'});}
+});
+
 
 // --- REAL APP FLOW: start a payment and return its client secret to the app. ---------------
 // The app collects the card on the phone and confirms it there.
@@ -3636,6 +3660,12 @@ app.post('/travel/prepare', requireAuth, LIMITS.dispatch, requireFreshAuth, requ
       return res.status(409).json({ error: 'No eligible Operator is available; nothing was charged', code: 'no_operator' });
     }
     const tripNo = travelNumberFor(id, pickup);
+    const quoteView=String(b.cls||'Standard').toLowerCase()==='standard'
+      ? quoteViewContract.verify(b.researchQuoteToken,{uid:req.uid}):null;
+    const matchedView=quoteView&&quoteViewContract.matchesBooking(quoteView,{
+      marketId:marketFor(pickup)?.id,distanceBand:quoteDistanceBand(priced.miles),
+      totalCents:priced.travelerPays,
+      routeFingerprint:quoteViewContract.routeTag({uid:req.uid,pickup,dest:destinationPoint})})?quoteView:null;
     const outcome = await prepareBooking({ db, uid: req.uid, key, fingerprint, record: {
       tripNo, travelerName: party.travelerName.slice(0, 60), party,
       dep: String(b.dep || '').slice(0, 60), dest: String(b.dest || '').slice(0, 60),
@@ -3650,6 +3680,12 @@ app.post('/travel/prepare', requireAuth, LIMITS.dispatch, requireFreshAuth, requ
     } });
     if (party.teen && [200,201].includes(outcome.status)) {
       await provisionTeenPin({ rideRef: db.collection('rides').doc(id), rideId: id, party });
+    }
+    // Research must not delay or roll back a legitimate Travel. Link only AFTER
+    // the server-authoritative booking transaction has finished successfully.
+    if([200,201].includes(outcome.status)&&matchedView){
+      void quoteViewStore.linkAfterBooking({db,view:matchedView,rideId:id})
+        .catch(()=>null);
     }
     return res.status(outcome.status).json({ ...outcome.body, amountCents: priced.travelerPays });
   } catch (e) { return res.status(502).json({ error: e.message, code: 'prepare_unavailable' }); }
@@ -3822,6 +3858,26 @@ app.post('/travel/schedule', requireAuth, LIMITS.dispatch, requireFreshAuth, req
   } catch (e) {
     res.status(502).json({ error: e.message });
   }
+});
+
+// On-demand Founder research. Ordinary /ops page and customer requests do not scan this collection.
+app.get('/ops/pricing-research',requireOps,async(req,res)=>{
+  try{
+    const p=await quoteViewStore.report({db:adminDb()});
+    const safe=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    const content='<h1>Pricing research</h1><p><a href="/ops">← Operations</a></p>'+
+      (!p.enabled?'<p>Quote-view pilot is OFF pending privacy and automatic deletion approval.</p>':
+       !p.available?'<p role="alert">Research records are temporarily unavailable.</p>':
+       '<p>Signed-in standard price views, last 24 hours; recent hour excluded.</p>'+
+       '<p>'+p.counted+' eligible visible quotes, '+p.prepared+
+       ' linked prepared Travels. Prepared is not paid or completed.</p>'+
+       (p.incomplete?'<p role="alert">Sample limited to 120. This is NOT a complete conversion rate.</p>':'')+
+       p.groups.map(g=>'<p>'+safe(g.marketId)+': '+g.views+' views, '+g.prepared+
+       ' prepared bookings.</p>').join('')+
+       '<p>Research only. No fare changes authorized.</p>');
+    return res.type('html').send(page('Pricing research',content));
+  }catch{return res.status(503).type('html').send(page('Pricing research',
+     '<h1>Pricing research</h1><p>Data unavailable. No conclusions.</p>'));}
 });
 
 // --- Who can bring a lost item back. -------------------------------------------------------

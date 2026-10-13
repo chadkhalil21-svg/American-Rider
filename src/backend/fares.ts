@@ -19,6 +19,7 @@ export type Coords = { lat: number; lng: number };
 
 export type Quote = {
   travelerPays: number; // cents — the ONE price shown to the traveler (fare + platform fee)
+  researchQuoteToken?: string; // optional signed research reference; no fare authority
   /** The journey time the fare was computed from, when the server priced by coordinates. */
   minutes?: number;
   operatorGets: number; // cents — 99% of the fare
@@ -173,6 +174,7 @@ export async function fetchQuote(args: {
     if (typeof d?.travelerPays !== 'number') return null;
     return {
       travelerPays: d.travelerPays,
+      ...(typeof d.researchQuoteToken==='string'&&d.researchQuoteToken.length<=450?{researchQuoteToken:d.researchQuoteToken}:{}),
       minutes: typeof d.minutes === 'number' ? d.minutes : undefined,
       operatorGets: d.operatorGets,
       travelCostCents: d.travelCostCents,
@@ -205,4 +207,20 @@ export async function quoteForPlace(args: {
     geocodePlace(args.destQuery, args.near ?? null),
   ]);
   return fetchQuote({ pickup, dest, destination: args.fallbackName ?? null });
+}
+
+// Optional, best-effort signed-in quote-view research. No amount or coordinates are
+// supplied by the app; only the server-issued signed reference is accepted.
+export async function recordVisibleStandardQuote(token:string):Promise<boolean>{
+ if(!token||token.length>450)return false;
+ try{
+  const id=await auth.currentUser?.getIdToken().catch(()=>null);
+  if(!id)return false;
+  const response=await fetch(`${PAYMENT_SERVER_URL}/pricing/research/view`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json',Authorization:`Bearer ${id}`},
+    body:JSON.stringify({researchQuoteToken:token}),
+  });
+  return response.ok;
+ }catch{return false;}
 }

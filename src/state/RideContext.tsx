@@ -195,6 +195,8 @@ export type RideStore = {
   // before the platform fee. Screens derive display prices from this; the charge is re-priced
   // server-side at confirm regardless.
   quotedFareCents: number | null;
+  researchQuoteToken: string | null;
+  setResearchQuoteToken: (token: string | null) => void;
   /** THE all-in price for the travel currently being booked. Never recompute this. */
   travelerTotal: number;
   setQuotedFareCents: (n: number | null) => void;
@@ -367,6 +369,11 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     return platformFee(fare);
   };
   const [quotedFareCents, setQuotedFareCents] = useState<number | null>(null);
+  const [researchQuoteToken, setResearchQuoteTokenState] = useState<string | null>(null);
+  const researchQuoteRef = useRef<string | null>(null);
+  const setResearchQuoteToken = useCallback((token:string|null)=>{
+    researchQuoteRef.current=token;setResearchQuoteTokenState(token);
+  },[]);
   const [quotedFeeLines, setQuotedFeeLines] = useState<FeeLine[]>([]);
   const [repricing, setRepricing] = useState(false);
   const quotedFeeLinesRef = useRef<FeeLine[]>([]);
@@ -424,6 +431,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     // The old pickup's quote ceases to be true the instant the pickup changes.
     setQuotedFareCents(null);
     setQuotedFeeLines([]);
+    setResearchQuoteToken(null);
     setRepricing(true);
     fetchQuote({ pickup: pickupPin, dest, destination: arrival.short, travelClass })
       .then((q) => {
@@ -431,6 +439,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
         if (q && !isUnavailable(q)) {
           setQuotedFareCents(q.travelCostCents);
           setQuotedFeeLines(q.feeLines);
+          setResearchQuoteToken(q.researchQuoteToken??null);
         }
       })
       .finally(() => {
@@ -678,6 +687,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       setTravelClass('standard');
       setQuotedFareCents(null);
       setQuotedFeeLines([]);
+      setResearchQuoteToken(null);
     },
     [defaultPrefs],
   );
@@ -836,6 +846,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
           bookingKeyRef.current ||= Crypto.randomUUID();
           const prepared = await prepareRide({
             bookingKey: bookingKeyRef.current, pickup: from, destinationPoint: dest,
+            researchQuoteToken:researchQuoteRef.current,
             dep: departure.short, dest: arrival.short,
             cls: operatorClassFor(travelClassRef.current),
             journeyNo: smartJourneyRef.current?.stage === 'leg2' ? smartJourneyRef.current.leg1No ?? null : null,
@@ -1656,6 +1667,8 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     beginSmartLeg,
     endSmartJourney,
     quotedFareCents,
+    researchQuoteToken,
+    setResearchQuoteToken,
     travelerTotal,
     setQuotedFareCents,
     repricing,

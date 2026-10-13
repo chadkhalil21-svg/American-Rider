@@ -340,7 +340,7 @@ ${unreadable.length ? `<section role="alert" style="border:2px solid #B42318;">
 <p><a href="/ar/oauth/connections">ChatGPT Operations connection · view or disconnect →</a></p>
 <p><a href="/ops/cases?kind=emergency">Urgent and deadline cases · acknowledge →</a> · <a href="/ops/cases?kind=support">Support cases →</a></p>
 <p><a href="/ops/screening">Operator screening · verify authenticated agency reports →</a></p>
-<p><a href="/ops/disputes">Stripe dispute evidence · review only →</a></p>
+<p><a href="/ops/disputes">Stripe dispute evidence · review only →</a> · <a href="/ops/pricing-research">Pricing research · quoted price to prepared booking →</a></p>
 <section>
   <h2>Pricing research · our own bookings</h2>
   <p>Last 24 hours. Existing Travel records only; no extra database query. Prices shown here are the

@@ -34,7 +34,10 @@ async function link({tx,db,view,rideId,now=Date.now()}){
 async function report({db,now=Date.now(),env=process.env}){
  if(!enabled(env))return {enabled:false};
  if(!db)return {enabled:true,available:false};
+ // Query only mature views: thousands of very recent quotes must not hide
+ // yesterday's eligible results behind the 120-row safety limit.
  const snap=await db.collection(C).where('viewedAt','>=',new Date(now-86400000))
+  .where('viewedAt','<=',new Date(now-3600000))
   .orderBy('viewedAt','desc').limit(SAMPLE).get();
  let counted=0,prepared=0;const groups=new Map();
  for(const row of snap.docs){

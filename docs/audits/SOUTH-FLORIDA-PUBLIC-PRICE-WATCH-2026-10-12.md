@@ -19,6 +19,19 @@
 
 Broward and Palm Beach remain `not_commissioned` for an official public tariff watch until genuine suitable issuer pages/data licenses are identified; **do not inherit Miami values**. South Florida `fl-miami-dade`, `fl-broward`, `fl-palm-beach` already have *plans* for controlled consent-based field panels and optional independent pricing evidence, but no installed approved data feed currently supplies full contemporaneous TNC totals.
 
+## Optional real authorized quote feed: ready for connection, not yet connected
+
+`backend/south-florida-authorized-panel.js` integrates with the existing `configuredCollectors()`/daily `runMarketReferenceSweep()` **only if a lawful full-price data source is configured and its pricing-research rights documented**. It is nationwide-template architecture with three distinct market IDs, never a Miami rate applied to Broward or Palm Beach. These four values are server-side administrative configuration, not traveler-facing data:
+
+- `AR_PANEL_APPROVED_FOR_MARKET_RESEARCH=true` — explicit authorization after reviewing supplier's legal right to provide and license quote observations
+- `AR_PANEL_APPROVAL_REFERENCE` — review identifier to match the supplier's response (not a claim of regulator approval)
+- `AR_PANEL_HTTPS_URL` — approved HTTPS data-feed endpoint, never a private network address, user-provided URL or unauthenticated commercial marketplace
+- `AR_PANEL_READ_TOKEN` — supplier-issued credential for a read-only feed, stored as secret; never in GitHub, logs, tickets or chat
+
+The adapter makes no network request and registers no collector until all four are present. Once connected, at most **50 recent, ordinary, USD all-in, route/time-matched quotes per county per daily collection** can pass. It rejects personal identifiers, promotional/partial prices, absent right-to-use acknowledgement, stale/unverified route conditions, nonapproved markets and suspicious network redirects. The observation type remains a single field-panel source family: the existing independent-source, per-cell minimum, validation and manual promotion gates still apply. A single supplier feeding three counties does **not** become three independent suppliers. No market fare changes automatically.
+
+**This release does NOT connect a legally authorized outside live price-feed supplier or verify ordinary market discounts.** It implements the safe adapter so a future authorized feed requires source commissioning/configuration, not a rewrite of the platform. `backend/south-florida-authorized-panel.test.js` tests all three county paths twice, plus rejection and provider outages.
+
 ## Required tests and next actions
 
 `backend/south-florida-public-rates.test.js` uses real production module and fictitious HTTP/Firestore doubles. It runs two independent cycles for rate conflicts, valid identical rates still forbidden from TNC promotion, weekly skip and persistence after restart, offline/oversized source and no per-Travel queries. Added to the full commissioning manifest; existing six release checks, mobile builds, Firestore emulator and twice-run stress campaign remain mandatory. No genuine government page was fetched **by the GitHub synthetic test**.

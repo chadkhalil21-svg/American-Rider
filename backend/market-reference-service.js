@@ -16,6 +16,14 @@ const STATE='market_reference_state';
 const MAX_OBSERVATIONS_PER_MARKET_SWEEP=100;
 const HOUR=60*60*1000;
 const DAY=24*HOUR;
+// Source-led safety cap: a current competitor benchmark cannot be formed from
+// old prices just because one new quote arrived. Google production data quality
+// guidance requires checking every input, not merely the newest input.
+const MAX_REFERENCE_AGE_DAYS=30;
+function referenceAgeDays(plan){
+  const configured=Number(plan?.maxObservationAgeDays);
+  return Number.isFinite(configured)&&configured>=1 ? Math.min(MAX_REFERENCE_AGE_DAYS,configured) : MAX_REFERENCE_AGE_DAYS;
+}
 // Historical city datasets are published in batches. Do not poll hourly.
 const SOURCE_RECHECK_MS=Object.freeze({'chicago-tnp-open-data':7*DAY});
 
@@ -66,16 +74,19 @@ async function persistObservations(db,rows){
 // Historical fares, published estimates and supplier assertions without lawful
 // all-in-price metadata are useful for research but must never supply the
 // production reference, observation quorum or independent-family count.
-function comparableObservation(o){
+function comparableObservation(o,now=Date.now(),maxAgeDays=MAX_REFERENCE_AGE_DAYS){
   const catalog=sourceCatalogEntry(o?.sourceId);
-  return o?.hasAllInTotalComparable===true &&
+  const observed=Date.parse(o?.observedAt||'');
+  return Number.isFinite(now)&&Number.isFinite(observed)&&
+    observed<=now+5*60*1000 && now-observed<=maxAgeDays*DAY &&
+    o?.hasAllInTotalComparable===true &&
     catalog?.primaryEligible===true && catalog.type===o.sourceType &&
     Number.isSafeInteger(o?.travelerTotalCents) && o.travelerTotalCents>0 &&
     Number.isFinite(o?.routedMiles)&&o.routedMiles>=0 &&
     Number.isFinite(o?.routedMinutes)&&o.routedMinutes>=0;
 }
-function buildReferenceCell(rows,now=Date.now()){
-  const eligible=rows.filter(comparableObservation);
+function buildReferenceCell(rows,now=Date.now(),maxAgeDays=MAX_REFERENCE_AGE_DAYS){
+  const eligible=rows.filter(o=>comparableObservation(o,now,maxAgeDays));
   const bySource=new Map();
   for(const row of eligible){
     if(!bySource.has(row.sourceId))bySource.set(row.sourceId,[]);
@@ -100,23 +111,28 @@ function buildReferenceCell(rows,now=Date.now()){
     providers:Object.keys(providerCounts),
     maxProviderShare,
     latestObservedAt:eligible.map(x=>x.observedAt).filter(Boolean).sort().at(-1)||null,
+    oldestObservedAt:eligible.map(x=>x.observedAt).filter(Boolean).sort()[0]||null,
     asOf:new Date(now).toISOString(),
   };
 }
 
 async function recomputeMarket(db,marketId,{now=Date.now(),lookbackDays=90}={}){
-  const since=new Date(now-lookbackDays*86400000).toISOString();
+  const ageDays=referenceAgeDays(planForRegion(marketId));
+  // A 30-day scan is cheaper than the prior 90-day scan, and cannot qualify
+  // obsolete observations as current merely by importing one recent record.
+  const effectiveDays=Math.min(lookbackDays,ageDays);
+  const since=new Date(now-effectiveDays*DAY).toISOString();
   const snap=await db.collection(OBS).where('marketId','==',marketId).where('observedAt','>=',since).limit(10000).get();
   const groups=new Map(),sources=new Set(),families=new Set();
   snap.forEach(d=>{const o=d.data();const k=cellKey(o);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(o);sources.add(o.sourceId);families.add(o.sourceType);});
   const cells={};
   for(const [key,rows] of groups){
-    cells[key]=buildReferenceCell(rows,now);
+    cells[key]=buildReferenceCell(rows,now,ageDays);
   }
   const latestObservedAt=[...groups.values()].flat().map(x=>x.observedAt).sort().at(-1)||null;
   // Recompute produces a CANDIDATE. It is deliberately not production authority until an
   // explicit promotion record proves holdout, economics and router gates for this exact snapshot.
-  const out={marketId,asOf:new Date(now).toISOString(),latestObservedAt,lookbackDays,observations:snap.size,sourceCount:sources.size,evidenceFamilies:[...families],promotion:{status:'candidate'},cells};
+  const out={marketId,asOf:new Date(now).toISOString(),latestObservedAt,lookbackDays:effectiveDays,observations:snap.size,sourceCount:sources.size,evidenceFamilies:[...families],promotion:{status:'candidate'},cells};
   // Research recomputation must not overwrite an independently promoted live snapshot.
   await db.collection(CANDIDATE).doc(marketId).set(out);
   return out;
@@ -222,4 +238,4 @@ const referenceCache=createMarketReferenceCache({load:async marketId=>{
   return snapshot.exists?snapshot.data():null;
 }});
 async function currentReference(marketId){return referenceCache.read(marketId);}
-module.exports={median,distanceBand,durationBand,cellKey,persistObservations,recomputeMarket,runMarketReferenceSweep,currentReference,firestoreReady,MAX_OBSERVATIONS_PER_MARKET_SWEEP,eligibleEvidenceMarkets,sourceFingerprint,comparableObservation,buildReferenceCell};
+module.exports={median,distanceBand,durationBand,cellKey,persistObservations,recomputeMarket,runMarketReferenceSweep,currentReference,firestoreReady,MAX_OBSERVATIONS_PER_MARKET_SWEEP,eligibleEvidenceMarkets,sourceFingerprint,comparableObservation,buildReferenceCell,referenceAgeDays};

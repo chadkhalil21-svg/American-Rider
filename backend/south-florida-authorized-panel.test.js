@@ -1,4 +1,5 @@
 'use strict';
+const Response=globalThis.Response;
 const assert=require('node:assert/strict');
 const {approvedSource,authorizedMarketPanelCollectors}=require('./south-florida-authorized-panel');
 const {configuredCollectors}=require('./market-evidence-collectors');

@@ -14,6 +14,7 @@ const RECEIPT_EXPIRY_MS = 24 * 60 * 60_000;
 const AUDIT_RETENTION_MS = 7 * 24 * 60 * 60_000;
 const MAX_PER_SWEEP = 100;
 const MAX_PURGE_PER_SWEEP = 100;
+const NEVER_DUE_MS = Number.MAX_SAFE_INTEGER; // terminal entries must never precede due work
 const VALID_KINDS = new Set(['check_in']); // safety only: no per-Travel marketing cost
 const hash = value => createHash('sha256').update(String(value)).digest('hex');
 const ticketDocId = ticketId => hash('expo-receipt:' + ticketId);
@@ -70,7 +71,7 @@ async function sweepPushReceipts({
   if (!db) return {...report,ok:false,reason:adminStatus().reason || 'Firestore unavailable'};
   try {
     // One automatically indexed field, no composite index deployment needed.
-    // Completed records have nextAttemptAt=null, so cannot starve due receipts.
+    // Completed records use a far-future numeric due time, so even a Firestore\n    // cross-type comparison cannot make old terminal records starve new due receipts.
     const snap=await db.collection(COLLECTION).where('nextAttemptAt','<=',now)
       .orderBy('nextAttemptAt').limit(MAX_PER_SWEEP).get();
     report.scanned=snap.size ?? snap.docs.length;
@@ -82,7 +83,7 @@ async function sweepPushReceipts({
     const changes=[];
     for(const row of expired){
       changes.push({ref:row.ref,update:{status:'unverified_expired',
-        providerStatus:'unverified',nextAttemptAt:null,updatedAt:now}});
+        providerStatus:'unverified',nextAttemptAt:NEVER_DUE_MS,updatedAt:now}});
       report.unverified++;
     }
     if(current.length){
@@ -114,14 +115,14 @@ async function sweepPushReceipts({
         if(result?.status==='ok'){
           changes.push({ref:row.ref,update:{
             status:'provider_accepted',providerStatus:'accepted_by_APNs_or_FCM',
-            nextAttemptAt:null,updatedAt:now,
+            nextAttemptAt:NEVER_DUE_MS,updatedAt:now,
           }});
           report.providerAccepted++;
         } else if(result?.status==='error'){
           const code=receiptCode(result.details?.error);
           changes.push({ref:row.ref,update:{
             status:'provider_rejected',providerStatus:'rejected',
-            providerError:code,nextAttemptAt:null,updatedAt:now,
+            providerError:code,nextAttemptAt:NEVER_DUE_MS,updatedAt:now,
           }});
           report.providerRejected++;
           report.ok=false;

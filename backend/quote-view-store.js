@@ -49,4 +49,9 @@ async function report({db,now=Date.now(),env=process.env}){
   incomplete:snap.docs.length===SAMPLE,groups:[...groups.values()],
   paidConversion:false,priceChangeAuthorized:false};
 }
-module.exports={record,link,report,C,SAMPLE};
+// Isolated and best-effort AFTER the authoritative booking commit.
+async function linkAfterBooking({db,view,rideId,now=Date.now()}){
+ if(!db||!view)return false;
+ return db.runTransaction(tx=>link({tx,db,view,rideId,now}));
+}
+module.exports={record,link,linkAfterBooking,report,C,SAMPLE};

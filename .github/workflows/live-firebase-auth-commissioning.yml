@@ -7,6 +7,20 @@ on:
   push:
     branches: [release/current]
   workflow_dispatch:
+    inputs:
+      password_reset:
+        description: 'Use one genuine Firebase password-reset email quota request'
+        type: boolean
+        required: false
+        default: false
+  # Once daily; never one provider reset email for every commit/re-run.
+  schedule:
+    - cron: '17 12 * * *'
+
+# Cancel superseded in-flight PR runs to avoid repeated live account creates.
+concurrency:
+  group: live-firebase-auth-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -20,5 +34,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Exercise production Firebase account and session boundary
+      - name: Test real account, token and sign-in; reset email only once daily or manually
+        env:
+          TEST_FIREBASE_PASSWORD_RESET: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.password_reset == true) }}
         run: node scripts/commission-live-firebase-auth.cjs

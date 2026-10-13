@@ -69,8 +69,14 @@ async function refresh(token) {
     // Exercise the same Firebase password-reset issuance endpoint used by the app. This does
     // not pretend CI can prove inbox delivery, but it prevents a broken/disabled reset provider
     // path from remaining invisible while create/sign-in tests stay green.
-    await call('sendOobCode', {requestType:'PASSWORD_RESET', email});
-    console.log('PASS password-reset action accepted by live Firebase');
+    if (process.env.TEST_FIREBASE_PASSWORD_RESET === 'true') {
+      // Firebase caps email reset requests daily. Reserve the real request for
+      // one scheduled daily commission or explicit one-off verification.
+      await call('sendOobCode', {requestType:'PASSWORD_RESET', email});
+      console.log('PASS password-reset action accepted by live Firebase');
+    } else {
+      console.log('SKIP live password-reset issuance on code-change build; synthetic reset tests run in Release Gate');
+    }
 
     await call('delete', {idToken});
     idToken = null;

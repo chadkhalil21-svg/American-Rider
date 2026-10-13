@@ -3,6 +3,7 @@
 // Routine administrative checks are intentionally less frequent to bound idle database cost.
 // Live eligibility checks remain authoritative at booking, dispatch and on-duty operations.
 const PERIOD_MS = Object.freeze({
+  pushReceipts: 5 * 60_000, // Expo first receipt available about 15 minutes after send
   screening: 30 * 60_000,
   insuranceMonitoring: 30 * 60_000,
   operatorFees: 6 * 60 * 60_000,

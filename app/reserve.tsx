@@ -11,7 +11,7 @@
 // The demo's search screen is kept whole inside it: editable pickup (with the map pin), the
 // destination field and its results, and the live server quote. While a field is being edited
 // the sheet shows only the fields and their results; the rest returns with the pick.
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
@@ -26,7 +26,7 @@ import { Text } from '../src/components/AppText';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { destinationsNear, type Destination } from '../src/backend/destinations';
 import { searchPlaces, type PlaceSuggestion } from '../src/backend/placeSearch';
-import { fetchQuote, geocodePlace, isUnavailable } from '../src/backend/fares';
+import { fetchQuote, geocodePlace, isUnavailable, recordVisibleStandardQuote } from '../src/backend/fares';
 import { joinWaitlist } from '../src/backend/connect';
 import { fetchSmartQuote } from '../src/backend/smart';
 import { useGoBack } from '../src/components/nav';
@@ -144,6 +144,7 @@ export default function TravelConfirmation() {
       // flight makes the platform-fee floor look like a complete Travel price.
       ride.setQuotedFareCents(null);
       ride.setQuotedFeeLines([]);
+      ride.setResearchQuoteToken(null);
       ride.setTripCoords(null);
       ride.setArrival(place);
       if (!opts?.keepSearchOpen) {
@@ -201,6 +202,7 @@ export default function TravelConfirmation() {
         // Government fees the server fenced for this trip — an airport pickup fee, say. They
         // are inside the one price, and the sheet names them.
         ride.setQuotedFeeLines(quote.feeLines);
+        ride.setResearchQuoteToken(quote.researchQuoteToken??null);
       } else {
         setPriceFailed(true);
       }
@@ -375,6 +377,18 @@ export default function TravelConfirmation() {
   const busy = pricing || ride.repricing;
   const partyReady = ride.travelParty.mode === 'self' || (ride.travelParty.mode === 'other_adult' && ride.travelParty.travelerName.trim().length > 0);
   const canReserve = payConfig.canTakePayment && partyReady && authoritativePriceReady && !!ride.tripCoords && !busy && !priceFailed && !unavailable;
+  // A background server quote is not a view. Count only a focused sheet with
+  // the ordinary standard Total visible. The disabled pilot incurs no server write.
+  const lastVisibleQuote=React.useRef<string|null>(null);
+  useFocusEffect(React.useCallback(()=>{
+    const token=ride.researchQuoteToken;
+    if(!editing&&!smartLeg&&authoritativePriceReady&&ride.travelClass==='standard'&&
+      token&&lastVisibleQuote.current!==token){
+      lastVisibleQuote.current=token;
+      void recordVisibleStandardQuote(token);
+    }
+    return undefined;
+  },[ride.researchQuoteToken,ride.travelClass,editing,smartLeg,authoritativePriceReady]));
   const confirm = () => {
     if (!canReserve) return;
     ride.confirmRide();

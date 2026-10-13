@@ -8,12 +8,15 @@ const {pricingForRegion,pricingForTrip,requiresAgreedTotalOnBooking} = require('
 const {quote} = require('./payments');
 const release = pricingForRegion('fl-southeast');
 assert.deepEqual([release.baseCents,release.perMileCents,release.perMinuteCents,
-  release.minimumFareCents],[100,85,15,300]);
-assert.equal(requiresAgreedTotalOnBooking(release),false,
-  'present released price must not immediately abandon existing TestFlight testers');
-const proposal={...release,perMileCents:95,perMinuteCents:32,evidenceAsOf:'2026-10-13'};
+  release.minimumFareCents],[100,95,32,300]);
+assert.equal(requiresAgreedTotalOnBooking(release),true,
+  'new regional prices must require an upgraded client that consents to the actual Total');
+const legacy={...release,perMileCents:85,perMinuteCents:15};
+assert.equal(requiresAgreedTotalOnBooking(legacy),false,
+  'frozen historical Florida rate is recognized for retrospective evidence only');
+const proposal={...release,evidenceAsOf:'2026-10-13'};
 assert.equal(requiresAgreedTotalOnBooking(proposal),true,
-  'proposed Florida 95c/mi and 32c/min cannot book on an unconfirmed old app');
+  'Florida 95c/mi and 32c/min cannot book on an unconfirmed old app');
 for(const k of ['baseCents','perMileCents','perMinuteCents','minimumFareCents']){
  const raised={...release,[k]:release[k]+1};
  assert.equal(requiresAgreedTotalOnBooking(raised),true,'all four changes require consent: '+k);

@@ -3,7 +3,14 @@ const assert=require('node:assert/strict');
 const {normalizeObservation}=require('./market-evidence-ingest');
 const {buildReferenceCell,comparableObservation}=require('./market-reference-service');
 const {qualification}=require('./market-reference-authority');
+const {planForRegion}=require('./market-evidence');
 const now=Date.parse('2026-10-13T16:00:00Z');
+for(const market of ['fl-miami-dade','fl-broward','fl-palm-beach']){
+ const p=planForRegion(market);
+ assert.ok(p.sources.includes('controlled-public-price-panel'));
+ assert.ok(p.sources.includes('independent-controlled-audit'));
+ assert.ok(p.sources.includes('gridwise-analytics'));
+}
 const stamp='2026-10-13T15:30:00Z';
 const base={marketId:'fl-miami-dade',serviceClass:'standard',
   observedAt:stamp,routedMiles:8,routedMinutes:21,

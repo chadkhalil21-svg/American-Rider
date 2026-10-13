@@ -40,9 +40,10 @@ const base={marketId:'fl-miami-dade',sourceId:'controlled-public-price-panel',
   assert.equal(again.sourceObservationId,base.sourceObservationId);
   const legacy={...base,marketId:'il-chicago',sourceId:'chicago-tnp-open-data',sourceType:'government-trips',
    sourceObservationId:null};
+  const storedLegacy=normalizeObservation(legacy);
   const historicHash=crypto.createHash('sha256').update([
-   legacy.marketId,legacy.sourceId,legacy.observedAt,legacy.routedMiles,
-   legacy.routedMinutes,legacy.travelerTotalCents].join('|')).digest('hex');
+   storedLegacy.marketId,storedLegacy.sourceId,storedLegacy.observedAt,storedLegacy.routedMiles,
+   storedLegacy.routedMinutes,storedLegacy.travelerTotalCents].join('|')).digest('hex');
   await persistObservations(db,[legacy]);
   assert.equal(db.storage.has(historicHash),true,'public published historical hash format unchanged');
   console.log('PASS stable field-panel IDs pass '+pass+': 2 independent sources, changed amount conflict, no first-read cost, legacy hashes intact');

@@ -4,7 +4,7 @@
 const {regionForTrip}=require('./regions');
 const {marketFor}=require('./markets');
 const {planForRegion}=require('./market-evidence');
-const {currentReference,distanceBand,durationBand}=require('./market-reference-service');
+const {currentReference,distanceBand,durationBand,referenceAgeDays}=require('./market-reference-service');
 
 function localConditions(region,date=new Date()){
   const p=Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:region.timezone,hour:'numeric',hourCycle:'h23',weekday:'short'}).formatToParts(date).map(x=>[x.type,x.value]));
@@ -49,7 +49,13 @@ function qualification(snapshot,plan,cell=null,now=Date.now()){
   const observed=Date.parse(cell.latestObservedAt||'');
   if(!Number.isFinite(observed))return {ok:false,reason:'condition-cell evidence timestamp missing'};
   if(observed>now+5*60_000)return {ok:false,reason:'condition-cell evidence future-dated'};
-  const maxAgeDays=Number(plan?.maxObservationAgeDays||90);
+  const maxAgeDays=referenceAgeDays(plan);
+  // The newest price alone cannot attest to the freshness of the other
+  // observations that formed this price. Require a complete time range.
+  const oldest=Date.parse(cell.oldestObservedAt||'');
+  if(!Number.isFinite(oldest)||oldest>observed)return {ok:false,reason:'condition-cell evidence range unverified'};
+  if(oldest>now+5*60_000)return {ok:false,reason:'condition-cell evidence future-dated'};
+  if(now-oldest>maxAgeDays*86400000)return {ok:false,reason:'condition-cell evidence stale'};
   if(now-observed>maxAgeDays*86400000)return {ok:false,reason:'condition-cell evidence stale'};
   return {ok:true};
 }

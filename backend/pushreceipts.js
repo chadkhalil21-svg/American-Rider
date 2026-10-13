@@ -41,7 +41,18 @@ async function recordAcceptedTicket({
     return { ok:true };
   } catch (e) {
     // A duplicate ticket is already durably tracked; do not duplicate writes.
-    if (e?.code===6 || /already exists/i.test(String(e?.message||''))) return {ok:true,duplicate:true};
+    if (e?.code===6 || /already exists/i.test(String(e?.message||''))) {
+      // Amazon's "same request ID, different intent" rule: the already-used
+      // ticket ID is valid only for the original person, token and kind.
+      try {
+        const existing=await ref.get();
+        const old=existing.exists ? existing.data() : null;
+        if (old?.uid===uid && old?.kind===kind &&
+            old?.ticketId===ticketId && old?.tokenHash===hash(token))
+          return {ok:true,duplicate:true};
+      } catch { /* no optimistic duplicate success on unavailable Firestore */ }
+      return {ok:false,reason:'safety push ticket conflicts with existing event'};
+    }
     return {ok:false,reason:'safety push ticket not stored'};
   }
 }

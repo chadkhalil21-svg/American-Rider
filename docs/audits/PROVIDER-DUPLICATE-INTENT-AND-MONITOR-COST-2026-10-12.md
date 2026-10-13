@@ -1,0 +1,26 @@
+# Source-led audit — provider event identity and scale acceptance
+**2026-10-12, PR under review.**
+
+## Governing sources before implementation
+1. [Amazon Builders' Library: Making retries safe with idempotent APIs](https://aws.amazon.com/builders-library/making-retries-safe-with-idempotent-APIs/): accepting a repeated client request ID with changed parameters is not safe. Return a mismatch rather than falsely claiming success. Durable event identity must be more precise than a sanitized document key.
+2. [Google Firestore best practices](https://firebase.google.com/docs/firestore/best-practices) and [billing](https://firebase.google.com/docs/firestore/pricing): lookups cost document reads; verify provider event details on **retries only**, not every initial event. Use document-ID lookups and bounded storage. Full scans are a separate scaling concern.
+3. [NASA SWE-055 Requirements Validation](https://swehb.nasa.gov/spaces/SWEHBVD/pages/102695440/SWE-055%2B-%2BRequirements%2BValidation): test real intended operating conditions, including bad and duplicate provider inputs and actual Firestore transaction semantics; local emulators cannot prove real Stripe delivery or real-money reconciliation.
+4. [Google SRE four golden signals](https://sre.google/sre-book/monitoring-distributed-systems/): distinguish syntactic HTTP success from wrong financial outcome, and measure backlog/read traffic and failure rates.
+5. [Harvard Business School Service Excellence by Design](https://www.hbs.edu/faculty/Pages/item.aspx?research=7002), [Stanford d.school design test methods](https://dschool.stanford.edu/tools/design-thinking-bootleg), and Apple’s notification/user experience guidance are institutional lenses, not endorsements or consultations. The approved Council criteria are defined in `docs/COUNCIL-STANDARDS.md`.
+
+## Verified source-level defect
+`backend/providerqueue.js` previously derived Firestore inbox document ID by replacing unsafe characters with "_" and cutting at 220 characters. It **acknowledged every Firestore ALREADY_EXISTS event as a safe duplicate**, without reading the original. An otherwise valid, separately signed event with a different raw ID might normalize to the same stored ID; two payloads with the same event ID but changed payment amount could also be silently misclassified. Provider signatures authenticate who sent a message; they do **not** resolve this local event-ID collision.
+
+## Contained correction
+- For each new event, store the SHA-256 hash of its complete, recursively canonicalized JSON payload with the provider and unmodified event ID. Reject invalid or oversized identities and excessively deep nested JSON.
+- On Firestore ALREADY_EXISTS only, read the existing document and compare provider, original full event ID, and canonical payload fingerprint. A true retransmission with rearranged JSON key order is a duplicate; a conflicting amount, type, account or normalized/truncated ID returns a fail-closed error. A database read outage also fails closed. Existing legacy event documents lack a stored fingerprint; compare against their stored event payload without migration or replay loss.
+- Firestore reads during **new events stay the same**; the extra one-document read only occurs on duplicate notifications. No new subscription, new API, or live-money operation.
+- Synthetic tests cover same ID with changed type, amount, reordered keys, invalid IDs, sanitized collisions, 220-character truncation, and signed Stripe-to-Travel altered-amount injection, twice. The real local Firestore emulator adds two passes of 60 legitimate duplicate dispute messages each plus payment/collision cases.
+
+## Separate scale finding—not solved by this narrow patch
+`backend/monitor.js` still performs a full paginated `status in [accepted, arrived, onboard]` scan **every minute**. Returned-document lower bounds if those active counts persist a full day: 1,201 records ⇒ 1,729,440 returned-document reads/day; 10,000 ⇒ 14,400,000/day; 1,000,000 ⇒ 1,440,000,000/day, before monitoring writes, health, other queries, index and network charges. These are arithmetic workloads, **not measured production throughput/bills**. Pagination prevents skipped Travels but does **not** reduce total billed returned documents. Any safe replacement must preserve incident priority, new trips and emergency reply detection, stale GPS, restart recovery, and an overdue full-fleet fallback. An event/due-time driven queue and separately tested coverage completeness is the right next architecture study; **do not install a naive cap or sample that stops monitoring active Travels**.
+
+## Risk/acceptance boundaries
+A signed synthetic event with fictional money is not a real Stripe sandbox webhook callback. The new Firestore emulator is not a production cloud peak-load test. No safety or emergency guarantee may be represented as physically validated. National pricing data, Operator verification, phone UX and externally required launch evidence remain as recorded in the canonical ledger and existing issues.
+
+**Release protocol:** run all six checks against the exact PR head twice where configured, merge only when green, and independently verify the deployed Render SHA; no live market, fare, card, insurance or provider setting changes in this patch.

@@ -82,6 +82,7 @@ const LIMITS = {
   placeSearchIp: perIp({ name: 'place-search', limit: 600, windowMs: 60 * 60 * 1000 }),
 };
 const { authoritativeFare } = require('./fareauthority');
+const { pricingForTrip, requiresAgreedTotalOnBooking } = require('./market-pricing');
 const { outsideMarket, outsideMarketMessage } = require('./market');
 const { permitRequired, permitRequiredMessage } = require('./fees');
 const { destinationsNear } = require('./places');
@@ -3643,6 +3644,18 @@ app.post('/travel/prepare', requireAuth, LIMITS.dispatch, requireFreshAuth, requ
       return res.status(409).json({ error: 'The road distance cannot be verified', code: 'route_geometry_required' });
     }
     if (priced.tollStatus === 'unknown') return res.status(503).json({ error: 'Toll price unavailable', code: 'toll_unavailable' });
+    // Price revisions require the Traveler to have seen and explicitly agreed
+    // to the precise, current server Total. Legacy TestFlight builds lack this
+    // field and may not be booked at a newly increased rate. No extra DB read.
+    // Existing idempotent, previously prepared Travels are handled above.
+    if (requiresAgreedTotalOnBooking(pricingForTrip(pickup, destinationPoint)) &&
+        (b.agreedTotalCents === undefined || b.agreedTotalCents === null)) {
+      return res.status(428).json({
+        error: 'Update American Rider to review and confirm the current Travel Total.',
+        code: 'travel_price_confirmation_required',
+        currentTotalCents: priced.travelerPays,
+      });
+    }
     // When the current client supplies the all-in amount shown on its booking
     // sheet, never silently create or charge a Travel at a different Total.
     // The quote remains server-computed; this is a CONSENT comparison only.

@@ -11,10 +11,11 @@
 // The demo's search screen is kept whole inside it: editable pickup (with the map pin), the
 // destination field and its results, and the live server quote. While a field is being edited
 // the sheet shows only the fields and their results; the rest returns with the pick.
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -58,6 +59,7 @@ import { useLanguage } from '../src/state/LanguageContext';
 import { useAuth } from '../src/state/AuthContext';
 import { colors, fmt } from '../src/theme';
 import { fetchFamily, type FamilyLink } from '../src/backend/family';
+import { LEGAL_URL } from '../src/config';
 
 // The demo's search-field magnifier: 18px, muted stroke 1.7.
 function Magnifier() {
@@ -89,7 +91,7 @@ function RailIcon() {
 const minutesOf = (meta: string) => (meta.match(/\d+/)?.[0] ?? meta);
 
 export default function TravelConfirmation() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const router = useRouter();
   const goBack = useGoBack();
   const ride = useRide();
@@ -377,18 +379,17 @@ export default function TravelConfirmation() {
   const busy = pricing || ride.repricing;
   const partyReady = ride.travelParty.mode === 'self' || (ride.travelParty.mode === 'other_adult' && ride.travelParty.travelerName.trim().length > 0);
   const canReserve = payConfig.canTakePayment && partyReady && authoritativePriceReady && !!ride.tripCoords && !busy && !priceFailed && !unavailable;
-  // A background server quote is not a view. Count only a focused sheet with
-  // the ordinary standard Total visible. The disabled pilot incurs no server write.
-  const lastVisibleQuote=React.useRef<string|null>(null);
-  useFocusEffect(React.useCallback(()=>{
+  // Explicit informed consent, not a background price quote or a passive screen
+  // render, is the only way the research endpoint receives a view observation.
+  // This checkbox never affects payment, route selection or booking eligibility.
+  const [approvedResearchToken,setApprovedResearchToken]=useState<string|null>(null);
+  const joinQuoteStudy=()=>{
     const token=ride.researchQuoteToken;
-    if(!editing&&!smartLeg&&authoritativePriceReady&&ride.travelClass==='standard'&&
-      token&&lastVisibleQuote.current!==token){
-      lastVisibleQuote.current=token;
-      void recordVisibleStandardQuote(token);
-    }
-    return undefined;
-  },[ride.researchQuoteToken,ride.travelClass,editing,smartLeg,authoritativePriceReady]));
+    if(!token||editing||smartLeg||!authoritativePriceReady||
+       ride.travelClass!=='standard'||approvedResearchToken===token)return;
+    setApprovedResearchToken(token);
+    void recordVisibleStandardQuote(token);
+  };
   const confirm = () => {
     if (!canReserve) return;
     ride.confirmRide();
@@ -831,6 +832,23 @@ export default function TravelConfirmation() {
               <Text style={styles.stateNote}>{t('traveler.selectDestAgain')}</Text>
             )}
             {modeNote && <Text style={styles.payNote}>{modeNote}</Text>}
+            {!!ride.researchQuoteToken && authoritativePriceReady &&
+              ride.travelClass==='standard' && !smartLeg && (
+                <View style={styles.studyRow}>
+                  <Pressable accessibilityRole="checkbox"
+                    accessibilityState={{checked:approvedResearchToken===ride.researchQuoteToken}}
+                    onPress={joinQuoteStudy} style={styles.studyToggle}>
+                    <Text style={styles.studyCheck}>
+                      {approvedResearchToken===ride.researchQuoteToken?'☑':'□'}
+                    </Text>
+                    <Text style={styles.studyLabel}>{t('traveler.pricingResearchOptIn')}</Text>
+                  </Pressable>
+                  <Pressable accessibilityRole="link"
+                    onPress={()=>void Linking.openURL(`${LEGAL_URL}/privacy?lang=${encodeURIComponent(language)}`)}>
+                    <Text style={styles.studyPrivacy}>{t('traveler.privacy')}</Text>
+                  </Pressable>
+                </View>
+              )}
             <PrimaryButton
               label={busy ? t('traveler.busyChecking') : t('traveler.confirmTravel')}
               disabled={!canReserve}
@@ -936,6 +954,11 @@ const styles = StyleSheet.create({
   totalState: { fontSize: 15, color: colors.muted },
   stateNote: { fontSize: 13, color: colors.ink, marginTop: 8 },
   payNote: { fontSize: 12, color: colors.muted, marginTop: 8, textAlign: 'right', paddingHorizontal: 4 },
+  studyRow: {marginTop: 10, gap: 5, paddingHorizontal: 5},
+  studyToggle: {flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 38},
+  studyCheck: {fontSize: 21, color: colors.ink},
+  studyLabel: {flex: 1, fontSize: 12, color: colors.ink2, lineHeight: 16},
+  studyPrivacy: {fontSize: 12, color: colors.ink, textDecorationLine: 'underline', paddingVertical: 2},
   confirm: { marginTop: 12 },
   cancelTerms: { fontSize: 12, color: colors.ink2, marginTop: 10, lineHeight: 17.5, textAlign: 'center' },
 });

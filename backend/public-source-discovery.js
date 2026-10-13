@@ -15,7 +15,11 @@ function assessPublicSource(meta={}){
   if(!meta.endpoint)problems.push('endpoint missing');
   if(!meta.publicationCadence)problems.push('publication cadence missing');
   if(!meta.geography)problems.push('geography missing');
-  if(meta.hasPassengerCharge===true&&meta.hasTripDistance===true&&meta.hasTripDuration===true)fitness.push(FITNESS.FARE_REFERENCE);
+  // Having a fare column does NOT imply a comparable, all-in, ordinary
+  // upfront Traveler Total. Tips, surge/promotions, rounding and fees differ.
+  if(meta.hasPassengerCharge===true&&meta.hasAllInTotalComparable===true&&
+    meta.hasTripDistance===true&&meta.hasTripDuration===true)
+    fitness.push(FITNESS.FARE_REFERENCE);
   if(meta.hasTripDistance===true||meta.hasTripDuration===true)fitness.push(FITNESS.TRIP_SHAPE);
   if(meta.hasTripCount===true)fitness.push(FITNESS.DEMAND);
   if(meta.isRegulatoryRate===true)fitness.push(FITNESS.REGULATORY_FLOOR);

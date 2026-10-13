@@ -1,7 +1,7 @@
 'use strict';
 const assert=require('node:assert/strict');
 const {issue,verify,routeTag}=require('./quote-view-contract');
-const {record,link,report,C,SAMPLE}=require('./quote-view-store');
+const {record,link,linkAfterBooking,report,C,SAMPLE}=require('./quote-view-store');
 const now=Date.UTC(2026,9,13,18),uid='synthetic-uid',
  env={PRICE_VIEWS_PILOT:'1',PRICE_VIEWS_PRIVACY_OK:'1',PRICE_VIEWS_TTL_READY:'1',
  PRICE_VIEWS_KEY:'synthetic-separate-key-32-chars-minimum'};
@@ -13,8 +13,8 @@ const token=issue({uid,now,env,id:'a'.repeat(32),marketId:'fl-miami-dade',
  const db={collection:n=>{assert.equal(n,C);return {doc:id=>({
   create:async o=>{if(items.has(id)){const e=Error('already exists');e.code=6;throw e;}
    items.set(id,o);creates++;}
- }),where:()=>({orderBy:()=>({limit:cap=>({get:async()=>{reads++;return{
-  docs:[...items.values()].slice(0,cap).map(d=>({data:()=>d}))};}})})})};}};
+ }),where:()=>({where:()=>({orderBy:()=>({limit:cap=>({get:async()=>{reads++;return{
+  docs:[...items.values()].slice(0,cap).map(d=>({data:()=>d}))};}})})})})};}};
  assert.equal((await record({db,token,uid,now,env})).ok,true);
  assert.equal((await record({db,token,uid,now,env})).duplicate,true);
  assert.equal(creates,1);
@@ -29,6 +29,12 @@ const token=issue({uid,now,env,id:'a'.repeat(32),marketId:'fl-miami-dade',
  assert.equal(await link({tx,db:txDB,view,rideId:ride,now:now+20}),true);
  assert.equal(tx.updates.length,1);
  assert.equal(await link({tx,db:txDB,view,rideId:'c'.repeat(40),now:now+20}),false);
+ const separate={collection:txDB.collection,runTransaction:async fn=>fn(tx)};
+ assert.equal(await linkAfterBooking({db:separate,view,rideId:ride,now:now+25}),true);
+ const failed=linkAfterBooking({db:{runTransaction:async()=>{throw Error('research down');}},
+   view,rideId:ride,now:now+25}).then(()=>false,()=>true);
+ assert.equal(await failed,true);
+
  const info=await report({db,now:now+61*60000,env});
  assert.equal(info.counted,1);assert.equal(info.prepared,1);
  assert.equal(info.priceChangeAuthorized,false);assert.equal(info.paidConversion,false);

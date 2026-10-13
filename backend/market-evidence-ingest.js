@@ -30,6 +30,10 @@ function normalizeObservation(raw,now=Date.now()){
     routedMiles:raw.routedMiles,
     routedMinutes:raw.routedMinutes,
     travelerTotalCents:raw.travelerTotalCents,
+    // An explicit source-validated assertion, not proof of independent authority.
+    // Only an approved adapter may set this true; the snapshot builder independently
+    // checks source eligibility, evidence diversity and human promotion gates.
+    hasAllInTotalComparable:raw.hasAllInTotalComparable===true,
     daypart:raw.daypart?String(raw.daypart):null,
     weekdayWeekend:raw.weekdayWeekend?String(raw.weekdayWeekend):null,
     calendarClass:raw.calendarClass?String(raw.calendarClass):null,

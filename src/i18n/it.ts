@@ -242,6 +242,8 @@ export default {
     lostNotFound: "Oggetto non trovato",
   },
   traveler: {
+    updateRequiredTitle: 'Aggiornamento necessario',
+    updateRequiredBody: 'Aggiorni American Rider per verificare e confermare il totale attuale del viaggio. Non è stata effettuata alcuna prenotazione né alcun addebito.',
     priceChangedTitle: 'Il costo totale è cambiato',
     priceChangedBody: 'Il prezzo è cambiato prima della prenotazione. Nessun addebito è stato effettuato. Controlli il totale attuale.',
     reviewUpdatedTotal: 'Controllare il totale',

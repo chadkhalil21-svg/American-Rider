@@ -1743,7 +1743,8 @@ app.post('/fare-quote', attachAuth, LIMITS.quoteIp, requireOperationalReadiness,
        String(req.body?.travelClass||'standard').toLowerCase()==='standard'
      ? (()=>{const v=quoteViewContract.issue({uid:req.uid,
          marketId:marketFor(req.body?.pickup)?.id,
-         distanceBand:quoteDistanceBand(priced.miles),totalCents:priced.travelerPays});
+         distanceBand:quoteDistanceBand(priced.miles),totalCents:priced.travelerPays,
+         routeFingerprint:quoteViewContract.routeTag({uid:req.uid,pickup:req.body.pickup,dest:req.body.dest})});
        return v?{researchQuoteToken:v}:{};})() : {}),
   });
 });
@@ -3663,7 +3664,8 @@ app.post('/travel/prepare', requireAuth, LIMITS.dispatch, requireFreshAuth, requ
       ? quoteViewContract.verify(b.researchQuoteToken,{uid:req.uid}):null;
     const matchedView=quoteView&&quoteViewContract.matchesBooking(quoteView,{
       marketId:marketFor(pickup)?.id,distanceBand:quoteDistanceBand(priced.miles),
-      totalCents:priced.travelerPays})?quoteView:null;
+      totalCents:priced.travelerPays,
+      routeFingerprint:quoteViewContract.routeTag({uid:req.uid,pickup,dest:destinationPoint})})?quoteView:null;
     const outcome = await prepareBooking({ db, uid: req.uid, key, fingerprint,
       quoteView:matchedView, record: {
       tripNo, travelerName: party.travelerName.slice(0, 60), party,

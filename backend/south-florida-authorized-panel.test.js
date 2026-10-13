@@ -66,7 +66,7 @@ async function run(){
   [{routeConditionsConfirmed:false},/promotional/],
   [{customerId:'personal'},/personalized/],
   [{userId:'personal'},/personalized/],
-  [{marketId:'fl-broward'},/scope|permissions/],
+  [{marketId:'fl-broward'},/unmatched|promotional/],
   [{observedAt:'2026-08-12T00:00:00Z'},/stale/],
   [{observedAt:'2026-10-13T20:00:00Z'},/stale/],
   [{routedMiles:-1},/routedMiles/],

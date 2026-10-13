@@ -22,8 +22,8 @@ const HOME = { lat: 25.7689, lng: -80.1935 }; // Brickell City Centre
 // Priced through a router's own numbers, so neither the circuity factor nor the assumed speed
 // can flatter the result. This is the number in Chad's comparison, to the cent.
 const chad = fareCentsForCoords(HOME, { lat: 25.7953, lng: -80.2789 }, { routedMiles: 5.04, routedMinutes: 15 });
-check('the verified route prices at a $7.53 fare — $1.00 + 5.04 miles + 15 minutes',
-  chad.travelCostCents === 753, `got ${usd(chad.travelCostCents)}`);
+check('the verified route prices at a $10.59 Fare — $1.00 + 5.04 miles + 15 minutes',
+  chad.travelCostCents === 1059, `got ${usd(chad.travelCostCents)}`);
 
 // Market competitiveness is NOT hard-coded against one platform-published snapshot. The fare
 // formula is pinned here as product behavior; independent repeated-market sampling belongs in
@@ -31,26 +31,26 @@ check('the verified route prices at a $7.53 fare — $1.00 + 5.04 miles + 15 min
 // Rider total and the 99% operator distribution for the calibration route.
 const allIn = chad.travelCostCents + platformFeeCents(chad.travelCostCents, 'US');
 check('the calibration route includes the complete platform fee in the traveler total',
-  allIn === 1003, `ours all-in ${usd(allIn)}`);
-check('the operator receives exactly 99% of the $7.53 Travel Fare',
-  chad.travelCostCents - commissionCents(chad.travelCostCents) === 746,
+  allIn === 1309, `ours all-in ${usd(allIn)}`);
+check('the operator receives exactly 99% of the $10.59 Travel Fare',
+  chad.travelCostCents - commissionCents(chad.travelCostCents) === 1049,
   `operator ${usd(chad.travelCostCents - commissionCents(chad.travelCostCents))}`);
 check('a routed travel is marked as measured, not assumed', chad.timedBy === 'router');
-check('the $1.80-per-mile model would have charged $12.07 — above both. It is gone.',
+check('the retired $1.80-per-mile flat Travel Fare model is no longer our route Fare',
   chad.travelCostCents < 1207);
 
 // ---- The time term is real, and it is what the $1.80 model could not do ------------------
 const clear = fareCentsForCoords(HOME, { lat: 25.7953, lng: -80.2789 }, { routedMiles: 5.04, routedMinutes: 15 });
 const stuck = fareCentsForCoords(HOME, { lat: 25.7953, lng: -80.2789 }, { routedMiles: 5.04, routedMinutes: 40 });
 check('the same five miles in forty minutes pays the operator more than in fifteen',
-  stuck.travelCostCents - clear.travelCostCents === 375,
+  stuck.travelCostCents - clear.travelCostCents === 800,
   `${usd(clear.travelCostCents)} vs ${usd(stuck.travelCostCents)}`);
 
 // ---- The stand-in speed, and the one thing it must reproduce -----------------------------
 check('with no router, the calibration route still resolves to 15.0 minutes',
   Math.abs(minutesFor(5.04, null) - 15) < 0.05, `got ${minutesFor(5.04, null).toFixed(2)}`);
 check('and therefore to within a cent of the routed price',
-  Math.abs(fareCentsForCoords(HOME, { lat: 25.7953, lng: -80.2789 }, { routedMiles: 5.04 }).travelCostCents - 753) <= 2);
+  Math.abs(fareCentsForCoords(HOME, { lat: 25.7953, lng: -80.2789 }, { routedMiles: 5.04 }).travelCostCents - 1059) <= 2);
 check('an unrouted travel says so', fareCentsForCoords(HOME, { lat: 25.7826, lng: -80.1341 }).timedBy === 'estimate');
 check('assumed speed rises with distance — a city mile is not a Turnpike mile',
   assumedMph(1) < assumedMph(10) && assumedMph(10) < assumedMph(30));
@@ -64,11 +64,11 @@ let worstJump = 0;
 let prev = null;
 for (let tenths = 1; tenths <= 4000; tenths += 1) {
   const m = tenths / 10;
-  const cents = 100 + Math.round(m * 85) + Math.round(minutesFor(m, null) * 15);
+  const cents = 100 + Math.round(m * 95) + Math.round(minutesFor(m, null) * 32);
   if (prev !== null) worstJump = Math.max(worstJump, cents - prev);
   prev = cents;
 }
-check('a tenth of a mile further never costs more than 20 cents more', worstJump <= 20, `${worstJump}c`);
+check('a tenth of a mile further never costs more than 25 cents more', worstJump <= 25, `${worstJump}c`);
 
 // ---- The floor is on what the traveler pays ---------------------------------------------
 const tiny = fareCentsForCoords(HOME, { lat: 25.769, lng: -80.1936 });
@@ -78,18 +78,17 @@ check('the shortest possible travel costs the traveler exactly $5.50',
 check('the no-pass-through minimum remains the intended $5.50 product floor',
   MIN_TOTAL_CENTS === 550);
 
-// ---- The named table has not been left behind -------------------------------------------
-// It priced every destination under the old model for two months. A table that disagrees with
-// the formula is a second fare model, which is the thing this whole change removes.
-for (const [name, coords] of [
-  ['Miami International Airport', { lat: 25.7953, lng: -80.2789 }],
-  ['South Beach', { lat: 25.7826, lng: -80.1341 }],
-  ['Wynwood', { lat: 25.801, lng: -80.1994 }],
-]) {
-  const byName = fareCentsFor(name);
-  const byCoord = fareCentsForCoords(HOME, coords).travelCostCents;
-  check(`the table and the formula agree on ${name}`, byName === byCoord,
-    `table ${usd(byName)} vs formula ${usd(byCoord)}`);
+// ---- No second, obsolete named-place fare authority -------------------------------------
+// The historical Brickell table is intentionally retained for old records, NOT
+// available for new quotes after route-based price revision. A named destination
+// without a real pickup and destination cannot result in an honest Total.
+const { priceRoute } = require('./fareauthority');
+for (const name of ['Miami International Airport','South Beach','Wynwood']) {
+  const historic = fareCentsFor(name);
+  const attempted = priceRoute({destination:name});
+  check(`no inaccurate historic named-only quote for ${name}`,
+    historic > 0 && !(attempted?.travelCostCents > 0),
+    `historic ${usd(historic)}, priced ${JSON.stringify(attempted)}`);
 }
 check('the aliases agree with their canonical name',
   fareCentsFor('MIA Airport') === fareCentsFor('Miami International Airport') &&

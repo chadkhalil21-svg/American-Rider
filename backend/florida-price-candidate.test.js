@@ -24,7 +24,7 @@ function total(p,miles,minutes,country='US',toll=0,governmentFees=[]){
   const f=fare(p,miles,minutes);
   const q=quote(f,null,governmentFees,country,toll);
   assert.equal(q.operatorGets,f-commissionCents(f)+toll);
-  assert.equal(q.travelerPays,q.travelCostCents+q.appFee+q.passThroughCents);
+  assert.equal(q.travelerPays,f+q.appFee+q.passThroughCents);
   assert.ok(q.appFee>=MIN_PLATFORM_FEE_CENTS);
   assert.ok(q._economics.platformContributionCents>=q._economics.requiredContributionCents);
   return q;

@@ -178,10 +178,10 @@ export default function RideScreen() {
       <Screen>
         <LetterheadBar onBack={()=>router.replace('/reserve')}/>
         <View style={{flex:1,justifyContent:'center',paddingHorizontal:24,gap:14}}>
-          <Text style={styles.searchTitle}>{t('traveler.totalTravelCost')}</Text>
-          <Text style={styles.searchSub}>{t('traveler.selectDestAgain')}</Text>
+          <Text style={styles.searchTitle}>{t('traveler.priceChangedTitle')}</Text>
+          <Text style={styles.searchSub}>{t('traveler.priceChangedBody')}</Text>
           <PrimaryButton
-            label={t('traveler.changeTravel')}
+            label={t('traveler.reviewUpdatedTotal')}
             onPress={()=>router.replace('/reserve')}
           />
         </View>

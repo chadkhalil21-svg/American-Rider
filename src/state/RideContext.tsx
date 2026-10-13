@@ -191,10 +191,12 @@ export type RideStore = {
   beginSmartLeg: (which: 1 | 2) => boolean;
   endSmartJourney: () => void;
   setTravelClass: (c: string) => void;
-  // The server-quoted STANDARD fare (cents) for the trip being booked, before class and
-  // before the platform fee. Screens derive display prices from this; the charge is re-priced
-  // server-side at confirm regardless.
+  // The server-quoted fare already includes the selected vehicle class.
   quotedFareCents: number | null;
+  // This is the only authoritative amount to show before a booking.
+  quotedTotalCents: number | null;
+  quotedForClass: string | null;
+  setQuotedServerPrice: (fareCents:number,totalCents:number,travelClass:string)=>void;
   researchQuoteToken: string | null;
   setResearchQuoteToken: (token: string | null) => void;
   /** THE all-in price for the travel currently being booked. Never recompute this. */
@@ -368,7 +370,21 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     }
     return platformFee(fare);
   };
-  const [quotedFareCents, setQuotedFareCents] = useState<number | null>(null);
+  const [quotedFareCents, setRawQuotedFareCents] = useState<number | null>(null);
+  const [quotedTotalCents, setQuotedTotalCents] = useState<number | null>(null);
+  const [quotedForClass, setQuotedForClass] = useState<string | null>(null);
+  // Any old quote is void after a route/class change, and only a complete server
+  // answer may authorize a new amount. No class, fee or toll arithmetic on phone.
+  const setQuotedFareCents = useCallback((n:number|null)=>{
+    setRawQuotedFareCents(n);setQuotedTotalCents(null);setQuotedForClass(null);
+  },[]);
+  const setQuotedServerPrice = useCallback((fareCents:number,totalCents:number,cls:string)=>{
+    if(!Number.isSafeInteger(fareCents)||fareCents<=0||
+       !Number.isSafeInteger(totalCents)||totalCents<fareCents||!cls){
+      setRawQuotedFareCents(null);setQuotedTotalCents(null);setQuotedForClass(null);return;
+    }
+    setRawQuotedFareCents(fareCents);setQuotedTotalCents(totalCents);setQuotedForClass(cls);
+  },[]);
   const [researchQuoteToken, setResearchQuoteTokenState] = useState<string | null>(null);
   const researchQuoteRef = useRef<string | null>(null);
   const setResearchQuoteToken = useCallback((token:string|null)=>{
@@ -382,35 +398,14 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
 
   const [arrival, setArrival] = useState<Place>({ name: '', short: '', cost: 0, meta: '' });
 
-  // ---- THE PRICE. ONE DERIVATION, USED BY EVERY SCREEN THAT SHOWS MONEY. ------------------
-  //
-  // Four screens computed this themselves — reserve, review, schedule and options — and three
-  // of them got it wrong in the same way: they read `arrival.cost`, the base price from the
-  // named-place table, and added the platform fee to THAT. So they ignored both the server's
-  // quote and the travel class.
-  //
-  // What that produced: a traveler choosing Large Vehicle saw the Standard price on Reserve
-  // and on Schedule, and was charged the Large Vehicle price. The app quoted one number and
-  // Stripe took another — the single defect this product's rubric names as the most serious
-  // there is. Found by external review, 4 Sept 2026.
-  //
-  // `quotedFareCents` is the server's answer with the class already applied; it is the only
-  // fare anybody should build a price from. The named-place cost is the fallback for the web
-  // preview, where there is no geocoder and therefore no server quote.
-  //
-  // Every screen now reads THIS. A screen that computes its own price can drift from the one
-  // the server charges, and the only way to be sure it cannot is for there to be one.
-  // THE CLASS IS APPLIED HERE, and leaving it out was the very bug this exists to remove —
-  // I wrote that version first. `quotedFareCents` is the STANDARD fare; Large Vehicle, Pet
-  // Friendly and the rest are multipliers on top of it, exactly as options.tsx, review.tsx
-  // and the booking path all do. Same three lines, one place.
-  const travelerTotal = useMemo(() => {
-    if (quotedFareCents == null) return 0;
-    const baseCents = quotedFareCents;
-    const fare = applyClassCents(baseCents, travelClass) / 100;
-    return +(fare + feeFor(fare, smartJourney) + governmentFee(quotedFeeLines)).toFixed(2);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quotedFareCents, travelClass, smartJourney, quotedFeeLines]);
+  // The server computes class Fare + dynamic Platform Fee + tolls + government
+  // fees. Reconstructing that here drops tolls, can double-apply a class, and can
+  // disagree for card-country or promoted market references. Treat its all-in
+  // integer-cent Total as the sole display authority; unknown means NO price.
+  const travelerTotal=useMemo(()=>
+    quotedForClass===travelClass&&quotedTotalCents!==null
+      ? quotedTotalCents/100 : 0,
+    [quotedTotalCents,quotedForClass,travelClass]);
   const [tripCoords, setTripCoords] = useState<{ pickup: Coords; dest: Coords } | null>(null);
   const tripCoordsRef = useRef<{ pickup: Coords; dest: Coords } | null>(null);
   tripCoordsRef.current = tripCoords;
@@ -437,7 +432,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       .then((q) => {
         if (seq !== repriceSeq.current) return; // a newer pin superseded this quote
         if (q && !isUnavailable(q)) {
-          setQuotedFareCents(q.travelCostCents);
+          setQuotedServerPrice(q.travelCostCents,q.travelerPays,travelClass);
           setQuotedFeeLines(q.feeLines);
           setResearchQuoteToken(q.researchQuoteToken??null);
         }
@@ -1029,25 +1024,20 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     // Authority belongs at the action boundary, not merely in a disabled button. A second
     // tap, stale screen, or alternate caller cannot create another Travel or use a placeholder
     // fare. Exact coordinates and the current authoritative quote are prerequisites.
-    if (confirmInFlightRef.current || quotedFareCents == null || !tripCoordsRef.current) return;
+    if (confirmInFlightRef.current || quotedFareCents == null ||
+        quotedTotalCents == null || quotedForClass!==travelClass ||
+        !tripCoordsRef.current) return;
     confirmInFlightRef.current = true;
     // Clear AND null: the match-effect below only starts a timer when the ref is empty,
     // so a stale (already-cleared) id left in the ref would silently freeze the next ride.
     if (rideTimer.current) clearInterval(rideTimer.current);
     rideTimer.current = null;
-    // The trip's fare: the server's quote when we have one (with the travel class applied
-    // using the SAME math the server uses), else the placeholder table price. The charge
-    // itself is still priced server-side from destination+class — this is for display/records.
-    const baseCents = quotedFareCents ?? Math.round(arrival.cost * 100);
-    const costN = applyClassCents(baseCents, travelClass) / 100;
-    const coord = coordinationFee(costN);
+    // The Fare and complete Total are both from the selected class's same
+    // server response. No local platform fee/vehicle class computation.
+    const costN=quotedFareCents/100;
+    const coord=coordinationFee(costN);
     const nextSeq = tripSeq + 1;
-    // platformFee(), not APP_FEE. The fee is $1.50 up to a $30 fare and 5% of the fare above
-    // it; the server has always charged the real one. Using the flat figure here meant the
-    // trip record — and therefore the receipt, the Travel Log and the operator's fare —
-    // disagreed with what Stripe actually took on any larger travel.
-    // One all-in price: the fare, the platform fee, and any government fee on the trip.
-    const total = +(costN + feeFor(costN, smartJourneyRef.current) + governmentFee(quotedFeeLinesRef.current)).toFixed(2);
+    const total=quotedTotalCents/100;
     lastTotalRef.current = total;
     setTripSeq(nextSeq);
     statusRef.current = 0;
@@ -1088,7 +1078,8 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     // actually matched (see the effect below). Starting it at confirm meant the demo could
     // reach "Miguel is here" before Miguel was even found, skipping the whole approach
     // animation the traveler is watching for.
-  }, [arrival, departure, pay, tripSeq, refreshMyRides, runDispatch, quotedFareCents, travelClass]);
+  }, [arrival, departure, pay, tripSeq, refreshMyRides, runDispatch,
+      quotedFareCents, quotedTotalCents, quotedForClass, travelClass]);
 
   // Everything that happens when a travel finishes, wherever the news came from.
   //
@@ -1667,6 +1658,9 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     beginSmartLeg,
     endSmartJourney,
     quotedFareCents,
+    quotedTotalCents,
+    quotedForClass,
+    setQuotedServerPrice,
     researchQuoteToken,
     setResearchQuoteToken,
     travelerTotal,

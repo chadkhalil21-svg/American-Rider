@@ -372,6 +372,8 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   };
   const [quotedFareCents, setRawQuotedFareCents] = useState<number | null>(null);
   const [quotedTotalCents, setQuotedTotalCents] = useState<number | null>(null);
+  const quotedTotalRef=useRef<number|null>(null);
+  quotedTotalRef.current=quotedTotalCents;
   const [quotedForClass, setQuotedForClass] = useState<string | null>(null);
   // Any old quote is void after a route/class change, and only a complete server
   // answer may authorize a new amount. No class, fee or toll arithmetic on phone.
@@ -841,6 +843,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
           bookingKeyRef.current ||= Crypto.randomUUID();
           const prepared = await prepareRide({
             bookingKey: bookingKeyRef.current, pickup: from, destinationPoint: dest,
+            agreedTotalCents:quotedTotalRef.current,
             researchQuoteToken:researchQuoteRef.current,
             dep: departure.short, dest: arrival.short,
             cls: operatorClassFor(travelClassRef.current),

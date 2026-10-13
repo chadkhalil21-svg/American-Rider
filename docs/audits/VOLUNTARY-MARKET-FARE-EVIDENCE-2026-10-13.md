@@ -1,0 +1,33 @@
+# First-party voluntary local-price evidence: phone-first, source-led
+**2026-10-13. No paid supplier. Research collection only, not a pricing promotion or commercial market admission.**
+
+## Why this source changes the economic question
+American Rider should not be blocked forever by commercial data subscriptions. A non-scraping alternative is **consent-based, participant-provided historical TNC offer/receipt facts**: amount the Traveler was quoted or paid, mileage, duration, county, observation time, ordinary Standard classification and service name. We make independent pricing decisions. A voluntary report is NOT a certified competing platform quote. Human source verification, sufficient distinct participants and independent evidentiary families are still required before any published price reference may alter the company's rate curve.
+
+**Direct sources:**
+- Florida TNC law §627.748(6) https://www.leg.state.fl.us/statutes/index.cfm?App_mode=Display_Statute&URL=0600-0699/0627/Sections/0627.748.html requires a customer electronic receipt showing origin/destination, total distance/time and total price. A participant can consult their own receipt. Do not request, store or relay identifiable exact addresses.
+- Princeton original FairFare trial https://www.cs.princeton.edu/news/new-tool-drives-gig-workers-toward-wage-transparency demonstrates 76,625 voluntarily connected gig worker trips and links to the peer-reviewed FairFare paper; the 2024 Colorado sampled trips and Argyle partner access are **not data licensed to American Rider**, not a free nationwide route table. Argyle https://www.argyle.com/platform-overview/api requires B2B onboarding and https://www.argyle.com/consumers/faq says service providers pay; American Rider has not purchased or connected it.
+- Consumer Reports https://github.com/consumerreports/lyft-uber describes human volunteers recording real same-route app offers, independent verification of date/class/route and exclusion of user errors/promotions. This is the methodological benchmark, **not an assertion that CR licensed its findings for automated competitor tracking**.
+- MIT Sloan's limited experimentation analysis https://news.mit.edu/2017/identifying-optimal-product-prices-0918 and research https://dspace.mit.edu/entities/publication/0a42aaf1-7e71-4550-8d57-308600a4874b support learning from a service's own demand rather than chasing inaccessible competitor prices. Its NC-SA paper license applies to reproducing the paper, not the underlying general idea.
+- NBER https://www.nber.org/papers/w34441 documented average $3.50 supplier variation for identical NYC journeys, supporting robust medians instead of one quote.
+- Google Firestore https://firebase.google.com/docs/firestore/best-practices and Amazon idempotency https://aws.amazon.com/builders-library/making-retries-safe-with-idempotent-APIs/ guide bounded writes and duplicate handling.
+
+## Implementation
+- New app route `/operator/market-research` linked from Operator home and pre-commission economics: optional simple phone form, server-provided registered market/county selector, ordinary Standard attestation, age, miles, minutes, all-in dollar Total, service name and explicit research consent.
+- App-side `src/backend/voluntaryPrices.ts` uses current logged-in Firebase ID token via the existing backend server, **not an untrusted caller's identification**. No external competitor API, no signup with a third party.
+- `GET /market-price/research/markets` restricted to authenticated verified-email user returns configured public county labels. The proposal includes unadmitted markets for research; no enabled Travel is implied.
+- `POST /market-price/research` requires authenticated and email-verified contributor with account-scoped rate limits; rejects extra fields/PII; accepts declared county ONLY when in configured market list; rejects nonordinary/promo/unsupported class, implausible amount/distance/duration/speed, stale >14d, future >5m and missing consent.
+- Only pseudonymous SHA-256 contributor ID and market/time/price characteristics retained; no raw UID, passenger name, pickup coordinates, screenshot or source credentials. **Pseudonymous is NOT anonymous**; deletion/retention/legal consent policies should be reviewed before scaling this research channel. A `sourceKind` and `marketEvidence` distinguish source and self-declared county. Unknown provider source is retained as "other" and does NOT establish independent provider corroboration.
+- The `market_price_research_submissions` collection is separate from `market_reference_observations`; **pricePromotionEligible:false** permanently on ingested records. No automatic candidate or fare authority, no money, no side-loading API. Repeated observation id is idempotent, inconsistent reuse rejected. UI never calls competitor services or uploads receipts.
+- No consumer-facing promise of a 10% discount. Any human review of contributor data must avoid selection bias; contributors may not know full toll or promo, receipts may be misreported. Before future promotion, require right-to-use review, holdouts, >=20 matched observations **from genuinely independent contributing families**, provider dispersion, geographic coverage and representative time distribution, Operator pay and platform contribution, control-group test and explicit approval. Self-reports are only one evidence family.
+
+## Release and cost
+No provider subscription, external URL, API calls to another platform or change to business fares; each voluntary submission creates at most one small Firestore research record, with a read only on duplicate. Markets list one lightweight authenticated request per screen visit. Production Firebase data-write cost is nonzero and charged under the company's tier; no source calls per Traveler quote.
+
+Run all six exact-head Github Actions before PR merge and confirm exact Render live SHA. **Do not claim any real submissions exist until records are independently verified in live Firebase; CI's 30,000 tests are synthetic.**
+
+## Remaining caveats
+- A submission is self-reported and may be fraudulent or inaccurate. Do not use it for real-time dynamic pricing.
+- A driver may only see weekly aggregate passenger charges, not individual full Totals. Users should provide only figures they actually possess.
+- App availability and live pilot require actual operator accounts and device-level acceptance. GitHub/Render success alone is not iOS/Android TestFlight certification.
+- Pseudonymous data retention and account-delete handling, provider-specific source terms and applicable anti-collusion competition laws require legal/privacy review before full-scale recruitment or rate activation.

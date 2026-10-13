@@ -10,7 +10,7 @@ const env={AR_PANEL_APPROVED_FOR_MARKET_RESEARCH:'true',
 const normal=(marketId)=>({
  marketId,serviceClass:'standard',currency:'USD',
  fullOrdinaryTravelerTotal:true,promotionApplied:false,routeConditionsConfirmed:true,
- providerKey:'independent-provider-A',travelerTotalCents:1496,
+ providerKey:'independent-provider-A',observationId:'obs-000001',travelerTotalCents:1496,
  observedAt:'2026-10-12T19:58:00Z',routedMiles:6.3,routedMinutes:17,
  daypart:'evening',weekdayWeekend:'weekday',
 });
@@ -54,6 +54,7 @@ async function run(){
      assert.equal(got[0].sourceId,'controlled-public-price-panel');
      assert.equal(got[0].calendarClass,'ordinary');
      assert.equal(got[0].providerKey,'independent-provider-A');
+     assert.equal(got[0].sourceObservationId,'obs-000001');
      assert.equal(got[0].userId,undefined);
    }
    assert.deepEqual(urls,['fl-miami-dade','fl-broward','fl-palm-beach']);

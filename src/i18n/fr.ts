@@ -249,6 +249,8 @@ export default {
   },
 
   traveler: {
+    updateRequiredTitle: 'Mise à jour nécessaire',
+    updateRequiredBody: 'Mettez à jour American Rider pour vérifier et confirmer le total actuel du trajet. Aucune réservation ni aucun paiement n\'a été effectué.',
     priceChangedTitle: 'Le Total du trajet a changé',
     priceChangedBody: 'Le prix a changé avant la réservation. Aucun paiement n’a été effectué. Veuillez vérifier le nouveau Total.',
     reviewUpdatedTotal: 'Vérifier le nouveau Total',

@@ -61,7 +61,7 @@ for(const [changes,re] of fails)
   assert.throws(()=>validateVoluntaryPrice({body:{...normal(),...changes},uid:UID,now:NOW,marketForPoint:pick}),re);
 assert.throws(()=>validateVoluntaryPrice({body:normal(),uid:'',now:NOW,marketForPoint:pick}),/authenticated/);
 assert.throws(()=>validateVoluntaryPrice({body:normal(),uid:UID,now:NOW,marketForPoint:()=>null}),/known source market/);
-assert.throws(()=>validateVoluntaryPrice({body:normal(),uid:UID,now:NOW}),/known source market/,
+assert.throws(()=>validateVoluntaryPrice({body:{...normal(),pickup:{lat:30.2672,lng:-97.7431}},uid:UID,now:NOW}),/known source market/,
  'real outside-state geography must be rejected by the live FIPS market gate');
 
 (async()=>{

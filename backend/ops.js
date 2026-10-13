@@ -31,6 +31,7 @@ const { recordIndependentContact } = require('./insurance-contact-trust');
 const { codeFor, totpStep, sessionFor, verifySession } = require('./opssecurity');
 const { withinDeadline, OPS_MFA_DEADLINE_MS } = require('./opslatency');
 const { loadOpsBoard, UNDERWAY } = require('./opsboarddata');
+const { summarizeFirstPartyPricing } = require('./first-party-pricing');
 
 const COOKIE = 'ar_ops';
 
@@ -294,6 +295,7 @@ async function board() {
   const underway = loaded.underway.rows.filter((r) => UNDERWAY.includes(r.status)).sort((a, b) => b.createdAt - a.createdAt);
   const today = loaded.recent.rows;
   const completed = today.filter((r) => r.status === 'completed');
+  const firstPartyPrices=loaded.recent.unavailable?null:summarizeFirstPartyPricing(today,{saturated:loaded.recent.saturated});
   const onDuty = operators.filter((o) => o.available);
   const owed = loaded.owed.rows;
   const disputed = loaded.disputed.rows;
@@ -339,6 +341,27 @@ ${unreadable.length ? `<section role="alert" style="border:2px solid #B42318;">
 <p><a href="/ops/cases?kind=emergency">Urgent and deadline cases · acknowledge →</a> · <a href="/ops/cases?kind=support">Support cases →</a></p>
 <p><a href="/ops/screening">Operator screening · verify authenticated agency reports →</a></p>
 <p><a href="/ops/disputes">Stripe dispute evidence · review only →</a></p>
+<section>
+  <h2>Pricing research · our own bookings</h2>
+  <p>Last 24 hours. Existing Travel records only; no extra database query. Prices shown here are the
+  amount recorded when booking was prepared, not independently verified charges.</p>
+  ${firstPartyPrices===null
+    ? '<p role="alert">Recent booking records unavailable. Pricing outcomes cannot be assessed.</p>'
+    : firstPartyPrices.valid===0
+      ? '<p>No eligible standard booking records in the sample yet. No price conclusions.</p>'
+      : `<p><strong>${firstPartyPrices.valid}</strong> valid recorded bookings in the sample;
+        ${firstPartyPrices.excluded} excluded; ${firstPartyPrices.duplicates} duplicates skipped.</p>
+        ${firstPartyPrices.segments.map(g=>`<p>
+          <strong>${esc(g.marketId)} · ${esc(g.distanceBand)} miles</strong>:
+          ${g.recorded} recorded · ${g.completed} completed · ${g.cancelled} cancelled ·
+          ${g.other} other stages.
+          Recorded median: ${money(g.medianRecordedTotalCents)};
+          completed median: ${g.medianCompletedTotalCents===null?'not available':money(g.medianCompletedTotalCents)}.
+        </p>`).join('')}`}
+  <p><strong>${firstPartyPrices?.saturated?'Partial sample (limit 120 records).':'Bounded recent sample.'}</strong>
+  This is not a price-conversion rate: we do not yet count every quote displayed. No
+  competitor benchmark, recommendation or automatic fare change is derived from these records.</p>
+</section>
 ${Object.entries(loaded).some(([,g]) => g.saturated)
   ? '<p role="alert"><strong>Some sections show a bounded sample.</strong> A “+” means more records exist. Do not use sample amounts for accounting; reconcile with Stripe and the financial ledger. Check /health for worker saturation.</p>' : ''}
 

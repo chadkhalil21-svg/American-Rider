@@ -34,7 +34,7 @@ const base={marketId:'fl-miami-dade',sourceId:'controlled-public-price-panel',
   assert.equal(db.stats.created,2);
   await assert.rejects(persistObservations(db,[{...base,travelerTotalCents:1800}]),/conflicting/);
   assert.equal(db.stats.created,2,'corrected price with same ID does not inflate sample');
-  await assert.rejects(persistObservations(db,[{...base,sourceObservationId:null}]),/identity|missing/);
+  await assert.rejects(persistObservations(db,[{...base,sourceObservationId:null}]),/identity|missing|invalid anonymous/);
   assert.equal(db.stats.created,2);
   const again=normalizeObservation(base);
   assert.equal(again.sourceObservationId,base.sourceObservationId);

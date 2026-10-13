@@ -35,13 +35,14 @@ export default function VolunteerMarketPrice() {
   const [ordinary,setOrdinary]=useState(false);
   const [consent,setConsent]=useState(false);
   const [busy,setBusy]=useState(false);
-  const [message,setMessage]=useState<null|'county'|'receipt'|'received'|'unavailable'|'auth'>(null);
+  const [message,setMessage]=useState<null|'county'|'market'|'receipt'|'received'|'unavailable'|'auth'>(null);
   const pendingAttempt=useRef<PreparedResearchAttempt|null>(null);
   const sending=useRef(false);
   useEffect(()=>{
     let active=true;
     marketResearchCounties().then(rows=>{if(active)setMarkets(rows);})
-      .catch(()=>{if(active)setMessage('county');});
+      .catch((e)=>{if(active)setMessage(e instanceof Error && e.message==='research_auth_required'?'auth':
+        e instanceof Error && e.message==='research_markets_unavailable'?'market':'county');});
     return()=>{active=false;};
   },[]);
   const amount=price.trim(),mi=miles.trim(),mins=minutes.trim(),hours=hoursAgo.trim();
@@ -81,6 +82,7 @@ export default function VolunteerMarketPrice() {
   }
   const messageKeys={
     county:'operator.fareResearchCountyUnavailable',
+    market:'operator.fareResearchMarketUnavailable',
     receipt:'operator.fareResearchReceiptUnconfirmed',
     received:'operator.fareResearchReceived',
     unavailable:'operator.fareResearchUnavailable',

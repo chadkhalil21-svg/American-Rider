@@ -4,6 +4,7 @@
 // configured with an approved right to use its data for pricing research.
 const {isIP}=require('node:net');
 const {normalizeObservation}=require('./market-evidence-ingest');
+const {boundedSourceText}=require('./bounded-source-response');
 const MARKETS=new Set(['fl-miami-dade','fl-broward','fl-palm-beach']);
 const MAX_ROWS=50, MAX_BYTES=120000;
 function approvedSource(env=process.env){
@@ -34,10 +35,7 @@ function authorizedMarketPanelCollectors({env=process.env,fetchFn=fetch}={}){
         'user-agent':'American-Rider-Approved-Market-Research/1.0'},
     });
     if(!res?.ok||res.status!==200)throw Error('market research feed unavailable');
-    const len=Number(res.headers?.get?.('content-length'));
-    if(Number.isFinite(len)&&len>MAX_BYTES)throw Error('market research feed oversized');
-    const raw=await res.text();
-    if(Buffer.byteLength(raw,'utf8')>MAX_BYTES)throw Error('market research feed oversized');
+    const raw=await boundedSourceText(res,{maxBytes:MAX_BYTES,label:'market research feed'});
     let data;
     try{data=JSON.parse(raw);}catch{throw Error('invalid market research response');}
     if(data?.approvalReference!==source.approvalRef ||

@@ -5,7 +5,9 @@
 // This feeds an audit-only collection, not market_reference_snapshots.
 const {createHash}=require('node:crypto');
 const {adminDb}=require('./firebase-admin');
+const {boundedSourceText}=require('./bounded-source-response');
 const WEEK=7*24*60*60_000;
+const RETRY_AFTER_UNVERIFIED=24*60*60_000;
 const MAX_HTML=300000;
 const PAGES=Object.freeze([
   Object.freeze({id:'miami-dade-passenger-info',
@@ -43,10 +45,7 @@ async function readPublicPage(page,{fetchFn=fetch}={}){
   const response=await fetchFn(page.url,{redirect:'error',signal:AbortSignal.timeout(8000),
     headers:{'accept':'text/html','user-agent':'American-Rider-Public-Fare-Research/1.0'}});
   if(!response?.ok||response.status!==200)throw Error('official source unavailable');
-  const declared=Number(response.headers?.get?.('content-length'));
-  if(Number.isFinite(declared)&&declared>MAX_HTML)throw Error('official source oversized');
-  const html=await response.text();
-  if(Buffer.byteLength(html,'utf8')>MAX_HTML)throw Error('official source oversized');
+  const html=await boundedSourceText(response,{maxBytes:MAX_HTML,label:'official source'});
   const parsed=extractOfficialTaxiRate(html);
   if(!parsed)throw Error('official source schedule not recognized');
   return {id:page.id,url:page.url,rate:parsed,excerptHash:sha(JSON.stringify(parsed))};
@@ -72,7 +71,11 @@ async function sweepSouthFloridaPublicRates({db=adminDb(),fetchFn=fetch,now=Date
     const previous=await ref.get();
     const prev=previous.exists?previous.data():{};
     // Use a persisted weekly checkpoint across Render restarts and instances.
-    if(Number.isFinite(prev.checkedAt)&&now>=prev.checkedAt&&now-prev.checkedAt<WEEK)
+    // A transient failed source must not strand research for a full week.
+    // At most one bounded retry per 24h; consistent/conflicting valid pages
+    // retain the original low-cost weekly cadence.
+    const interval=prev.status==='unverified'?RETRY_AFTER_UNVERIFIED:WEEK;
+    if(Number.isFinite(prev.checkedAt)&&now>=prev.checkedAt&&now-prev.checkedAt<interval)
       return {ok:true,skipped:'weekly_cadence',status:prev.status,marketId:'fl-miami-dade',
         rateAuthority:false};
     const resolved=await Promise.allSettled(PAGES.map(p=>readPublicPage(p,{fetchFn})));
@@ -94,5 +97,5 @@ async function sweepSouthFloridaPublicRates({db=adminDb(),fetchFn=fetch,now=Date
     return out('public rate check cannot be persisted; no rate inferred');
   }
 }
-module.exports={PAGES,WEEK,COLLECTION,extractOfficialTaxiRate,compareSources,
+module.exports={PAGES,WEEK,RETRY_AFTER_UNVERIFIED,COLLECTION,extractOfficialTaxiRate,compareSources,
   readPublicPage,sweepSouthFloridaPublicRates};

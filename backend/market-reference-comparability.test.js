@@ -47,6 +47,32 @@ assert.equal(mixed.maxProviderShare,0.5);
 assert.ok(mixed.referenceTotalCents>0);
 assert.equal(mixed.targetTotalCents,Math.round(mixed.referenceTotalCents*0.90));
 
+assert.equal(mixed.oldestObservedAt,stamp);
+assert.equal(mixed.latestObservedAt,stamp);
+// Adversarial freshness: one new quote must never qualify 19 stale ones.
+const stale=Array.from({length:19},(_,i)=>({
+  ...record(i%2?'controlled-public-price-panel':'independent-controlled-audit',
+    i%2?'field-panel':'independent-audit',300+i),
+  observedAt:new Date(now-45*86400000).toISOString(),
+}));
+const singleFresh=buildReferenceCell([...stale,panel[0]],now);
+assert.equal(singleFresh.observations,1);
+assert.equal(singleFresh.researchObservations,20);
+assert.equal(singleFresh.evidenceFamilies.length,1);
+assert.equal(singleFresh.oldestObservedAt,stamp);
+assert.equal(singleFresh.travelerTotalComparable,true);
+assert.equal(buildReferenceCell(stale,now).observations,0);
+const future={...panel[0],observedAt:new Date(now+6*60000).toISOString()};
+assert.equal(comparableObservation(future,now),false);
+assert.equal(buildReferenceCell([...panel,...audit,future],now).observations,20);
+assert.equal(buildReferenceCell([...panel,...audit],now,0.01).observations,0,
+  'stricter market freshness must exclude the complete old batch');
+const {referenceAgeDays}=require('./market-reference-service');
+assert.equal(referenceAgeDays(null),30);
+assert.equal(referenceAgeDays({maxObservationAgeDays:90}),30);
+assert.equal(referenceAgeDays({maxObservationAgeDays:14}),14);
+
+
 const plan={minimumIndependentFamilies:2,maxObservationAgeDays:30};
 const asOf=new Date(now).toISOString();
 const candidate={asOf,promotion:{status:'candidate'},cells:{key:mixed}};

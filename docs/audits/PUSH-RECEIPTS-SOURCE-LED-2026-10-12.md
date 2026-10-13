@@ -26,6 +26,10 @@ Existing cross-instance scheduler lease is retained; work runs only every five m
 
 **Do not mark successful until exact PR-head CI succeeds and Render confirms release.**
 
+## Further provider reliability finding: Firebase daily reset quota
+
+An earlier real CI run reported `sendOobCode: QUOTA_EXCEEDED` after all other real sign-up/login/session tests had succeeded. Google's [published Firebase limits](https://firebase.google.com/docs/auth/limits) restrict daily password-reset emails. Previously every code commit attempted a real reset, consuming scarce production email quota. The updated PR check retains real provider account creation, token, wrong-password and cleanup steps without issuing email; the reset request now occurs only on the once-daily scheduled check or an explicit manual opt-in. New offline tests run twice and prove no ordinary PR email issuance, exactly one planned email request, and truthful failure on quota denial. **Future daily real reset completion and actual inbox delivery remain unverified**, not silently converted into a success.
+
 ## Cross-domain audit: evidence ledger
 
 | Domain | Current evidence level | Open gate |

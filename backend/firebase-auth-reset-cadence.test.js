@@ -14,7 +14,7 @@ async function drill(reset,quotaExceeded=false){
   const proc={env,exitCode:0};
   async function fetch(url,options){
     const u=new URL(url);
-    const action=u.pathname.includes('securetoken')?'refresh':u.pathname.split(':').at(-1);
+    const action=u.hostname.startsWith('securetoken.')?'refresh':u.pathname.split(':').at(-1);
     calls.push(action);
     let body;
     if(options.headers?.['content-type']==='application/x-www-form-urlencoded'){

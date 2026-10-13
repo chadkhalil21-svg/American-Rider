@@ -3666,8 +3666,7 @@ app.post('/travel/prepare', requireAuth, LIMITS.dispatch, requireFreshAuth, requ
       marketId:marketFor(pickup)?.id,distanceBand:quoteDistanceBand(priced.miles),
       totalCents:priced.travelerPays,
       routeFingerprint:quoteViewContract.routeTag({uid:req.uid,pickup,dest:destinationPoint})})?quoteView:null;
-    const outcome = await prepareBooking({ db, uid: req.uid, key, fingerprint,
-      quoteView:matchedView, record: {
+    const outcome = await prepareBooking({ db, uid: req.uid, key, fingerprint, record: {
       tripNo, travelerName: party.travelerName.slice(0, 60), party,
       dep: String(b.dep || '').slice(0, 60), dest: String(b.dest || '').slice(0, 60),
       pickupLat: pickup.lat, pickupLng: pickup.lng,
@@ -3681,6 +3680,12 @@ app.post('/travel/prepare', requireAuth, LIMITS.dispatch, requireFreshAuth, requ
     } });
     if (party.teen && [200,201].includes(outcome.status)) {
       await provisionTeenPin({ rideRef: db.collection('rides').doc(id), rideId: id, party });
+    }
+    // Research must not delay or roll back a legitimate Travel. Link only AFTER
+    // the server-authoritative booking transaction has finished successfully.
+    if([200,201].includes(outcome.status)&&matchedView){
+      void quoteViewStore.linkAfterBooking({db,view:matchedView,rideId:id})
+        .catch(()=>null);
     }
     return res.status(outcome.status).json({ ...outcome.body, amountCents: priced.travelerPays });
   } catch (e) { return res.status(502).json({ error: e.message, code: 'prepare_unavailable' }); }

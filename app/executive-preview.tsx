@@ -10,24 +10,41 @@ const previewAllowed = () =>
   typeof window !== 'undefined' &&
   window.location.hostname === 'american-rider-preview-ng4p.onrender.com';
 
-const southFlorida = [
-  {id:'fl-miami-dade',name:'Miami-Dade'},
-  {id:'fl-broward',name:'Broward'},
-  {id:'fl-palm-beach',name:'Palm Beach'},
-];
+type PreviewCounty={id:string;name:string};
+type PreviewRegion={id:string;name:string;counties:PreviewCounty[]};
+type PreviewCommand={scope:string;id:string;action:string};
+type PreviewConfig={version:number;mode:string;regions:PreviewRegion[];commands:PreviewCommand[]};
+const configured=preview as PreviewConfig;
+const regionNames=(Array.isArray(configured.regions)?configured.regions:[]);
+function projectedCounties(region:PreviewRegion){
+  const counties=Array.isArray(region.counties)?region.counties:[];
+  const status:Record<string,boolean>={};
+  for(const c of counties)status[c.id]=false;
+  if(configured.version!==1||configured.mode!=='preview_only')return counties.map(c=>({...c,opened:false}));
+  for(const command of Array.isArray(configured.commands)?configured.commands:[]) {
+    if(!['open','close'].includes(command.action))continue;
+    if(command.scope==='region' && command.id===region.id) {
+      for(const c of counties)status[c.id]=command.action==='open';
+    }
+    if(command.scope==='county' && Object.prototype.hasOwnProperty.call(status,command.id))
+      status[command.id]=command.action==='open';
+  }
+  return counties.map(c=>({...c,opened:status[c.id]===true}));
+}
 
 export default function ExecutivePreview() {
   const allowed=previewAllowed();
-  const commands=preview.mode==='preview_only' && preview.version===1 ? preview.commands : [];
-  const opened=commands.some(c=>c.scope==='region'&&c.id==='fl-southeast'&&c.action==='open');
   if(!allowed)return <View style={styles.page}><Text>Preview unavailable.</Text></View>;
   return <ScrollView contentContainerStyle={styles.page}>
     <Text style={styles.kicker}>AMERICAN RIDER — DEVELOPMENT PREVIEW</Text>
-    <Text style={styles.title}>South Florida</Text>
-    <Text style={styles.lead}>Three-county preview status</Text>
-    {southFlorida.map(c=><View key={c.id} style={styles.county}>
-      <Text style={styles.name}>{c.name}</Text>
-      <Text style={styles.status}>{opened?'OPEN FOR PREVIEW':'CLOSED FOR PREVIEW'}</Text>
+    <Text style={styles.title}>Founder regional preview</Text>
+    <Text style={styles.lead}>Configured regions and counties</Text>
+    {regionNames.map(region=><View key={region.id} style={styles.region}>
+      <Text style={styles.name}>{region.name}</Text>
+      {projectedCounties(region).map(county=><View key={county.id} style={styles.county}>
+        <Text style={styles.name}>{county.name}</Text>
+        <Text style={styles.status}>{county.opened?'OPEN FOR PREVIEW':'CLOSED FOR PREVIEW'}</Text>
+      </View>)}
     </View>)}
     <Text style={styles.warning}>TEST DISPLAY ONLY. No paid Travels, live Operator duty, insurance approvals, or background checks are enabled by this preview.</Text>
     <Text style={styles.note}>Production opening and closing use the existing authenticated Founder command and commercial-readiness process.</Text>
@@ -38,6 +55,7 @@ const styles=StyleSheet.create({
   kicker:{fontSize:11,letterSpacing:1.5,color:'#43526d'},
   title:{fontSize:32,fontWeight:'600',color:'#17243b'},
   lead:{fontSize:16,color:'#415166'},
+  region:{gap:10},
   county:{borderWidth:1,borderColor:'#d9dedf',backgroundColor:'#fff',padding:18,borderRadius:12,gap:8},
   name:{fontSize:19,color:'#17243b',fontWeight:'600'},
   status:{fontSize:12,letterSpacing:1,color:'#1b614a',fontWeight:'700'},

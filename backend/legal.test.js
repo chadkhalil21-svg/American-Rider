@@ -5,7 +5,7 @@ const assert = require('node:assert');
 const results = [];
 const check = (label, ok, detail) => results.push({ label, ok: !!ok, detail });
 
-const { TERMS_HTML, PRIVACY_HTML, ABOUT_HTML, legalPage, LEGAL_LANGUAGES } = require('./legal');
+const { TERMS_HTML, PRIVACY_HTML, ABOUT_HTML, ACCOUNT_DELETION_HTML, legalPage, LEGAL_LANGUAGES } = require('./legal');
 const LANGS = {
   es: { ...require('./legal-es'), terms: 'TERMS_ES', privacy: 'PRIVACY_ES' },
   fr: { ...require('./legal-fr'), terms: 'TERMS_FR', privacy: 'PRIVACY_FR' },
@@ -97,6 +97,10 @@ for(const l of Object.keys(LANGS)){
    !terms.includes('\\n<p>') && !privacy.includes('\\n<p>'));
 }
 
+check('Public external account-deletion page has contact and no password requirement',
+  ACCOUNT_DELETION_HTML.includes('americanrider.communications@gmail.com') &&
+  ACCOUNT_DELETION_HTML.includes('Without the app') &&
+  ACCOUNT_DELETION_HTML.includes('secure way to verify'));
 check('About page still served', typeof ABOUT_HTML === 'string' && ABOUT_HTML.length > 0);
 
 // THE RULE IS NO LONGER QUOTED TO THE TRAVELER, AND THAT IS THE POINT (Chad, 20 Sept 2026):

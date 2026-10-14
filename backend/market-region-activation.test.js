@@ -134,6 +134,30 @@ const run = (db,extra={}) => M.activateRegion({
     assert.equal((await run(db)).code,'region_not_ready','expiry blocks group');
     assert.equal(db.writes,0);
   }
+  // GitHub-declared founder commands have their own immutable audit identity.
+  // A pause after the instruction overrides any automatic resumption.
+  {
+    const db=testDb();seed(db);
+    const actor='github:chadkhalil21-svg';
+    const staleIntentAt=now-60_000;
+    db.documents.get('market_admission/'+ids[0]).pausedAt=now-1_000;
+    const denied=await run(db,{actor,auditMethod:'founder_gitops_release',
+      intentRequestedAt:staleIntentAt});
+    assert.equal(denied.code,'market_paused_after_founder_instruction');
+    assert.equal(db.writes,0);
+    const approved=await run(db,{actor,auditMethod:'founder_gitops_release',
+      intentRequestedAt:now-500});
+    assert.equal(approved.code,'region_activated');
+    const audits=[...db.documents.values()].filter(x=>x.action==='market_activated');
+    assert.equal(audits.length,3);
+    assert.ok(audits.every(x=>x.actor.name===actor &&
+      x.actor.method==='founder_gitops_release'));
+    assert.equal((await run(db,{actor,auditMethod:'founder_gitops_release'})).code,
+      'invalid_admission_authority','GitHub path requires a dated founder order');
+    assert.equal((await run(db,{actor,auditMethod:'invented_privilege'})).code,
+      'invalid_admission_authority','cannot invent a new admission authority');
+    assert.equal(db.writes,6,'all deny cases have zero mutations');
+  }
   const ui = require('fs').readFileSync(require('path').join(__dirname,'market-readiness-ui.js'),'utf8');
   const server = require('fs').readFileSync(require('path').join(__dirname,'server.js'),'utf8');
   assert.match(server,/app\.post\('\/ops\/markets\/regions\/:regionId\/activate', requireOps, requireOpsMutation/);

@@ -30,6 +30,7 @@ assert.equal(validateIntents({...raw,commands:[command,command]},now).ok,false);
        assert.equal(a.actor,ACTOR);
        assert.equal(a.auditMethod,METHOD);
        assert.equal(a.intentRequestedAt,Date.parse(command.requestedAt));
+       assert.equal(a.founderCommandId,command.id);
        assert.deepEqual(a.providerMissing,['screening_provider']);
        assert.deepEqual(a.entries.map(e=>e.market.id).sort(),[...three].sort());
        for(const row of a.entries) assert.equal(a.expectedVersions[row.market.id],

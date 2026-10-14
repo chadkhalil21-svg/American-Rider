@@ -122,7 +122,7 @@ const { bookingId, prepareBooking, paymentMatches, assignPaidTravel } = require(
 const { progressTravel } = require('./travelprogress');
 const { payForTravel, cancelTravel: cancelTravelFor, settleTravel: settleTravelFor } = require('./travelmoney');
 const { authorizeVoiceTravel, lostItemTravel, authorizeAnnouncement, claimAnnouncement } = require('./trustboundaries');
-const { TERMS_HTML, PRIVACY_HTML, ABOUT_HTML, legalPage, LEGAL_LANGUAGES } = require('./legal');
+const { TERMS_HTML, PRIVACY_HTML, ABOUT_HTML, ACCOUNT_DELETION_HTML, legalPage, LEGAL_LANGUAGES } = require('./legal');
 const {
   HOME_HTML, OPERATE_HTML, SUPPORT_HTML, TRAVEL_HTML, SAFETY_HTML, SMART_HTML,
 } = require('./site');
@@ -649,6 +649,7 @@ app.post('/travel/follow-link', requireAuth, LIMITS.announce, async (req, res) =
 
 app.get('/terms', (req, res) => res.type('html').send(legalPage('terms', req.query?.lang)));
 app.get('/privacy', (req, res) => res.type('html').send(legalPage('privacy', req.query?.lang)));
+app.get('/account-deletion', (_req, res) => res.type('html').send(ACCOUNT_DELETION_HTML));
 
 // --- Deep health check: proves this server can actually TALK to Stripe. --------------------
 // /health only reports whether a key is present. This one makes a real call, so it tells the

@@ -364,6 +364,7 @@ export default {
     insRequestSent: "Bestätigungsanfrage gesendet",
     insAttest: "Bestätigen, dass Mein Versicherungsschutz Unverändert Ist",
     insAttestationSent: "Ihre Bestätigung wurde aufgezeichnet.",
+    insRiskEntry: "Änderung meines Versicherungsschutzes melden",
     insRiskTitle: "Mitteilung zum Versicherungsschutz",
     insRiskBody: "Haben Sie eine Mahnung wegen Nichtzahlung, eine Kündigung oder einen Hinweis auf fehlenden Versicherungsschutz erhalten? Melden Sie dies hier, um neue Fahrten sofort zu sperren. Nur der Versicherer oder ein verifizierter Makler kann die Freigabe wiederherstellen.",
     insRiskPending: "Bevorstehende Kündigung oder Nichtzahlung melden",

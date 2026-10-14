@@ -31,6 +31,7 @@ const { disclosureCurrent } = require('./disclosure');
 const { screeningCurrent } = require('./screening');
 const { coverageLapsed } = require('./matching');
 const { continuingStatus } = require('./insurance-monitoring');
+const { coverageUnsafeForNewTravel } = require('./insurance-horizon');
 const { forState: insuranceForState } = require('./insurance-jurisdictions');
 const { markets } = require('./markets');
 const { policyForState: screeningPolicyForState, reviewPolicyFor } = require('./screening-jurisdictions');
@@ -269,7 +270,7 @@ function documentFinding(kind, d, now, ctx = {}) {
  * Returns { qualified, eligible, status, blockers[] }. `status` describes qualification:
  * suspended > refused > exception > incomplete > qualified. Never reads a stored approval.
  */
-function assessOperator({ user, fleet = null, context = 'qualify', liveMoney = false, account, payouts, now = Date.now() }) {
+function assessOperator({ user, fleet = null, context = 'qualify', liveMoney = false, account, payouts, now = Date.now(), travelMinutes = null }) {
   const blockers = [];
   const add = (f) => f && blockers.push(f);
   const u = user || null;
@@ -347,9 +348,19 @@ function assessOperator({ user, fleet = null, context = 'qualify', liveMoney = f
     if (!payouts || payouts.enabled !== true || fleet?.payoutsEnabled === false) {
       add(D('payouts_not_ready', 'Stripe has not cleared this account for payouts.'));
     }
+    // Duty and acceptance require coverage beyond the minimum advance margin.
+    // Also check the server's routed trip duration if it exceeds the margin.
+    const insuranceDoc = u?.documents?.insurance;
+    const policyExpiry = insuranceDoc?.expiry || insuranceDoc?.evidence?.insurance?.expirationDate;
+    if (coverageUnsafeForNewTravel(policyExpiry, now, travelMinutes)) {
+      add(D('insurance_renewal_required', 'Insurance expires too soon for new Travel. Submit independently verified renewal coverage.'));
+    }
     if (context === 'accept') {
       if (!fleet || fleet.available !== true) add(D('not_on_duty', 'You are not in service. Commence operations to accept travel.'));
-      if (fleet && coverageLapsed(fleet)) add(D('coverage_expired', 'Your commercial coverage has expired.'));
+      if (fleet && coverageLapsed(fleet, now)) add(D('coverage_expired', 'Your commercial coverage has expired.'));
+      if (fleet && coverageUnsafeForNewTravel(fleet.insuranceExpiry, now, travelMinutes)) {
+        add(D('insurance_renewal_required', 'The recorded fleet policy expires too soon for this Travel. Renew and verify it before accepting.'));
+      }
       if (fleet?.documentBlocked) add(D('document_blocked', 'A document on file is not accepted.'));
     }
   }

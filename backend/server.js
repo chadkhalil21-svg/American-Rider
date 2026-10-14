@@ -3738,7 +3738,7 @@ app.post('/travel/prepare', requireAuth, LIMITS.dispatch, requireFreshAuth, requ
     // Availability is a pre-charge hint, not a reservation. The post-payment transaction is
     // authoritative and can still find the fleet gone; then the paid Travel is refund-owed.
     const fleet = await availableOperatorCandidates(db, pickup);
-    if (!matchOperator(fleet, pickup, String(b.cls || 'Standard'), { requireScreening: operationalMode, allowQueued: true })) {
+    if (!matchOperator(fleet, pickup, String(b.cls || 'Standard'), { requireScreening: operationalMode, allowQueued: true, travelMinutes: priced.minutes })) {
       return res.status(409).json({ error: 'No eligible Operator is available; nothing was charged', code: 'no_operator' });
     }
     const tripNo = travelNumberFor(id, pickup);
@@ -3754,7 +3754,7 @@ app.post('/travel/prepare', requireAuth, LIMITS.dispatch, requireFreshAuth, requ
       pickupLat: pickup.lat, pickupLng: pickup.lng,
       destinationLat: destinationPoint.lat, destinationLng: destinationPoint.lng,
       travelClass: String(b.cls || 'Standard'), travelCostCents: priced.travelCostCents,
-      costCents: priced.travelerPays, miles: priced.miles,
+      costCents: priced.travelerPays, miles: priced.miles, routedMinutes: priced.minutes,
       governmentFeeCents: priced.governmentFeeCents,
       tollCents: Math.max(0, Number(priced.tollCents) || 0), feeLines: priced.feeLines,
       pricedBy: priced.pricedBy, cardCountry: priced.cardCountry,

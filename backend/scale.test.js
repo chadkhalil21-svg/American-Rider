@@ -19,7 +19,7 @@ function fleet(n,now){
  for(let i=0;i<n;i++){
    const angle=(i*2.399963229728653), radius=Math.sqrt(i+1)*0.00008;
    a[i]={id:'o'+i,available:true,onlineAt:now,screeningCheckedAt:now,
-    disclosureVersion:require('./disclosure').DISCLOSURE_VERSION,commissioned:true,
+    disclosureVersion:require('./disclosure').DISCLOSURE_VERSION,commissioned:true,insuranceExpiry:'2099-01-01',
     lat:25.7617+Math.sin(angle)*radius,lng:-80.1918+Math.cos(angle)*radius,classes:['Standard']};
  }
  return a;

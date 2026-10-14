@@ -78,6 +78,39 @@ const {refundableFor,refundTravel,__refundBalanceFromVerifiedIntent:balance}=mon
     assert.equal((await refundableFor({paymentIntentId:paymentId,expectUid:'traveler_1'})).cents,0);
     prior.latest_charge={id:'ch_ar_synthetic',payment_intent:paymentId,amount_refunded:400};
   }
+
+  // Exact founder-approved Florida prelaunch 10mi/25min example:
+  // $1.00 + $0.95*10mi + $0.32*25min = $18.50 Travel Fare;
+  // $2.50 minimum Platform Fee gives a $21.00 Traveler Total. Synthetic only.
+  // Test full refunds, retained $3.00 arrival fee, wrong ownership and
+  // replay, with one realistic PaymentIntent/Charge balance.
+  for(let pass=0;pass<2;pass++){
+    const id='pi_florida_21_synthetic_'+pass,uid='fl_traveler';
+    const intent={id,status:'succeeded',amount:2100,amount_received:2100,
+      metadata:{uid},latest_charge:{id:'ch_fl_'+pass,payment_intent:id,amount_refunded:0}};
+    intents.set(id,intent);
+    assert.equal((await refundableFor({paymentIntentId:id,expectUid:uid})).cents,2100);
+    assert.equal((await refundableFor({paymentIntentId:id,expectUid:'other_user'})).cents,0);
+    assert.equal((await refundTravel({paymentIntentId:id,amountCents:2101,expectUid:uid})).ok,false,
+      'cannot refund more than the $21 collected');
+    const sentBefore=sent.length;
+    const whole=await refundTravel({paymentIntentId:id,amountCents:2100,
+      expectUid:uid,idempotencyKey:'full_refund_'+pass});
+    assert.equal(whole.ok,true);
+    assert.equal(sent.length,sentBefore+1,'only one real-size synthetic full refund');
+    assert.equal((await refundableFor({paymentIntentId:id,expectUid:uid})).cents,0);
+    assert.equal((await refundTravel({paymentIntentId:id,amountCents:100,expectUid:uid})).ok,false,
+      'no second unauthorized amount may be refunded');
+    // Independent scenario: cancellation after arrival retains the $3 fee,
+    // refunding the remaining $18 of the original $21 payment.
+    const arrivalId='pi_fl_arrival_'+pass;
+    intents.set(arrivalId,{id:arrivalId,status:'succeeded',amount:2100,amount_received:2100,
+      metadata:{uid},latest_charge:{id:'ch_arrival_'+pass,payment_intent:arrivalId,amount_refunded:0}});
+    const arrival=await refundTravel({paymentIntentId:arrivalId,amountCents:1800,
+      expectUid:uid,idempotencyKey:'arrival_refund_'+pass});
+    assert.equal(arrival.ok,true);
+    assert.equal((await refundableFor({paymentIntentId:arrivalId,expectUid:uid})).cents,300);
+  }
   for(const v of [NaN,-1,1001,undefined,null,'400']){
     const pi=structuredClone(intents.get(paymentId));pi.latest_charge.amount_refunded=v;
     assert.equal(balance(pi).ok,false,'invalid refund history fails closed');

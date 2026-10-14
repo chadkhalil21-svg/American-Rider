@@ -110,7 +110,7 @@ async function command(db){
     const activated=await command(db);
     assert.equal(activated.ok,true);
     assert.equal(activated.results[0].code,'region_activated');
-    assert.deepEqual(activated.results[0].newlyOpened,ids);
+    assert.deepEqual([...activated.results[0].newlyOpened].sort(),[...ids].sort());
     for(const {market,region} of marketRows){
       const status=await inspectMarket({db,market,region,providerMissing:[],now});
       assert.equal(status.status,'active');

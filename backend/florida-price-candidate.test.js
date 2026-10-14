@@ -1,5 +1,6 @@
 'use strict';
-// Executable PRICE PROPOSAL ONLY. Does not change a live Fare or quote.
+// Verify the exact release CANDIDATE on this PR; merging would affect live Fare.
+// Physical-device and signed market admission remain separate required gates.
 // External citations, assumptions and launch gates are in:
 // docs/audits/SOUTH-FLORIDA-CONCRETE-PRICE-CANDIDATE-2026-10-13.md
 const assert=require('node:assert/strict');
@@ -8,11 +9,12 @@ const {pricingForRegion}=require('./market-pricing');
 const {commissionCents,MIN_PLATFORM_FEE_CENTS}=require('./economics');
 
 const current=pricingForRegion('fl-southeast');
+const previous=Object.freeze({baseCents:100,perMileCents:85,perMinuteCents:15,minimumFareCents:300});
 assert.ok(current);
 assert.deepEqual(
   [current.baseCents,current.perMileCents,current.perMinuteCents,current.minimumFareCents],
-  [100,85,15,300],
-  'do not silently mistake the research proposal for an actual production price change'
+  [100,95,32,300],
+  'Florida release candidate must use the exact independently evaluated coefficients'
 );
 assert.equal(pricingForRegion('tx-dallas'),null,'no other state can inherit Florida fares');
 const proposed=Object.freeze({baseCents:100,perMileCents:95,perMinuteCents:32,minimumFareCents:300});
@@ -35,7 +37,7 @@ for (const [miles,minutes,actual,proposedTotal,operatorFareProceeds] of [
   [8,21,1345,1782,1517],
   [10,25,1575,2100,1832]
 ]){
-  const old=total(current,miles,minutes);
+  const old=total(previous,miles,minutes);
   const next=total(proposed,miles,minutes);
   assert.equal(old.travelerPays,actual);
   assert.equal(next.travelerPays,proposedTotal);
@@ -56,7 +58,7 @@ for(let pass=0;pass<2;pass++){
     const country=i%3===0?'US':i%3===1?'GB':null;
     const toll=i%17===0?550:0;
     const governmentFees=i%19===0?[{id:'test-pass-through',name:'Public body fee',payee:'public-body',cents:250}]:[];
-    const old=total(current,miles,minutes,country,toll,governmentFees);
+    const old=total(previous,miles,minutes,country,toll,governmentFees);
     const next=total(proposed,miles,minutes,country,toll,governmentFees);
     assert.ok(next.travelerPays>=old.travelerPays);
     assert.equal(next.tollCents,toll);

@@ -28,7 +28,7 @@ const quote = {
 const operator = {
   id: 'operator-1', name: 'Operator One', available: true,
   lat: 25.77, lng: -80.19, onlineAt: now, commissioned: true,
-  disclosureVersion: DISCLOSURE_VERSION, screeningCheckedAt: now,
+  disclosureVersion: DISCLOSURE_VERSION, screeningCheckedAt: now, insuranceExpiry:'2099-01-01',
   classes: ['Standard'], car: 'Car', plate: 'Plate',
 };
 function provider(rideId, uid, amount = 2350) {

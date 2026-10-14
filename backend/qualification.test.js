@@ -306,6 +306,41 @@ const codes = (a) => a.blockers.map((b) => b.code);
       db2.data.operators.op.available === false && db2.data.operators.op.commissioned === false);
   }
 
+  // ——— 8b. Known insurance expiry: lock BEFORE new Travel, not after ———————————————
+  {
+    const now = NOW;
+    const short = cleanUser();
+    short.documents.insurance = insuranceRead({ expirationDate:'2026-09-22' }, { expiry:'2026-09-22' });
+    short.documents.insurance.expiry = '2026-09-22';
+    const duty = A(short,{context:'online'});
+    check('8b. duty blocked in the final 24 hours before documented expiry',
+      !duty.eligible && codes(duty).includes('insurance_renewal_required'),JSON.stringify(duty.blockers));
+
+    const fleet = { available:true,onlineAt:now,commissioned:true,disclosureVersion:DISCLOSURE_VERSION,
+      insuranceExpiry:'2028-01-31',lat:25.76,lng:-80.19 };
+    const ride={operatorId:'op',status:'assigned',createdAt:now-5000};
+    const db = fakeDb({ users:{op:short},operators:{op:fleet},rides:{r1:ride} });
+    const accepted = await acceptOffer({db,uid:'op',rideId:'r1',externals:OK,liveMoney:true,now:()=>now});
+    check('8b. acceptance blocked despite stale fleet policy expiry',
+      accepted.status===409 && accepted.body.code==='insurance_renewal_required',
+      JSON.stringify(accepted.body));
+
+    const long = cleanUser();
+    long.documents.insurance = insuranceRead({ expirationDate:'2026-09-23' }, { expiry:'2026-09-23' });
+    long.documents.insurance.expiry = '2026-09-23';
+    const longRide={...ride,routedMinutes:36*60};
+    const dbLong = fakeDb({users:{op:long},operators:{op:{...fleet,insuranceExpiry:'2026-09-23'}},rides:{r1:longRide}});
+    const longResult=await acceptOffer({db:dbLong,uid:'op',rideId:'r1',externals:OK,liveMoney:true,now:()=>now});
+    check('8b. route projection over policy end blocks acceptance',
+      longResult.status===409 && longResult.body.code==='insurance_renewal_required',
+      JSON.stringify(longResult.body));
+
+    const dbRenewed = fakeDb({users:{op:cleanUser()},operators:{op:fleet},rides:{r1:ride}});
+    const renewed = await acceptOffer({db:dbRenewed,uid:'op',rideId:'r1',externals:OK,liveMoney:true,now:()=>now});
+    check('8b. independently verified replacement with future expiry may accept',
+      renewed.status===200,JSON.stringify(renewed.body));
+  }
+
   // ——— 9. the client cannot grant itself qualification ———————————————————————————————
   {
     const forged = cleanUser({

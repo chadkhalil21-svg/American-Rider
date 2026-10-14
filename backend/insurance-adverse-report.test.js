@@ -50,4 +50,10 @@ assert.ok(provider.includes('mayClearOperatorInsuranceRisk'));
 assert.ok(provider.includes('row.createdAt'));
 assert.ok(provider.includes('currentContactTrust'));
 assert.ok(provider.includes('matchedPolicy'));
+assert.ok(server.includes("const saveRequestMetadata = async (deliveryIssue = null) => db.runTransaction("),
+  'outbound confirmations must update against latest monitoring in a transaction');
+assert.ok(server.includes('const current=latestUser.insuranceMonitoring||{}'),
+  'a delayed email must not overwrite a newer self-reported adverse status');
+assert.ok(!server.includes('insuranceMonitoring: nextMonitoring'),
+  'no old request snapshot is allowed to reset the cancellation lockout');
 console.log('PASS twice: nonpayment notice, early cancellation, already-outstanding token, provider-only release, no new offer');

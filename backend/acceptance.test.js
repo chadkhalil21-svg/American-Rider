@@ -124,6 +124,33 @@ const accept = (db, extra = {}) => acceptOffer({ db, uid: 'op', rideId: 'r1', ex
     const again = await accept(db);
     check('RACE: a second tap is refused as well', again.status === 409 && db.data.rides.r1.status === 'assigned');
   }
+  // FOUNDER'S INSURANCE RULE: if the insurer changes status after an offer
+  // but before acceptance, no new Travel can be accepted. Check the authoritative
+  // account record, even if the fleet still displays a future insurance date.
+  // Multiple conditions and both test passes must independently fail closed.
+  for(let pass=0;pass<2;pass++)for(const bad of
+    ['cancelled','nonrenewed','coverage_reduced','vehicle_removed','pending_cancellation','unverified']){
+    const db=fakeDb(seed());
+    db.data.users.op.insuranceMonitoring.status=bad;
+    const out=await accept(db);
+    check('INSURANCE after offer '+bad+' P'+pass+': refuse the Travel',
+      out.status===409 && String(out.body?.code||'').startsWith('insurance_'),JSON.stringify(out));
+    check('INSURANCE after offer '+bad+' P'+pass+': no acceptance or invented charge',
+      db.data.rides.r1.status==='assigned' && !db.data.rides.r1.acceptedAt &&
+      !db.data.rides.r1.paymentIntentId);
+    check('INSURANCE after offer '+bad+' P'+pass+': take Operator out of service',
+      db.data.operators.op.available===false);
+  }
+  {
+    const db=fakeDb(seed());
+    // A policy expiry at the exact acceptance decision always outranks a
+    // new/old fleet expiry and a prior insurer confirmation.
+    db.data.users.op.insuranceMonitoring.expirationDate='2026-09-21';
+    const out=await accept(db);
+    check('INSURANCE expiry after offer blocks new acceptance',
+      out.status===409&&db.data.rides.r1.status==='assigned'&&db.data.operators.op.available===false,
+      JSON.stringify(out));
+  }
   {
     const db = fakeDb(seed());
     const out = await accept(db);

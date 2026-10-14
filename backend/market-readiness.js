@@ -71,6 +71,7 @@ function founderDeclaredFrameworks(manifest, missing) {
   return founderDeclarations.domains.map(domain => ({
     domain,
     policyDecision: 'founder_finalized',
+    policySatisfied: true, // Founder-authorized internal policy, NOT external commissioning.
     marketEvidenceState: outstanding.get(domain) || 'verified_record',
     approvalGrantsMarketAccess: false,
   }));
@@ -94,6 +95,10 @@ function readinessFor({ market, region, record = {}, now = Date.now(), providerM
     enforcedInCode: configuredControls(manifest),
     mappedConfiguredSubcontrols: mappedConfiguredSubcontrols(manifest),
     founderDeclaredFrameworks: founderDeclaredFrameworks(manifest, missing),
+    // A separate, explicit policy-plane result. Do NOT feed this into
+    // requirementsFor(), readyToActivate, or paid-Travel authorization.
+    executivePolicyReadinessSatisfied:
+      founderDeclaredFrameworks(manifest, missing).length === founderDeclarations.domains.length,
     // Regional activation reads market_admission and verified platform/provider proof.
     // It never requires individual users/ or operators/ documents. Those are
     // checked at qualification, duty, dispatch and acceptance, not here.

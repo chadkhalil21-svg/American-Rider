@@ -1,5 +1,8 @@
 # AMERICAN RIDER — CANONICAL PROJECT LEDGER
 
+**2026-10-14 EXPLICIT FOUNDER POLICY READINESS:** The Founder requires a true/false evaluation of the 11 machine-readable, finalized internal frameworks. `market-readiness.js` now returns `policySatisfied: true` for each declared framework and `executivePolicyReadinessSatisfied: true` for valid configured South Florida markets. This is a final internal executive policy decision, separate from external evidence supporting commercial admission. Actual insurer coverage, screening-provider verification, live financial and service checks continue to determine `readyToActivate` under the existing atomic market engine. The 24-hour Operator guards are unchanged. No new approval from the Founder is required. See `docs/audits/FOUNDER-POLICY-STATUS-2026-10-14.md`.
+
+
 **2026-10-14 FOUNDER RATIFICATION — ELEVEN SOUTH FLORIDA FRAMEWORKS:** Founder formally declares the eleven internal platform policies, pricing/tax structures, safety procedures, and operational frameworks finalized. This decision is recorded in `backend/founder-platform-declarations.json` and presented by `market-readiness.js` as `founderDeclaredFrameworks` for Miami-Dade, Broward, and Palm Beach. It records executive policy approval, not independent proof of insurer coverage, screening-provider handoff, live financial reconciliation, real-device testing, or backup restoration. The existing admission proof checks and individual Operator 24-hour safeguards remain unchanged. The standing `founder-open-fl-southeast-20261013` command remains valid. See `docs/audits/EXECUTIVE-DECISIONS-2026-10-14.md`.
 
 

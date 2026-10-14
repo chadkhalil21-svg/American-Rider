@@ -14,8 +14,10 @@ for(let pass=0;pass<2;pass++) for(const id of ids){
  assert.deepEqual(state.founderDeclaredFrameworks.map(x=>x.domain),declarations.domains);
  assert.ok(state.founderDeclaredFrameworks.every(x=>
    x.policyDecision==='founder_finalized' &&
+   x.policySatisfied===true &&
    x.marketEvidenceState==='record_absent' &&
    x.approvalGrantsMarketAccess===false));
+ assert.equal(state.executivePolicyReadinessSatisfied,true);
  assert.equal(state.readinessScope.individualOperatorRowsRequired,false);
  assert.equal(state.readyToActivate,false);
  assert.equal(state.status,'waitlist');
@@ -23,6 +25,7 @@ for(let pass=0;pass<2;pass++) for(const id of ids){
  assert.ok(state.missing.some(x=>x.id==='provider:screening_provider'));
  const tampered={...region,geographyEvidence:{status:'not_verified'}};
  assert.deepEqual(readinessFor({market,region:tampered}).founderDeclaredFrameworks,[]);
+ assert.equal(readinessFor({market,region:tampered}).executivePolicyReadinessSatisfied,false);
 }
 assert.equal(new Set(declarations.domains).size,11);
 assert.ok(declarations.domains.every(x=>REQUIRED_EVIDENCE.includes(x)));

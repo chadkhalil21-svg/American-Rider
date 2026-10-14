@@ -2,14 +2,14 @@
 // /terms and /privacy so the app's sign-up screen can link to real, live pages.
 //
 // PLAIN-ENGLISH ON PURPOSE: these are written so a normal person can actually read them.
-// ⚠️ STATUS: drafts written 6 Aug 2026, awaiting review by a Florida attorney before real
-// (non-test) rides begin. Keep the wording honest about the beta at all times.
+// ⚠️ STATUS: written for the prelaunch platform and pending qualified attorney review.
+// Keep factual disclosures synchronized with actual account, Family/Teen and payment flows.
 //
 // The shell lives in backend/shell.js and is shared with the public site, so the legal pages
 // and the marketing pages cannot drift apart the way they had — these carried their own copy
 // of the styling in the wrong tokens, under a tagline the app does not use.
 
-const UPDATED = 'August 6, 2026';
+const UPDATED = 'October 13, 2026';
 const PRIVACY_UPDATED = 'October 13, 2026';
 
 const { page } = require('./shell');
@@ -32,7 +32,7 @@ American Rider — we are a coordination platform, not a transportation carrier.
 
 <section><h2>2 · Your account</h2>
 <ul>
-<li>You must be 18 or older to hold an account. Minors ride with an accountholder.</li>
+<li>Ordinary adult Traveler and Operator accounts require you to be at least 18. The separate Family/Teen Travel program allows an eligible Teen aged 13–17 to use an invited, verified Teen account under a verified guardian's authorization and safety controls. No child under 13 may hold a Teen account.</li>
 <li>Keep your email and sign-in details accurate and to yourself. What happens on your
 account is your responsibility, so tell us right away (through Patron Support) if you think someone
 else is using it.</li>
@@ -44,7 +44,7 @@ else is using it.</li>
 cost of the travel: the travel fare together with a platform fee, which is never shown as a
 separate charge and is never added on top of the amount you were quoted. Payment processing
 is paid from that fee.</li>
-<li>The price quoted at reservation is the price charged.</li>
+<li>The confirmed Total is the amount authorized for a Travel. If the route conditions or Total change before booking, American Rider requires you to review the revised Total before payment. Tolls, government fees and permitted adjustments must be shown before you agree; an unconfirmed increased Total must never be charged.</li>
 <li>Your operator keeps 99% of the travel fare. Our commission is 1% of the travel fare.</li>
 </ul></section>
 
@@ -71,7 +71,9 @@ traveler at risk may be suspended.</p></section>
 <p>The service is provided "as is" while we test. Features may be simulated, change, or
 break; the app may be unavailable at times. To the fullest extent Florida law allows,
 American Rider's liability during the test program is limited to the amounts you actually
-paid us.</p></section>
+paid us, except to the extent such a limit is prohibited by applicable law. No term removes a
+Traveler's nonwaivable statutory rights or responsibility for conduct the law does not allow
+us to disclaim.</p></section>
 
 <section><h2>8 · Disagreements</h2>
 <p>Raise anything that goes wrong through Patron Support in the app. For anything that
@@ -79,9 +81,9 @@ cannot be resolved there, these terms are governed by Florida law and any disput
 the courts of Miami-Dade County, Florida.</p></section>
 
 <section><h2>9 · Changes to these terms</h2>
-<p>When we update these terms — including before real paid rides begin — we'll post the new
-version here and update the date at the top. Using the app after a change means you accept
-the updated terms.</p></section>
+<p>We publish revised terms with an updated date. If a material change affects your payment,
+privacy or rights, we will provide appropriate notice and request consent when legally
+required. A change is not applied retroactively to an already confirmed Travel.</p></section>
 `,
 );
 
@@ -91,24 +93,24 @@ const PRIVACY_HTML = page(
 <h1>Privacy Policy</h1>
 <p class="updated">Last updated ${PRIVACY_UPDATED}</p>
 
-<div class="panel"><strong>The short version:</strong> we collect what's needed to arrange
-your rides — your email and your trip locations. We don't sell your data, we don't run
-ads, and your card number goes to Stripe, never to us.</div>
+<div class="panel"><strong>The short version:</strong> we collect the account, location,
+trip, safety and eligibility details needed to arrange Travel and protect Travelers and
+Operators. Family/Teen Travel involves guardian and Teen information. We do not sell
+personal data or run advertising; full card numbers are handled by Stripe, not our server.</div>
 
 <section><h2>1 · What we collect</h2>
 <ul>
-<li><strong>Account:</strong> your email address and a password (stored securely by
-Google Firebase — we never see the password itself).</li>
+<li><strong>Account:</strong> name, contact details, sign-in identity, account and device/session information. If you use password sign-in, Firebase handles password authentication; American Rider does not receive your plain-text password.</li>
+<li><strong>Operators:</strong> identity, driver licence, vehicle registration, commercial insurance details and continuing verification status, screening decisions and lawful exception records. Screening and insurance records are needed to determine eligibility and investigate concerns.</li>
+<li><strong>Family/Teen:</strong> invited Teen name, verified email, date of birth for age eligibility, guardian relationship, consent/revocation records and safety information needed for guardian-authorized Travel for ages 13–17. We do not offer accounts for children under 13.</li>
+<li><strong>Support and safety:</strong> messages, reports, optional submitted photos, lost item records, location-sharing choices and relevant trip incident records.</li>
 <li><strong>Trips:</strong> pickup and destination locations, the route, times, and the
 price of each ride — that's what a receipt is made of.</li>
-<li><strong>Location:</strong> your device location, only while you're setting a pickup or
-during a ride, to point the arrow to your car and show trip progress. You can say no in
-iOS Settings; the app still works without it.</li>
+<li><strong>Location:</strong> precise pickup and destination and device location when permitted. Travelers use location for pickup, route, estimated Total and active Travel tracking; Operators who commence operations may share live/background location while on duty, including when their app is not in the foreground, to receive and fulfill Travel. Location permissions are controlled through the device settings. Denying them may limit pickup convenience or Operator availability.</li>
 </ul></section>
 
 <section><h2>2 · What we use it for</h2>
-<p>Running the service: matching you with an operator, pricing and showing your trip,
-receipts, fixing problems you report, and keeping the platform safe. That's it.</p></section>
+<p>We use these records to establish identity and eligibility, verify Operator insurance and screening, arrange and price Travel, enable dispatch, provide live safety/guardian features, process transactions and refunds, send service notices, resolve safety/support matters, prevent fraud and meet applicable legal obligations. Optional price research has a separate consent choice and does not set an individual Traveler's price.</p></section>
 
 <section><h2>3 · Who touches the data (our processors)</h2>
 <ul>
@@ -116,13 +118,15 @@ receipts, fixing problems you report, and keeping the platform safe. That's it.<
 <li><strong>Stripe</strong> — payments. Your card details go directly to Stripe; we never
 store a full card number.</li>
 <li><strong>Render</strong> — hosts our server.</li>
-<li>Route lookups send trip coordinates (never your name) to a routing service.</li>
+<li><strong>Routing, maps and toll providers</strong> may receive route coordinates needed to calculate roads, traffic or regulated tolls.</li>
+<li><strong>Screening, storage, communications and notification service providers</strong> may handle only the information needed for their respective authorized service.</li>
+<li><strong>The assigned Operator</strong> receives relevant pickup, destination and safety information; a verified guardian may receive an eligible Teen's live Travel status, location and communications where the Family/Teen service is authorized.</li>
+<li><strong>Authorized emergency responders or public authorities</strong> may receive information when requested lawfully or needed to address an emergency.</li>
 </ul>
 <p>We don't sell your personal information to anyone, and we don't show ads.</p></section>
 
 <section><h2>4 · How long we keep it</h2>
-<p>Trip history stays on your account so your receipts exist. Want your account and its
-data deleted? Ask through Patron Support in the app and it will be done.</p></section>
+<p>You may initiate full account deletion from the in-app Account &gt; Delete Account screen, subject to verification and safe completion of any active Travel. You may also request deletion without the app through the public contact <a href="mailto:americanrider.communications@gmail.com?subject=American%20Rider%20Account%20Deletion">americanrider.communications@gmail.com</a>. We delete or de-identify linked account data as appropriate, while retaining only information reasonably necessary for lawful receipts, tax, fraud, safety, insurance claims, disputes or other legal obligations. We do not promise immediate erasure of records we must retain; you may request details through Patron Support.</p></section>
 
 <section><h2>4A · Optional pricing research</h2>
 <p>Only if you actively choose to participate when a Travel price is displayed, we record
@@ -136,8 +140,7 @@ database provider's deletion service. Deleting your account removes linked resea
 earlier; you may also ask Patron Support to withdraw your participation.</p></section>
 
 <section><h2>5 · Children</h2>
-<p>American Rider accounts are for adults 18 and over. We don't knowingly collect data
-from children.</p></section>
+<p>Ordinary Traveler and Operator accounts are for adults. The separate, guardian-authorized Family/Teen program uses limited data for verified Teen accounts aged 13–17; it is not available to children under 13. Guardians control invitations and revocation, with restrictions for Trips already underway. We do not knowingly create under-13 accounts.</p></section>
 
 <section><h2>6 · Changes</h2>
 <p>If this policy changes, the new version is posted here with an updated date at the top.</p></section>

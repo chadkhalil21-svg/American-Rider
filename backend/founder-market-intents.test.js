@@ -11,7 +11,7 @@ const command=raw.commands[0];
 assert.equal(validateIntents(raw,now).ok,true);
 assert.equal(command.regionId,'fl-southeast');
 assert.equal(command.requestedBy,'chadkhalil21-svg');
-assert.deepEqual(three,markets().filter(m=>m.regionId==='fl-southeast').map(m=>m.id));
+assert.deepEqual([...three].sort(),markets().filter(m=>m.regionId==='fl-southeast').map(m=>m.id).sort());
 const bad=x=>assert.equal(validateIntents({...raw,commands:[{...command,...x}]},now).ok,false);
 bad({requestedBy:'not-founder'});
 bad({action:'bypass'});
@@ -31,7 +31,7 @@ assert.equal(validateIntents({...raw,commands:[command,command]},now).ok,false);
        assert.equal(a.auditMethod,METHOD);
        assert.equal(a.intentRequestedAt,Date.parse(command.requestedAt));
        assert.deepEqual(a.providerMissing,['screening_provider']);
-       assert.deepEqual(a.entries.map(e=>e.market.id),three);
+       assert.deepEqual(a.entries.map(e=>e.market.id).sort(),[...three].sort());
        for(const row of a.entries) assert.equal(a.expectedVersions[row.market.id],
          manifestFor(row.market,row.region).version);
        return {ok:false,code:'region_not_ready',

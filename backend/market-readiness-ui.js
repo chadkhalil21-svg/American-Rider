@@ -1,6 +1,7 @@
 // Internal Operations control: no evidence is approved by rendering a green checklist.
 const { page } = require('./shell');
 const { REQUIRED_EVIDENCE } = require('./market-readiness');
+const { conciseMarketIssues } = require('./market-launch-summary');
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c]);
 const title = (id) => id.replaceAll('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 function marketChecklistPage(items, { production = false, expansion = null } = {}) {
@@ -61,12 +62,22 @@ function marketChecklistPage(items, { production = false, expansion = null } = {
   const southReady = southFlorida.length > 0 && southFlorida.every(({ state }) => state.readyToActivate);
   const southStatus = southActive ? 'Open' : southReady ? 'Ready to open' :
     'Not yet cleared for paid Travel';
+  // Show one regional exception summary, not 14 technical identifiers times
+  // three counties. Full scoped evidence remains under each county's details.
+  const exceptionSummary=conciseMarketIssues(southFlorida.flatMap(({state})=>state.missing||[]));
+  const exceptionHtml=exceptionSummary.length
+    ? `<p><strong>What needs attention</strong> (these are groups of existing checks, not new permits):</p>
+       <ul id="founder-launch-issues">${exceptionSummary.map(g=>
+         `<li><strong>${esc(g.label)}</strong>: ${esc(g.message)}</li>`).join('')}</ul>
+       <p>Missing records do not mean earlier work or testing was never completed.</p>`
+    : '<p>No further launch exceptions reported by the current checklist.</p>';
   const quickAction = `<section id="south-florida-launch" aria-label="South Florida launch">
     <h2>South Florida</h2>
     <p>Miami-Dade · Broward · Palm Beach</p>
     <p><strong>Status: ${esc(southStatus)}</strong> · ${southFlorida.filter(({ state }) => state.status === 'active').length} of ${southFlorida.length} counties open</p>
     <button type="button" id="open-south-florida" ${!production || !southFlorida.length || southActive ? 'disabled' : ''}>Open South Florida</button>
     <p id="south-florida-result" role="status" aria-live="polite">One action. The server rechecks all counties and either opens them together or tells you exactly what remains. No partial launch.</p>
+    ${exceptionHtml}
   </section>`;
   const cards = items.map(({ market, state }) => {
     const localMissing = (state.missing || []).filter(m => !m.id?.startsWith('provider:'));

@@ -39,6 +39,7 @@ const quoteViewStore=require('./quote-view-store');
 const {distanceBand:quoteDistanceBand}=require('./market-reference-service');
 const { forMarket: insuranceForMarket, publicConfig: publicInsuranceConfig } = require('./insurance-jurisdictions');
 const { manifestFor, inspectMarket, recordEvidence, activateMarket, activateRegion, authorizeOnboarding, pauseMarket } = require('./market-readiness');
+const { conciseMarketIssues } = require('./market-launch-summary');
 const { sweepFounderMarketIntents } = require('./founder-market-intents');
 const { setAdmittedFleetOnline, setFleetOnlineIfOpen, deactivateMarketFleet, sweepPausedMarketFleet } = require('./market-fleet');
 const { marketChecklistPage } = require('./market-readiness-ui');
@@ -2061,7 +2062,7 @@ async function runAllSweeps({criticalOnly=false}={}) {
         ? intentSettled.value : {ok:false,code:'founder_admission_unavailable'};
       // Log only changed summaries. Never disclose evidence references or personal data.
       for (const row of intent?.results || []) {
-        const summary = JSON.stringify({code:row.code,missing:row.missing || [],recordStates:row.missingRecordStates || {}});
+        const summary = JSON.stringify({code:row.code,summary:conciseMarketIssues((row.missing||[]).map(id=>({id,code:row.missingRecordStates?.[id]||'unverified'}))),missing:row.missing || [],recordStates:row.missingRecordStates || {}});
         if (founderIntentLoggedStates.get(row.regionId) !== summary) {
           founderIntentLoggedStates.set(row.regionId,summary);
           console.info('[founder market command]',row.regionId,summary);

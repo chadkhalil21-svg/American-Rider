@@ -4,7 +4,7 @@ import {
   IBMPlexMono_600SemiBold,
   useFonts,
 } from '@expo-google-fonts/ibm-plex-mono';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, usePathname, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
@@ -24,6 +24,14 @@ import { colors } from '../src/theme';
 function AppGate() {
   const { user, initializing, onboarding } = useAuth();
   const router = useRouter();
+  const route=usePathname();
+  // Public read-only demonstration, restricted to the Render preview hostname
+  // and this one route. This grants no authentication or backend permission.
+  const readOnlyRegionalPreview =
+    Platform.OS === 'web' &&
+    route === '/executive-preview' &&
+    typeof window !== 'undefined' &&
+    window.location.hostname === 'american-rider-preview-ng4p.onrender.com';
 
   // DESIGN REVIEW BYPASS — web preview only. This never runs in native builds and is
   // inert unless the Render preview explicitly enables it. Add ?preview=app to the
@@ -72,7 +80,7 @@ function AppGate() {
       />
       {initializing ? (
         <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.bg, zIndex: 10 }]} />
-      ) : (!user || onboarding) && !webPreviewBypass ? (
+      ) : (!user || onboarding) && !webPreviewBypass && !readOnlyRegionalPreview ? (
         <View style={[StyleSheet.absoluteFill, { zIndex: 10 }]}>
           <AuthScreen />
         </View>

@@ -264,10 +264,14 @@ function evaluateExistingReport({ source, issuedAt, elements }) {
   };
 }
 
-/** Whether an operator's screening is current. Read at dispatch, not only at onboarding. */
+// A paid Travel must not begin within 24 hours of the check's renewal deadline.
+// This is an American Rider operating margin, not a statutory renewal interval.
+const SCREENING_ADVANCE_MARGIN_MS = 24 * 60 * 60 * 1000;
+/** A current provider-reviewed pass AND at least 24 hours before recheck. */
 function screeningCurrent(screening, now = Date.now()) {
-  if (!screening || screening.decision !== 'pass') return false;
-  return Number(screening.recheckDue || 0) > now;
+  if (!screening || screening.decision !== 'pass' || !Number.isFinite(now)) return false;
+  const due = Number(screening.recheckDue);
+  return Number.isFinite(due) && due > now + SCREENING_ADVANCE_MARGIN_MS;
 }
 
 /** Screening is provider-neutral. A vendor URL is optional and never proof.
@@ -290,7 +294,7 @@ const RECHECK_WARN_MS = 30 * 24 * 60 * 60 * 1000;
  * why. One sweep tick:
  *
  *   - inside the 30-day window and not yet warned  → push, once, marked so it stays once
- *   - past the deadline and not yet acted on       → dispatch flag set, push, case filed
+ *   - within 24h of deadline and not yet acted on  → dispatch flag set, push, case filed
  *
  * Both writes are idempotent by marker (recheckWarnedAt / recheckExpiredAt), so the sweep
  * can run every minute without repeating itself.
@@ -341,27 +345,27 @@ async function sweepScreening({
         (!s.recheckWarnedForDue && Number(s.recheckWarnedAt) >= due - RECHECK_WARN_MS &&
           Number(s.recheckWarnedAt) < due);
       const expiredThisCycle = Number(s.recheckExpiredForDue) === due ||
-        (!s.recheckExpiredForDue && Number(s.recheckExpiredAt) >= due);
-      if (due <= now && !expiredThisCycle) {
-        // An expired screening always blocks dispatch, regardless of notification.
+        (!s.recheckExpiredForDue && Number(s.recheckExpiredAt) >= due - SCREENING_ADVANCE_MARGIN_MS);
+      if (due <= now + SCREENING_ADVANCE_MARGIN_MS && !expiredThisCycle) {
+        // The 24h lockout blocks dispatch in advance, regardless of notification.
         await db.collection('operators').doc(uid).set(
           { available: false, screeningBlocked: true,
-            screeningReason: 'Background screening expired — a current check is required.' },
+            screeningReason: 'Background check renewal required before new Travels.' },
           { merge: true },
         );
         // Durable, retry-safe case comes before the one-cycle checkpoint. An
         // email-only notification is not a stored exception. If case storage
         // fails, retain the expired block and try again on a later sweep.
         const caseResult = await createTicket({
-          uid, kind: 'support', reason: 'Operator screening expired — renewal due',
+          uid, kind: 'support', reason: 'Operator screening renewal deadline approaching',
           idempotencyKey: `screening-renewal-${due}`,
-          description: `Operator ${uid}'s background screening conducted ${new Date(Number(s.conductedAt || due - RECHECK_MS)).toISOString().slice(0, 10)} expired ${new Date(due).toISOString().slice(0, 10)}. Dispatch remains blocked until a new, authoritative check passes.`,
+          description: `Operator ${uid}'s background screening conducted ${new Date(Number(s.conductedAt || due - RECHECK_MS)).toISOString().slice(0, 10)} is due ${new Date(due).toISOString().slice(0, 10)}. New Travels are held from 24 hours before that date/time until a current check passes.`,
         });
         if (caseResult?.stored !== true)
           throw new Error('screening_renewal_case_not_stored');
         await doc.ref.set({ screening: { recheckExpiredAt: now, recheckExpiredForDue: due } }, { merge: true });
         await send({
-          uid, kind: 'screening_due', title: 'Your background check has expired',
+          uid, kind: 'screening_due', title: 'Background check renewal required',
           body: 'A current background check is required to resume operations. Renew it in the app.',
         });
         expired++;
@@ -398,5 +402,6 @@ module.exports = {
   sweepScreening,
   RECHECK_MS,
   RECHECK_WARN_MS,
+  SCREENING_ADVANCE_MARGIN_MS,
   DISQUALIFIERS,
 };

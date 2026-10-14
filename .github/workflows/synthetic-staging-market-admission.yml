@@ -1,0 +1,30 @@
+name: Synthetic Staging Market Admission
+
+on:
+  push:
+    branches:
+      - release/staging-synthetic-20261014
+  pull_request:
+    branches:
+      - release/current
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-market-command:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      AR_SYNTHETIC_STAGING: isolated_ci_only
+      DEPLOYMENT_MODE: development
+      NODE_ENV: test
+      SCREENING_EVIDENCE_WORKFLOW_VERIFIED: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --prefix backend
+      - name: Test registered Founder activation twice using synthetic Firestore
+        run: node scripts/run-staging-market-activation.cjs

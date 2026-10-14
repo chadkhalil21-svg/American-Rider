@@ -3,6 +3,7 @@
 const { createHash } = require('node:crypto');
 const { regionAdmissionProblems } = require('./market-admission');
 const { forState: insuranceForState } = require('./insurance-jurisdictions');
+const { evidenceProblem } = require('./market-evidence-diagnosis');
 
 const SCHEMA_VERSION = 2;
 const REQUIRED_EVIDENCE = Object.freeze([
@@ -44,17 +45,10 @@ function requirementsFor(manifest, record = {}, now = Date.now(), providerMissin
   const missing = manifest.sourceProblems.map((reason) => ({ id: 'source', reason }));
   if (record.fleetCleanupPending) missing.push({ id: 'fleet_cleanup', reason: 'Operator availability cleanup after a market pause has not completed' });
   for (const id of level === 'onboarding' ? ONBOARDING_EVIDENCE : REQUIRED_EVIDENCE) {
-    const proof = record.evidence?.[id];
-    if (!proof || typeof proof !== 'object' ||
-        proof.manifestVersion !== manifest.version ||
-        !String(proof.reference || '').trim() || !String(proof.issuer || '').trim() ||
-        !String(proof.verifiedBy || '').trim() ||
-        !Number.isFinite(Number(proof.reviewedAt)) || Number(proof.reviewedAt) <= 0 ||
-        !Number.isFinite(Number(proof.validUntil)) || Number(proof.validUntil) <= now) {
-      missing.push({ id, reason: `${id}: independently reviewed, current evidence is required` });
-    }
+    const problem=evidenceProblem(id,record.evidence?.[id],manifest.version,now);
+    if(problem)missing.push(problem);
   }
-  for (const id of providerMissing) missing.push({ id: `provider:${id}`, reason: `Production dependency is unavailable: ${id}` });
+  for (const id of providerMissing) missing.push({ id: `provider:${id}`, code:'production_verification_missing', reason: `Production dependency is unavailable or its verification has not been recorded: ${id}` });
   return missing;
 }
 
@@ -193,7 +187,7 @@ async function activateRegion({ db, entries, actor, expectedVersions, providerMi
       const grouped = new Map();
       for (const b of blocked) for (const missing of b.state.missing) {
         const key = missing.id + ':' + missing.reason;
-        if (!grouped.has(key)) grouped.set(key, { id: missing.id, reason: missing.reason, markets: [] });
+        if (!grouped.has(key)) grouped.set(key, { id: missing.id, code: missing.code || 'unspecified', reason: missing.reason, markets: [] });
         grouped.get(key).markets.push(b.marketId);
       }
       return {

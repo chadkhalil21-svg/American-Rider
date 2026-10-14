@@ -2061,7 +2061,7 @@ async function runAllSweeps({criticalOnly=false}={}) {
         ? intentSettled.value : {ok:false,code:'founder_admission_unavailable'};
       // Log only changed summaries. Never disclose evidence references or personal data.
       for (const row of intent?.results || []) {
-        const summary = JSON.stringify({code:row.code,missing:row.missing || []});
+        const summary = JSON.stringify({code:row.code,missing:row.missing || [],recordStates:row.missingRecordStates || {}});
         if (founderIntentLoggedStates.get(row.regionId) !== summary) {
           founderIntentLoggedStates.set(row.regionId,summary);
           console.info('[founder market command]',row.regionId,summary);

@@ -69,6 +69,8 @@ async function sweepFounderMarketIntents({
       results.push({regionId:command.regionId,ok:outcome.ok===true,
         code:outcome.code||'unknown_result',newlyOpened:opened,
         missing:Array.isArray(outcome.missing)?[...new Set(outcome.missing.map(x=>x.id))]:[],
+        missingRecordStates:Array.isArray(outcome.missing)
+          ? Object.fromEntries(outcome.missing.map(x=>[x.id,x.code||'unspecified'])) : {},
       });
     }catch {
       results.push({regionId:command.regionId,ok:false,code:'admission_check_unavailable'});

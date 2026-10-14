@@ -185,10 +185,13 @@ async function main() {
   const requestEnd = server.indexOf('// --- Continuing Operator insurance status.', requestStart);
   assert(requestStart >= 0 && requestEnd > requestStart, 'find the actual insurance send workflow');
   const sendFlow = server.slice(requestStart, requestEnd);
-  const stampPos = sendFlow.lastIndexOf('insuranceMonitoring: nextMonitoring');
+  const stampPos = sendFlow.lastIndexOf('const resultingEligibility = await saveRequestMetadata();');
   const correlatePos = sendFlow.lastIndexOf('providerMessageId: sent.id || null');
   assert(stampPos >= 0 && correlatePos > stampPos,
     'the current user request stamp must be persisted before exposing providerMessageId');
+  assert(sendFlow.includes('const snap=await tx.get(userRef)') &&
+    sendFlow.includes('const current=latestUser.insuranceMonitoring||{}'),
+    'outgoing insurance email must not overwrite a newer nonpayment/cancellation report');
 
   console.log('PASS Resend published Svix signature vector, tampering, timestamp, size and event minimization');
   console.log('PASS insurance email delivery, race recovery, bounce, duplicates, stale/confirmed request and zero policy-approval effects');

@@ -163,6 +163,7 @@ const {
 const { COLLECTION: TRUSTED_INSURANCE_CONTACTS, contactId: insuranceContactId,
   currentContactTrust, policyFingerprint, normalizeEmail: normalizeInsuranceContact } = require('./insurance-contact-trust');
 const { insuranceSourceState, recognizeOfficialInsuranceContact } = require('./insurance-official-source-router');
+const { recordOperatorInsuranceRisk, mayClearOperatorInsuranceRisk } = require('./insurance-adverse-report');
 const { normalizeParty, operatorPartyView } = require('./travelparty');
 const family = require('./family');
 const { provisionTeenPin, verifyTeenPin, teenPinReady, pinForRide } = require('./teenpickup');
@@ -2810,14 +2811,29 @@ async function issueInsuranceConfirmationRequest({ uid, user, contact, now = Dat
       'If your organization requires its own authorization form, reply to insurance@americanrider.app and American Rider will use that process instead.\n',
   });
 
-  const nextMonitoring = {
-    ...m,
+  // A confirmation email may be in-flight when an Operator reports a
+  // nonpayment notice. Only mutate request metadata against the CURRENT
+  // document, never re-save the pre-email monitoring snapshot and accidentally
+  // clear a newer cancellation hold.
+  const requestMetadata = {
     contact: { name: String(contact?.name || '').slice(0, 100), email, type: String(contact?.type || 'broker') },
     verificationRequestedAt: now,
     verificationRequestedTo: email,
     verificationRequestReason: reason,
-    verificationRequestCount: attempt,
   };
+  const saveRequestMetadata = async (deliveryIssue = null) => db.runTransaction(async tx => {
+    const userRef=db.collection('users').doc(String(uid));
+    const snap=await tx.get(userRef);
+    const latestUser=snap.exists?snap.data()||{}:{};
+    const current=latestUser.insuranceMonitoring||{};
+    const update={...current,...requestMetadata,
+      verificationRequestCount:Math.max(Number(current.verificationRequestCount)||0,attempt)};
+    // A new nonpayment notice always takes precedence over a delivery problem.
+    if(deliveryIssue && !current.operatorAdverseReportedAt)
+      update.verificationIssue=deliveryIssue;
+    tx.set(userRef,{insuranceMonitoring:update},{merge:true});
+    return continuingStatus({...latestUser,insuranceMonitoring:update},now);
+  });
 
   if (!sent.ok) {
     const issue = attempt >= 3 ? {
@@ -2832,9 +2848,7 @@ async function issueInsuranceConfirmationRequest({ uid, user, contact, now = Dat
       deliveryFailedAt: now,
       deliveryFailure: String(sent.reason || 'Confirmation request could not be sent.').slice(0, 500),
     }, { merge: true });
-    await db.collection('users').doc(String(uid)).set({
-      insuranceMonitoring: { ...nextMonitoring, verificationIssue: issue },
-    }, { merge: true });
+    const resultingEligibility = await saveRequestMetadata(issue);
     await db.collection('audit_log').add({
       at: now,
       subject: String(uid),
@@ -2844,7 +2858,7 @@ async function issueInsuranceConfirmationRequest({ uid, user, contact, now = Dat
       contactEmail: email,
       attempt,
       reason: String(sent.reason || '').slice(0, 500),
-      resultingEligibility: continuingStatus({ ...(user || {}), insuranceMonitoring: { ...nextMonitoring, verificationIssue: issue } }, now),
+      resultingEligibility,
     }).catch(() => {});
     if (attempt >= 3) {
       await fileTicket({
@@ -2864,9 +2878,7 @@ async function issueInsuranceConfirmationRequest({ uid, user, contact, now = Dat
   // A signed bounce can arrive immediately after the outbound API returns. If the
   // provider ID were saved first, that bounce could correlate while the user
   // still held the prior request and would not create an actionable contact issue.
-  await db.collection('users').doc(String(uid)).set({
-    insuranceMonitoring: nextMonitoring,
-  }, { merge: true });
+  const resultingEligibility = await saveRequestMetadata();
   await requestRef.set({
     deliveryStatus: 'accepted',
     deliveryAcceptedAt: now,
@@ -2881,7 +2893,7 @@ async function issueInsuranceConfirmationRequest({ uid, user, contact, now = Dat
     contactEmail: email,
     attempt,
     providerMessageId: sent.id || null,
-    resultingEligibility: continuingStatus({ ...(user || {}), insuranceMonitoring: nextMonitoring }, now),
+    resultingEligibility,
   }).catch(() => {});
   return { ok: true, expiresAt, providerMessageId: sent.id || null };
 }
@@ -3022,6 +3034,44 @@ app.post('/operator/insurance/request-confirmation', requireAuth, LIMITS.documen
   }
 });
 
+// Immediate self-report of a nonpayment/cancellation notice. A self-report
+// CANNOT reinstate an Operator; only a new independently verified provider
+// confirmation can do that. This is source-neutral and costs no provider API.
+app.post('/operator/insurance/report-risk', requireAuth, LIMITS.qualification, async (req, res) => {
+  const db=adminDb();
+  if (!db) return res.status(503).json({ok:false,code:'no_admin_db'});
+  const kind=String(req.body?.kind||'');
+  if (!['pending_cancellation','cancelled'].includes(kind))
+    return res.status(400).json({ok:false,code:'invalid_insurance_risk'});
+  const now=Date.now(), uid=String(req.uid);
+  try {
+    const result=await db.runTransaction(async tx=>{
+      const userRef=db.collection('users').doc(uid), opRef=db.collection('operators').doc(uid);
+      const [userSnap,opSnap]=await Promise.all([tx.get(userRef),tx.get(opRef)]);
+      if (!userSnap.exists) return {ok:false,code:'operator_record_missing'};
+      const user=userSnap.data()||{};
+      const monitoring=recordOperatorInsuranceRisk(user.insuranceMonitoring,kind,now);
+      const unchanged=Number(user.insuranceMonitoring?.operatorAdverseReportedAt)>0 &&
+        ['pending_cancellation','cancelled'].includes(String(user.insuranceMonitoring?.status||'')) &&
+        (user.insuranceMonitoring?.status==='cancelled'||kind==='pending_cancellation');
+      // Every repeat command reasserts the restrictive fleet state. A stale
+      // duty flag cannot survive merely because this risk was reported once.
+      if(opSnap.exists && opSnap.data()?.available !== false)
+        tx.set(opRef,{available:false,offDutyReason:'insurance_'+monitoring.status,offDutyAt:now},{merge:true});
+      if (!unchanged) {
+        tx.set(userRef,{insuranceMonitoring:monitoring},{merge:true});
+        const auditRef=db.collection('audit_log').doc();
+        tx.set(auditRef,{at:now,action:'operator_reported_insurance_risk',subject:uid,
+          actor:{uid,method:'authenticated_operator'},status:monitoring.status,
+          scope:'no_new_travel_provider_confirmation_required'});
+      }
+      return {ok:true,status:monitoring.status};
+    });
+    if(!result.ok)return res.status(409).json(result);
+    return res.json({...result,newTravelBlocked:true});
+  }catch(e){return res.status(502).json({ok:false,code:'insurance_risk_record_unavailable'});}
+});
+
 // Secure third-party confirmation. Possession of the random, single-use token sent to the
 // stored insurer/broker address is the authentication factor. It exposes only masked policy
 // identity and the minimum status choices needed for eligibility.
@@ -3127,12 +3177,18 @@ app.post('/insurance/status-confirmation', express.urlencoded({ extended: false 
         const officialTrusted = sameJurisdiction && official.recognized === true &&
           official.jurisdiction === row.sourceStateCode &&
           normalizeInsuranceContact(row.email) === normalizeInsuranceContact(official.email);
-        if (!matched || !matchedPolicy || !sameJurisdiction || (!staffTrusted && !officialTrusted)) {
+        const providerRequestNewerThanOperatorRisk = mayClearOperatorInsuranceRisk(
+          u.insuranceMonitoring, Number(row.createdAt));
+        if (!matched || !matchedPolicy || !sameJurisdiction ||
+            !providerRequestNewerThanOperatorRisk || (!staffTrusted && !officialTrusted)) {
           const issue = {
-            kind: !matchedPolicy ? 'insurance_policy_changed_since_request' :
+            kind: !providerRequestNewerThanOperatorRisk ? 'insurance_new_confirmation_required' :
+              !matchedPolicy ? 'insurance_policy_changed_since_request' :
               'independent_provider_contact_required', at: now,
             contactEmail: row.email,
-            note: !matchedPolicy
+            note: !providerRequestNewerThanOperatorRisk
+              ? 'This active-status reply was requested before the Operator reported an insurance cancellation risk. A new insurer or broker confirmation is required.'
+              : !matchedPolicy
               ? 'The insured policy changed after this confirmation request. A fresh provider confirmation is required.'
               : !sameJurisdiction
                 ? 'The operating jurisdiction changed since the request. Obtain a new confirmation for the current market.'
@@ -3141,7 +3197,7 @@ app.post('/insurance/status-confirmation', express.urlencoded({ extended: false 
           const monitoring = { ...(u.insuranceMonitoring || {}),
             verificationIssue: issue, untrustedConfirmationAt: now };
           const resultingEligibility = continuingStatus({ ...u, insuranceMonitoring: monitoring }, now);
-          // Do not refresh lastVerifiedAt or clear a previous adverse status.
+          // Do not refresh lastVerifiedAt or clear a previous adverse status or Operator cancellation notice.
           tx.set(userRef, { insuranceMonitoring: monitoring }, { merge: true });
           tx.set(requestRef, { usedAt: now, result: !matchedPolicy ?
             'policy_changed_since_request' : 'unverified_provider_contact' }, { merge: true });
@@ -3198,6 +3254,12 @@ app.post('/insurance/status-confirmation', express.urlencoded({ extended: false 
       });
       updated.verificationRequestCount = 0;
       updated.verificationIssue = null;
+      // Clear the self-reported warning ONLY with a fresh, source-vetted,
+      // policy-bound insurer/broker affirmative reply issued after the report.
+      if(status==='verified_active'){
+        updated.operatorAdverseReportedAt=null;
+        updated.operatorAdverseKind=null;
+      }
       const resultingEligibility = continuingStatus({ ...u, insuranceMonitoring: updated }, now);
 
       tx.set(userRef, { insuranceMonitoring: updated }, { merge: true });

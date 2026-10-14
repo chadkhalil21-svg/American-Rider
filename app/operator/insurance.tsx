@@ -7,7 +7,7 @@ import { Text } from '../../src/components/AppText';
 import { pickDocument } from '../../src/backend/documentUpload';
 import {
   insuranceStatus, insuranceConfig, authorizeInsuranceStatusVerification,
-  attestInsuranceUnchanged, requestInsuranceConfirmation,
+  attestInsuranceUnchanged, requestInsuranceConfirmation, reportInsuranceRisk,
   type InsuranceStatus, type InsuranceConfig,
 } from '../../src/backend/insuranceStatus';
 import { useGoBack } from '../../src/components/nav';
@@ -75,6 +75,22 @@ export default function OperatorInsurance() {
       await refresh();
       Alert.alert(t('traveler.insStatusTitle'), t('traveler.insRequestSent'));
     } finally { setStatusBusy(false); }
+  };
+  const reportRisk = (kind: 'pending_cancellation' | 'cancelled') => {
+    Alert.alert(t('traveler.insRiskTitle'), t('traveler.insRiskBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('traveler.insRiskConfirm'), style: 'destructive', onPress: () => {
+        void (async () => {
+          setStatusBusy(true);
+          try {
+            const result = await reportInsuranceRisk(kind);
+            if (!result.ok) return Alert.alert(t('traveler.notRecorded'), result.error || t('traveler.errReachAR'));
+            await refresh();
+            Alert.alert(t('traveler.insRiskTitle'), t('traveler.insRiskRecorded'));
+          } finally { setStatusBusy(false); }
+        })();
+      } },
+    ]);
   };
   const submitPolicy = async (fromCamera: boolean) => {
     if (!config) return Alert.alert(t('operator.commercialInsurance'), t('traveler.insJurisdictionUnavailable'));
@@ -156,6 +172,15 @@ export default function OperatorInsurance() {
           </>
         )}
         {configResolved && !config && <Text style={styles.attention}>{t('traveler.insJurisdictionUnavailable')}</Text>}
+        <Text style={styles.note}>{t('traveler.insRiskBody')}</Text>
+        <Pressable accessibilityRole="button" disabled={statusBusy}
+          onPress={() => reportRisk('pending_cancellation')} style={styles.tap}>
+          <Text style={styles.link}>{t('traveler.insRiskPending')} ›</Text>
+        </Pressable>
+        <Pressable accessibilityRole="button" disabled={statusBusy}
+          onPress={() => reportRisk('cancelled')} style={styles.tap}>
+          <Text style={styles.link}>{t('traveler.insRiskCancelled')} ›</Text>
+        </Pressable>
         <Pressable accessibilityRole="button" onPress={() => { void refresh(); }} style={styles.tap}>
           <Text style={styles.link}>{t('operator.insRefreshStatus')} ›</Text>
         </Pressable>

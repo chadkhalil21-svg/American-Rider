@@ -259,6 +259,8 @@ export default {
   },
 
   traveler: {
+    updateRequiredTitle: 'Actualización necesaria',
+    updateRequiredBody: 'Actualice American Rider para revisar y confirmar el total actual del viaje. No se hizo ninguna reserva ni ningún cobro.',
     priceChangedTitle: 'El costo total cambió',
     priceChangedBody: 'El precio cambió antes de la reserva. No se realizó ningún cobro. Revise el nuevo total.',
     reviewUpdatedTotal: 'Revisar el total',

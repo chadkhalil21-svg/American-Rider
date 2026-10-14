@@ -147,10 +147,17 @@ async function activateMarket({ db, market, region, actor, expectedVersion, prov
  * This never manufactures evidence, treats a proposal as a licence, or authorizes an
  * unconfigured state. A single failure means ZERO new county activations.
  */
-async function activateRegion({ db, entries, actor, expectedVersions, providerMissing = [], auditMethod = 'named_ops_mfa', now = Date.now() }) {
+async function activateRegion({ db, entries, actor, expectedVersions, providerMissing = [], auditMethod = 'named_ops_mfa', intentRequestedAt = null, founderCommandId = null, now = Date.now() }) {
   if (!db || !actor || !Array.isArray(entries) || !entries.length || entries.length > 100 ||
       !expectedVersions || typeof expectedVersions !== 'object' || Array.isArray(expectedVersions))
     return { ok: false, code: 'invalid_region_request' };
+  // A versioned GitHub release can carry a founder instruction but cannot
+  // undo a later deliberate market pause or impersonate an MFA session.
+  if (!['named_ops_mfa','oauth_delegated_mfa','founder_gitops_release'].includes(auditMethod) ||
+      (auditMethod === 'founder_gitops_release' &&
+       (!Number.isSafeInteger(intentRequestedAt)||intentRequestedAt<=0||intentRequestedAt>now||
+        !/^founder-open-[a-z0-9-]{4,80}$/.test(String(founderCommandId||'')))))
+    return {ok:false,code:'invalid_admission_authority'};
   const ids = new Set(), prepared = [];
   let regionId = null;
   for (const entry of entries) {
@@ -168,6 +175,10 @@ async function activateRegion({ db, entries, actor, expectedVersions, providerMi
   return db.runTransaction(async (tx) => {
     // Firestore requires all transaction reads to precede writes.
     const snapshots = await Promise.all(prepared.map((p) => tx.get(p.ref)));
+    if (auditMethod === 'founder_gitops_release' && snapshots.some(
+      snap => snap.exists && Number(snap.data()?.pausedAt) >= intentRequestedAt
+    )) return {ok:false,code:'market_paused_after_founder_instruction',regionId};
+
     const checked = prepared.map((p, i) => ({
       marketId: p.market.id,
       state: readinessFor({
@@ -204,7 +215,8 @@ async function activateRegion({ db, entries, actor, expectedVersions, providerMi
       tx.create(db.collection('audit_log').doc(), {
         at: now, action: 'market_activated', marketId: market.id,
         regionId, manifestVersion: manifest.version,
-        actor: { name: actor, method: ['named_ops_mfa','oauth_delegated_mfa'].includes(auditMethod) ? auditMethod : 'named_ops_mfa' },
+        actor: { name: actor, method: auditMethod },
+        ...(auditMethod === 'founder_gitops_release' ? {founderCommandId} : {}),
       });
       newlyOpened.push(market.id);
     }

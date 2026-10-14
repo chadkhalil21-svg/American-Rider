@@ -6,6 +6,7 @@ const PERIOD_MS = Object.freeze({
   pushReceipts: 5 * 60_000, // Expo first receipt available about 15 minutes after send
   screening: 30 * 60_000,
   insuranceMonitoring: 30 * 60_000,
+  founderMarketIntent: 10 * 60_000, // at most 3 admission reads every ten minutes while intent is pending
   operatorFees: 6 * 60 * 60_000,
   familyAgeOut: 60 * 60_000,
   marketReference: 24 * 60 * 60_000,

@@ -39,6 +39,7 @@ const quoteViewStore=require('./quote-view-store');
 const {distanceBand:quoteDistanceBand}=require('./market-reference-service');
 const { forMarket: insuranceForMarket, publicConfig: publicInsuranceConfig } = require('./insurance-jurisdictions');
 const { manifestFor, inspectMarket, recordEvidence, activateMarket, activateRegion, authorizeOnboarding, pauseMarket } = require('./market-readiness');
+const { sweepFounderMarketIntents } = require('./founder-market-intents');
 const { setAdmittedFleetOnline, setFleetOnlineIfOpen, deactivateMarketFleet, sweepPausedMarketFleet } = require('./market-fleet');
 const { marketChecklistPage } = require('./market-readiness-ui');
 const { catalog: expansionCatalog, proposeMarket, listPlans: listMarketPlans } = require('./market-expansion');
@@ -1984,6 +1985,7 @@ app.post('/charge-ride', requireAuth, LIMITS.payments, requireOperationalReadine
 // without the configured token fail closed before any operational work begins.
 let lastSweep = { at: 0, report: null };
 const maintenanceCadence = createSweepCadence();
+const founderIntentLoggedStates = new Map();
 const quotaBackoff = createQuotaBackoff();
 const criticalRecoveryGate = createCriticalRecoveryGate({ intervalMs:60_000 });
 const maintenanceSweep = (name, work) => maintenanceCadence.run(name, work);
@@ -2040,7 +2042,34 @@ async function runAllSweeps({criticalOnly=false}={}) {
       ]);
       return {...reference,publicRates,ok:reference.ok!==false && publicRates.ok!==false};
     }),
-    marketFleet: () => sweepPausedMarketFleet({ db: adminDb(), marketById: (id) => allMarkets().find((m) => m.id === id) }),
+    marketFleet: async () => {
+      // Founder commands ride on the existing optional leased sweep; never a
+      // second interval, internet-facing control endpoint or new paid service.
+      // Failures are independently reported and cannot stop paused-fleet cleanup.
+      const [fleetSettled, intentSettled] = await Promise.allSettled([
+        sweepPausedMarketFleet({ db: adminDb(), marketById: (id) => allMarkets().find((m) => m.id === id) }),
+        maintenanceSweep('founderMarketIntent', () => sweepFounderMarketIntents({
+          db: adminDb(), markets: allMarkets(), regions: REGIONS,
+          production: DEPLOYMENT_MODE === 'production' && keyMode === 'live',
+          providerMissing: productionReadiness().missing,
+          onOpened: invalidatePublicMarkets,
+        })),
+      ]);
+      const fleet = fleetSettled.status === 'fulfilled'
+        ? fleetSettled.value : {ok:false,code:'fleet_cleanup_unavailable'};
+      const intent = intentSettled.status === 'fulfilled'
+        ? intentSettled.value : {ok:false,code:'founder_admission_unavailable'};
+      // Log only changed summaries. Never disclose evidence references or personal data.
+      for (const row of intent?.results || []) {
+        const summary = JSON.stringify({code:row.code,missing:row.missing || []});
+        if (founderIntentLoggedStates.get(row.regionId) !== summary) {
+          founderIntentLoggedStates.set(row.regionId,summary);
+          console.info('[founder market command]',row.regionId,summary);
+        }
+      }
+      return {...fleet,founderAdmission:intent,
+        ok:fleet?.ok!==false && intent?.ok!==false};
+    },
     accountDeletion: () => maintenanceSweep('accountDeletion', () => sweepAccountDeletion({ db: adminDb(), auth: adminStatus().ok ? require('firebase-admin/auth').getAuth() : null })),
   }, {criticalOnly});
 }

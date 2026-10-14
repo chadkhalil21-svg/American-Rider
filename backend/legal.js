@@ -42,7 +42,9 @@ else is using it.</li>
 <ul>
 <li>You are shown <strong>one all-in price before you reserve</strong>. It is the whole
 cost of the travel: the travel fare together with a platform fee, which is never shown as a
-separate charge and is never added on top of the amount you were quoted. Payment processing
+separate charge and is never added on top of the amount you were quoted. The Platform Fee
+has a minimum of $2.50 and may increase when necessary to cover processing and operating
+costs; any such amount is included in the confirmed all-in Total. Payment processing
 is paid from that fee.</li>
 <li>The confirmed Total is the amount authorized for a Travel. If the route conditions or Total change before booking, American Rider requires you to review the revised Total before payment. Tolls, government fees and permitted adjustments must be shown before you agree; an unconfirmed increased Total must never be charged.</li>
 <li>Your operator keeps 99% of the travel fare. Our commission is 1% of the travel fare.</li>

@@ -27,7 +27,7 @@ for(let pass=0;pass<2;pass++){
  assert.equal(evidenceProblem(id,[],version,now).code,'record_absent');
  const empty=M.readinessFor({market,region,now});
  assert.equal(empty.readyToActivate,false);
- assert.equal(empty.missing.length,M.REQUIRED_EVIDENCE.length);
+ assert.deepEqual(empty.missing.map(x=>x.id),[M.RELEASE_PACKET]);
  assert.ok(empty.missing.every(x=>x.code==='record_absent'));
  const verified=Object.fromEntries(M.REQUIRED_EVIDENCE.map(k=>[k,{...good}]));
  const record={status:'active',manifestVersion:version,evidence:verified};

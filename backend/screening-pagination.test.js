@@ -2,7 +2,7 @@
 const assert = require('node:assert/strict');
 
 // No real Firestore, notifications, reports or Operator identifiers are used.
-const { sweepScreening, RECHECK_MS, RECHECK_WARN_MS, screeningCurrent } = require('./screening');
+const { sweepScreening, RECHECK_MS, RECHECK_WARN_MS, SCREENING_ADVANCE_MARGIN_MS, screeningCurrent } = require('./screening');
 
 const DAY = 86_400_000, NOW = Date.parse('2026-10-10T18:00:00Z');
 const users = Array.from({length: 620}, (_, i) => ({
@@ -98,14 +98,14 @@ const sweep = now => sweepScreening({
   assert.equal(users[0].data.screening.recheckWarnedForDue, users[0].data.screening.recheckDue);
   assert.notEqual(users[0].data.screening.recheckWarnedForDue, oldDue);
 
-  // On a new, already-expired screening cycle, stale prior expiry markers do
-  // not suppress suspension/case. And all 620 Operators eventually get processed.
+  // On a new screening cycle 12 hours BEFORE expiry, stale prior markers
+  // do not suppress advance suspension/case. All 620 Operators are processed.
   messages.length=0;tickets.length=0;operators.clear();cursor.clear();
   for(const item of users) {
     const s=item.data.screening;
     s.recheckExpiredForDue=NOW-100*DAY;
     s.recheckExpiredAt=NOW-99*DAY;
-    s.recheckDue=NOW-1*DAY;
+    s.recheckDue=NOW+12*60*60*1000;
   }
   const results=[];
   for(let i=0;i<4;i++)results.push(await sweep(NOW+100+i));
@@ -129,5 +129,13 @@ const sweep = now => sweepScreening({
   assert.match(failed.reason,/checkpoint/);
 
   assert.equal(RECHECK_WARN_MS,30*DAY);
-  console.log('PASS 620-Operator rotating screening renewals, wrap/restart, stale-cycle markers, expiry lockout and failed checkpoint');
+  assert.equal(SCREENING_ADVANCE_MARGIN_MS,DAY);
+  const passing={decision:'pass',recheckDue:NOW+DAY+1};
+  assert.equal(screeningCurrent(passing,NOW),true,'outside the 24h window remains valid');
+  assert.equal(screeningCurrent({...passing,recheckDue:NOW+DAY},NOW),false,'exactly 24h ahead is blocked');
+  assert.equal(screeningCurrent({...passing,recheckDue:NOW+12*60*60*1000},NOW),false,'12h ahead is blocked');
+  assert.equal(screeningCurrent({decision:'review',recheckDue:NOW+10*DAY},NOW),false,'unverified screening is blocked');
+  assert.equal(screeningCurrent(null,NOW),false,'missing screening is blocked');
+  assert.equal(screeningCurrent({...passing,recheckDue:NaN},NOW),false,'invalid screening date is blocked');
+  console.log('PASS 620-Operator rotating screening renewals, wrap/restart, stale-cycle markers, 24h advance lockout and failed checkpoint');
 })().catch(e=>{console.error(e);process.exitCode=1;});

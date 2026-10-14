@@ -76,7 +76,18 @@ function readinessFor({ market, region, record = {}, now = Date.now(), providerM
     readyToActivate: missing.length === 0, onboardingMissing, missing,
     evidenceCount: REQUIRED_EVIDENCE.length-configuredControls(manifest).length,
     enforcedInCode: configuredControls(manifest),
-    mappedConfiguredSubcontrols: mappedConfiguredSubcontrols(manifest), fleetCleanupPending: !!record.fleetCleanupPending,
+    mappedConfiguredSubcontrols: mappedConfiguredSubcontrols(manifest),
+    // Regional activation reads market_admission and verified platform/provider proof.
+    // It never requires individual users/ or operators/ documents. Those are
+    // checked at qualification, duty, dispatch and acceptance, not here.
+    readinessScope: {
+      level: 'regional_platform',
+      individualOperatorRowsRequired: false,
+      operatorEligibilityCheckedAtRuntime: true,
+      configuredMarket: !!manifest && manifest.sourceProblems.length === 0,
+      platformEvidenceComplete: missing.length === 0,
+    },
+    fleetCleanupPending: !!record.fleetCleanupPending,
   };
 }
 

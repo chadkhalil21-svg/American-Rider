@@ -1,5 +1,8 @@
 # AMERICAN RIDER — CANONICAL PROJECT LEDGER
 
+**2026-10-14 REGIONAL ADMISSION SCOPE:** Founder directed activation to depend on platform-level readiness, not a required collection of individual Operator rows. Inspection confirms regional `market-readiness.js` already uses `market_admission` platform records and provider readiness. PR #201 mapped code configuration subcontrols, not proof of every operational requirement. This change exposes the check scope in the readiness response and adds a twice-run three-county regression showing that fully verified market evidence can activate a region even when there are no individual Operator rows. Incomplete market evidence remains blocked, and per-Operator eligibility checks remain enforced separately. The standing Founder command needs no new authorization. No production activation is claimed here. See `docs/audits/PLATFORM-AND-OPERATOR-READINESS-2026-10-14.md`.
+
+
 **2026-10-14 REGIONAL CONFIGURATION PROVENANCE — PR #201:** Reuses existing South Florida pricing matrix, fail-closed toll configuration and versioned insurance disclosure to display independently checkable platform subcontrols in market readiness. Each mapped subcontrol remains explicitly marked as less than the full requirement; separate proof of taxes, operational routing, provider arrangements, external coverage, live settlement, device/safety evidence and screening-provider verification remains necessary. No market activation gate, individual Operator safeguard or standing Founder command is changed. Decision reference: `docs/audits/REGIONAL-CONFIGURATION-PROVENANCE-2026-10-14.md`.
 
 

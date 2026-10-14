@@ -35,6 +35,14 @@ function releasePacketProblem(proof, manifestVersion, now) {
     return { id: RELEASE_PACKET, code: 'release_packet_incomplete',
       reason: 'The verified release packet must attest to all launch domains and identify the exact release and evidence digest.' };
   }
+  // Render supplies the exact deployed revision at runtime. A package from
+  // a prior build does not certify the currently running code.
+  const deployedSha = String(process.env.RENDER_GIT_COMMIT || '');
+  if ((process.env.NODE_ENV === 'production' && !SHA40.test(deployedSha)) ||
+      (deployedSha && proof.releaseSha.toLowerCase() !== deployedSha.toLowerCase())) {
+    return { id: RELEASE_PACKET, code: 'release_packet_revision_mismatch',
+      reason: 'The independently reviewed package must match the exact deployed release SHA.' };
+  }
   return null;
 }
 

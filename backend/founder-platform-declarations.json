@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "regionId": "fl-southeast",
+  "assertedBy": "Founder and Executive",
+  "assertedOn": "2026-10-14",
+  "declaration": "Platform policies, frameworks and procedures are finalized as a management decision. This is not certification that underlying independent commissioning and launch proof is complete.",
+  "domains": [
+    "company_insurance_bound",
+    "disclosure_and_retention",
+    "pricing_and_taxes",
+    "routing_and_toll_rights",
+    "payment_and_reconciliation",
+    "provider_contracts",
+    "safety_coverage",
+    "accessible_service",
+    "qualified_operator_supply",
+    "backup_restore_drill",
+    "device_and_release_tests"
+  ]
+}

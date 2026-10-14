@@ -38,7 +38,7 @@ const quoteViewContract=require('./quote-view-contract');
 const quoteViewStore=require('./quote-view-store');
 const {distanceBand:quoteDistanceBand}=require('./market-reference-service');
 const { forMarket: insuranceForMarket, publicConfig: publicInsuranceConfig } = require('./insurance-jurisdictions');
-const { manifestFor, inspectMarket, recordEvidence, activateMarket, activateRegion, authorizeOnboarding, pauseMarket } = require('./market-readiness');
+const { manifestFor, inspectMarket, recordEvidence, recordRegionEvidence, activateMarket, activateRegion, authorizeOnboarding, pauseMarket } = require('./market-readiness');
 const { conciseMarketIssues } = require('./market-launch-summary');
 const { sweepFounderMarketIntents } = require('./founder-market-intents');
 const { setAdmittedFleetOnline, setFleetOnlineIfOpen, deactivateMarketFleet, sweepPausedMarketFleet } = require('./market-fleet');
@@ -2545,6 +2545,32 @@ app.post('/ops/markets/regions/:regionId/activate', requireOps, requireOpsMutati
   } catch (e) {
     console.error('[markets] region activation unavailable:', e?.message || e);
     return res.status(503).json({ code: 'region_activation_unavailable' });
+  }
+});
+// Shared real-world documents are reviewed once, but only if their verified
+// coverage includes every county. This is not an alternate activation route.
+app.post('/ops/markets/regions/:regionId/evidence', requireOps, requireOpsMutation, async (req,res)=>{
+  if(opsAuthMode()!=='named')return res.status(403).json({code:'named_ops_required'});
+  const region=REGIONS.find(r=>r.id===req.params.regionId);
+  if(!region)return res.status(404).json({code:'unknown_region'});
+  const markets=allMarkets().filter(m=>m.regionId===region.id);
+  if(!markets.length)return res.status(409).json({code:'region_not_configured'});
+  try{
+    const result=await recordRegionEvidence({
+      db:adminDb(),entries:markets.map(market=>({market,region})),
+      domain:req.body?.domain,input:req.body,actor:req.opsUser,
+      expectedVersions:req.body?.manifestVersions,
+    });
+    if(!result.ok)return res.status(400).json(result);
+    invalidatePublicMarkets();
+    // State changed to paused. Any on-duty fleet must be cleared before
+    // a region may reopen. Ignore neither failure nor pending cleanup.
+    const cleanup=await Promise.all(markets.map(market=>
+      deactivateMarketFleet({db:adminDb(),market,maxPages:2})
+        .catch(()=>({ok:false,done:false,reason:'cleanup_unavailable'}))));
+    return res.json({...result,cleanupPending:cleanup.some(x=>x.done!==true)});
+  }catch{
+    return res.status(503).json({code:'region_evidence_unavailable'});
   }
 });
 app.get('/ops/markets/:id/readiness', requireOps, async (req, res) => {

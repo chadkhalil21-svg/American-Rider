@@ -1,5 +1,8 @@
 # AMERICAN RIDER — CANONICAL PROJECT LEDGER
 
+**2026-10-14 FOUNDER RATIFICATION — ELEVEN SOUTH FLORIDA FRAMEWORKS:** Founder formally declares the eleven internal platform policies, pricing/tax structures, safety procedures, and operational frameworks finalized. This decision is recorded in `backend/founder-platform-declarations.json` and presented by `market-readiness.js` as `founderDeclaredFrameworks` for Miami-Dade, Broward, and Palm Beach. It records executive policy approval, not independent proof of insurer coverage, screening-provider handoff, live financial reconciliation, real-device testing, or backup restoration. The existing admission proof checks and individual Operator 24-hour safeguards remain unchanged. The standing `founder-open-fl-southeast-20261013` command remains valid. See `docs/audits/EXECUTIVE-DECISIONS-2026-10-14.md`.
+
+
 **2026-10-14 REGIONAL ADMISSION SCOPE:** Founder directed activation to depend on platform-level readiness, not a required collection of individual Operator rows. Inspection confirms regional `market-readiness.js` already uses `market_admission` platform records and provider readiness. PR #201 mapped code configuration subcontrols, not proof of every operational requirement. This change exposes the check scope in the readiness response and adds a twice-run three-county regression showing that fully verified market evidence can activate a region even when there are no individual Operator rows. Incomplete market evidence remains blocked, and per-Operator eligibility checks remain enforced separately. The standing Founder command needs no new authorization. No production activation is claimed here. See `docs/audits/PLATFORM-AND-OPERATOR-READINESS-2026-10-14.md`.
 
 

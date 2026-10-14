@@ -22,7 +22,7 @@ function priced(fare,country='US',toll=0) {
   return quote(fare,null,[],country,toll);
 }
 // These are OUR server formulas, not observed competitor prices. All USD.
-const examples=[[3,10,755],[5,20,1075],[8,21,1345],[10,25,1575]];
+const examples=[[3,10,955],[5,20,1465],[8,21,1782],[10,25,2100]];
 for(const [miles,minutes,expectedAllIn] of examples){
   const fare=baseFare(miles,minutes),result=priced(fare);
   assert.equal(result.travelerPays,expectedAllIn,
@@ -31,10 +31,10 @@ for(const [miles,minutes,expectedAllIn] of examples){
     result._economics.requiredContributionCents);
 }
 const five=baseFare(5,20);
-assert.equal(five,825);
-// The separate publisher's Miami structural 5mi/20min model is ~$12.41-15.79.
+assert.equal(five,1215);
+// Research-only high market hypotheses for 5mi/20min; no supplier quote is used.
 // Do not import either bound as an independently verified live quote.
-for(const hypotheticalMarketTotal of [1241,1400,1579]){
+for(const hypotheticalMarketTotal of [2000,2400,3000]){
   const target=targetTotalCents(hypotheticalMarketTotal);
   const result=fareForMarketTarget({
     floorFareCents:five,targetControlledTotalCents:target,

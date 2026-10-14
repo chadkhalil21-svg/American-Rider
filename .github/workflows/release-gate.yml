@@ -34,6 +34,8 @@ jobs:
         run: npx expo export --platform ios --output-dir dist-ci-ios
       - name: Export Expo Android bundle
         run: npx expo export --platform android --output-dir dist-ci-android
+      - name: Read public tri-county admission status (no changes, no new authority)
+        run: node scripts/check-public-tricounty-status.mjs
 
   firestore-rules:
     runs-on: ubuntu-latest

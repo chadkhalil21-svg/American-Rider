@@ -21,6 +21,7 @@ require('node:dns').setDefaultResultOrder('ipv4first');
 const express = require('express');
 const cors = require('cors');
 const { corsOptionsFor } = require('./cors-policy');
+const { provenance: releaseProvenance } = require('./release-provenance');
 const {
   quote, createPaymentIntent, resumePaymentIntent, verifiedTravelPayment, cancelUnpaidIntent, chargeRide, refundTravel,
   connectAccountFor, connectOnboardingLink, connectAccountStatus,
@@ -395,6 +396,8 @@ const FLEET_READ_TIMEOUT_MS = 2000;
 //
 // /health keeps everything else. It is for people, not for a watchdog.
 app.get('/healthz', (req, res) => res.json({ ok: true, service: 'american-rider-server' }));
+// Protected, read-only provenance. Never make a database or provider call here.
+app.get('/ops/release-provenance', requireOps, (_req, res) => res.json(releaseProvenance(process.env)));
 
 app.get('/health', async (req, res) => {
   const tickets = adminStatus();

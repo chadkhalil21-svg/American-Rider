@@ -55,6 +55,7 @@ async function acceptOffer({ db, uid, rideId, externals, liveMoney = false, now 
       account: externals?.account,
       payouts: externals?.payouts,
       now: at,
+      travelMinutes: ride.routedMinutes ?? null,
     });
     if (!a.eligible) {
       const first = a.blockers[0];

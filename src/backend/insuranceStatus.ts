@@ -75,6 +75,20 @@ export async function requestInsuranceConfirmation(contact: {
   }
 }
 
+// A negative report can only pause new Travel; the Operator cannot certify a
+// policy as active or reverse this report without an independent source.
+export async function reportInsuranceRisk(kind: 'pending_cancellation' | 'cancelled'):
+  Promise<{ ok: boolean; error?: string }> {
+  try {
+    const r = await fetch(`${PAYMENT_SERVER_URL}/operator/insurance/report-risk`, {
+      method: 'POST', headers: await headers(), body: JSON.stringify({ kind }),
+    });
+    const d = await r.json().catch(() => ({}));
+    return r.ok && d.newTravelBlocked === true ? { ok: true } :
+      { ok: false, error: d?.error || t('traveler.errReachARNoStop') };
+  } catch { return { ok: false, error: t('traveler.errReachARNoStop') }; }
+}
+
 export async function insuranceConfig(): Promise<InsuranceConfig | null> {
   try {
     const r = await fetch(`${PAYMENT_SERVER_URL}/operator/insurance/config`, { headers: await headers() });

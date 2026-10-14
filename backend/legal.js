@@ -147,6 +147,24 @@ earlier; you may also ask Patron Support to withdraw your participation.</p></se
 `,
 );
 
+// Public deletion-request page for Google Play external deletion link. No sign-in is
+// needed to *request* deletion; identity is verified before account data is altered.
+// Never put personal account details in public query strings.
+const ACCOUNT_DELETION_HTML = page(
+  'Account deletion · American Rider',
+  `
+<h1>Delete your American Rider account</h1>
+<p class="lede">Your account and personal information remain under your control.</p>
+<section><h2>From the app</h2>
+<p>Open Account, choose <strong>Delete Account</strong>, and confirm your identity. If a Travel is active, your deletion request may need to wait until the Travel safely ends. We will not claim the deletion is complete before it is processed.</p></section>
+<section><h2>Without the app</h2>
+<p>Send a request to <a href="mailto:americanrider.communications@gmail.com?subject=American%20Rider%20Account%20Deletion">americanrider.communications@gmail.com</a> with the subject <strong>American Rider Account Deletion</strong>. We will provide a secure way to verify your account; do not send passwords, payment card numbers, driver's licence images, or other sensitive documents by email.</p></section>
+<section><h2>What happens to the data</h2>
+<p>Associated account data is removed or de-identified, except records that must be retained for lawful safety, accounting, tax, fraud, disputes or claims purposes. Processing may take additional time if there are active Travels, legal holds or pending payments. We will explain any legally required retention and confirm completion.</p>
+<p>See our <a href="/privacy">Privacy Policy</a> for the categories of data and service providers.</p></section>
+`,
+);
+
 // About American Rider — the company-information page both drawers open.
 //
 // WHY IT EXISTS: "About American Rider" sat in the traveler drawer AND the operator drawer
@@ -269,4 +287,4 @@ function legalPage(doc, lang) {
   return doc === 'privacy' ? PRIVACY_HTML : TERMS_HTML;
 }
 
-module.exports = { TERMS_HTML, PRIVACY_HTML, ABOUT_HTML, legalPage, LEGAL_LANGUAGES };
+module.exports = { TERMS_HTML, PRIVACY_HTML, ABOUT_HTML, ACCOUNT_DELETION_HTML, legalPage, LEGAL_LANGUAGES };

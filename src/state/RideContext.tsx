@@ -89,7 +89,7 @@ export type PaymentState = {
 };
 // How finding an operator is going: searching → matched, or none available / error (so the
 // live screen can offer a retry instead of spinning on "Finding your operator…" forever).
-export type DispatchState = 'idle' | 'searching' | 'matched' | 'none' | 'error' | 'price_changed';
+export type DispatchState = 'idle' | 'searching' | 'matched' | 'none' | 'error' | 'price_changed' | 'update_required';
 
 const DEFAULT_PREFS: Prefs = { quiet: true, charging: false, luggage: false, pet: false };
 
@@ -932,6 +932,12 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
             setRideActive(false);
             setPayment({status:'idle'});
             setDispatchState('price_changed');
+          }else if(code==='travel_price_confirmation_required'){
+            // A stale client must never book at a new price it did not confirm.
+            // The server refused the prepare operation before booking or payment.
+            setRideActive(false);
+            setPayment({status:'idle'});
+            setDispatchState('update_required');
           }else setDispatchState('error');
           confirmInFlightRef.current=false;
         }

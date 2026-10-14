@@ -1,5 +1,5 @@
 'use strict';
-// Real production coefficients versus documented UNDEPLOYED tri-county scenario.
+// New Florida prelaunch coefficients versus frozen old historical tri-county scenario.
 // No exact road route, booking, insurance bind, card charge or added market admission.
 const assert=require('node:assert/strict');
 const {pricingForRegion}=require('./market-pricing');
@@ -13,11 +13,13 @@ assert.deepEqual(fl.activeMarketFips,['12086','12011','12099'],
 assert.equal(fl.state,'FL');
 assert.equal(forState('FL').ride.primaryLiabilityMinDollars,1000000);
 assert.equal(forState('GA'),null,'no unconfigured other-state insurance or fare allowed');
-const old=pricingForRegion('fl-southeast');
-assert.deepEqual([old.baseCents,old.perMileCents,old.perMinuteCents,old.minimumFareCents],
- [100,85,15,300],'live fares must not silently be changed by a synthetic scenario');
-assert.equal(pricingForRegion('ga-atlanta'),null);
-const proposal={...old,perMileCents:95,perMinuteCents:32};
+// The previous Florida price is a frozen HISTORICAL comparison, not the
+// currently active prelaunch pricing register. No actual markets open here.
+const proposal=pricingForRegion('fl-southeast');
+assert.deepEqual([proposal.baseCents,proposal.perMileCents,proposal.perMinuteCents,proposal.minimumFareCents],
+ [100,95,32,300],'founder-directed prelaunch Florida pricing is authoritative');
+assert.equal(pricingForRegion('ga-atlanta'),null,'other states cannot inherit Florida pricing');
+const old={...proposal,perMileCents:85,perMinuteCents:15};
 function price(p,miles,minutes){
   const fare=Math.max(p.minimumFareCents,p.baseCents+
     Math.round(miles*p.perMileCents)+Math.round(minutes*p.perMinuteCents));

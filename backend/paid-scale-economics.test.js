@@ -40,8 +40,8 @@ assert(international.platformContributionCents>=MIN_PLATFORM_CONTRIBUTION_CENTS)
 // The operating-overhead allowance is already deducted above. Do not treat
 // the modeled contribution as full business profit or free insurer coverage.
 assert.equal(pricingForRegion('fl-southeast').baseCents,100);
-assert.equal(pricingForRegion('fl-southeast').perMileCents,85);
-assert.equal(pricingForRegion('fl-southeast').perMinuteCents,15);
+assert.equal(pricingForRegion('fl-southeast').perMileCents,95);
+assert.equal(pricingForRegion('fl-southeast').perMinuteCents,32);
 assert.equal(pricingProblems({id:'fl-southeast'}).length,0);
 assert.equal(pricingForRegion('ny-nyc'),null,
   'a new city must never inherit South Florida pricing');

@@ -12,7 +12,7 @@ const GOVERNING =
 
 const TERMS_FR = `
 <h1>Conditions Générales</h1>
-<p class="updated">Dernière mise à jour : 6 août 2026</p>
+<p class="updated">Dernière mise à jour : 13 octobre 2026</p>
 
 <div class="panel">${GOVERNING}</div>
 
@@ -27,25 +27,9 @@ affichons un prix unique tout compris et gérons le paiement. La conduite est as
 opérateurs indépendants, et non par American Rider : nous sommes une plateforme de
 coordination, non un transporteur.</p></section>
 
-<section><h2>2 · Votre compte</h2>
-<ul>
-<li>Vous devez avoir 18 ans ou plus pour détenir un compte. Les mineurs voyagent accompagnés
-du titulaire du compte.</li>
-<li>Tenez votre adresse e-mail et vos identifiants à jour et confidentiels. Ce qui se passe
-sur votre compte relève de votre responsabilité ; prévenez-nous immédiatement (via
-l’Assistance Voyageurs) si vous pensez qu’une autre personne l’utilise.</li>
-</ul></section>
+<section><h2>2 · Compte et âge</h2>\n<p>Les comptes ordinaires Voyageur et Opérateur sont réservés aux personnes de 18 ans et plus. Le programme Famille/Adolescents permet aux 13–17 ans de créer un compte vérifié sur invitation et avec autorisation du responsable légal, sous réserve des contrôles de sécurité et de révocation. Aucun compte pour les moins de 13 ans.</p></section>
 
-<section><h2>3 · Tarification — l’engagement</h2>
-<ul>
-<li>Un <strong>prix unique tout compris vous est indiqué avant la réservation</strong> : le
-tarif du trajet plus des frais de plateforme. Les frais de plateforme s’élèvent à 1,50 USD
-ou à 5 % du tarif du trajet, selon le montant le plus élevé. Le traitement du paiement est
-prélevé sur ces frais.</li>
-<li>Le prix indiqué à la réservation est le prix débité.</li>
-<li>Votre opérateur conserve 99 % du tarif du trajet. Notre commission s’élève à 1 % du tarif
-du trajet.</li>
-</ul></section>
+<section><h2>3 · Prix total confirmé</h2>\n<p>Avant toute réservation, un seul Total inclut le tarif du trajet, les frais de plateforme ainsi que les péages et prélèvements publics applicables. Les frais de plateforme dépendent des coûts du service et ne sont pas inférieurs à 2,50 USD ; ils sont déjà compris dans le Total affiché. L'Opérateur conserve 99 % du tarif du trajet et American Rider reçoit une commission de 1 %. Si le Total change avant la réservation, un nouvel accord exprès est nécessaire. Aucun montant supérieur non accepté ne sera débité.</p></section>
 
 <section><h2>4 · Annulations</h2>
 <ul>
@@ -82,16 +66,12 @@ versés.</p></section>
 être résolu, les présentes conditions sont régies par le droit de Floride et tout litige
 relève des tribunaux du comté de Miami-Dade, Floride.</p></section>
 
-<section><h2>9 · Modification des présentes conditions</h2>
-<p>Lorsque nous modifierons ces conditions — y compris avant le début des trajets payants
-réels — nous publierons ici la nouvelle version et mettrons à jour la date figurant en haut.
-L’utilisation de l’application après une modification vaut acceptation des conditions
-mises à jour.</p></section>
+<section><h2>9 · Modifications</h2>\n<p>Nous publions les nouvelles conditions et leur date. Toute modification importante fera l'objet de l'information et du consentement requis par la loi, sans effet rétroactif sur le Total déjà accepté.</p></section>
 `;
 
 const PRIVACY_FR = `
 <h1>Politique de Confidentialité</h1>
-<p class="updated">Dernière mise à jour : 6 août 2026</p>
+<p class="updated">Dernière mise à jour : 13 octobre 2026</p>
 
 <div class="panel">${GOVERNING}</div>
 
@@ -100,39 +80,13 @@ organiser vos trajets — votre adresse e-mail et les lieux de vos déplacements
 vendons pas vos données, nous n’affichons pas de publicité, et le numéro de votre carte est
 transmis à Stripe, jamais à nous.</div>
 
-<section><h2>1 · Ce que nous collectons</h2>
-<ul>
-<li><strong>Compte :</strong> votre adresse e-mail et un mot de passe (conservé de manière
-sécurisée par Google Firebase — nous ne voyons jamais le mot de passe lui-même).</li>
-<li><strong>Trajets :</strong> lieux de prise en charge et de destination, itinéraire,
-horaires et prix de chaque trajet — c’est ce dont un reçu est constitué.</li>
-<li><strong>Localisation :</strong> la position de votre appareil, uniquement lorsque vous
-définissez un point de prise en charge ou pendant un trajet, afin d’orienter la flèche vers
-votre véhicule et d’afficher la progression. Vous pouvez la refuser dans les Réglages iOS ;
-l’application fonctionne sans elle.</li>
-</ul></section>
+<section><h2>1 · Données collectées</h2>\n<p>Nous recueillons le nom, l'adresse e-mail, l'identité de connexion et les informations de session ; les lieux précis de départ et d'arrivée, l'itinéraire, les heures, le prix et les reçus ; les messages et dossiers d'assistance ou de sécurité. Pour les Opérateurs : permis, véhicule, assurance commerciale, vérifications et résultats des contrôles d'antécédents. Pour Famille/Adolescents : nom, e-mail vérifié, date de naissance, autorisation du responsable légal et informations de suivi. La localisation de l'Opérateur peut continuer en arrière-plan lorsqu'il est en service et l'a autorisée ; le refus peut empêcher la mise en service.</p></section>
 
-<section><h2>2 · À quoi cela nous sert</h2>
-<p>À faire fonctionner le service : vous attribuer un opérateur, calculer et afficher le prix
-de votre trajet, établir les reçus, résoudre les problèmes que vous signalez et préserver la
-sécurité de la plateforme. Rien d’autre.</p></section>
+<section><h2>2 · Utilisation</h2>\n<p>Ces informations servent à l'identification, la sécurité, l'admissibilité, la tarification, la répartition des trajets, leur suivi, les contrôles Famille/Adolescents, les paiements, les remboursements, l'assistance et la prévention de la fraude. Les études facultatives de prix nécessitent un consentement distinct.</p></section>
 
-<section><h2>3 · Qui traite les données (nos sous-traitants)</h2>
-<ul>
-<li><strong>Google Firebase</strong> — comptes et enregistrements de trajets.</li>
-<li><strong>Stripe</strong> — paiements. Les données de votre carte sont transmises
-directement à Stripe ; nous ne conservons jamais un numéro de carte complet.</li>
-<li><strong>Render</strong> — héberge notre serveur.</li>
-<li>Les recherches d’itinéraire transmettent les coordonnées du trajet (jamais votre nom) à un
-service de calcul d’itinéraire.</li>
-</ul>
-<p>Nous ne vendons vos informations personnelles à personne et nous n’affichons pas de
-publicité.</p></section>
+<section><h2>3 · Destinataires</h2>\n<p>Google Firebase traite les comptes et trajets ; Stripe traite les paiements sans que nous conservions les numéros complets de carte ; Render héberge les services. Les prestataires d'itinéraires, de cartes, de péages, de contrôle, de messagerie et de notifications ne reçoivent que les informations nécessaires. L'Opérateur affecté et le responsable légal autorisé peuvent recevoir les données pertinentes pour le trajet ; les autorités ou secours lorsque cela est justifié. Nous ne vendons pas les données personnelles et n'affichons pas de publicité.</p></section>
 
-<section><h2>4 · Durée de conservation</h2>
-<p>L’historique des trajets reste sur votre compte afin que vos reçus existent. Vous
-souhaitez la suppression de votre compte et de ses données ? Demandez-le via l’Assistance
-Voyageurs dans l’application et cela sera fait.</p></section>
+<section><h2>4 · Conservation et suppression</h2>\n<p>La rubrique Compte > Supprimer le compte permet de demander sa suppression dans l'application. La demande peut aussi être envoyée sans l'application à americanrider.communications@gmail.com. Les données liées sont supprimées, sauf les dossiers dont la conservation est justifiée par la loi, les reçus, la sécurité, la fiscalité, les litiges ou la prévention de la fraude. Un trajet actif peut différer la fin du traitement. L'Assistance traite les demandes d'accès, de correction et de durée de conservation.</p></section>
 
 <section><h2>4A · Étude facultative des tarifs</h2>
 <p>Uniquement si vous acceptez expressément lorsque le prix est affiché, nous enregistrons
@@ -145,9 +99,7 @@ après sept jours, avec un délai de traitement supplémentaire possible. La sup
 du compte retire plus tôt les données liées. Vous pouvez aussi demander le retrait
 auprès de l'Assistance Voyageurs.</p></section>
 
-<section><h2>5 · Mineurs</h2>
-<p>Les comptes American Rider sont réservés aux adultes de 18 ans et plus. Nous ne collectons
-pas sciemment de données concernant des mineurs.</p></section>
+<section><h2>5 · Mineurs</h2>\n<p>Les comptes ordinaires sont réservés aux adultes. Les comptes vérifiés Famille/Adolescents sont destinés aux 13–17 ans avec accord et contrôle du responsable légal. Nous n'ouvrons pas sciemment de compte aux moins de 13 ans.</p></section>
 
 <section><h2>6 · Modifications</h2>
 <p>En cas de modification de la présente politique, la nouvelle version sera publiée ici avec

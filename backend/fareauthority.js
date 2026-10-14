@@ -1,7 +1,7 @@
 // One authoritative fare computation for quoting, dispatch and payment.
 // Request bodies provide route inputs only. They never provide a computed fare, distance or fee.
 const { quote } = require('./payments');
-const { fareCentsFor, fareCentsForCoords, applyTravelClass } = require('./fares');
+const { fareCentsForCoords, applyTravelClass } = require('./fares');
 const { outsideMarket, outsideMarketMessage } = require('./market');
 const { governmentFeesFor, permitRequired, permitRequiredMessage } = require('./fees');
 const { resolveTollsCostAware } = require('./tolls');
@@ -29,12 +29,10 @@ function priceRoute(body, selectedRoute = null) {
       governmentFees: governmentFeesFor(body?.pickup, body?.dest),
     };
   }
-  const byName = fareCentsFor(body?.destination || body?.destName || body?.dest);
-  if (byName != null) {
-    return {
-      travelCostCents: withClass(byName), miles: null, pricedBy: 'table', governmentFees: [],
-    };
-  }
+  // A name alone has no pickup or measured route. The old Brickell-only fixed
+  // table cannot truthfully quote the new prices, other counties or national
+  // bookings. Refuse instead of showing a misleading lower amount that the
+  // canonical server would then replace before payment.
   return null;
 }
 

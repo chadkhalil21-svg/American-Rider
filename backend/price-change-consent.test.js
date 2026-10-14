@@ -8,12 +8,15 @@ const {pricingForRegion,pricingForTrip,requiresAgreedTotalOnBooking} = require('
 const {quote} = require('./payments');
 const release = pricingForRegion('fl-southeast');
 assert.deepEqual([release.baseCents,release.perMileCents,release.perMinuteCents,
-  release.minimumFareCents],[100,85,15,300]);
-assert.equal(requiresAgreedTotalOnBooking(release),false,
-  'present released price must not immediately abandon existing TestFlight testers');
-const proposal={...release,perMileCents:95,perMinuteCents:32,evidenceAsOf:'2026-10-13'};
+  release.minimumFareCents],[100,95,32,300]);
+assert.equal(requiresAgreedTotalOnBooking(release),true,
+  'new regional prices must require an upgraded client that consents to the actual Total');
+const legacy={...release,perMileCents:85,perMinuteCents:15};
+assert.equal(requiresAgreedTotalOnBooking(legacy),false,
+  'frozen historical Florida rate is recognized for retrospective evidence only');
+const proposal={...release,evidenceAsOf:'2026-10-13'};
 assert.equal(requiresAgreedTotalOnBooking(proposal),true,
-  'proposed Florida 95c/mi and 32c/min cannot book on an unconfirmed old app');
+  'Florida 95c/mi and 32c/min cannot book on an unconfirmed old app');
 for(const k of ['baseCents','perMileCents','perMinuteCents','minimumFareCents']){
  const raised={...release,[k]:release[k]+1};
  assert.equal(requiresAgreedTotalOnBooking(raised),true,'all four changes require consent: '+k);
@@ -36,6 +39,20 @@ assert.match(prepare,/res\.status\(428\)/);
 assert.match(prepare,/code: 'travel_price_confirmation_required'/);
 assert.match(prepare,/code:'travel_total_changed'/);
 assert.match(prepare,/!Number\.isSafeInteger\(b\.agreedTotalCents\)/);
+
+const rideContext=fs.readFileSync(path.join(__dirname,'../src/state/RideContext.tsx'),'utf8');
+const riderScreen=fs.readFileSync(path.join(__dirname,'../app/ride.tsx'),'utf8');
+assert.match(rideContext,/code==='travel_price_confirmation_required'/);
+assert.match(rideContext,/setDispatchState\('update_required'\)/);
+assert.match(riderScreen,/ride\.dispatchState==='update_required'/);
+assert.match(riderScreen,/t\('traveler\.updateRequiredTitle'\)/);
+assert.match(riderScreen,/t\('traveler\.updateRequiredBody'\)/);
+for(const lang of ['en','es','fr','it','de']){
+ const strings=fs.readFileSync(path.join(__dirname,'../src/i18n',lang+'.ts'),'utf8');
+ assert.match(strings,/updateRequiredTitle:/,'update message title missing: '+lang);
+ assert.match(strings,/updateRequiredBody:/,'update explanation missing: '+lang);
+}
+
 // Exercise identical cents for a current-app Traveler and refusal paths for a
 // hypothetical old app. Compare domestic/foreign cards, tolls and fees.
 // No provider service call, account data, or money can occur.

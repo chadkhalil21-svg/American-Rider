@@ -24,9 +24,11 @@ Berufsfahrern („Operatoren“) verbindet. Wir organisieren die Fahrt, zeigen e
 Gesamtpreis und wickeln die Zahlung ab. Die Beförderung erbringen unabhängige Operatoren,
 nicht American Rider: Wir sind eine Vermittlungsplattform, kein Beförderungsunternehmen.</p></section>
 
-<section><h2>2 · Konto und Alter</h2>\n<p>Normale Reisenden- und Operator-Konten sind für Personen ab 18 Jahren. Das Familien-/Jugendprogramm ermöglicht verifizierte Konten für 13- bis 17-Jährige mit Einladung und Zustimmung eines Erziehungsberechtigten sowie Sicherheitskontrollen und Widerruf. Keine Konten für Kinder unter 13 Jahren.</p></section>
+<section><h2>2 · Konto und Alter</h2>
+<p>Normale Reisenden- und Operator-Konten sind für Personen ab 18 Jahren. Das Familien-/Jugendprogramm ermöglicht verifizierte Konten für 13- bis 17-Jährige mit Einladung und Zustimmung eines Erziehungsberechtigten sowie Sicherheitskontrollen und Widerruf. Keine Konten für Kinder unter 13 Jahren.</p></section>
 
-<section><h2>3 · Bestätigter Gesamtpreis</h2>\n<p>Vor der Buchung wird ein einziger Gesamtpreis einschließlich Fahrpreis, Plattformgebühr, anwendbarer Maut und behördlicher Abgaben angezeigt. Die Plattformgebühr richtet sich nach den Dienstkosten, beträgt mindestens 2,50 USD und ist im angezeigten Gesamtpreis enthalten. Der Operator erhält 99 % des Fahrpreises, American Rider 1 % Provision. Ändert sich der Gesamtpreis vor der Buchung, ist eine neue ausdrückliche Zustimmung erforderlich. Ein nicht bestätigter höherer Betrag wird nicht belastet.</p></section>
+<section><h2>3 · Bestätigter Gesamtpreis</h2>
+<p>Vor der Buchung wird ein einziger Gesamtpreis einschließlich Fahrpreis, Plattformgebühr, anwendbarer Maut und behördlicher Abgaben angezeigt. Die Plattformgebühr richtet sich nach den Dienstkosten, beträgt mindestens 2,50 USD und ist im angezeigten Gesamtpreis enthalten. Der Operator erhält 99 % des Fahrpreises, American Rider 1 % Provision. Ändert sich der Gesamtpreis vor der Buchung, ist eine neue ausdrückliche Zustimmung erforderlich. Ein nicht bestätigter höherer Betrag wird nicht belastet.</p></section>
 
 <section><h2>4 · Stornierungen</h2>
 <ul>
@@ -61,7 +63,8 @@ Testprogramms auf die Beträge beschränkt, die Sie uns tatsächlich gezahlt hab
 dort nicht geklärt werden kann, gilt das Recht Floridas, und für Streitigkeiten sind die
 Gerichte des Miami-Dade County, Florida, zuständig.</p></section>
 
-<section><h2>9 · Änderungen</h2>\n<p>Neue Bedingungen werden mit Datum veröffentlicht. Über wesentliche Änderungen informieren wir und holen gesetzlich erforderliche Zustimmungen ein; ein bereits bestätigter Gesamtpreis wird nicht rückwirkend geändert.</p></section>
+<section><h2>9 · Änderungen</h2>
+<p>Neue Bedingungen werden mit Datum veröffentlicht. Über wesentliche Änderungen informieren wir und holen gesetzlich erforderliche Zustimmungen ein; ein bereits bestätigter Gesamtpreis wird nicht rückwirkend geändert.</p></section>
 `;
 
 const PRIVACY_DE = `
@@ -74,13 +77,17 @@ const PRIVACY_DE = `
 Fahrten nötig ist — Ihre E-Mail-Adresse und Ihre Fahrtorte. Wir verkaufen Ihre Daten nicht,
 wir zeigen keine Werbung, und Ihre Kartennummer geht an Stripe, niemals an uns.</div>
 
-<section><h2>1 · Erhobene Daten</h2>\n<p>Wir erfassen Name, E-Mail-Adresse, Anmeldeidentität und Sitzungsdaten; genaue Abhol- und Zielorte, Strecke, Zeiten, Preise und Belege; Nachrichten sowie Support- und Sicherheitsberichte. Bei Operatoren auch Führerschein, Fahrzeug, gewerbliche Versicherung, Prüfungen und Ergebnisse der Hintergrundkontrolle. Beim Familien-/Jugendprogramm auch Name, verifizierte E-Mail, Geburtsdatum, Zustimmung der Erziehungsberechtigten und Sicherheitsstandort. Während des Dienstes kann bei erteilter Erlaubnis auch im Hintergrund der Operator-Standort verarbeitet werden; ohne diese Erlaubnis kann die Dienstbereitschaft eingeschränkt sein.</p></section>
+<section><h2>1 · Erhobene Daten</h2>
+<p>Wir erfassen Name, E-Mail-Adresse, Anmeldeidentität und Sitzungsdaten; genaue Abhol- und Zielorte, Strecke, Zeiten, Preise und Belege; Nachrichten sowie Support- und Sicherheitsberichte. Bei Operatoren auch Führerschein, Fahrzeug, gewerbliche Versicherung, Prüfungen und Ergebnisse der Hintergrundkontrolle. Beim Familien-/Jugendprogramm auch Name, verifizierte E-Mail, Geburtsdatum, Zustimmung der Erziehungsberechtigten und Sicherheitsstandort. Während des Dienstes kann bei erteilter Erlaubnis auch im Hintergrund der Operator-Standort verarbeitet werden; ohne diese Erlaubnis kann die Dienstbereitschaft eingeschränkt sein.</p></section>
 
-<section><h2>2 · Zwecke</h2>\n<p>Wir verarbeiten diese Daten für Identität, Sicherheit, Berechtigung, Preisberechnung, Fahrtvermittlung, Fahrtverfolgung, Familien-/Jugendschutz, Zahlungen, Erstattungen, Support und Betrugsabwehr. Die freiwillige Preisforschung erfordert eine gesonderte Zustimmung.</p></section>
+<section><h2>2 · Zwecke</h2>
+<p>Wir verarbeiten diese Daten für Identität, Sicherheit, Berechtigung, Preisberechnung, Fahrtvermittlung, Fahrtverfolgung, Familien-/Jugendschutz, Zahlungen, Erstattungen, Support und Betrugsabwehr. Die freiwillige Preisforschung erfordert eine gesonderte Zustimmung.</p></section>
 
-<section><h2>3 · Empfänger</h2>\n<p>Google Firebase verwaltet Konten und Fahrten; Stripe verarbeitet Zahlungen, ohne dass wir vollständige Kartennummern speichern; Render hostet den Dienst. Karten-, Routen-, Maut-, Prüf-, Nachrichten- und Benachrichtigungsdienste erhalten erforderliche Informationen. Zugewiesene Operatoren und berechtigte Erziehungsberechtigte erhalten fahrtbezogene Daten; Rettungsdienste und Behörden nur im erforderlichen bzw. gesetzlich vorgesehenen Umfang. Wir verkaufen keine personenbezogenen Daten und schalten keine Werbung.</p></section>
+<section><h2>3 · Empfänger</h2>
+<p>Google Firebase verwaltet Konten und Fahrten; Stripe verarbeitet Zahlungen, ohne dass wir vollständige Kartennummern speichern; Render hostet den Dienst. Karten-, Routen-, Maut-, Prüf-, Nachrichten- und Benachrichtigungsdienste erhalten erforderliche Informationen. Zugewiesene Operatoren und berechtigte Erziehungsberechtigte erhalten fahrtbezogene Daten; Rettungsdienste und Behörden nur im erforderlichen bzw. gesetzlich vorgesehenen Umfang. Wir verkaufen keine personenbezogenen Daten und schalten keine Werbung.</p></section>
 
-<section><h2>4 · Aufbewahrung und Löschung</h2>\n<p>Über Konto > Konto löschen können Sie die Löschung in der App veranlassen. Ohne App können Sie an americanrider.communications@gmail.com schreiben. Zugeordnete Daten werden gelöscht, außer soweit Aufbewahrung für Gesetze, Belege, Sicherheit, Steuerrecht, Streitfälle oder Betrugsabwehr erforderlich ist. Eine laufende Fahrt kann die endgültige Löschung verzögern. Support beantwortet Anträge auf Auskunft, Berichtigung und Informationen zur Speicherdauer.</p></section>
+<section><h2>4 · Aufbewahrung und Löschung</h2>
+<p>Über Konto > Konto löschen können Sie die Löschung in der App veranlassen. Ohne App können Sie an americanrider.communications@gmail.com schreiben. Zugeordnete Daten werden gelöscht, außer soweit Aufbewahrung für Gesetze, Belege, Sicherheit, Steuerrecht, Streitfälle oder Betrugsabwehr erforderlich ist. Eine laufende Fahrt kann die endgültige Löschung verzögern. Support beantwortet Anträge auf Auskunft, Berichtigung und Informationen zur Speicherdauer.</p></section>
 
 <section><h2>4A · Freiwillige Preisstudie</h2>
 <p>Nur wenn Sie bei Anzeige des Fahrpreises ausdrücklich zustimmen, erfassen wir den
@@ -94,7 +101,8 @@ Datenbankanbieter kann länger dauern. Beim Löschen des Kontos werden verknüpf
 Forschungsdaten früher entfernt. Sie können den Widerruf auch beim Kundenservice
 beantragen.</p></section>
 
-<section><h2>5 · Minderjährige</h2>\n<p>Normale Konten sind für Erwachsene. Verifizierte Familien-/Jugendkonten für 13- bis 17-Jährige erfordern Zustimmung und Kontrolle der Erziehungsberechtigten. Konten für Kinder unter 13 Jahren werden nicht wissentlich eingerichtet.</p></section>
+<section><h2>5 · Minderjährige</h2>
+<p>Normale Konten sind für Erwachsene ab 18 Jahren. Verifizierte Familien-/Jugendkonten für 13- bis 17-Jährige erfordern Zustimmung und Kontrolle der Erziehungsberechtigten. Konten für Kinder unter 13 Jahren werden nicht wissentlich eingerichtet.</p></section>
 
 <section><h2>6 · Änderungen</h2>
 <p>Ändert sich diese Erklärung, wird die neue Fassung hier mit aktualisiertem Datum oben

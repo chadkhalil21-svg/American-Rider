@@ -3183,7 +3183,9 @@ app.post('/insurance/status-confirmation', express.urlencoded({ extended: false 
               !matchedPolicy ? 'insurance_policy_changed_since_request' :
               'independent_provider_contact_required', at: now,
             contactEmail: row.email,
-            note: !matchedPolicy
+            note: !providerRequestNewerThanOperatorRisk
+              ? 'This active-status reply was requested before the Operator reported an insurance cancellation risk. A new insurer or broker confirmation is required.'
+              : !matchedPolicy
               ? 'The insured policy changed after this confirmation request. A fresh provider confirmation is required.'
               : !sameJurisdiction
                 ? 'The operating jurisdiction changed since the request. Obtain a new confirmation for the current market.'

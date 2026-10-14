@@ -358,6 +358,9 @@ function assessOperator({ user, fleet = null, context = 'qualify', liveMoney = f
     if (context === 'accept') {
       if (!fleet || fleet.available !== true) add(D('not_on_duty', 'You are not in service. Commence operations to accept travel.'));
       if (fleet && coverageLapsed(fleet)) add(D('coverage_expired', 'Your commercial coverage has expired.'));
+      if (fleet && coverageUnsafeForNewTravel(fleet.insuranceExpiry, now, travelMinutes)) {
+        add(D('insurance_renewal_required', 'The recorded fleet policy expires too soon for this Travel. Renew and verify it before accepting.'));
+      }
       if (fleet?.documentBlocked) add(D('document_blocked', 'A document on file is not accepted.'));
     }
   }

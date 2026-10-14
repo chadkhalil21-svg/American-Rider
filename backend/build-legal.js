@@ -16,7 +16,7 @@
 // Output goes to legal/ (gitignored from Pages' perspective — it is generated, not authored).
 const fs = require('fs');
 const path = require('path');
-const { TERMS_HTML, PRIVACY_HTML, ABOUT_HTML } = require('./legal');
+const { TERMS_HTML, PRIVACY_HTML, ABOUT_HTML, ACCOUNT_DELETION_HTML } = require('./legal');
 const {
   HOME_HTML, OPERATE_HTML, SUPPORT_HTML, TRAVEL_HTML, SAFETY_HTML, SMART_HTML,
 } = require('./site');
@@ -27,6 +27,7 @@ const OUT = path.join(__dirname, '..', 'legal');
 const PAGES = [
   { dir: 'terms', html: TERMS_HTML },
   { dir: 'privacy', html: PRIVACY_HTML },
+  { dir: 'account-deletion', html: ACCOUNT_DELETION_HTML },
   { dir: 'about', html: ABOUT_HTML },
   { dir: 'travel', html: TRAVEL_HTML },
   { dir: 'operate', html: OPERATE_HTML },

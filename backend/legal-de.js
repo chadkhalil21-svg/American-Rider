@@ -10,7 +10,7 @@ const GOVERNING =
 
 const TERMS_DE = `
 <h1>Nutzungsbedingungen</h1>
-<p class="updated">Zuletzt aktualisiert: 6. August 2026</p>
+<p class="updated">Zuletzt aktualisiert: 13. Oktober 2026</p>
 
 <div class="panel">${GOVERNING}</div>
 
@@ -24,24 +24,11 @@ Berufsfahrern („Operatoren“) verbindet. Wir organisieren die Fahrt, zeigen e
 Gesamtpreis und wickeln die Zahlung ab. Die Beförderung erbringen unabhängige Operatoren,
 nicht American Rider: Wir sind eine Vermittlungsplattform, kein Beförderungsunternehmen.</p></section>
 
-<section><h2>2 · Ihr Konto</h2>
-<ul>
-<li>Sie müssen mindestens 18 Jahre alt sein, um ein Konto zu führen. Minderjährige fahren in
-Begleitung des Kontoinhabers.</li>
-<li>Halten Sie Ihre E-Mail-Adresse und Ihre Zugangsdaten aktuell und vertraulich. Was auf
-Ihrem Konto geschieht, liegt in Ihrer Verantwortung — teilen Sie uns daher umgehend über die
-Reisendenbetreuung mit, wenn Sie vermuten, dass eine andere Person es nutzt.</li>
-</ul></section>
+<section><h2>2 · Konto und Alter</h2>
+<p>Normale Reisenden- und Operator-Konten sind für Personen ab 18 Jahren. Das Familien-/Jugendprogramm ermöglicht verifizierte Konten für 13- bis 17-Jährige mit Einladung und Zustimmung eines Erziehungsberechtigten sowie Sicherheitskontrollen und Widerruf. Keine Konten für Kinder unter 13 Jahren.</p></section>
 
-<section><h2>3 · Preise — die Zusage</h2>
-<ul>
-<li>Ihnen wird <strong>vor der Reservierung ein einziger Gesamtpreis</strong> angezeigt: der
-Fahrpreis zuzüglich einer Plattformgebühr. Die Plattformgebühr beträgt 1,50 USD oder 5 % des
-Fahrpreises, je nachdem, welcher Betrag höher ist. Die Zahlungsabwicklung wird aus dieser
-Gebühr bezahlt.</li>
-<li>Der bei der Reservierung genannte Preis ist der Preis, der abgebucht wird.</li>
-<li>Ihr Operator behält 99 % des Fahrpreises. Unsere Provision beträgt 1 % des Fahrpreises.</li>
-</ul></section>
+<section><h2>3 · Bestätigter Gesamtpreis</h2>
+<p>Vor der Buchung wird ein einziger Gesamtpreis einschließlich Fahrpreis, Plattformgebühr, anwendbarer Maut und behördlicher Abgaben angezeigt. Die Plattformgebühr richtet sich nach den Dienstkosten, beträgt mindestens 2,50 USD und ist im angezeigten Gesamtpreis enthalten. Der Operator erhält 99 % des Fahrpreises, American Rider 1 % Provision. Ändert sich der Gesamtpreis vor der Buchung, ist eine neue ausdrückliche Zustimmung erforderlich. Ein nicht bestätigter höherer Betrag wird nicht belastet.</p></section>
 
 <section><h2>4 · Stornierungen</h2>
 <ul>
@@ -76,15 +63,13 @@ Testprogramms auf die Beträge beschränkt, die Sie uns tatsächlich gezahlt hab
 dort nicht geklärt werden kann, gilt das Recht Floridas, und für Streitigkeiten sind die
 Gerichte des Miami-Dade County, Florida, zuständig.</p></section>
 
-<section><h2>9 · Änderungen dieser Bedingungen</h2>
-<p>Wenn wir diese Bedingungen aktualisieren — auch vor Beginn echter bezahlter Fahrten —
-veröffentlichen wir die neue Fassung hier und aktualisieren das Datum oben. Die weitere
-Nutzung der App nach einer Änderung gilt als Annahme der aktualisierten Bedingungen.</p></section>
+<section><h2>9 · Änderungen</h2>
+<p>Neue Bedingungen werden mit Datum veröffentlicht. Über wesentliche Änderungen informieren wir und holen gesetzlich erforderliche Zustimmungen ein; ein bereits bestätigter Gesamtpreis wird nicht rückwirkend geändert.</p></section>
 `;
 
 const PRIVACY_DE = `
 <h1>Datenschutzerklärung</h1>
-<p class="updated">Zuletzt aktualisiert: 6. August 2026</p>
+<p class="updated">Zuletzt aktualisiert: 13. Oktober 2026</p>
 
 <div class="panel">${GOVERNING}</div>
 
@@ -92,38 +77,17 @@ const PRIVACY_DE = `
 Fahrten nötig ist — Ihre E-Mail-Adresse und Ihre Fahrtorte. Wir verkaufen Ihre Daten nicht,
 wir zeigen keine Werbung, und Ihre Kartennummer geht an Stripe, niemals an uns.</div>
 
-<section><h2>1 · Was wir erheben</h2>
-<ul>
-<li><strong>Konto:</strong> Ihre E-Mail-Adresse und ein Passwort (sicher gespeichert von
-Google Firebase — wir sehen das Passwort selbst nie).</li>
-<li><strong>Fahrten:</strong> Abhol- und Zielorte, die Route, Zeiten und der Preis jeder
-Fahrt — daraus besteht ein Beleg.</li>
-<li><strong>Standort:</strong> der Standort Ihres Geräts, nur während Sie einen Abholpunkt
-festlegen oder während einer Fahrt, um den Pfeil auf Ihr Fahrzeug auszurichten und den
-Fahrtverlauf anzuzeigen. Sie können dies in den iOS-Einstellungen ablehnen; die App
-funktioniert auch ohne.</li>
-</ul></section>
+<section><h2>1 · Erhobene Daten</h2>
+<p>Wir erfassen Name, E-Mail-Adresse, Anmeldeidentität und Sitzungsdaten; genaue Abhol- und Zielorte, Strecke, Zeiten, Preise und Belege; Nachrichten sowie Support- und Sicherheitsberichte. Bei Operatoren auch Führerschein, Fahrzeug, gewerbliche Versicherung, Prüfungen und Ergebnisse der Hintergrundkontrolle. Beim Familien-/Jugendprogramm auch Name, verifizierte E-Mail, Geburtsdatum, Zustimmung der Erziehungsberechtigten und Sicherheitsstandort. Während des Dienstes kann bei erteilter Erlaubnis auch im Hintergrund der Operator-Standort verarbeitet werden; ohne diese Erlaubnis kann die Dienstbereitschaft eingeschränkt sein.</p></section>
 
-<section><h2>2 · Wofür wir sie verwenden</h2>
-<p>Für den Betrieb des Dienstes: Ihnen einen Operator zuzuweisen, Ihre Fahrt zu berechnen und
-anzuzeigen, Belege zu erstellen, von Ihnen gemeldete Probleme zu lösen und die Plattform
-sicher zu halten. Mehr nicht.</p></section>
+<section><h2>2 · Zwecke</h2>
+<p>Wir verarbeiten diese Daten für Identität, Sicherheit, Berechtigung, Preisberechnung, Fahrtvermittlung, Fahrtverfolgung, Familien-/Jugendschutz, Zahlungen, Erstattungen, Support und Betrugsabwehr. Die freiwillige Preisforschung erfordert eine gesonderte Zustimmung.</p></section>
 
-<section><h2>3 · Wer die Daten verarbeitet (unsere Auftragsverarbeiter)</h2>
-<ul>
-<li><strong>Google Firebase</strong> — Konten und Fahrtdaten.</li>
-<li><strong>Stripe</strong> — Zahlungen. Ihre Kartendaten gehen direkt an Stripe; wir
-speichern niemals eine vollständige Kartennummer.</li>
-<li><strong>Render</strong> — betreibt unseren Server.</li>
-<li>Routenabfragen übermitteln Fahrtkoordinaten (niemals Ihren Namen) an einen
-Routing-Dienst.</li>
-</ul>
-<p>Wir verkaufen Ihre personenbezogenen Daten an niemanden und zeigen keine Werbung.</p></section>
+<section><h2>3 · Empfänger</h2>
+<p>Google Firebase verwaltet Konten und Fahrten; Stripe verarbeitet Zahlungen, ohne dass wir vollständige Kartennummern speichern; Render hostet den Dienst. Karten-, Routen-, Maut-, Prüf-, Nachrichten- und Benachrichtigungsdienste erhalten erforderliche Informationen. Zugewiesene Operatoren und berechtigte Erziehungsberechtigte erhalten fahrtbezogene Daten; Rettungsdienste und Behörden nur im erforderlichen bzw. gesetzlich vorgesehenen Umfang. Wir verkaufen keine personenbezogenen Daten und schalten keine Werbung.</p></section>
 
-<section><h2>4 · Wie lange wir sie aufbewahren</h2>
-<p>Der Fahrtverlauf bleibt auf Ihrem Konto, damit Ihre Belege existieren. Sie möchten Ihr
-Konto und dessen Daten löschen lassen? Beantragen Sie es über die Reisendenbetreuung in der
-App, und es wird erledigt.</p></section>
+<section><h2>4 · Aufbewahrung und Löschung</h2>
+<p>Über Konto > Konto löschen können Sie die Löschung in der App veranlassen. Ohne App können Sie an americanrider.communications@gmail.com schreiben. Zugeordnete Daten werden gelöscht, außer soweit Aufbewahrung für Gesetze, Belege, Sicherheit, Steuerrecht, Streitfälle oder Betrugsabwehr erforderlich ist. Eine laufende Fahrt kann die endgültige Löschung verzögern. Support beantwortet Anträge auf Auskunft, Berichtigung und Informationen zur Speicherdauer.</p></section>
 
 <section><h2>4A · Freiwillige Preisstudie</h2>
 <p>Nur wenn Sie bei Anzeige des Fahrpreises ausdrücklich zustimmen, erfassen wir den
@@ -138,8 +102,7 @@ Forschungsdaten früher entfernt. Sie können den Widerruf auch beim Kundenservi
 beantragen.</p></section>
 
 <section><h2>5 · Minderjährige</h2>
-<p>American-Rider-Konten sind für Erwachsene ab 18 Jahren bestimmt. Wir erheben nicht
-wissentlich Daten von Kindern.</p></section>
+<p>Normale Konten sind für Erwachsene ab 18 Jahren. Verifizierte Familien-/Jugendkonten für 13- bis 17-Jährige erfordern Zustimmung und Kontrolle der Erziehungsberechtigten. Konten für Kinder unter 13 Jahren werden nicht wissentlich eingerichtet.</p></section>
 
 <section><h2>6 · Änderungen</h2>
 <p>Ändert sich diese Erklärung, wird die neue Fassung hier mit aktualisiertem Datum oben

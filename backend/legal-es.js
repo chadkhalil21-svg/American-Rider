@@ -19,7 +19,7 @@ const GOVERNING =
 
 const TERMS_ES = `
 <h1>Términos del Servicio</h1>
-<p class="updated">Última actualización: 6 de agosto de 2026</p>
+<p class="updated">Última actualización: 13 de octubre de 2026</p>
 
 <div class="panel">${GOVERNING}</div>
 
@@ -35,25 +35,11 @@ profesionales independientes («operadores»). Nosotros organizamos el viaje, mo
 independientes, no American Rider: somos una plataforma de coordinación, no una empresa de
 transporte.</p></section>
 
-<section><h2>2 · Su cuenta</h2>
-<ul>
-<li>Debe tener 18 años o más para tener una cuenta. Los menores viajan acompañados del
-titular de la cuenta.</li>
-<li>Mantenga su correo electrónico y sus datos de acceso actualizados y en privado. Lo que
-ocurra en su cuenta es su responsabilidad, así que avísenos de inmediato (a través de
-Atención al Viajero) si cree que otra persona la está usando.</li>
-</ul></section>
+<section><h2>2 · Cuenta y edades</h2>
+<p>Las cuentas ordinarias de Viajeros y Operadores son para mayores de 18 años. El programa Familia/Adolescentes permite cuentas verificadas de 13 a 17 años con invitación y autorización del tutor, controles de seguridad y revocación. No se permiten cuentas para menores de 13 años.</p></section>
 
-<section><h2>3 · Precios — el compromiso</h2>
-<ul>
-<li>Se le muestra <strong>un único precio final antes de reservar</strong>: la tarifa del
-viaje más una tarifa de plataforma. La tarifa de plataforma es de 1,50 USD o el 5 % de la
-tarifa del viaje, lo que sea mayor. El procesamiento del pago se paga con cargo a esa
-tarifa.</li>
-<li>El precio indicado al reservar es el precio que se cobra.</li>
-<li>Su operador retiene el 99 % de la tarifa del viaje. Nuestra comisión es del 1 % de la
-tarifa del viaje.</li>
-</ul></section>
+<section><h2>3 · Precio total confirmado</h2>
+<p>Antes de reservar, se muestra un solo Total que comprende la tarifa del viaje, la tarifa de plataforma y los peajes o cargos públicos aplicables. La tarifa de plataforma se calcula según los costes del servicio y no es inferior a 2,50 USD; ya está incluida en el Total mostrado. El Operador conserva el 99 % de la tarifa del viaje y la comisión de American Rider es del 1 %. Si cambia el Total antes de reservar, debe revisar y confirmar el nuevo importe. No se efectuará un cargo superior sin su aceptación.</p></section>
 
 <section><h2>4 · Cancelaciones</h2>
 <ul>
@@ -87,15 +73,13 @@ aquello que no pueda resolverse allí, estos términos se rigen por la legislaci
 y cualquier controversia corresponde a los tribunales del condado de Miami-Dade,
 Florida.</p></section>
 
-<section><h2>9 · Cambios en estos términos</h2>
-<p>Cuando actualicemos estos términos —incluso antes de que comiencen los viajes reales de
-pago— publicaremos aquí la nueva versión y actualizaremos la fecha que figura arriba. El uso
-de la aplicación tras un cambio implica la aceptación de los términos actualizados.</p></section>
+<section><h2>9 · Cambios de los términos</h2>
+<p>Publicaremos la fecha y la versión de los términos actualizados. Los cambios importantes recibirán el aviso y el consentimiento que exija la ley; no modifican retroactivamente el Total de un viaje ya confirmado.</p></section>
 `;
 
 const PRIVACY_ES = `
 <h1>Política de Privacidad</h1>
-<p class="updated">Última actualización: 6 de agosto de 2026</p>
+<p class="updated">Última actualización: 13 de octubre de 2026</p>
 
 <div class="panel">${GOVERNING}</div>
 
@@ -103,38 +87,17 @@ const PRIVACY_ES = `
 sus viajes —su correo electrónico y las ubicaciones de sus trayectos—. No vendemos sus
 datos, no mostramos publicidad, y el número de su tarjeta va a Stripe, nunca a nosotros.</div>
 
-<section><h2>1 · Qué recogemos</h2>
-<ul>
-<li><strong>Cuenta:</strong> su dirección de correo electrónico y una contraseña (almacenada
-de forma segura por Google Firebase; nosotros nunca vemos la contraseña).</li>
-<li><strong>Viajes:</strong> ubicaciones de recogida y destino, la ruta, los horarios y el
-precio de cada viaje: eso es lo que compone un recibo.</li>
-<li><strong>Ubicación:</strong> la ubicación de su dispositivo, únicamente mientras fija un
-punto de recogida o durante un viaje, para orientar la flecha hacia su vehículo y mostrar el
-avance del trayecto. Puede denegarla en los Ajustes de iOS; la aplicación sigue funcionando
-sin ella.</li>
-</ul></section>
+<section><h2>1 · Datos recopilados</h2>
+<p>Recopilamos nombre, correo electrónico, datos de autenticación y sesión; ubicaciones exactas de recogida y destino, ruta, hora, precio y recibos; mensajes y solicitudes de asistencia o seguridad. Para los Operadores, también datos del permiso de conducir, vehículo, seguro comercial, verificación y evaluación de antecedentes. Para Familia/Adolescentes, nombre, correo verificado, fecha de nacimiento, autorización del tutor y datos de seguimiento. La ubicación del Operador puede actualizarse en segundo plano mientras esté de servicio, según el permiso del dispositivo; rechazar dicho permiso puede impedir operar.</p></section>
 
-<section><h2>2 · Para qué lo utilizamos</h2>
-<p>Para prestar el servicio: asignarle un operador, calcular y mostrar el precio de su
-viaje, emitir recibos, resolver los problemas que nos comunique y mantener la seguridad de
-la plataforma. Nada más.</p></section>
+<section><h2>2 · Finalidades</h2>
+<p>Usamos los datos para identidad, seguridad, cumplimiento, verificación, precios, asignación de viajes, seguimiento, protección de adolescentes y tutores, pagos, reembolsos, atención y prevención del fraude. Los estudios opcionales de precios requieren consentimiento aparte.</p></section>
 
-<section><h2>3 · Quién trata los datos (nuestros encargados)</h2>
-<ul>
-<li><strong>Google Firebase</strong> — cuentas y registros de viajes.</li>
-<li><strong>Stripe</strong> — pagos. Los datos de su tarjeta van directamente a Stripe;
-nosotros nunca almacenamos un número de tarjeta completo.</li>
-<li><strong>Render</strong> — aloja nuestro servidor.</li>
-<li>Las consultas de ruta envían coordenadas del trayecto (nunca su nombre) a un servicio de
-cálculo de rutas.</li>
-</ul>
-<p>No vendemos su información personal a nadie y no mostramos publicidad.</p></section>
+<section><h2>3 · Destinatarios</h2>
+<p>Google Firebase almacena cuentas y viajes; Stripe procesa pagos sin que almacenemos números completos de tarjeta; Render aloja los servicios. Proveedores de mapas, rutas, peajes, verificaciones, mensajes y notificaciones reciben solo los datos necesarios para prestar el servicio. Compartimos información pertinente con el Operador asignado, el tutor autorizado durante viajes de adolescentes y, cuando corresponda, servicios de emergencia o autoridades. No vendemos datos personales ni mostramos publicidad.</p></section>
 
-<section><h2>4 · Cuánto tiempo lo conservamos</h2>
-<p>El historial de viajes permanece en su cuenta para que existan sus recibos. ¿Desea que se
-eliminen su cuenta y sus datos? Solicítelo a través de Atención al Viajero en la aplicación
-y así se hará.</p></section>
+<section><h2>4 · Conservación y eliminación</h2>
+<p>La opción Cuenta > Eliminar cuenta permite iniciar la eliminación desde la aplicación. También puede solicitarla fuera de ella por correo electrónico a americanrider.communications@gmail.com. Eliminamos los datos asociados, salvo los registros que debamos conservar por ley o para recibos, seguridad, impuestos, reclamaciones, fraude y disputas; la eliminación puede estar pendiente mientras exista un viaje activo. Consulte Asistencia para solicitar acceso, corrección o detalles de conservación.</p></section>
 
 <section><h2>4A · Estudio opcional de precios</h2>
 <p>Solo si usted acepta expresamente al ver el precio de un viaje, registramos el condado,
@@ -148,8 +111,7 @@ cuenta retira antes los registros vinculados. También puede solicitar la retira
 a Atención al Viajero.</p></section>
 
 <section><h2>5 · Menores</h2>
-<p>Las cuentas de American Rider son para adultos mayores de 18 años. No recogemos
-conscientemente datos de menores.</p></section>
+<p>Las cuentas ordinarias son para adultos de 18 años o más. El programa Familia/Adolescentes permite cuentas verificadas de 13 a 17 años con autorización y control del tutor. No creamos deliberadamente cuentas para menores de 13 años.</p></section>
 
 <section><h2>6 · Cambios</h2>
 <p>Si esta política cambia, la nueva versión se publicará aquí con una fecha actualizada

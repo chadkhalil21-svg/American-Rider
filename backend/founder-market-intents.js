@@ -61,6 +61,7 @@ async function sweepFounderMarketIntents({
       const outcome=await activate({
         db,entries:entries.map(market=>({market,region})),
         actor:ACTOR,auditMethod:METHOD,intentRequestedAt:command.requested,
+        founderCommandId:command.id,
         expectedVersions,providerMissing,now,
       });
       const opened=Array.isArray(outcome.newlyOpened)?outcome.newlyOpened:[];

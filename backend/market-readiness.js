@@ -4,7 +4,7 @@ const { createHash } = require('node:crypto');
 const { regionAdmissionProblems } = require('./market-admission');
 const { forState: insuranceForState } = require('./insurance-jurisdictions');
 const { evidenceProblem } = require('./market-evidence-diagnosis');
-const {configuredControls}=require('./market-runtime-controls');
+const {configuredControls,mappedConfiguredSubcontrols}=require('./market-runtime-controls');
 
 const SCHEMA_VERSION = 2;
 const REQUIRED_EVIDENCE = Object.freeze([
@@ -75,7 +75,8 @@ function readinessFor({ market, region, record = {}, now = Date.now(), providerM
     storedStatus: record.status || 'waitlist', readyToOnboard: onboardingMissing.length === 0,
     readyToActivate: missing.length === 0, onboardingMissing, missing,
     evidenceCount: REQUIRED_EVIDENCE.length-configuredControls(manifest).length,
-    enforcedInCode: configuredControls(manifest), fleetCleanupPending: !!record.fleetCleanupPending,
+    enforcedInCode: configuredControls(manifest),
+    mappedConfiguredSubcontrols: mappedConfiguredSubcontrols(manifest), fleetCleanupPending: !!record.fleetCleanupPending,
   };
 }
 

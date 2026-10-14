@@ -35,9 +35,11 @@ profesionales independientes («operadores»). Nosotros organizamos el viaje, mo
 independientes, no American Rider: somos una plataforma de coordinación, no una empresa de
 transporte.</p></section>
 
-<section><h2>2 · Cuenta y edades</h2>\n<p>Las cuentas ordinarias de Viajeros y Operadores son para mayores de 18 años. El programa Familia/Adolescentes permite cuentas verificadas de 13 a 17 años con invitación y autorización del tutor, controles de seguridad y revocación. No se permiten cuentas para menores de 13 años.</p></section>
+<section><h2>2 · Cuenta y edades</h2>
+<p>Las cuentas ordinarias de Viajeros y Operadores son para mayores de 18 años. El programa Familia/Adolescentes permite cuentas verificadas de 13 a 17 años con invitación y autorización del tutor, controles de seguridad y revocación. No se permiten cuentas para menores de 13 años.</p></section>
 
-<section><h2>3 · Precio total confirmado</h2>\n<p>Antes de reservar, se muestra un solo Total que comprende la tarifa del viaje, la tarifa de plataforma y los peajes o cargos públicos aplicables. La tarifa de plataforma se calcula según los costes del servicio y no es inferior a 2,50 USD; ya está incluida en el Total mostrado. El Operador conserva el 99 % de la tarifa del viaje y la comisión de American Rider es del 1 %. Si cambia el Total antes de reservar, debe revisar y confirmar el nuevo importe. No se efectuará un cargo superior sin su aceptación.</p></section>
+<section><h2>3 · Precio total confirmado</h2>
+<p>Antes de reservar, se muestra un solo Total que comprende la tarifa del viaje, la tarifa de plataforma y los peajes o cargos públicos aplicables. La tarifa de plataforma se calcula según los costes del servicio y no es inferior a 2,50 USD; ya está incluida en el Total mostrado. El Operador conserva el 99 % de la tarifa del viaje y la comisión de American Rider es del 1 %. Si cambia el Total antes de reservar, debe revisar y confirmar el nuevo importe. No se efectuará un cargo superior sin su aceptación.</p></section>
 
 <section><h2>4 · Cancelaciones</h2>
 <ul>
@@ -71,7 +73,8 @@ aquello que no pueda resolverse allí, estos términos se rigen por la legislaci
 y cualquier controversia corresponde a los tribunales del condado de Miami-Dade,
 Florida.</p></section>
 
-<section><h2>9 · Cambios de los términos</h2>\n<p>Publicaremos la fecha y la versión de los términos actualizados. Los cambios importantes recibirán el aviso y el consentimiento que exija la ley; no modifican retroactivamente el Total de un viaje ya confirmado.</p></section>
+<section><h2>9 · Cambios de los términos</h2>
+<p>Publicaremos la fecha y la versión de los términos actualizados. Los cambios importantes recibirán el aviso y el consentimiento que exija la ley; no modifican retroactivamente el Total de un viaje ya confirmado.</p></section>
 `;
 
 const PRIVACY_ES = `
@@ -84,13 +87,17 @@ const PRIVACY_ES = `
 sus viajes —su correo electrónico y las ubicaciones de sus trayectos—. No vendemos sus
 datos, no mostramos publicidad, y el número de su tarjeta va a Stripe, nunca a nosotros.</div>
 
-<section><h2>1 · Datos recopilados</h2>\n<p>Recopilamos nombre, correo electrónico, datos de autenticación y sesión; ubicaciones exactas de recogida y destino, ruta, hora, precio y recibos; mensajes y solicitudes de asistencia o seguridad. Para los Operadores, también datos del permiso de conducir, vehículo, seguro comercial, verificación y evaluación de antecedentes. Para Familia/Adolescentes, nombre, correo verificado, fecha de nacimiento, autorización del tutor y datos de seguimiento. La ubicación del Operador puede actualizarse en segundo plano mientras esté de servicio, según el permiso del dispositivo; rechazar dicho permiso puede impedir operar.</p></section>
+<section><h2>1 · Datos recopilados</h2>
+<p>Recopilamos nombre, correo electrónico, datos de autenticación y sesión; ubicaciones exactas de recogida y destino, ruta, hora, precio y recibos; mensajes y solicitudes de asistencia o seguridad. Para los Operadores, también datos del permiso de conducir, vehículo, seguro comercial, verificación y evaluación de antecedentes. Para Familia/Adolescentes, nombre, correo verificado, fecha de nacimiento, autorización del tutor y datos de seguimiento. La ubicación del Operador puede actualizarse en segundo plano mientras esté de servicio, según el permiso del dispositivo; rechazar dicho permiso puede impedir operar.</p></section>
 
-<section><h2>2 · Finalidades</h2>\n<p>Usamos los datos para identidad, seguridad, cumplimiento, verificación, precios, asignación de viajes, seguimiento, protección de adolescentes y tutores, pagos, reembolsos, atención y prevención del fraude. Los estudios opcionales de precios requieren consentimiento aparte.</p></section>
+<section><h2>2 · Finalidades</h2>
+<p>Usamos los datos para identidad, seguridad, cumplimiento, verificación, precios, asignación de viajes, seguimiento, protección de adolescentes y tutores, pagos, reembolsos, atención y prevención del fraude. Los estudios opcionales de precios requieren consentimiento aparte.</p></section>
 
-<section><h2>3 · Destinatarios</h2>\n<p>Google Firebase almacena cuentas y viajes; Stripe procesa pagos sin que almacenemos números completos de tarjeta; Render aloja los servicios. Proveedores de mapas, rutas, peajes, verificaciones, mensajes y notificaciones reciben solo los datos necesarios para prestar el servicio. Compartimos información pertinente con el Operador asignado, el tutor autorizado durante viajes de adolescentes y, cuando corresponda, servicios de emergencia o autoridades. No vendemos datos personales ni mostramos publicidad.</p></section>
+<section><h2>3 · Destinatarios</h2>
+<p>Google Firebase almacena cuentas y viajes; Stripe procesa pagos sin que almacenemos números completos de tarjeta; Render aloja los servicios. Proveedores de mapas, rutas, peajes, verificaciones, mensajes y notificaciones reciben solo los datos necesarios para prestar el servicio. Compartimos información pertinente con el Operador asignado, el tutor autorizado durante viajes de adolescentes y, cuando corresponda, servicios de emergencia o autoridades. No vendemos datos personales ni mostramos publicidad.</p></section>
 
-<section><h2>4 · Conservación y eliminación</h2>\n<p>La opción Cuenta > Eliminar cuenta permite iniciar la eliminación desde la aplicación. También puede solicitarla fuera de ella por correo electrónico a americanrider.communications@gmail.com. Eliminamos los datos asociados, salvo los registros que debamos conservar por ley o para recibos, seguridad, impuestos, reclamaciones, fraude y disputas; la eliminación puede estar pendiente mientras exista un viaje activo. Consulte Asistencia para solicitar acceso, corrección o detalles de conservación.</p></section>
+<section><h2>4 · Conservación y eliminación</h2>
+<p>La opción Cuenta > Eliminar cuenta permite iniciar la eliminación desde la aplicación. También puede solicitarla fuera de ella por correo electrónico a americanrider.communications@gmail.com. Eliminamos los datos asociados, salvo los registros que debamos conservar por ley o para recibos, seguridad, impuestos, reclamaciones, fraude y disputas; la eliminación puede estar pendiente mientras exista un viaje activo. Consulte Asistencia para solicitar acceso, corrección o detalles de conservación.</p></section>
 
 <section><h2>4A · Estudio opcional de precios</h2>
 <p>Solo si usted acepta expresamente al ver el precio de un viaje, registramos el condado,
@@ -103,7 +110,8 @@ después de siete días; el proveedor puede tardar más en procesarla. La elimin
 cuenta retira antes los registros vinculados. También puede solicitar la retirada
 a Atención al Viajero.</p></section>
 
-<section><h2>5 · Menores</h2>\n<p>Las cuentas ordinarias son para adultos. El programa Familia/Adolescentes permite cuentas verificadas de 13 a 17 años con autorización y control del tutor. No creamos deliberadamente cuentas para menores de 13 años.</p></section>
+<section><h2>5 · Menores</h2>
+<p>Las cuentas ordinarias son para adultos de 18 años o más. El programa Familia/Adolescentes permite cuentas verificadas de 13 a 17 años con autorización y control del tutor. No creamos deliberadamente cuentas para menores de 13 años.</p></section>
 
 <section><h2>6 · Cambios</h2>
 <p>Si esta política cambia, la nueva versión se publicará aquí con una fecha actualizada

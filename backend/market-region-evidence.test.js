@@ -64,7 +64,7 @@ const input={reference:'verified-regional-external-reference',issuer:'Independen
     assert.equal(saved.evidence.disclosure_and_retention.manifestVersion,versions[market.id]);
     const state=readinessFor({market,region,record:saved,now});
     assert.equal(state.status,'waitlist','one source does NOT turn on paid bookings');
-    assert.equal(state.missing.length,REQUIRED_EVIDENCE.length-1);
+    assert.equal(state.missing.length,state.evidenceCount-1);
   }
   assert.equal(db.data.get('audit_log/audit-1').action,'region_evidence_recorded');
   assert.equal(db.data.get('audit_log/audit-1').actor.method,'named_ops_mfa');

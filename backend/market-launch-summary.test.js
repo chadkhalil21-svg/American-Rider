@@ -15,8 +15,8 @@ for(let campaign=0;campaign<2;campaign++){
  const all=sameCounty.flatMap(m=>M.readinessFor({market:m,region:regionById(m.regionId)}).missing);
  const result=conciseMarketIssues([...all,{id:'provider:screening_provider',code:'production_verification_missing'}]);
  assert.deepEqual(result.map(x=>x.id),['insurance','operators','travel','safety']);
- assert.equal(result.reduce((n,x)=>n+x.items,0),15);
- assert.equal(result.reduce((n,x)=>n+x.unrecorded,0),14);
+ assert.equal(result.reduce((n,x)=>n+x.items,0),12);
+ assert.equal(result.reduce((n,x)=>n+x.unrecorded,0),11);
  assert.equal(result.find(x=>x.id==='operators').unverifiedProvider,1);
  assert.ok(result.every(x=>!x.message.includes('failed')&&!x.message.includes('not completed')));
  const html=marketChecklistPage(sameCounty.map(m=>({
@@ -42,4 +42,4 @@ for(let campaign=0;campaign<2;campaign++){
  assert.equal(conciseMarketIssues([{id:'unknown_protection',code:'unverified'}])[0].id,'other',
    'unknown future admission condition stays visible rather than being dropped');
 }
-console.log('PASS TWICE: 14 unchanged evidence gates, four concise explanations, no permission or UI bypass');
+console.log('PASS TWICE: 11 independently required FL records, four concise explanations, no permission or UI bypass');

@@ -4,6 +4,7 @@ const { createHash } = require('node:crypto');
 const { regionAdmissionProblems } = require('./market-admission');
 const { forState: insuranceForState } = require('./insurance-jurisdictions');
 const { evidenceProblem } = require('./market-evidence-diagnosis');
+const {configuredControls}=require('./market-runtime-controls');
 
 const SCHEMA_VERSION = 2;
 const REQUIRED_EVIDENCE = Object.freeze([
@@ -44,7 +45,14 @@ function requirementsFor(manifest, record = {}, now = Date.now(), providerMissin
   if (!manifest) return [{ id: 'source', reason: 'No configured market or service region' }];
   const missing = manifest.sourceProblems.map((reason) => ({ id: 'source', reason }));
   if (record.fleetCleanupPending) missing.push({ id: 'fleet_cleanup', reason: 'Operator availability cleanup after a market pause has not completed' });
+  // The FL statutory/geographic rule, Operator insurance enforcement and
+  // provider-neutral screening gates already run in production. They must not
+  // demand three further paper 'approvals' per county. Importantly, *actual*
+  // coverage, authenticated screening delivery, each Operator's checks, money
+  // and physical-service evidence still have separate hard gates.
+  const redundant=new Set(configuredControls(manifest));
   for (const id of level === 'onboarding' ? ONBOARDING_EVIDENCE : REQUIRED_EVIDENCE) {
+    if(redundant.has(id))continue;
     const problem=evidenceProblem(id,record.evidence?.[id],manifest.version,now);
     if(problem)missing.push(problem);
   }
@@ -66,7 +74,8 @@ function readinessFor({ market, region, record = {}, now = Date.now(), providerM
     status: active ? 'active' : onboarding ? 'onboarding' : 'waitlist',
     storedStatus: record.status || 'waitlist', readyToOnboard: onboardingMissing.length === 0,
     readyToActivate: missing.length === 0, onboardingMissing, missing,
-    evidenceCount: REQUIRED_EVIDENCE.length, fleetCleanupPending: !!record.fleetCleanupPending,
+    evidenceCount: REQUIRED_EVIDENCE.length-configuredControls(manifest).length,
+    enforcedInCode: configuredControls(manifest), fleetCleanupPending: !!record.fleetCleanupPending,
   };
 }
 

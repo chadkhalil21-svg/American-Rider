@@ -32,7 +32,7 @@ assert.match(ctx,/code==='travel_total_changed'/);
 assert.match(txt('app/ride.tsx'),/ride\.dispatchState==='price_changed'/);
 assert.equal(pricingForTrip(null,null),null,'no nationwide default');
 const p=pricingForRegion('fl-southeast');
-assert.ok(p&&p.baseCents===100&&p.perMileCents===85&&p.perMinuteCents===15);
+assert.ok(p&&p.baseCents===100&&p.perMileCents===95&&p.perMinuteCents===32);
 const examples=[
  {name:'Miami ordinary directional',miles:8,minutes:21,estimate:2773},
  {name:'Cutler Bay directional',miles:8.5,minutes:22,estimate:3074},

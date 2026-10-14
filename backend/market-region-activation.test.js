@@ -139,19 +139,20 @@ const run = (db,extra={}) => M.activateRegion({
   {
     const db=testDb();seed(db);
     const actor='github:chadkhalil21-svg';
+    const founderCommandId='founder-open-fl-southeast-20261013';
     const staleIntentAt=now-60_000;
     db.documents.get('market_admission/'+ids[0]).pausedAt=now-1_000;
     const denied=await run(db,{actor,auditMethod:'founder_gitops_release',
-      intentRequestedAt:staleIntentAt});
+      founderCommandId,intentRequestedAt:staleIntentAt});
     assert.equal(denied.code,'market_paused_after_founder_instruction');
     assert.equal(db.writes,0);
     const approved=await run(db,{actor,auditMethod:'founder_gitops_release',
-      intentRequestedAt:now-500});
+      founderCommandId,intentRequestedAt:now-500});
     assert.equal(approved.code,'region_activated');
     const audits=[...db.documents.values()].filter(x=>x.action==='market_activated');
     assert.equal(audits.length,3);
     assert.ok(audits.every(x=>x.actor.name===actor &&
-      x.actor.method==='founder_gitops_release'));
+      x.actor.method==='founder_gitops_release' && x.founderCommandId===founderCommandId));
     assert.equal((await run(db,{actor,auditMethod:'founder_gitops_release'})).code,
       'invalid_admission_authority','GitHub path requires a dated founder order');
     assert.equal((await run(db,{actor,auditMethod:'invented_privilege'})).code,

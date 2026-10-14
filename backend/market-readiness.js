@@ -5,6 +5,7 @@ const { regionAdmissionProblems } = require('./market-admission');
 const { forState: insuranceForState } = require('./insurance-jurisdictions');
 const { evidenceProblem } = require('./market-evidence-diagnosis');
 const {configuredControls,mappedConfiguredSubcontrols}=require('./market-runtime-controls');
+const founderDeclarations = require('./founder-platform-declarations.json');
 
 const SCHEMA_VERSION = 2;
 const REQUIRED_EVIDENCE = Object.freeze([
@@ -60,6 +61,21 @@ function requirementsFor(manifest, record = {}, now = Date.now(), providerMissin
   return missing;
 }
 
+
+// Founder approval is a policy decision, not an external clearance.
+// This is deliberately not consumed by requirementsFor() or activateRegion().
+function founderDeclaredFrameworks(manifest, missing) {
+  if (!manifest || manifest.regionId !== founderDeclarations.regionId ||
+      manifest.sourceProblems.length || configuredControls(manifest).length === 0) return [];
+  const outstanding = new Map(missing.map(problem => [problem.id, problem.code || 'verification_required']));
+  return founderDeclarations.domains.map(domain => ({
+    domain,
+    policyDecision: 'founder_finalized',
+    marketEvidenceState: outstanding.get(domain) || 'verified_record',
+    approvalGrantsMarketAccess: false,
+  }));
+}
+
 function readinessFor({ market, region, record = {}, now = Date.now(), providerMissing = [] }) {
   const manifest = manifestFor(market, region);
   const missing = requirementsFor(manifest, record, now, providerMissing);
@@ -77,6 +93,7 @@ function readinessFor({ market, region, record = {}, now = Date.now(), providerM
     evidenceCount: REQUIRED_EVIDENCE.length-configuredControls(manifest).length,
     enforcedInCode: configuredControls(manifest),
     mappedConfiguredSubcontrols: mappedConfiguredSubcontrols(manifest),
+    founderDeclaredFrameworks: founderDeclaredFrameworks(manifest, missing),
     // Regional activation reads market_admission and verified platform/provider proof.
     // It never requires individual users/ or operators/ documents. Those are
     // checked at qualification, duty, dispatch and acceptance, not here.

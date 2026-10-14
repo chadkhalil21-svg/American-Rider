@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "mode": "preview_only",
+  "requestedBy": "chadkhalil21-svg",
+  "commands": [
+    {
+      "scope": "region",
+      "id": "fl-southeast",
+      "action": "open"
+    }
+  ]
+}

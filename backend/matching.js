@@ -4,7 +4,7 @@
 
 // The version in force. Imported rather than passed in, deliberately: see disclosureStale.
 const { DISCLOSURE_VERSION } = require('./disclosure');
-const { coverageUnsafeForNewTravel } = require('./insurance-horizon');
+const { coverageUnsafeForNewTravel, policyExpiryAt } = require('./insurance-horizon');
 
 // Distance between two lat/lng points, in miles (haversine formula).
 function distanceMiles(a, b) {
@@ -32,10 +32,10 @@ function etaMinutes(miles, mph = 22) { return Math.max(1, Math.round((miles / mp
 //
 // No expiry on file is NOT lapsed: /operator/online refuses to put anybody on duty without
 // one, so an operator record without the field predates the gate rather than evading it.
-function coverageLapsed(o) {
+function coverageLapsed(o, now = Date.now()) {
   if (!o.insuranceExpiry) return false;
-  const end = Date.parse(`${o.insuranceExpiry}T23:59:59`);
-  return !Number.isNaN(end) && end < Date.now();
+  const end = policyExpiryAt(o.insuranceExpiry);
+  return end === null || end < now;
 }
 
 // Has the statutory insurance disclosure moved on since this operator agreed to it?
@@ -128,7 +128,7 @@ function matchOperator(operators, pickup, travelClass = 'Standard', { requireScr
     //    the reason rule 2 is here. Both callers filtered for this themselves and one of them
     //    was calling an undefined function to do it. A rule every caller must remember is a
     //    rule that gets forgotten; this one now cannot be.
-    .filter(o => !coverageLapsed(o) && !coverageUnsafeForNewTravel(o.insuranceExpiry, now, travelMinutes))
+    .filter(o => !coverageLapsed(o, now) && !coverageUnsafeForNewTravel(o.insuranceExpiry, now, travelMinutes))
     // 5. and the disclosure they agreed to must be the one in force. Same reason as 2 and 4:
     //    a rule every caller has to remember is a rule that gets forgotten.
     .filter(o => !disclosureStale(o))

@@ -4,8 +4,11 @@
 // pricing record cannot be priced. This prevents a newly-added Texas/California region from
 // silently inheriting South Florida coefficients.
 //
-// An independently reviewed local starting-price candidate, pending physical-device
-// validation before this PR is eligible for merger. NO national fallback is allowed.
+// Founder-ratified South Florida prelaunch Standard tariff was merged in PR #184
+// and deployed on Render. Live paid booking remains separately gated by actual
+// market-admission and physical-device/provider release evidence.
+// No independent competitor-price feed is required to use this chosen tariff.
+// NO national fallback is allowed.
 const PRICING = Object.freeze({
   'fl-southeast': Object.freeze({
     regionId: 'fl-southeast',

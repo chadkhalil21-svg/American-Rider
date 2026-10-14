@@ -4,6 +4,7 @@ const {PERIOD_MS,createSweepCadence,quotaError,createQuotaBackoff}=require('./sw
 (async()=>{
   assert.equal(PERIOD_MS.screening,30*60_000);
   assert.equal(PERIOD_MS.insuranceMonitoring,30*60_000);
+  assert.equal(PERIOD_MS.founderMarketIntent,10*60_000);
   assert.equal(PERIOD_MS.operatorFees,6*60*60_000);
   const clock=createSweepCadence();let calls=0;const f=async()=>{calls++;return {ok:true};};
   const now=100_000_000;
@@ -12,6 +13,9 @@ const {PERIOD_MS,createSweepCadence,quotaError,createQuotaBackoff}=require('./sw
   assert.equal(calls,1);
   assert.equal((await clock.run('screening',f,now+30*60_000)).ok,true);
   assert.equal(calls,2);
+  assert.equal((await clock.run('founderMarketIntent',f,now)).ok,true);
+  assert.equal((await clock.run('founderMarketIntent',f,now+9*60_000)).skipped,'cadence');
+  assert.equal((await clock.run('founderMarketIntent',f,now+10*60_000)).ok,true);
   assert.equal((await clock.run('insuranceMonitoring',f,now+60_000)).ok,true,'different jobs have separate cadence');
   assert.equal((await clock.run('insuranceMonitoring',f,now+2*60_000)).skipped,'cadence');
   assert.equal((await clock.run('accountDeletion',f,now+60_000)).ok,true);

@@ -186,8 +186,7 @@ async function recordRegionEvidence({ db, entries, domain, input, actor, expecte
     const snapshots=await Promise.all(prepared.map(p=>tx.get(p.ref)));
     const targetMarkets=prepared.map(p=>p.market.id).sort();
     const evidence={
-      reference:proof.reference,issuer:proof.issuer,validUntil:proof.validUntil,
-      verifiedBy:String(actor),reviewedAt:now,scope:'verified_complete_region',
+      ...proof, verifiedBy:String(actor),reviewedAt:now,scope:'verified_complete_region',
       coveredMarkets:targetMarkets,
     };
     for(let i=0;i<prepared.length;i++){

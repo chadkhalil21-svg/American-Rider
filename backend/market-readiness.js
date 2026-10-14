@@ -147,7 +147,7 @@ async function activateMarket({ db, market, region, actor, expectedVersion, prov
  * This never manufactures evidence, treats a proposal as a licence, or authorizes an
  * unconfigured state. A single failure means ZERO new county activations.
  */
-async function activateRegion({ db, entries, actor, expectedVersions, providerMissing = [], auditMethod = 'named_ops_mfa', intentRequestedAt = null, now = Date.now() }) {
+async function activateRegion({ db, entries, actor, expectedVersions, providerMissing = [], auditMethod = 'named_ops_mfa', intentRequestedAt = null, founderCommandId = null, now = Date.now() }) {
   if (!db || !actor || !Array.isArray(entries) || !entries.length || entries.length > 100 ||
       !expectedVersions || typeof expectedVersions !== 'object' || Array.isArray(expectedVersions))
     return { ok: false, code: 'invalid_region_request' };
@@ -155,7 +155,8 @@ async function activateRegion({ db, entries, actor, expectedVersions, providerMi
   // undo a later deliberate market pause or impersonate an MFA session.
   if (!['named_ops_mfa','oauth_delegated_mfa','founder_gitops_release'].includes(auditMethod) ||
       (auditMethod === 'founder_gitops_release' &&
-       (!Number.isSafeInteger(intentRequestedAt)||intentRequestedAt<=0||intentRequestedAt>now)))
+       (!Number.isSafeInteger(intentRequestedAt)||intentRequestedAt<=0||intentRequestedAt>now||
+        !/^founder-open-[a-z0-9-]{4,80}$/.test(String(founderCommandId||'')))))
     return {ok:false,code:'invalid_admission_authority'};
   const ids = new Set(), prepared = [];
   let regionId = null;
@@ -215,6 +216,7 @@ async function activateRegion({ db, entries, actor, expectedVersions, providerMi
         at: now, action: 'market_activated', marketId: market.id,
         regionId, manifestVersion: manifest.version,
         actor: { name: actor, method: auditMethod },
+        ...(auditMethod === 'founder_gitops_release' ? {founderCommandId} : {}),
       });
       newlyOpened.push(market.id);
     }

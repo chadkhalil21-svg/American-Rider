@@ -82,14 +82,17 @@ function continuingStatus(user, now = Date.now()) {
 
   const status = cleanStatus(m.status);
   if (ADVERSE.has(status)) {
-    const reason = {
-      pending_cancellation: 'The insurer or broker has reported a pending cancellation.',
-      cancelled: 'The insurance policy is reported cancelled.',
+    const reasons = {
+      pending_cancellation: 'A pending cancellation was reported. New Travel is paused until verified coverage is confirmed.',
+      cancelled: 'The insurance policy is reported cancelled. New Travel is paused.',
       nonrenewed: 'The insurance policy is reported nonrenewed.',
       coverage_reduced: 'The policy changed and must be checked again before service.',
       vehicle_removed: 'The registered vehicle is no longer confirmed on the policy.',
       unverified: 'Current insurance status cannot be verified.',
-    }[status];
+    };
+    // A self-report or licensed provider may originate the same adverse event.
+    // Never identify the insurer as the reporter without authentic evidence.
+    const reason = reasons[status];
     return { ok: false, code: `insurance_${status}`, status, reason, nextVerificationDueAt: m.nextVerificationDueAt || null };
   }
 

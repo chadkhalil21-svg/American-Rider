@@ -19,7 +19,7 @@ const base = (over = {}) => ({
   uid: 'op1', available: true, lat: 25.762, lng: -80.192,
   onlineAt: Date.now(),
   disclosureVersion: DISCLOSURE_VERSION,
-  commissioned: true,
+  commissioned: true, insuranceExpiry:'2099-01-01',
   ...over,
 });
 

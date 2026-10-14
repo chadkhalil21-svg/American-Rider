@@ -2811,14 +2811,29 @@ async function issueInsuranceConfirmationRequest({ uid, user, contact, now = Dat
       'If your organization requires its own authorization form, reply to insurance@americanrider.app and American Rider will use that process instead.\n',
   });
 
-  const nextMonitoring = {
-    ...m,
+  // A confirmation email may be in-flight when an Operator reports a
+  // nonpayment notice. Only mutate request metadata against the CURRENT
+  // document, never re-save the pre-email monitoring snapshot and accidentally
+  // clear a newer cancellation hold.
+  const requestMetadata = {
     contact: { name: String(contact?.name || '').slice(0, 100), email, type: String(contact?.type || 'broker') },
     verificationRequestedAt: now,
     verificationRequestedTo: email,
     verificationRequestReason: reason,
-    verificationRequestCount: attempt,
   };
+  const saveRequestMetadata = async (deliveryIssue = null) => db.runTransaction(async tx => {
+    const userRef=db.collection('users').doc(String(uid));
+    const snap=await tx.get(userRef);
+    const latestUser=snap.exists?snap.data()||{}:{};
+    const current=latestUser.insuranceMonitoring||{};
+    const update={...current,...requestMetadata,
+      verificationRequestCount:Math.max(Number(current.verificationRequestCount)||0,attempt)};
+    // A new nonpayment notice always takes precedence over a delivery problem.
+    if(deliveryIssue && !current.operatorAdverseReportedAt)
+      update.verificationIssue=deliveryIssue;
+    tx.set(userRef,{insuranceMonitoring:update},{merge:true});
+    return continuingStatus({...latestUser,insuranceMonitoring:update},now);
+  });
 
   if (!sent.ok) {
     const issue = attempt >= 3 ? {
@@ -2833,9 +2848,7 @@ async function issueInsuranceConfirmationRequest({ uid, user, contact, now = Dat
       deliveryFailedAt: now,
       deliveryFailure: String(sent.reason || 'Confirmation request could not be sent.').slice(0, 500),
     }, { merge: true });
-    await db.collection('users').doc(String(uid)).set({
-      insuranceMonitoring: { ...nextMonitoring, verificationIssue: issue },
-    }, { merge: true });
+    const resultingEligibility = await saveRequestMetadata(issue);
     await db.collection('audit_log').add({
       at: now,
       subject: String(uid),
@@ -2845,7 +2858,7 @@ async function issueInsuranceConfirmationRequest({ uid, user, contact, now = Dat
       contactEmail: email,
       attempt,
       reason: String(sent.reason || '').slice(0, 500),
-      resultingEligibility: continuingStatus({ ...(user || {}), insuranceMonitoring: { ...nextMonitoring, verificationIssue: issue } }, now),
+      resultingEligibility,
     }).catch(() => {});
     if (attempt >= 3) {
       await fileTicket({
@@ -2865,9 +2878,7 @@ async function issueInsuranceConfirmationRequest({ uid, user, contact, now = Dat
   // A signed bounce can arrive immediately after the outbound API returns. If the
   // provider ID were saved first, that bounce could correlate while the user
   // still held the prior request and would not create an actionable contact issue.
-  await db.collection('users').doc(String(uid)).set({
-    insuranceMonitoring: nextMonitoring,
-  }, { merge: true });
+  const resultingEligibility = await saveRequestMetadata();
   await requestRef.set({
     deliveryStatus: 'accepted',
     deliveryAcceptedAt: now,
@@ -2882,7 +2893,7 @@ async function issueInsuranceConfirmationRequest({ uid, user, contact, now = Dat
     contactEmail: email,
     attempt,
     providerMessageId: sent.id || null,
-    resultingEligibility: continuingStatus({ ...(user || {}), insuranceMonitoring: nextMonitoring }, now),
+    resultingEligibility,
   }).catch(() => {});
   return { ok: true, expiresAt, providerMessageId: sent.id || null };
 }

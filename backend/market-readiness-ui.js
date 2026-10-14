@@ -1,7 +1,7 @@
 // Internal Operations control: no evidence is approved by rendering a green checklist.
 const { page } = require('./shell');
 const { REQUIRED_EVIDENCE } = require('./market-readiness');
-const { conciseMarketIssues } = require('./market-launch-summary');
+const { conciseMarketIssues, founderResolutionPlan } = require('./market-launch-summary');
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c]);
 const title = (id) => id.replaceAll('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 function marketChecklistPage(items, { production = false, expansion = null } = {}) {
@@ -71,6 +71,21 @@ function marketChecklistPage(items, { production = false, expansion = null } = {
          `<li><strong>${esc(g.label)}</strong>: ${esc(g.message)}</li>`).join('')}</ul>
        <p>Missing records do not mean earlier work or testing was never completed.</p>`
     : '<p>No further launch exceptions reported by the current checklist.</p>';
+  // Show THREE types of source work, not 14 purported regulatory permits
+  // or 3 separate county approvals. A missing record is NOT a failed audit.
+  const resolution = founderResolutionPlan(southFlorida.flatMap(({state})=>state.missing||[]));
+  const resolutionHtml = resolution.length ? `<details id="founder-resolution">
+    <summary>Resolve the existing evidence once — ${resolution.length} source workstreams</summary>
+    <p>Our founder's region-opening instruction is already recorded. None of these groups requests another founder decision.</p>
+    <p><strong>Florida's statewide TNC law generally prohibits extra county and city TNC operating licenses.</strong>
+       Airport and seaport pickup locations and fees remain separately controlled.
+       <a href="https://www.flsenate.gov/Laws/Statutes/2026/627.748" target="_blank" rel="noopener noreferrer">Florida Statute 627.748(17)</a>.</p>
+    ${resolution.map(g=>`<section class="founder-source-group">
+      <p><strong>${esc(g.label)}</strong> · ${g.items} unique record${g.items===1?'':'s'}${g.unrecorded?' · '+g.unrecorded+' not yet filed':''}</p>
+      <p>${esc(g.next)}</p>
+    </section>`).join('')}
+    <p>Our existing one-source/three-county filing route below reuses real verified records. No approval can be inferred from a CI test alone.</p>
+  </details>` : '';
   const quickAction = `<section id="south-florida-launch" aria-label="South Florida launch">
     <h2>South Florida</h2>
     <p>Miami-Dade · Broward · Palm Beach</p>
@@ -78,6 +93,7 @@ function marketChecklistPage(items, { production = false, expansion = null } = {
     <button type="button" id="open-south-florida" ${!production || !southFlorida.length || southActive ? 'disabled' : ''}>Open South Florida</button>
     <p id="south-florida-result" role="status" aria-live="polite">One action. The server rechecks all counties and either opens them together or tells you exactly what remains. No partial launch.</p>
     ${exceptionHtml}
+    ${resolutionHtml}
     <details id="regional-source-proof">
       <summary>Record one verified document covering all three counties</summary>
       <p>Only for a genuine source whose scope has been checked. Use county-specific records if the source does not cover all three.</p>

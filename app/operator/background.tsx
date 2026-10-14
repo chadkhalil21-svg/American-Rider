@@ -134,22 +134,20 @@ export default function OperatorBackground() {
           ) : null}
 
           <SectionLabel style={styles.section}>{t('traveler.bgCompleteSection')}</SectionLabel>
-          <Card style={styles.providerCard}>
-            <Text style={styles.providerName}>{t('traveler.bgApprovedProvider')}</Text>
-            <Text style={styles.providerMeta}>{t('traveler.bgExternalProvider')}</Text>
-            <Text style={styles.body}>{t('traveler.bgProviderBody')}</Text>
-            {status?.providerUrl ? (
+          {status?.providerUrl ? (
+            <Card style={styles.providerCard}>
+              <Text style={styles.providerName}>{t('traveler.bgApprovedProvider')}</Text>
+              <Text style={styles.providerMeta}>{t('traveler.bgExternalProvider')}</Text>
+              <Text style={styles.body}>{t('traveler.bgProviderBody')}</Text>
               <PrimaryButton
                 label={t('traveler.bgContinueProvider')}
                 onPress={() => Linking.openURL(status.providerUrl!)}
                 style={styles.primary}
               />
-            ) : (
-              <Text style={styles.pending}>
-                {t('traveler.bgProviderPending')}
-              </Text>
-            )}
-          </Card>
+            </Card>
+          ) : (
+            <Text style={styles.pending}>{t('traveler.bgProviderPending')}</Text>
+          )}
 
           <Pressable accessibilityRole="button" onPress={() => {
             if (requestMode !== 'existing') { setShowExisting(true); setDeclared(null); }

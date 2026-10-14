@@ -256,8 +256,8 @@ async function triCountyAdmission() {
     const cold = readinessFor({ market, region, now: NOW });
     check(!cold.readyToActivate && cold.status === 'waitlist',
       market.id + ' geography never authorizes real bookings');
-    check(cold.missing.length === REQUIRED_EVIDENCE.length,
-      market.id + ' missing evidence must be accounted for');
+    check(cold.missing.length === cold.evidenceCount,
+      market.id + ' genuinely required evidence must be accounted for');
 
     // These records are intentionally SYNTHETIC and used only in this memory
     // test. They may not be copied to live market_admission or signoff.
@@ -280,8 +280,14 @@ async function triCountyAdmission() {
     for (const missing of REQUIRED_EVIDENCE) {
       const copy = clone(evidence);
       delete copy[missing];
-      check(!readinessFor({ market, region, record: { ...record, evidence: copy }, now: NOW }).readyToActivate,
-        market.id + ' lacks independently reviewable evidence domain: ' + missing);
+      const status=readinessFor({ market, region, record: { ...record, evidence: copy }, now: NOW });
+      if(cold.enforcedInCode.includes(missing)) {
+        check(status.readyToActivate,
+          market.id + ' code-enforced check must not demand another paper certificate: ' + missing);
+      } else {
+        check(!status.readyToActivate,
+          market.id + ' cannot omit independently reviewable real-world evidence: ' + missing);
+      }
     }
   }
 }

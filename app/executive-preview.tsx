@@ -1,6 +1,7 @@
 import React from 'react';
 import { Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '../src/components/AppText';
+import { useLanguage } from '../src/state/LanguageContext';
 import preview from '../backend/executive-preview-regions.json';
 
 // This page is visual demonstration only. It never sends Travel requests or
@@ -33,21 +34,22 @@ function projectedCounties(region:PreviewRegion){
 }
 
 export default function ExecutivePreview() {
+  const { t } = useLanguage();
   const allowed=previewAllowed();
-  if(!allowed)return <View style={styles.page}><Text>Preview unavailable.</Text></View>;
+  if(!allowed)return <View style={styles.page}><Text>{t('traveler.executivePreviewUnavailable')}</Text></View>;
   return <ScrollView contentContainerStyle={styles.page}>
-    <Text style={styles.kicker}>AMERICAN RIDER — DEVELOPMENT PREVIEW</Text>
-    <Text style={styles.title}>Founder regional preview</Text>
-    <Text style={styles.lead}>Configured regions and counties</Text>
+    <Text style={styles.kicker}>{t('traveler.executivePreviewLabel')}</Text>
+    <Text style={styles.title}>{t('traveler.executivePreviewTitle')}</Text>
+    <Text style={styles.lead}>{t('traveler.executivePreviewSubtitle')}</Text>
     {regionNames.map(region=><View key={region.id} style={styles.region}>
       <Text style={styles.name}>{region.name}</Text>
       {projectedCounties(region).map(county=><View key={county.id} style={styles.county}>
         <Text style={styles.name}>{county.name}</Text>
-        <Text style={styles.status}>{county.opened?'OPEN FOR PREVIEW':'CLOSED FOR PREVIEW'}</Text>
+        <Text style={styles.status}>{county.opened?t('traveler.executivePreviewOpen'):t('traveler.executivePreviewClosed')}</Text>
       </View>)}
     </View>)}
-    <Text style={styles.warning}>TEST DISPLAY ONLY. No paid Travels, live Operator duty, insurance approvals, or background checks are enabled by this preview.</Text>
-    <Text style={styles.note}>Production opening and closing use the existing authenticated Founder command and commercial-readiness process.</Text>
+    <Text style={styles.warning}>{t('traveler.executivePreviewWarning')}</Text>
+    <Text style={styles.note}>{t('traveler.executivePreviewNote')}</Text>
   </ScrollView>;
 }
 const styles=StyleSheet.create({

@@ -7,7 +7,7 @@ const region = regionById(market.regionId);
 const manifest = M.manifestFor(market, region);
 assert.equal(manifest.sourceProblems.length, 0);
 assert.equal(M.readinessFor({ market, region }).status, 'waitlist');
-assert.equal(M.readinessFor({ market, region }).missing.length, M.REQUIRED_EVIDENCE.length);
+assert.deepEqual(M.readinessFor({ market, region }).missing.map(x=>x.id), [M.RELEASE_PACKET], 'one source record replaces 14 county filings');
 
 const now = 1_800_000_000_000;
 const evidence = Object.fromEntries(M.REQUIRED_EVIDENCE.map((id) => [id, {

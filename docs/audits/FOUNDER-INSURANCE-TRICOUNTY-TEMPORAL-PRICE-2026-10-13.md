@@ -25,7 +25,7 @@ Official Zoo destination: 12400 SW 152nd Street, Miami FL 33177, https://www.zoo
 | Fare: $1 base + distance + minutes | $9.65 | $13.41 |
 | Dynamic Platform Fee (illustrative) | $2.50 | $2.50 |
 | Traveler Total | **$12.15** | **$15.91** |
-| Operator 99% of Fare | $9.55 | $13.27 |
+| Operator Fare proceeds (1% floor-rounded commission) | $9.56 | $13.28 |
 
 For a plausible **scenario sensitivity only** of 6 miles/15 minutes to 8 miles/22 minutes: current Total ~$10.85–$13.60, proposed ~$14.00–$18.14; **not** exact current-route pricing or confirmed local competitive prices. Need actual API quote before presenting an unconditional dollar figure. Base fare is not all-in until Platform Fee and applicable toll/public fees are added.
 

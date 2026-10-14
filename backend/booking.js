@@ -131,7 +131,7 @@ async function assignPaidTravel({ db, uid, rideId, payment, candidate, now = Dat
     }
     const valid = op && matchOperator(
       [{ ...op, id: opRef.id, queueEligible }], from, ride.travelClass || 'Standard',
-      { requireScreening, now, allowQueued: true },
+      { requireScreening, now, allowQueued: true, travelMinutes: ride.routedMinutes ?? null },
     );
     if (!valid || String(valid.operator.id) !== String(candidate.operator.id)) {
       return deny(409, 'operator_unavailable', 'That Operator is no longer available');

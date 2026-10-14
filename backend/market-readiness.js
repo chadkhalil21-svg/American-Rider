@@ -115,6 +115,61 @@ async function recordEvidence({ db, market, region, domain, input, actor, expect
   });
 }
 
+// Authenticate and review a source ONCE if it actually covers every county.
+// Do not infer that a policy, report, or contract covers every jurisdiction.
+async function recordRegionEvidence({ db, entries, domain, input, actor, expectedVersions, now = Date.now() }) {
+  if (!db || !Array.isArray(entries) || !entries.length || entries.length > 25 ||
+      !actor || !/^[A-Za-z0-9_@.:-]{3,100}$/.test(String(actor)) ||
+      !expectedVersions || typeof expectedVersions !== 'object' ||
+      Array.isArray(expectedVersions) || input?.allCountiesVerified !== true) {
+    return {ok:false,code:'invalid_region_evidence_request'};
+  }
+  const proof=validEvidenceInput(domain,input);
+  if (!proof || proof.validUntil <= now) return {ok:false,code:'invalid_evidence'};
+  const ids=new Set(),prepared=[];
+  let regionId=null,region=null;
+  for(const entry of entries){
+    const manifest=manifestFor(entry?.market,entry?.region);
+    if(!manifest || !entry?.market?.id || ids.has(entry.market.id) ||
+        (regionId!==null&&regionId!==entry.region.id) ||
+        expectedVersions[entry.market.id]!==manifest.version)
+      return {ok:false,code:'stale_or_invalid_region_manifest'};
+    regionId=entry.region.id;
+    region=entry.region;
+    ids.add(entry.market.id);
+    prepared.push({market:entry.market,manifest,ref:db.collection(COLLECTION).doc(entry.market.id)});
+  }
+  const configured=new Set(region?.activeMarketFips||[]);
+  if(ids.size!==configured.size||configured.size===0||
+      prepared.some(e=>!configured.has(e.market.fips)))
+    return {ok:false,code:'partial_region_not_allowed'};
+  return db.runTransaction(async tx=>{
+    // No changes until ALL market snapshots are read and verified.
+    const snapshots=await Promise.all(prepared.map(p=>tx.get(p.ref)));
+    const targetMarkets=prepared.map(p=>p.market.id).sort();
+    const evidence={
+      reference:proof.reference,issuer:proof.issuer,validUntil:proof.validUntil,
+      verifiedBy:String(actor),reviewedAt:now,scope:'verified_complete_region',
+      coveredMarkets:targetMarkets,
+    };
+    for(let i=0;i<prepared.length;i++){
+      const p=prepared[i],prior=snapshots[i].exists?snapshots[i].data():{};
+      tx.set(p.ref,{
+        evidence:{...(prior.evidence||{}),[domain]:{...evidence,manifestVersion:p.manifest.version}},
+        status:'paused',updatedAt:now,updatedBy:String(actor),
+        ...(['active','onboarding'].includes(prior.status)
+          ? {fleetCleanupPending:true,fleetCleanupCursor:null}:{}),
+      },{merge:true});
+    }
+    tx.create(db.collection('audit_log').doc(),{
+      at:now,action:'region_evidence_recorded',regionId,marketIds:targetMarkets,
+      domain,actor:{name:String(actor),method:'named_ops_mfa'},reference:proof.reference,
+    });
+    return {ok:true,code:'region_evidence_recorded',regionId,
+      marketIds:targetMarkets,status:'paused'};
+  });
+}
+
 async function activateMarket({ db, market, region, actor, expectedVersion, providerMissing = [], now = Date.now() }) {
   if (!db || !market || !actor || !expectedVersion) return { ok: false, code: 'invalid_request' };
   const manifest = manifestFor(market, region);
@@ -257,5 +312,5 @@ async function pauseMarket({ db, market, actor, reason, auditMethod = 'named_ops
 }
 
 module.exports = { SCHEMA_VERSION, REQUIRED_EVIDENCE, ONBOARDING_EVIDENCE,
-  manifestFor, requirementsFor, readinessFor, inspectMarket, recordEvidence,
+  manifestFor, requirementsFor, readinessFor, inspectMarket, recordEvidence, recordRegionEvidence,
   activateMarket, activateRegion, authorizeOnboarding, pauseMarket };

@@ -78,6 +78,21 @@ function marketChecklistPage(items, { production = false, expansion = null } = {
     <button type="button" id="open-south-florida" ${!production || !southFlorida.length || southActive ? 'disabled' : ''}>Open South Florida</button>
     <p id="south-florida-result" role="status" aria-live="polite">One action. The server rechecks all counties and either opens them together or tells you exactly what remains. No partial launch.</p>
     ${exceptionHtml}
+    <details id="regional-source-proof">
+      <summary>Record one verified document covering all three counties</summary>
+      <p>Only for a genuine source whose scope has been checked. Use county-specific records if the source does not cover all three.</p>
+      <form id="region-evidence-form">
+        <label>Existing review category
+          <select name="domain" required>${REQUIRED_EVIDENCE.map(r=>`<option value="${esc(r)}">${esc(title(r))}</option>`).join('')}</select>
+        </label>
+        <label>Independent evidence reference <input name="reference" required minlength="8" maxlength="500"></label>
+        <label>Issuing authority <input name="issuer" required minlength="3" maxlength="120"></label>
+        <label>Valid until <input type="date" name="validUntil" required></label>
+        <label><input type="checkbox" name="allCountiesVerified" required> Independent review confirms this exact source covers Miami-Dade, Broward and Palm Beach</label>
+        <button type="submit">Record source for all three counties</button>
+      </form>
+      <p id="region-evidence-result" role="status" aria-live="polite"></p>
+    </details>
   </section>`;
   const cards = items.map(({ market, state }) => {
     const localMissing = (state.missing || []).filter(m => !m.id?.startsWith('provider:'));
@@ -216,6 +231,33 @@ if (southButton) southButton.addEventListener('click',async()=>{
     output.textContent='Activation not confirmed. Check current market status before retrying.';
     southButton.disabled=false;
   }
+});
+// One authenticated operation, one independently reviewed source, three
+// county-scoped records. This does not approve commercial booking by itself.
+const regionalProofForm=document.getElementById('region-evidence-form');
+if(regionalProofForm) regionalProofForm.addEventListener('submit',async e=>{
+  e.preventDefault();
+  const out=document.getElementById('region-evidence-result');
+  const button=regionalProofForm.querySelector('button[type="submit"]');
+  const values=new FormData(regionalProofForm);
+  if(values.get('allCountiesVerified')!=='on'){out.textContent='Confirm verified coverage for all three counties.';return;}
+  const validUntil=Date.parse(String(values.get('validUntil')||'')+'T23:59:59Z');
+  if(!Number.isFinite(validUntil)){out.textContent='Enter a valid expiration date.';return;}
+  button.disabled=true;
+  out.textContent='Recording one verified region-wide source…';
+  try{
+    const response=await fetch('/ops/markets/regions/fl-southeast/evidence',{
+      method:'POST',credentials:'same-origin',
+      headers:{'content-type':'application/json','x-ar-ops-action':'1'},
+      body:JSON.stringify({manifestVersions:southVersions,
+        domain:values.get('domain'),reference:values.get('reference'),
+        issuer:values.get('issuer'),validUntil,allCountiesVerified:true}),
+    });
+    const result=await response.json();
+    if(!response.ok){out.textContent='Not recorded: '+String(result.code||'Verification unavailable');button.disabled=false;return;}
+    out.textContent='Verified source recorded for all three counties. Market admission will recheck.';
+    location.reload();
+  }catch{out.textContent='Could not confirm the record. Check current status before retrying.';button.disabled=false;}
 });
 const expansionForm=document.getElementById('expansion-plan');
 const expansionState=document.getElementById('expansion-state');

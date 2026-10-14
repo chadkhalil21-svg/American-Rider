@@ -68,7 +68,7 @@ function testDb() {
 function seed(db,blocked=null) {
   for(const id of ids){
     const evidence=evidenceFor(id);
-    if(id===blocked)delete evidence.screening_agreement;
+    if(id===blocked)delete evidence.company_insurance_bound;
     db.documents.set('market_admission/'+id, {
       status:'waitlist', manifestVersion:versions[id], evidence,
     });
@@ -87,11 +87,11 @@ const run = (db,extra={}) => M.activateRegion({
     assert.equal(result.code,'region_not_ready');
     assert.equal(result.ready,2);
     assert.deepEqual(result.blockedMarkets,[ids[1]]);
-    assert.deepEqual(result.missing.filter(x=>x.id==='screening_agreement')
+    assert.deepEqual(result.missing.filter(x=>x.id==='company_insurance_bound')
       .map(x=>x.markets),[[ids[1]]]);
     assert.equal(db.writes,0);
     for(const id of ids)assert.equal(db.documents.get('market_admission/'+id).status,'waitlist');
-    // Repairing a real reference is separate from this operation; no synthetic
+    // Repairing a real company-insurance reference is separate from this operation; no synthetic
     // data may be written by the activation function itself.
     db.documents.get('market_admission/'+ids[1]).evidence=evidenceFor(ids[1]);
     const ok=await run(db);

@@ -134,22 +134,18 @@ export default function OperatorBackground() {
           ) : null}
 
           <SectionLabel style={styles.section}>{t('traveler.bgCompleteSection')}</SectionLabel>
-          <Card style={styles.providerCard}>
-            <Text style={styles.providerName}>{t('traveler.bgApprovedProvider')}</Text>
-            <Text style={styles.providerMeta}>{t('traveler.bgExternalProvider')}</Text>
-            <Text style={styles.body}>{t('traveler.bgProviderBody')}</Text>
-            {status?.providerUrl ? (
+          {status?.providerUrl ? (
+            <Card style={styles.providerCard}>
+              <Text style={styles.providerName}>{t('traveler.bgApprovedProvider')}</Text>
+              <Text style={styles.providerMeta}>{t('traveler.bgExternalProvider')}</Text>
+              <Text style={styles.body}>{t('traveler.bgProviderBody')}</Text>
               <PrimaryButton
                 label={t('traveler.bgContinueProvider')}
                 onPress={() => Linking.openURL(status.providerUrl!)}
                 style={styles.primary}
               />
-            ) : (
-              <Text style={styles.pending}>
-                {t('traveler.bgProviderPending')}
-              </Text>
-            )}
-          </Card>
+            </Card>
+          ) : null}
 
           <Pressable accessibilityRole="button" onPress={() => {
             if (requestMode !== 'existing') { setShowExisting(true); setDeclared(null); }
@@ -263,7 +259,6 @@ const styles = StyleSheet.create({
   providerName: { fontSize: 15, fontWeight: '600', color: colors.ink },
   providerMeta: { fontSize: 11.5, color: colors.muted, marginTop: 2, marginBottom: 8 },
   body: { fontSize: 12.5, color: colors.muted, lineHeight: 18.5, marginTop: 4 },
-  pending: { fontSize: 12, color: colors.ink2, lineHeight: 18, marginTop: 13 },
   primary: { marginTop: 14, paddingVertical: 14 },
   choiceCard: { marginTop: 12, paddingHorizontal: 17, paddingVertical: 14 },
   choiceRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },

@@ -60,6 +60,8 @@ function marketChecklistPage(items, { production = false, expansion = null } = {
   const southVersionsJson = JSON.stringify(southVersions).replace(/</g, '\\u003c');
   const southActive = southFlorida.length > 0 && southFlorida.every(({ state }) => state.status === 'active');
   const southReady = southFlorida.length > 0 && southFlorida.every(({ state }) => state.readyToActivate);
+  const southernPaperIds = REQUIRED_EVIDENCE.filter(id =>
+    !southFlorida.length || !southFlorida.every(({state})=>state.enforcedInCode?.includes(id)));
   const southStatus = southActive ? 'Open' : southReady ? 'Ready to open' :
     'Not yet cleared for paid Travel';
   // Show one regional exception summary, not 14 technical identifiers times
@@ -99,7 +101,7 @@ function marketChecklistPage(items, { production = false, expansion = null } = {
       <p>Only for a genuine source whose scope has been checked. Use county-specific records if the source does not cover all three.</p>
       <form id="region-evidence-form">
         <label>Existing review category
-          <select name="domain" required>${REQUIRED_EVIDENCE.map(r=>`<option value="${esc(r)}">${esc(title(r))}</option>`).join('')}</select>
+          <select name="domain" required>${southernPaperIds.map(r=>`<option value="${esc(r)}">${esc(title(r))}</option>`).join('')}</select>
         </label>
         <label>Independent evidence reference <input name="reference" required minlength="8" maxlength="500"></label>
         <label>Issuing authority <input name="issuer" required minlength="3" maxlength="120"></label>
@@ -112,6 +114,7 @@ function marketChecklistPage(items, { production = false, expansion = null } = {
   </section>`;
   const cards = items.map(({ market, state }) => {
     const localMissing = (state.missing || []).filter(m => !m.id?.startsWith('provider:'));
+    const paperIds=REQUIRED_EVIDENCE.filter(id=>!state.enforcedInCode?.includes(id));
     const id = esc(market.id);
     const ready = production && state.readyToActivate && state.manifestVersion && state.status !== 'active';
     const canOnboard = production && state.readyToOnboard && state.manifestVersion && state.status === 'waitlist';
@@ -131,7 +134,7 @@ function marketChecklistPage(items, { production = false, expansion = null } = {
   <details><summary>Record independently reviewed evidence</summary>
     <p>Paste only a document reference, independent issuer and expiry, not personal data or the document itself. This pauses an active county until it is re-approved.</p>
     <form class="evidence" data-market="${id}" data-version="${esc(state.manifestVersion || '')}">
-      <label>Requirement <select name="domain">${REQUIRED_EVIDENCE.map((r) => `<option value="${esc(r)}">${esc(title(r))}</option>`).join('')}</select></label>
+      <label>Requirement <select name="domain">${paperIds.map((r) => `<option value="${esc(r)}">${esc(title(r))}</option>`).join('')}</select></label>
       <label>External record reference <input name="reference" minlength="8" maxlength="500" required></label>
       <label>Issuer or independent authority <input name="issuer" minlength="3" maxlength="120" required></label>
       <label>Valid through <input name="validUntil" type="date" required></label>

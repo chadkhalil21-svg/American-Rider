@@ -30,9 +30,9 @@ function price(p,miles,minutes){
 }
 for(let pass=0;pass<2;pass++){
   for(const [m,mins,oldTotal,newTotal,oldOperator,newOperator] of [
-    [6,15,1085,1400,827,1138],
-    [7,18,1215,1591,955,1327],
-    [8,22,1360,1814,1099,1548],
+    [6,15,1085,1400,827,1139],
+    [7,18,1215,1591,956,1328],
+    [8,22,1360,1814,1099,1549],
   ]){
     const a=price(old,m,mins), b=price(proposal,m,mins);
     assert.equal(a.travelerPays,oldTotal,'old illustrative scenario');

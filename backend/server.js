@@ -3054,9 +3054,12 @@ app.post('/operator/insurance/report-risk', requireAuth, LIMITS.qualification, a
       const unchanged=Number(user.insuranceMonitoring?.operatorAdverseReportedAt)>0 &&
         ['pending_cancellation','cancelled'].includes(String(user.insuranceMonitoring?.status||'')) &&
         (user.insuranceMonitoring?.status==='cancelled'||kind==='pending_cancellation');
+      // Every repeat command reasserts the restrictive fleet state. A stale
+      // duty flag cannot survive merely because this risk was reported once.
+      if(opSnap.exists && opSnap.data()?.available !== false)
+        tx.set(opRef,{available:false,offDutyReason:'insurance_'+monitoring.status,offDutyAt:now},{merge:true});
       if (!unchanged) {
         tx.set(userRef,{insuranceMonitoring:monitoring},{merge:true});
-        if(opSnap.exists)tx.set(opRef,{available:false,offDutyReason:'insurance_'+monitoring.status,offDutyAt:now},{merge:true});
         const auditRef=db.collection('audit_log').doc();
         tx.set(auditRef,{at:now,action:'operator_reported_insurance_risk',subject:uid,
           actor:{uid,method:'authenticated_operator'},status:monitoring.status,

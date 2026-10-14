@@ -51,9 +51,12 @@ for (const l of Object.keys(LANGS)) {
 for (const l of Object.keys(LANGS)) {
   const [terms, privacy] = docsOf(l);
   check(`${l}: the 99/1 split survives`, /99 ?%/.test(terms) && /\b1 ?%/.test(terms));
-  // The fee is the greater of $1.50 and 5% of the travel fare (Chad, 9 Sept 2026). Both halves
-  // must survive, and the wording it replaced — a fee that "rises on larger fares" — must not.
-  check(`${l}: the $1.50-or-5% platform fee survives`, /1[.,]50 USD/.test(terms) && /\b5 ?%/.test(terms));
+  // The former $1.50-or-5% fee schedule is RETIRED. The current backend
+  // minimum is $2.50, with a larger fee only when costs justify it.
+  check(`${l}: current $2.50 fee floor survives`, /2[.,]50 USD/.test(terms));
+  check(`${l}: retired $1.50/5% schedule absent`, !/1[.,]50 USD/.test(terms) && !/\b5 ?%/.test(terms));
+  check(`${l}: guardian Teen service included in legal text`, /13/.test(terms) && /17/.test(terms) &&
+    /13/.test(privacy) && /17/.test(privacy));
   check(`${l}: the superseded rising-fee wording is gone`,
     !/aumenta en trayectos|augmentent sur les courses|aumenta sulle corse|steigt bei höheren/.test(terms));
   check(`${l}: the $3.00 arrival fee survives`, /3[.,]00 USD/.test(terms));
@@ -67,6 +70,31 @@ for (const l of Object.keys(LANGS)) {
   check(`${l}: the 18+ rule survives`, /18/.test(privacy));
   // The rubric applies in every language.
   check(`${l}: no exclamation marks`, !terms.includes('!') && !privacy.includes('!'));
+}
+
+
+// Official Apple App Store and Google Play policy requires account deletion
+// instructions in and out of the app. Never claim a support-only flow.
+check('English Privacy describes actual in-app account deletion',
+  PRIVACY_HTML.includes('Delete Account'));
+check('English Privacy gives external account deletion contact',
+  PRIVACY_HTML.includes('americanrider.communications@gmail.com'));
+check('English Privacy explicitly describes Teen and Operator data',
+  PRIVACY_HTML.includes('13–17') && PRIVACY_HTML.includes('Operators:'));
+check('English Privacy discloses on-duty background location',
+  /background location/i.test(PRIVACY_HTML));
+check('English Terms require consent to a changed Total',
+  /review the revised Total/i.test(TERMS_HTML));
+check('English legal document discloses company funds do not waive statutory rights',
+  /nonwaivable statutory rights/i.test(TERMS_HTML));
+for(const l of Object.keys(LANGS)){
+ const [terms, privacy] = docsOf(l);
+ check(`${l}: account deletion contact exists outside app`,
+   privacy.includes('americanrider.communications@gmail.com'));
+ check(`${l}: disclosure has Teen age threshold, 18+ ordinary accounts`,
+   /13/.test(privacy) && /17/.test(privacy) && /18/.test(privacy));
+ check(`${l}: no literal slash-n leaked into HTML`,
+   !terms.includes('\\n<p>') && !privacy.includes('\\n<p>'));
 }
 
 check('About page still served', typeof ABOUT_HTML === 'string' && ABOUT_HTML.length > 0);

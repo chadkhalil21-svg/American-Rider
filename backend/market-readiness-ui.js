@@ -1,6 +1,6 @@
 // Internal Operations control: no evidence is approved by rendering a green checklist.
 const { page } = require('./shell');
-const { REQUIRED_EVIDENCE } = require('./market-readiness');
+const { REQUIRED_EVIDENCE, RELEASE_PACKET } = require('./market-readiness');
 const { conciseMarketIssues, founderResolutionPlan } = require('./market-launch-summary');
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c]);
 const title = (id) => id.replaceAll('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -94,6 +94,22 @@ function marketChecklistPage(items, { production = false, expansion = null } = {
     <p id="south-florida-result" role="status" aria-live="polite">One action. The server rechecks all counties and either opens them together or tells you exactly what remains. No partial launch.</p>
     ${exceptionHtml}
     ${resolutionHtml}
+    <details id="regional-release-packet">
+      <summary>Record one independently reviewed commercial release package</summary>
+      <p>This is a single reference to the complete existing launch evidence package, not fourteen county forms. The named reviewer must have independently checked every applicable launch requirement. An invented hash, missing artifact or synthetic test is not evidence.</p>
+      <form id="release-packet-form">
+        <input type="hidden" name="domain" value="${esc(RELEASE_PACKET)}">
+        <label>Secure evidence package reference <input name="reference" required minlength="8" maxlength="500"></label>
+        <label>Independent reviewer / issuer <input name="issuer" required minlength="3" maxlength="120"></label>
+        <label>Exact candidate commit SHA <input name="releaseSha" required minlength="40" maxlength="40" pattern="[a-fA-F0-9]{40}" autocapitalize="off"></label>
+        <label>SHA-256 digest of the secure evidence package <input name="packetDigest" required minlength="64" maxlength="64" pattern="[a-fA-F0-9]{64}" autocapitalize="off"></label>
+        <label>Valid until <input type="date" name="validUntil" required></label>
+        <label><input type="checkbox" name="allDomainsReviewed" required> The reviewer verified all substantive launch requirements against this exact release, not merely code or screenshots.</label>
+        <label><input type="checkbox" name="allCountiesVerified" required> The verified package applies to Miami-Dade, Broward and Palm Beach.</label>
+        <button type="submit">Record verified package once for South Florida</button>
+      </form>
+      <p id="release-packet-result" role="status" aria-live="polite"></p>
+    </details>
     <details id="regional-source-proof">
       <summary>Record one verified document covering all three counties</summary>
       <p>Only for a genuine source whose scope has been checked. Use county-specific records if the source does not cover all three.</p>
@@ -250,6 +266,36 @@ if (southButton) southButton.addEventListener('click',async()=>{
 });
 // One authenticated operation, one independently reviewed source, three
 // county-scoped records. This does not approve commercial booking by itself.
+const releasePacketForm=document.getElementById('release-packet-form');
+if(releasePacketForm) releasePacketForm.addEventListener('submit',async e=>{
+  e.preventDefault();
+  const out=document.getElementById('release-packet-result');
+  const button=releasePacketForm.querySelector('button[type="submit"]');
+  const values=new FormData(releasePacketForm);
+  if(values.get('allDomainsReviewed')!=='on'||values.get('allCountiesVerified')!=='on'){
+    out.textContent='Independent review and regional scope must both be confirmed.';return;
+  }
+  const validUntil=Date.parse(String(values.get('validUntil')||'')+'T23:59:59Z');
+  if(!Number.isFinite(validUntil)){out.textContent='Enter a valid expiration date.';return;}
+  button.disabled=true;
+  out.textContent='Recording the independently verified release package…';
+  try{
+    const response=await fetch('/ops/markets/regions/fl-southeast/evidence',{
+      method:'POST',credentials:'same-origin',
+      headers:{'content-type':'application/json','x-ar-ops-action':'1'},
+      body:JSON.stringify({
+        manifestVersions:southVersions,domain:values.get('domain'),
+        reference:values.get('reference'),issuer:values.get('issuer'),validUntil,
+        releaseSha:values.get('releaseSha'),packetDigest:values.get('packetDigest'),
+        allDomainsReviewed:true,allCountiesVerified:true,
+      }),
+    });
+    const result=await response.json();
+    if(!response.ok){out.textContent='Not recorded: '+String(result.code||'Verification unavailable');button.disabled=false;return;}
+    out.textContent='Package recorded for all three counties. Current operational readiness will be rechecked.';
+    location.reload();
+  }catch{out.textContent='Verification was not confirmed. Recheck before retrying.';button.disabled=false;}
+});
 const regionalProofForm=document.getElementById('region-evidence-form');
 if(regionalProofForm) regionalProofForm.addEventListener('submit',async e=>{
   e.preventDefault();

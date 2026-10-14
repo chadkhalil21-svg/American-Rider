@@ -14,6 +14,8 @@ for(let pass=0;pass<2;pass++){
  assert.match(fl.script,/commercial livery.*for-hire passenger policy/i);
  assert.match(fl.script,/cancellation, nonrenewal and coverage changes/i);
  assert.match(fl.script,/declarations page/i);
+ assert.match(fl.script,/immediately prevents me from commencing operations or accepting new Travel/i);
+ assert.match(fl.script,/must promptly report coverage changes/i);
  assert.equal(publicConfig(fl).limits.ridePrimaryLiability,1000000);
 }
 console.log('PASS twice: state-specific Operator commercial livery onboarding and unconfigured-state refusal');

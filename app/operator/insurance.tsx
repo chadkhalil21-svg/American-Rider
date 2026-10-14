@@ -27,6 +27,7 @@ export default function OperatorInsurance() {
   const [configResolved, setConfigResolved] = useState(false);
   const [liveStatus, setLiveStatus] = useState<InsuranceStatus | null>(null);
   const [showMonitoring, setShowMonitoring] = useState(false);
+  const [showRiskOptions, setShowRiskOptions] = useState(false);
   const [showScript, setShowScript] = useState(false);
   const [showSources, setShowSources] = useState(false);
   const [showMore, setShowMore] = useState(false);
@@ -172,15 +173,23 @@ export default function OperatorInsurance() {
           </>
         )}
         {configResolved && !config && <Text style={styles.attention}>{t('traveler.insJurisdictionUnavailable')}</Text>}
-        <Text style={styles.note}>{t('traveler.insRiskBody')}</Text>
-        <Pressable accessibilityRole="button" disabled={statusBusy}
-          onPress={() => reportRisk('pending_cancellation')} style={styles.tap}>
-          <Text style={styles.link}>{t('traveler.insRiskPending')} ›</Text>
+        {/* Insurance issues are rare exceptions, never a daily questionnaire. */}
+        <Pressable accessibilityRole="button"
+          accessibilityState={{ expanded: showRiskOptions }}
+          onPress={() => setShowRiskOptions(!showRiskOptions)} style={styles.tap}>
+          <Text style={styles.link}>{t('traveler.insRiskEntry')} {showRiskOptions ? '−' : '+'}</Text>
         </Pressable>
-        <Pressable accessibilityRole="button" disabled={statusBusy}
-          onPress={() => reportRisk('cancelled')} style={styles.tap}>
-          <Text style={styles.link}>{t('traveler.insRiskCancelled')} ›</Text>
-        </Pressable>
+        {showRiskOptions && <>
+          <Text style={styles.note}>{t('traveler.insRiskBody')}</Text>
+          <Pressable accessibilityRole="button" disabled={statusBusy}
+            onPress={() => reportRisk('pending_cancellation')} style={styles.tap}>
+            <Text style={styles.link}>{t('traveler.insRiskPending')} ›</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" disabled={statusBusy}
+            onPress={() => reportRisk('cancelled')} style={styles.tap}>
+            <Text style={styles.link}>{t('traveler.insRiskCancelled')} ›</Text>
+          </Pressable>
+        </>}
         <Pressable accessibilityRole="button" onPress={() => { void refresh(); }} style={styles.tap}>
           <Text style={styles.link}>{t('operator.insRefreshStatus')} ›</Text>
         </Pressable>

@@ -381,6 +381,7 @@ export default {
     insRequestSent: "Confirmation request sent",
     insAttest: "Confirm My Coverage Is Unchanged",
     insAttestationSent: "Your confirmation has been recorded.",
+    insRiskEntry: "Report a change to my insurance",
     insRiskTitle: "Insurance coverage notice",
     insRiskBody: "Have you received a notice of nonpayment, cancellation, or other loss of cover? Report it here to pause new Travels immediately. Only an insurer or verified broker can restore clearance.",
     insRiskPending: "Report a pending cancellation or nonpayment notice",

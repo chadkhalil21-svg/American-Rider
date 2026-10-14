@@ -363,6 +363,7 @@ export default {
     insRequestSent: "Richiesta di conferma inviata",
     insAttest: "Confermare che la Mia Copertura Non È Cambiata",
     insAttestationSent: "La sua conferma è stata registrata.",
+    insRiskEntry: "Segnala una modifica alla mia assicurazione",
     insRiskTitle: "Avviso sulla copertura assicurativa",
     insRiskBody: "Ha ricevuto un avviso di mancato pagamento, annullamento o perdita della copertura? Lo segnali qui per sospendere subito i nuovi viaggi. Solo l'assicuratore o un intermediario verificato può ripristinare l'idoneità.",
     insRiskPending: "Segnala un avviso di annullamento o mancato pagamento",

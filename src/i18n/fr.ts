@@ -370,6 +370,7 @@ export default {
     insRequestSent: "Demande de confirmation envoyée",
     insAttest: "Confirmer que Ma Couverture N’a Pas Changé",
     insAttestationSent: "Votre confirmation a été enregistrée.",
+    insRiskEntry: "Signaler un changement de mon assurance",
     insRiskTitle: "Avis concernant l'assurance",
     insRiskBody: "Avez-vous reçu un avis de non-paiement, de résiliation ou de perte de garantie ? Signalez-le ici pour suspendre immédiatement les nouveaux trajets. Seul l'assureur ou un courtier vérifié peut rétablir l'autorisation.",
     insRiskPending: "Signaler un avis de résiliation à venir ou de non-paiement",

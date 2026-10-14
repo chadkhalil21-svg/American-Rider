@@ -7,7 +7,7 @@ const region = regionById(market.regionId);
 const manifest = M.manifestFor(market, region);
 assert.equal(manifest.sourceProblems.length, 0);
 assert.equal(M.readinessFor({ market, region }).status, 'waitlist');
-assert.equal(M.readinessFor({ market, region }).missing.length, M.REQUIRED_EVIDENCE.length);
+assert.deepEqual(M.readinessFor({ market, region }).missing.map(x=>x.id), [M.RELEASE_PACKET], 'one source record replaces 14 county filings');
 
 const now = 1_800_000_000_000;
 const evidence = Object.fromEntries(M.REQUIRED_EVIDENCE.map((id) => [id, {
@@ -83,5 +83,56 @@ function memoryDb() {
   assert.equal(db.data.get(`market_admission/${market.id}`).fleetCleanupPending,true);
   assert.equal((await M.inspectMarket({ db, market, region, now })).status, 'waitlist');
   assert.equal(db.data.get('audit_log/audit-2')?.actor?.name, 'named-ops');
+  // The new one-record path must demonstrably replace fourteen separate
+  // attestations, without bypassing live dependencies or revision matching.
+  // These fixtures are synthetic unit-test data and never production approval.
+  const priorRenderSha = process.env.RENDER_GIT_COMMIT;
+  process.env.RENDER_GIT_COMMIT = 'a'.repeat(40);
+  try {
+    const regionMarkets = markets().filter(m => m.regionId === region.id);
+    const entries = regionMarkets.map(m => ({market:m,region}));
+    const versions = Object.fromEntries(entries.map(e => [e.market.id, M.manifestFor(e.market,region).version]));
+    const packetDb=memoryDb();
+    const attestation={
+      reference:'secure-release-evidence-file',issuer:'Independent reviewer',
+      validUntil:now+10_000,releaseSha:'a'.repeat(40),
+      packetDigest:'b'.repeat(64),allDomainsReviewed:true,allCountiesVerified:true,
+    };
+    const invalid=await M.recordRegionEvidence({db:packetDb,entries,
+      domain:M.RELEASE_PACKET, input:{...attestation,packetDigest:'not-a-digest'},
+      actor:'named-ops',expectedVersions:versions,now});
+    assert.equal(invalid.code,'invalid_evidence');
+    assert.equal(packetDb.writes.length,0,'no partial or invented attestation');
+    const recorded=await M.recordRegionEvidence({db:packetDb,entries,
+      domain:M.RELEASE_PACKET,input:attestation,actor:'named-ops',expectedVersions:versions,now});
+    assert.equal(recorded.code,'region_evidence_recorded');
+    assert.equal(recorded.marketIds.length,3);
+    for(const e of entries){
+      const state=await M.inspectMarket({db:packetDb,market:e.market,region,now});
+      assert.deepEqual(state.missing,[],'single reviewed packet replaces all 14 filings');
+      const proof=packetDb.data.get('market_admission/'+e.market.id).evidence[M.RELEASE_PACKET];
+      assert.equal(proof.packetDigest,'b'.repeat(64));
+      assert.equal(proof.releaseSha,'a'.repeat(40));
+    }
+    const blocked=await M.activateRegion({db:packetDb,entries,actor:'named-ops',
+      expectedVersions:versions,providerMissing:['screening_provider'],now});
+    assert.equal(blocked.code,'region_not_ready','real provider problems remain effective');
+    assert.equal(blocked.missing[0].id,'provider:screening_provider');
+    const opened=await M.activateRegion({db:packetDb,entries,actor:'named-ops',
+      expectedVersions:versions,now});
+    assert.equal(opened.code,'region_activated');
+    assert.equal(opened.newlyOpened.length,3);
+    const stale=packetDb.data.get('market_admission/'+entries[0].market.id);
+    stale.evidence[M.RELEASE_PACKET].releaseSha='c'.repeat(40);
+    assert.equal(M.readinessFor({market:entries[0].market,region,record:stale,now}).status,
+      'waitlist','an incorrect candidate SHA does not certify paid bookings');
+    assert.equal(M.readinessFor({market:entries[1].market,region,
+      record:packetDb.data.get('market_admission/'+entries[1].market.id),
+      now:now+10_001}).status,'waitlist','expired packet stops paid bookings');
+  } finally {
+    if (priorRenderSha===undefined) delete process.env.RENDER_GIT_COMMIT;
+    else process.env.RENDER_GIT_COMMIT=priorRenderSha;
+  }
+  console.log('PASS single verified region packet, reject fabricated metadata, dependency and SHA checks');
   console.log('PASS versioned market admission, expiry, production dependencies, audited evidence, activate and pause');
 })().catch((error) => { console.error(error); process.exitCode = 1; });

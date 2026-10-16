@@ -1,5 +1,6 @@
 import React from 'react';
-import { Linking, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { AppState, Linking, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import { Text } from '../../src/components/AppText';
 import { useGoBack } from '../../src/components/nav';
 import { BadgeOk } from '../../src/components/operator';
@@ -40,7 +41,15 @@ export default function OperatorBackground() {
   const [error, setError] = React.useState<string | null>(null);
 
   const refresh = React.useCallback(() => fetchScreening().then(setStatus), []);
-  React.useEffect(() => { void refresh(); }, [refresh]);
+  // The external agency may return the Operator to a screen that never unmounted.
+  // Refresh on screen focus and when the phone app becomes active again.
+  useFocusEffect(React.useCallback(() => {
+    void refresh();
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') void refresh();
+    });
+    return () => subscription.remove();
+  }, [refresh]));
 
   const record = status?.screening || null;
   const decision = record?.decision;
@@ -141,7 +150,7 @@ export default function OperatorBackground() {
               <Text style={styles.body}>{t('traveler.bgProviderBody')}</Text>
               <PrimaryButton
                 label={t('traveler.bgContinueProvider')}
-                onPress={() => Linking.openURL(status.providerUrl!)}
+                onPress={() => { void Linking.openURL(status.providerUrl!).catch(() => setError(t('traveler.errReachARNoStop'))); }}
                 style={styles.primary}
               />
             </Card>

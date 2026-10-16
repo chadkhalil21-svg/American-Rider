@@ -1,8 +1,8 @@
 // Continuing coverage is a qualification, not a quote or automatic approval.
 // Law, platform policy, carrier judgment and verification are distinct authorities.
-import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, Linking, Pressable, Share, StyleSheet, TextInput, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
+import { Alert, AppState, Linking, Pressable, Share, StyleSheet, TextInput, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Text } from '../../src/components/AppText';
 import { pickDocument } from '../../src/backend/documentUpload';
 import {
@@ -45,7 +45,15 @@ export default function OperatorInsurance() {
       setContactType(nextStatus.contact.type);
     }
   }, []);
-  useEffect(() => { void refresh(); }, [refresh, op.docs.insurance]);
+  // Avoid a duplicate database refresh from doc-status changes. A completed
+  // upload refreshes explicitly; returning from the phone's browser also refreshes.
+  useFocusEffect(useCallback(() => {
+    void refresh();
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') void refresh();
+    });
+    return () => subscription.remove();
+  }, [refresh]));
 
   const authorizeStatus = async () => {
     setStatusBusy(true);

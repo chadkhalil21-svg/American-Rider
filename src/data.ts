@@ -295,12 +295,13 @@ export type Broker = {
 // used here. All three carry the same garzorinsurance.com contact address, so the agency is
 // real — it is the identifiers that were wrong.
 //
-// The phone number and the commercial-quotes@ address could not be checked against the state
-// register, which lists neither. They are as supplied.
+// The Florida agency record established the legal identity in September. The agency's
+// own public contact page now confirms (321) 206-8035 and commercial-quotes@garzorinsurance.com.
+// The agency is only a shopping option; carrier and policy suitability need independent review.
 export const BROKER: Broker | null = {
   name: 'Garzor Insurance LLC',
   note: 'traveler.brokerGarzorNote',
-  phone: '(407) 501-8275',
+  phone: '(321) 206-8035',
   email: 'commercial-quotes@garzorinsurance.com',
   license: 'L084884',
   hours: 'traveler.brokerGarzorHours',
@@ -314,8 +315,8 @@ export const BROKER: Broker | null = {
 // that the call is worth making.
 //
 // `secondary: true` holds a row behind "Compare more options", so the screen does not present
-// five names as five equal answers. Progressive is the only one shown beside Garzor: an
-// established carrier writing for-hire livery in 43 states.
+// five names as five equal answers. Show two independent quote marketplaces and the
+// Progressive specialist route first; regional specialists remain one tap away.
 //
 // `unverified: true` prints that we have not checked the agency's licence ourselves. Two of
 // these are local shops an operator may well prefer, and the honest thing is to list them with
@@ -376,7 +377,7 @@ export const INSURERS: {
     name: 'Insureon',
     note: 'traveler.insurerInsureonNote',
     url: 'https://www.insureon.com/livery-business-insurance/limousine-insurance',
-    secondary: true,
+    secondary: false,
   },
 ];
 

@@ -29,7 +29,7 @@ export default function OperatorInsurance() {
   const [showMonitoring, setShowMonitoring] = useState(false);
   const [showRiskOptions, setShowRiskOptions] = useState(false);
   const [showScript, setShowScript] = useState(false);
-  const [showSources, setShowSources] = useState(false);
+  const [showSources, setShowSources] = useState(true);
   const [showMore, setShowMore] = useState(false);
   const [brokerEmail, setBrokerEmail] = useState('');
   const [contactType, setContactType] = useState<'agent' | 'broker' | 'carrier' | null>(null);
@@ -203,6 +203,21 @@ export default function OperatorInsurance() {
         </Pressable>
       </Card>
 
+      <Pressable accessibilityRole="button" accessibilityState={{ expanded: showSources }} onPress={() => setShowSources(!showSources)} style={styles.tap}>
+        <Text style={styles.link}>{t('operator.compareProviders')} {showSources ? '−' : '+'}</Text>
+      </Pressable>
+      {showSources && <>
+        <Text style={styles.body}>{t('traveler.insNoAdvice')}</Text>
+        <Text style={styles.note}>{t('traveler.insVerifyLicence')}</Text>
+        {config ? <>
+          <Card style={styles.card}>{national.filter((x) => !x.secondary || showMore).map(sourceRow)}</Card>
+          {regional.length > 0 && <Card style={styles.card}>{regional.filter((x) => !x.secondary || showMore).map(sourceRow)}</Card>}
+          {!showMore && <Pressable accessibilityRole="button" onPress={() => setShowMore(true)} style={styles.tap}>
+            <Text style={styles.link}>{t('operator.compareMoreOptions')} ›</Text>
+          </Pressable>}
+        </> : <Text style={styles.attention}>{t('traveler.insJurisdictionUnavailable')}</Text>}
+      </>}
+
       <SectionLabel style={styles.label}>{t('operator.insWhoDecides')}</SectionLabel>
       <Card style={styles.card}>
         <Text style={styles.cardTitle}>{t(config?.state === 'FL' ? 'operator.insFloridaLaw' : 'operator.insLocalLaw')}</Text>
@@ -242,7 +257,7 @@ export default function OperatorInsurance() {
         <Text style={styles.cardTitle}>{t('operator.referredBroker')}</Text>
         <Text style={styles.providerTitle}>{BROKER.name}</Text>
         <Text style={styles.body}>{t(BROKER.note)}</Text>
-        <Pressable accessibilityRole="link" onPress={() => { void Linking.openURL(`tel:${BROKER!.phone.replace(/[^0-9+]/g, '')}`); }} style={styles.tap}>
+        <Pressable accessibilityRole="link" onPress={() => { void Linking.openURL(`tel:${BROKER!.phone.replace(/[^0-9+]/g, '')}`).catch(() => Alert.alert(t('traveler.notSent'), t('traveler.errReachAR'))); }} style={styles.tap}>
           <Text style={styles.link}>{BROKER.phone}</Text>
         </Pressable>
         {!!BROKER.email && <Pressable accessibilityRole="link" onPress={() => { void Linking.openURL(`mailto:${BROKER!.email}`); }} style={styles.tap}>
@@ -252,21 +267,6 @@ export default function OperatorInsurance() {
         {!!BROKER.license && <Text style={styles.body}>{t('traveler.floridaLicenceNo', { no: BROKER.license })}</Text>}
         <Text style={styles.note}>{t('traveler.noCommissionOnPremium')}</Text>
       </Card>}
-      <Pressable accessibilityRole="button" accessibilityState={{ expanded: showSources }} onPress={() => setShowSources(!showSources)} style={styles.tap}>
-        <Text style={styles.link}>{t('operator.compareProviders')} {showSources ? '−' : '+'}</Text>
-      </Pressable>
-      {showSources && <>
-        <Text style={styles.body}>{t('traveler.insNoAdvice')}</Text>
-        <Text style={styles.note}>{t('traveler.insVerifyLicence')}</Text>
-        {config ? <>
-          <Card style={styles.card}>{national.filter((x) => !x.secondary || showMore).map(sourceRow)}</Card>
-          {regional.length > 0 && <Card style={styles.card}>{regional.filter((x) => !x.secondary || showMore).map(sourceRow)}</Card>}
-          {!showMore && <Pressable accessibilityRole="button" onPress={() => setShowMore(true)} style={styles.tap}>
-            <Text style={styles.link}>{t('operator.compareMoreOptions')} ›</Text>
-          </Pressable>}
-        </> : <Text style={styles.attention}>{t('traveler.insJurisdictionUnavailable')}</Text>}
-      </>}
-
       <SectionLabel style={styles.label}>{t('traveler.insStatusTitle')}</SectionLabel>
       <Card style={styles.card}>
         <Text style={styles.body}>{t('operator.insMonitoringIntro')}</Text>

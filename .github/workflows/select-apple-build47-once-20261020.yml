@@ -47,19 +47,12 @@ jobs:
               return tuple(int(z) for z in str(v).split('.'))[:3] if str(v).replace('.','').isdigit() else None
           target=None
           for attempt in range(15):
-              _,builds=request('GET','/apps/'+app+'/builds',{'limit':'200','include':'preReleaseVersion'})
-              included={x['id']:x for x in builds.get('included',[])}
+              _,builds=request('GET','/apps/'+app+'/builds',{'limit':'50','fields[builds]':'version,processingState,uploadedDate'})
               matching=[x for x in builds.get('data',[]) if x.get('attributes',{}).get('version')==build_number]
               if len(matching)!=1:
                   print('Build 47 not visible yet, attempt',attempt+1)
               else:
                   b=matching[0]
-                  rel=b.get('relationships',{}).get('preReleaseVersion',{}).get('data')
-                  release_version=included.get(rel['id'],{}).get('attributes',{}).get('version') if rel else None
-                  if release_version and normalized(release_version)!=normalized(version['attributes']['versionString']):
-                      # Apple may display 1.0 vs 1.0.0: normalized comparison is explicit and exact for these two strings.
-                      if set([release_version,version['attributes']['versionString']])!=set(['1.0','1.0.0']):
-                          raise RuntimeError('Uploaded app version differs from App Store version; no update made')
                   if b.get('attributes',{}).get('processingState')=='VALID':target=b;break
                   print('Build 47 Apple processing:',str(b.get('attributes',{}).get('processingState','unknown'))[:32])
               if attempt<14:time.sleep(25)

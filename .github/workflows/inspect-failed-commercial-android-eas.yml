@@ -1,0 +1,38 @@
+name: Read exact failed Commercial Android EAS build diagnostics (no builds)
+on:
+  push:
+    branches: [ci/commercial-android-aab-20261020]
+    paths:
+      - .github/workflows/inspect-failed-commercial-android-eas.yml
+permissions:
+  contents: read
+jobs:
+  inspect-eas-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - name: Ensure existing EAS authentication only
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$EXPO_TOKEN" || { echo "Missing existing Expo credential"; exit 1; }
+      - name: Read FAILED Android build record, do not retry
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes eas-cli@latest build:view 41b38ac4-801f-41f8-be4c-4526b840f213 --json > "$RUNNER_TEMP/eas-failed-readonly.json"
+          node - "$RUNNER_TEMP/eas-failed-readonly.json" <<'NODE'
+          const fs=require('fs');
+          const data=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));
+          const b=Array.isArray(data)?data[0]:data;
+          const keep=(v)=>String(v||'').replace(/(?:sk|rk|pk)_(?:live|test)_[A-Za-z0-9]+/g,'[REDACTED]').slice(0,1800);
+          console.log('Existing build ID:',keep(b.id));
+          console.log('Platform:',keep(b.platform),'Status:',keep(b.status),'Profile:',keep(b.buildProfile));
+          console.log('Existing build error:',keep(JSON.stringify(b.error||null)));
+          console.log('Build diagnostics available:',Array.isArray(b.logs), b.logs?.length||0);
+          if(String(b.status).toLowerCase()!=='errored'&&String(b.status).toLowerCase()!=='failed'){
+             console.log('Build status is not failed; manually compare Expo UI.');
+          }
+          NODE

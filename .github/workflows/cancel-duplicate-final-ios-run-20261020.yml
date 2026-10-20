@@ -1,0 +1,35 @@
+name: Cancel duplicate one-time Commercial iOS run (keep earlier run)
+on:
+  push:
+    branches: [ci/cancel-duplicate-final-ios-run-20261020]
+    paths: ['.github/workflows/cancel-duplicate-final-ios-run-20261020.yml']
+permissions:
+  actions: write
+  contents: read
+jobs:
+  cancel-duplicate-only:
+    if: ${{ github.ref == 'refs/heads/ci/cancel-duplicate-final-ios-run-20261020' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Stop only duplicate workflow run 39385719964
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os, urllib.request, urllib.error
+          url='https://api.github.com/repos/chadkhalil21-svg/American-Rider/actions/runs/39385719964/cancel'
+          req=urllib.request.Request(url,data=b'',method='POST',headers={
+              'Authorization':'Bearer '+os.environ['GH_TOKEN'],
+              'Accept':'application/vnd.github+json',
+              'X-GitHub-Api-Version':'2022-11-28'})
+          try:
+              with urllib.request.urlopen(req,timeout=20) as result:
+                  if result.status != 202: raise RuntimeError('Cancellation not accepted')
+              print('Accepted cancellation of duplicate run 39385719964; earlier verified run 39385579739 untouched.')
+          except urllib.error.HTTPError as e:
+              if e.code == 409: print('Duplicate run already ended; no further action needed.')
+              else: raise
+          PY

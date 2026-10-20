@@ -68,4 +68,22 @@ jobs:
           _,after=request('GET','/appStoreVersions/'+version_id+'/relationships/build')
           if after.get('data',{}).get('id')!=target['id']:raise RuntimeError('App Store version does not show confirmed Build 47')
           print('VERIFIED: Build 47 selected for App Store version; no review submission or public publication was made.')
+
+          # Founder-authorized App Store listing fields: no fabricated reviews, photos, or legal claims.
+          _,locs=request('GET','/appStoreVersions/'+version_id+'/appStoreVersionLocalizations',{'limit':'20'})
+          target_locs=[x for x in locs.get('data',[]) if x.get('attributes',{}).get('locale')=='en-US']
+          if len(target_locs)!=1:raise RuntimeError('Expected one en-US App Store localization; no change')
+          loc=target_locs[0]; attrs=loc.get('attributes',{})
+          desired={'description':"American Rider connects Travelers with independent Operators for local transportation in South Florida.\n\nRequest a Travel\nChoose your pickup and destination, view your route and total price, and request an available Operator. You can also plan a Travel for a later date.\n\nStay informed\nFollow your Travel status and Operator assignment. Manage payment methods, review past Travels and receipts, and contact support about a specific Travel.\n\nFor Operators\nApply to join, submit required documents for review, manage availability, respond to requests, and review earnings.\n\nAmerican Rider initially serves Miami-Dade, Broward, and Palm Beach counties. Booking and vehicle options depend on your location and eligible Operator availability.",'keywords':"rides,transportation,Miami,Florida,ride booking,travel,operators,schedule,trip",'supportUrl':"https://americanrider.app/support"}
+          if any(attrs.get(field) not in (None,'',val) for field,val in desired.items()):
+              raise RuntimeError('Existing listing fields differ; refusing to overwrite user-provided text')
+          if any(attrs.get(field)!=val for field,val in desired.items()):
+              code,_=request('PATCH','/appStoreVersionLocalizations/'+loc['id'],payload={'data':{'type':'appStoreVersionLocalizations','id':loc['id'],'attributes':desired}})
+              if code not in (200,204):raise RuntimeError('Apple did not accept localization update')
+          _,check=request('GET','/appStoreVersionLocalizations/'+loc['id'])
+          post=check.get('data',{}).get('attributes',{})
+          if any(post.get(field)!=val for field,val in desired.items()):
+              raise RuntimeError('App Store listing fields were not confirmed')
+          print('VERIFIED: English description, search keywords and live branded support page saved to Apple.')
+
           PY

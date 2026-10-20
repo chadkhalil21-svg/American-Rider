@@ -60,6 +60,21 @@ jobs:
                   print('LOCALIZATION_FIELDS',{'locale':a.get('locale'),'description':bool(a.get('description')),'keywords':bool(a.get('keywords')),'supportUrl':bool(a.get('supportUrl')),'marketingUrl':bool(a.get('marketingUrl')),'promotionalText':bool(a.get('promotionalText')),'screenshots':False})
           reviews=get('/apps/'+app+'/reviewSubmissions',{'limit':'10'})
           print('REVIEW_SUBMISSIONS',json.dumps([{'state':x.get('attributes',{}).get('state')} for x in reviews.get('data',[])][:10]))
+
+          info=get('/apps/'+app+'/appInfos',{'limit':'10'})
+          print('APP_INFO_RECORD_COUNT',len(info.get('data',[])))
+          for info_row in info.get('data',[])[:3]:
+              iid=info_row['id']
+              locs=get('/appInfos/'+iid+'/appInfoLocalizations',{'limit':'30'})
+              print('APP_INFO_FIELDS',[{'locale':a.get('attributes',{}).get('locale'),'nameSet':bool(a.get('attributes',{}).get('name')),'subtitleSet':bool(a.get('attributes',{}).get('subtitle')),'privacyPolicyUrlSet':bool(a.get('attributes',{}).get('privacyPolicyUrl'))} for a in locs.get('data',[])])
+              age=get('/appInfos/'+iid+'/ageRatingDeclaration')
+              a=age.get('data',{}).get('attributes',{})
+              print('AGE_RATING_INFO',{'found':bool(age.get('data')),'answeredFields':sum(1 for v in a.values() if v is not None),'totalFields':len(a),'declaredRating':info_row.get('attributes',{}).get('appStoreAgeRating')})
+          for v in versions.get('data',[]):
+              review=get('/appStoreVersions/'+v['id']+'/appStoreReviewDetail')
+              a=review.get('data',{}).get('attributes',{})
+              print('APP_REVIEW_DETAIL',{'recordFound':bool(review.get('data')),'firstNamePresent':bool(a.get('contactFirstName')),'lastNamePresent':bool(a.get('contactLastName')),'phonePresent':bool(a.get('contactPhone')),'emailPresent':bool(a.get('contactEmail')),'demoAccountRequired':a.get('demoAccountRequired'),'demoNamePresent':bool(a.get('demoAccountName')),'demoPasswordPresent':bool(a.get('demoAccountPassword')),'reviewNotesPresent':bool(a.get('notes'))})
+
           for label,url in [
               ('branded-support','https://americanrider.app/support'),
               ('branded-privacy','https://americanrider.app/privacy'),

@@ -1,0 +1,78 @@
+name: Attach verified latest Commercial Build 47 to existing Apple review version (once)
+on:
+  push:
+    branches: [ci/one-time-apple-select-build47-20261020]
+    paths: ['.github/workflows/select-apple-build47-once-20261020.yml']
+permissions:
+  contents: read
+jobs:
+  attach-exact-build:
+    if: ${{ github.ref == 'refs/heads/ci/one-time-apple-select-build47-20261020' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
+      ASC_KEY_ID: LS74L322NV
+      ASC_ISSUER_ID: 2fa282d5-2b2c-4820-8fe9-6928ac1e8d33
+    steps:
+      - name: Wait for processed build 47 and link it to Apple App Store version only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet PyJWT cryptography
+          python3 - <<'PY'
+          import base64,json,os,time,urllib.parse,urllib.request,urllib.error
+          import jwt
+          app='6798078543'; build_number='47'
+          token=jwt.encode({'iss':os.environ['ASC_ISSUER_ID'],'iat':int(time.time()),'exp':int(time.time())+600,'aud':'appstoreconnect-v1'},base64.b64decode(os.environ['ASC_API_KEY_BASE64']),algorithm='ES256',headers={'kid':os.environ['ASC_KEY_ID'],'typ':'JWT'})
+          root='https://api.appstoreconnect.apple.com/v1'
+          def request(method,path,params=None,payload=None):
+              url=root+path+('?' + urllib.parse.urlencode(params) if params else '')
+              data=json.dumps(payload).encode() if payload is not None else None
+              headers={'Authorization':'Bearer '+token,'Accept':'application/json'}
+              if data is not None:headers['Content-Type']='application/json'
+              req=urllib.request.Request(url,data=data,method=method,headers=headers)
+              try:
+                  with urllib.request.urlopen(req,timeout=25) as rsp:
+                      return rsp.status,(json.load(rsp) if rsp.status != 204 else {})
+              except urllib.error.HTTPError as e:
+                  raise RuntimeError(method+' '+path+' returned HTTP '+str(e.code))
+          status,vers=request('GET','/apps/'+app+'/appStoreVersions',{'filter[platform]':'IOS','limit':'30'})
+          candidates=[v for v in vers.get('data',[]) if v.get('attributes',{}).get('versionString') in ('1.0','1.0.0') and v.get('attributes',{}).get('appVersionState')=='PREPARE_FOR_SUBMISSION']
+          if len(candidates)!=1:raise RuntimeError('Expected exactly one draft iOS version 1.0 for existing app; no update made')
+          version=candidates[0];version_id=version['id']
+          versions_build_rel=version.get('relationships',{}).get('build',{}).get('data')
+          print('Verified Apple app and exactly one draft App Store version',version['attributes']['versionString'])
+          def normalized(v):
+              return tuple(int(z) for z in str(v).split('.'))[:3] if str(v).replace('.','').isdigit() else None
+          target=None
+          for attempt in range(15):
+              _,builds=request('GET','/apps/'+app+'/builds',{'limit':'200','include':'preReleaseVersion'})
+              included={x['id']:x for x in builds.get('included',[])}
+              matching=[x for x in builds.get('data',[]) if x.get('attributes',{}).get('version')==build_number]
+              if len(matching)!=1:
+                  print('Build 47 not visible yet, attempt',attempt+1)
+              else:
+                  b=matching[0]
+                  rel=b.get('relationships',{}).get('preReleaseVersion',{}).get('data')
+                  release_version=included.get(rel['id'],{}).get('attributes',{}).get('version') if rel else None
+                  if release_version and normalized(release_version)!=normalized(version['attributes']['versionString']):
+                      # Apple may display 1.0 vs 1.0.0: normalized comparison is explicit and exact for these two strings.
+                      if set([release_version,version['attributes']['versionString']])!=set(['1.0','1.0.0']):
+                          raise RuntimeError('Uploaded app version differs from App Store version; no update made')
+                  if b.get('attributes',{}).get('processingState')=='VALID':target=b;break
+                  print('Build 47 Apple processing:',str(b.get('attributes',{}).get('processingState','unknown'))[:32])
+              if attempt<14:time.sleep(25)
+          if not target:raise RuntimeError('Apple has not completed processing build 47; nothing attached')
+          if versions_build_rel and versions_build_rel.get('id')==target['id']:
+              print('Build 47 was already selected; no update needed.')
+          elif versions_build_rel:
+              raise RuntimeError('Another build already selected; refusing to replace without approval')
+          else:
+              status,_=request('PATCH','/appStoreVersions/'+version_id+'/relationships/build',payload={'data':{'type':'builds','id':target['id']}})
+              if status!=204:raise RuntimeError('Apple did not accept the requested build link')
+              print('Apple App Store version now explicitly uses processed Build 47')
+          _,after=request('GET','/appStoreVersions/'+version_id+'/relationships/build')
+          if after.get('data',{}).get('id')!=target['id']:raise RuntimeError('App Store version does not show confirmed Build 47')
+          print('VERIFIED: Build 47 selected for App Store version; no review submission or public publication was made.')
+          PY

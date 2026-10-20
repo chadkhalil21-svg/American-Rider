@@ -19,7 +19,7 @@ jobs:
       ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
       ASC_KEY_ID: LS74L322NV
       ASC_ISSUER_ID: 2fa282d5-2b2c-4820-8fe9-6928ac1e8d33
-      CERTIFIED_SHA: 7289ee6fff8c9e8c75f9136a046f4868dfc13a86
+      CERTIFIED_SHA: e6a6a6a4ba4289887de54018578161e25e8d99b8
 
     steps:
       - name: Check out exact Commercial release (not legacy source)

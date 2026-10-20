@@ -70,6 +70,7 @@ jobs:
               age=get('/appInfos/'+iid+'/ageRatingDeclaration')
               a=age.get('data',{}).get('attributes',{})
               print('AGE_RATING_INFO',{'found':bool(age.get('data')),'answeredFields':sum(1 for v in a.values() if v is not None),'totalFields':len(a),'declaredRating':info_row.get('attributes',{}).get('appStoreAgeRating')})
+              print('AGE_RATING_FIELDS', {k:v for k,v in a.items() if k not in ('id','createdDate','lastModifiedDate')})
           for v in versions.get('data',[]):
               review=get('/appStoreVersions/'+v['id']+'/appStoreReviewDetail')
               a=(review.get('data') or {}).get('attributes',{})

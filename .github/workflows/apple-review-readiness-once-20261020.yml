@@ -72,7 +72,7 @@ jobs:
               print('AGE_RATING_INFO',{'found':bool(age.get('data')),'answeredFields':sum(1 for v in a.values() if v is not None),'totalFields':len(a),'declaredRating':info_row.get('attributes',{}).get('appStoreAgeRating')})
           for v in versions.get('data',[]):
               review=get('/appStoreVersions/'+v['id']+'/appStoreReviewDetail')
-              a=review.get('data',{}).get('attributes',{})
+              a=(review.get('data') or {}).get('attributes',{})
               print('APP_REVIEW_DETAIL',{'recordFound':bool(review.get('data')),'firstNamePresent':bool(a.get('contactFirstName')),'lastNamePresent':bool(a.get('contactLastName')),'phonePresent':bool(a.get('contactPhone')),'emailPresent':bool(a.get('contactEmail')),'demoAccountRequired':a.get('demoAccountRequired'),'demoNamePresent':bool(a.get('demoAccountName')),'demoPasswordPresent':bool(a.get('demoAccountPassword')),'reviewNotesPresent':bool(a.get('notes'))})
 
           for label,url in [

@@ -74,8 +74,8 @@ jobs:
           target_locs=[x for x in locs.get('data',[]) if x.get('attributes',{}).get('locale')=='en-US']
           if len(target_locs)!=1:raise RuntimeError('Expected one en-US App Store localization; no change')
           loc=target_locs[0]; attrs=loc.get('attributes',{})
-          desired={'description':"American Rider connects Travelers with independent Operators for local transportation in South Florida.\n\nRequest a Travel\nChoose your pickup and destination, view your route and total price, and request an available Operator. You can also plan a Travel for a later date.\n\nStay informed\nFollow your Travel status and Operator assignment. Manage payment methods, review past Travels and receipts, and contact support about a specific Travel.\n\nFor Operators\nApply to join, submit required documents for review, manage availability, respond to requests, and review earnings.\n\nAmerican Rider initially serves Miami-Dade, Broward, and Palm Beach counties. Booking and vehicle options depend on your location and eligible Operator availability.",'keywords':"rides,transportation,Miami,Florida,ride booking,travel,operators,schedule,trip",'supportUrl':"https://americanrider.app/support"}
-          if any(attrs.get(field) not in (None,'',val) for field,val in desired.items()):
+          desired={'description':"American Rider is a refined transportation platform connecting Travelers with independent Operators.\n\nArrange travel when you need it, or plan ahead. Review your itinerary and Complete Travel Cost before confirming, manage payment methods, and follow your Travel status from departure to arrival.\n\nFor Travelers\nAmerican Rider brings clarity, care and a considered experience to ground transportation. Arrange a Travel, review your journey, access receipts, and contact Patron Support from one place.\n\nFor Operators\nIndependent Operators retain 99% of the Travel Fare. Apply to join, submit qualifications, manage availability, respond to Travel requests and review earnings. Applicable platform and payment-account fees are disclosed separately.\n\nAmerican Rider is designed for service across the United States. Booking currently operates in Miami-Dade, Broward and Palm Beach counties in Florida, subject to eligible Operator availability. Further locations will become available as service expands.",'keywords':"rides,transportation,Miami,Florida,ride booking,travel,operators,schedule,trip,car service,airport",'supportUrl':"https://americanrider.app/support"}
+          if any(attrs.get(field) not in (None,'',val,{'description':"American Rider connects Travelers with independent Operators for local transportation in South Florida.\n\nRequest a Travel\nChoose your pickup and destination, view your route and total price, and request an available Operator. You can also plan a Travel for a later date.\n\nStay informed\nFollow your Travel status and Operator assignment. Manage payment methods, review past Travels and receipts, and contact support about a specific Travel.\n\nFor Operators\nApply to join, submit required documents for review, manage availability, respond to requests, and review earnings.\n\nAmerican Rider initially serves Miami-Dade, Broward, and Palm Beach counties. Booking and vehicle options depend on your location and eligible Operator availability.",'keywords':"rides,transportation,Miami,Florida,ride booking,travel,operators,schedule,trip"}.get(field)) for field,val in desired.items()):
               raise RuntimeError('Existing listing fields differ; refusing to overwrite user-provided text')
           if any(attrs.get(field)!=val for field,val in desired.items()):
               code,_=request('PATCH','/appStoreVersionLocalizations/'+loc['id'],payload={'data':{'type':'appStoreVersionLocalizations','id':loc['id'],'attributes':desired}})
@@ -95,10 +95,10 @@ jobs:
           if len(en)!=1:raise RuntimeError('Expected one English app-info localization')
           current=en[0]; at=current.get('attributes',{})
           desired_url='https://americanrider.app/privacy'
-          desired_subtitle='Request and schedule travel'
+          desired_subtitle='Private ground transportation'
           if at.get('privacyPolicyUrl') not in (None,'',desired_url):
               raise RuntimeError('Privacy URL differs; refusing to replace an existing value')
-          if at.get('subtitle') not in (None,'',desired_subtitle):
+          if at.get('subtitle') not in (None,'',desired_subtitle,'Request and schedule travel'):
               raise RuntimeError('Subtitle differs; refusing to replace an existing value')
           upd={}
           if at.get('privacyPolicyUrl')!=desired_url:upd['privacyPolicyUrl']=desired_url

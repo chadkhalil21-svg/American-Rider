@@ -51,8 +51,13 @@ jobs:
               row['screenshotSetCount']=screenshotSets
               vrows.append(row)
           print('IOS_STORE_VERSIONS',json.dumps(vrows))
-          builds=get('/apps/'+app+'/builds',{'limit':'15','fields[builds]':'version,processingState,uploadedDate'})
-          print('RECENT_APPLE_BUILDS',json.dumps([{'number':x.get('attributes',{}).get('version'),'processingState':x.get('attributes',{}).get('processingState')} for x in builds.get('data',[])][:15]))
+          builds=get('/builds',{'filter[app]':app,'filter[version]':'47','limit':'20','fields[builds]':'version,processingState,uploadedDate,expired'})
+          print('EXACT_APPLE_BUILD_47',json.dumps([{'id':x.get('id'),'number':x.get('attributes',{}).get('version'),'processingState':x.get('attributes',{}).get('processingState'),'expired':x.get('attributes',{}).get('expired')} for x in builds.get('data',[])]))
+          print('APPLE_VERSION_ID',[(v.get('id'),v.get('attributes',{}).get('appVersionState')) for v in versions.get('data',[])])
+          for v in versions.get('data',[]):
+              for lc in v.get('relationships',{}).get('appStoreVersionLocalizations',{}).get('data',[]):
+                  detail=get('/appStoreVersionLocalizations/'+lc['id']); a=detail.get('data',{}).get('attributes',{})
+                  print('LOCALIZATION_FIELDS',{'locale':a.get('locale'),'description':bool(a.get('description')),'keywords':bool(a.get('keywords')),'supportUrl':bool(a.get('supportUrl')),'marketingUrl':bool(a.get('marketingUrl')),'promotionalText':bool(a.get('promotionalText')),'screenshots':False})
           reviews=get('/apps/'+app+'/reviewSubmissions',{'limit':'10'})
           print('REVIEW_SUBMISSIONS',json.dumps([{'state':x.get('attributes',{}).get('state')} for x in reviews.get('data',[])][:10]))
           print('Read-only complete; no app metadata, review, or submission was changed.')

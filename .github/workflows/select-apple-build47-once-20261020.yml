@@ -86,4 +86,31 @@ jobs:
               raise RuntimeError('App Store listing fields were not confirmed')
           print('VERIFIED: English description, search keywords and live branded support page saved to Apple.')
 
+          _,infos=request('GET','/apps/'+app+'/appInfos',{'limit':'20'})
+          if len(infos.get('data',[]))!=1:
+              raise RuntimeError('Expected one current Apple app-info record; privacy URL unchanged')
+          info_id=infos['data'][0]['id']
+          _,info_locs=request('GET','/appInfos/'+info_id+'/appInfoLocalizations',{'limit':'50'})
+          en=[x for x in info_locs.get('data',[]) if x.get('attributes',{}).get('locale')=='en-US']
+          if len(en)!=1:raise RuntimeError('Expected one English app-info localization')
+          current=en[0]; at=current.get('attributes',{})
+          desired_url='https://americanrider.app/privacy'
+          desired_subtitle='Request and schedule travel'
+          if at.get('privacyPolicyUrl') not in (None,'',desired_url):
+              raise RuntimeError('Privacy URL differs; refusing to replace an existing value')
+          if at.get('subtitle') not in (None,'',desired_subtitle):
+              raise RuntimeError('Subtitle differs; refusing to replace an existing value')
+          upd={}
+          if at.get('privacyPolicyUrl')!=desired_url:upd['privacyPolicyUrl']=desired_url
+          if at.get('subtitle')!=desired_subtitle:upd['subtitle']=desired_subtitle
+          if upd:
+              code,_=request('PATCH','/appInfoLocalizations/'+current['id'],payload={'data':{'type':'appInfoLocalizations','id':current['id'],'attributes':upd}})
+              if code not in (200,204):raise RuntimeError('Apple did not accept app-info localization')
+          _,info_after=request('GET','/appInfoLocalizations/'+current['id'])
+          final=info_after.get('data',{}).get('attributes',{})
+          if final.get('privacyPolicyUrl')!=desired_url or final.get('subtitle')!=desired_subtitle:
+              raise RuntimeError('Apple did not confirm privacy URL and subtitle')
+          print('VERIFIED: Live privacy-policy URL and concise App Store subtitle saved.')
+
+
           PY

@@ -60,5 +60,18 @@ jobs:
                   print('LOCALIZATION_FIELDS',{'locale':a.get('locale'),'description':bool(a.get('description')),'keywords':bool(a.get('keywords')),'supportUrl':bool(a.get('supportUrl')),'marketingUrl':bool(a.get('marketingUrl')),'promotionalText':bool(a.get('promotionalText')),'screenshots':False})
           reviews=get('/apps/'+app+'/reviewSubmissions',{'limit':'10'})
           print('REVIEW_SUBMISSIONS',json.dumps([{'state':x.get('attributes',{}).get('state')} for x in reviews.get('data',[])][:10]))
+          for label,url in [
+              ('branded-support','https://americanrider.app/support'),
+              ('branded-privacy','https://americanrider.app/privacy'),
+              ('cloudrun-support','https://american-rider-api-production-623854974930.us-east1.run.app/support'),
+              ('cloudrun-privacy','https://american-rider-api-production-623854974930.us-east1.run.app/privacy')]:
+              try:
+                  with urllib.request.urlopen(urllib.request.Request(url,headers={'User-Agent':'AmericanRiderReleaseAudit/1.0'}),timeout=9) as response:
+                      ctype=response.headers.get('Content-Type','')
+                      print('PUBLIC_PAGE',label,'HTTP',response.status,'HTML',('html' in ctype.lower()))
+              except urllib.error.HTTPError as e:
+                  print('PUBLIC_PAGE',label,'HTTP',e.code)
+              except Exception:
+                  print('PUBLIC_PAGE',label,'UNAVAILABLE')
           print('Read-only complete; no app metadata, review, or submission was changed.')
           PY

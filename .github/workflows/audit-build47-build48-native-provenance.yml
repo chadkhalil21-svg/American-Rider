@@ -1,0 +1,104 @@
+name: Read-only Build 47 vs 48 EAS provenance
+on:
+  push:
+    branches:
+      - diagnostics/build47-build48-provenance-20261021
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      CI: "1"
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Require existing Expo read permission
+        run: |
+          test -n "$EXPO_TOKEN" || { echo "::error::EXPO_TOKEN unavailable"; exit 1; }
+          mkdir -p "$RUNNER_TEMP/ar47" "$RUNNER_TEMP/ar48"
+          echo "Read only: no builds, payments, deploys or submissions."
+      - name: Compare original EAS records
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes eas-cli@latest build:view ce290ec3-ede9-4ac7-9dba-28a5e0c306cc --json > "$RUNNER_TEMP/ar47/view.json"
+          npx --yes eas-cli@latest build:view 04b96eeb-9bea-4635-bd44-2f0b00e1bc0d --json > "$RUNNER_TEMP/ar48/view.json"
+          python3 - <<'PY'
+          import json,os
+          root=os.environ['RUNNER_TEMP']
+          allow=('id','status','platform','buildProfile','distribution','channel','gitCommitHash','sdkVersion','runtimeVersion','appVersion','appBuildVersion','fingerprint','fingerprintHash','createdAt','completedAt','updatedAt','resourceClass','buildImage','image','nodeVersion','cocoapodsVersion','xcodeVersion')
+          data={}
+          for n in (47,48):
+              d=json.load(open(f'{root}/ar{n}/view.json'))
+              row={k:d[k] for k in allow if k in d and d[k] is not None}
+              metadata=d.get('metadata') or {}
+              if isinstance(metadata,dict):
+                  row['metadata']={k:v for k,v in metadata.items() if k in allow and isinstance(v,(str,int,float,bool,type(None)))}
+              data[n]=row
+          print('ORIGINAL_EAS_BUILD_RECORDS')
+          print(json.dumps(data,indent=2))
+          with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as out:
+              out.write('## Build 47 vs 48 original EAS metadata\n\n')
+              for n,row in data.items():
+                  out.write(f'### Build {n}\n\n')
+                  for k,v in row.items():
+                      out.write(f'- {k}: {str(v)[:230]}\n')
+              out.write('\nNo new app, build, submission, or production change.\n')
+          PY
+      - name: Privately inspect existing signed IPA artifacts when accessible
+        shell: bash
+        run: |
+          set -euo pipefail
+          for spec in "47 ce290ec3-ede9-4ac7-9dba-28a5e0c306cc" "48 04b96eeb-9bea-4635-bd44-2f0b00e1bc0d"; do
+            set -- $spec
+            n="$1"; id="$2"
+            (
+              cd "$RUNNER_TEMP/ar$n"
+              if npx --yes eas-cli@latest build:download --build-id "$id" --all-artifacts --json --non-interactive > download.json 2> download.err; then
+                echo "EXISTING BUILD $n DOWNLOAD SUCCEEDED"
+              else
+                echo "EXISTING BUILD $n ARTIFACT UNAVAILABLE"
+              fi
+            )
+          done
+          python3 - <<'PY'
+          import os,glob,zipfile,plistlib,json
+          root=os.environ['RUNNER_TEMP']
+          records={}
+          for n in (47,48):
+              found=[]
+              for path in glob.glob(f'{root}/ar{n}/**/*',recursive=True):
+                  if not os.path.isfile(path) or not zipfile.is_zipfile(path):
+                      continue
+                  try:
+                      with zipfile.ZipFile(path) as z:
+                          names=z.namelist()
+                          infos=[p for p in names if p.startswith('Payload/') and p.endswith('.app/Info.plist')]
+                          if not infos:continue
+                          plist=plistlib.loads(z.read(infos[0]))
+                          keys=('CFBundleIdentifier','CFBundleVersion','CFBundleShortVersionString','MinimumOSVersion','DTXcode','DTXcodeBuild','DTSDKName','DTPlatformVersion','NSSupportsLiveActivities')
+                          native=sorted(set(p.split('.framework/')[0].split('/')[-1] for p in names if '.framework/' in p))
+                          bundles=[p for p in names if p.endswith(('main.jsbundle','.hbc'))]
+                          found.append({'archive_bytes':os.path.getsize(path),'plist':{k:plist[k] for k in keys if k in plist},
+                                        'framework_names':native,'js_bundle_sizes':{p.split('/')[-1]:z.getinfo(p).file_size for p in bundles}})
+                  except Exception as e:
+                      found.append({'read_error':type(e).__name__})
+              records[n]=found
+          print('SIGNED_IPA_COMPARISON')
+          print(json.dumps(records,indent=2)[:10000])
+          with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as out:
+              out.write('\n## Existing signed IPA inspection\n\n')
+              for n,found in records.items():
+                  out.write(f'### Build {n}\n\n')
+                  for row in found:out.write('- '+json.dumps(row,sort_keys=True)[:3300]+'\n')
+                  if not found:out.write('- Existing IPA inaccessible here; not evidence of equality.\n')
+              if records[47] and records[48]:
+                  a,b=records[47][0],records[48][0]
+                  for k in ('plist','framework_names','js_bundle_sizes'):
+                      if k in a and k in b:out.write(f'- {k} equal: {a[k]==b[k]}\n')
+              out.write('\nRaw IPAs and signed URLs are NOT published.\n')
+          PY

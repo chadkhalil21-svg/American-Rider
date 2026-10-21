@@ -1,0 +1,66 @@
+name: Read-only Apple App Store Connect launch package audit
+on:
+  push:
+    branches: [ci/one-time-read-testflight-crashes-20261021]
+    paths: ['.github/workflows/read-appstore-launch-package-20261021.yml']
+permissions:
+  contents: read
+jobs:
+  apple-metadata-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
+      ASC_KEY_ID: LS74L322NV
+      ASC_ISSUER_ID: 2fa282d5-2b2c-4820-8fe9-6928ac1e8d33
+    steps:
+      - name: Check required iOS/iPad gallery and version build without modifying Apple
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet PyJWT cryptography
+          python3 - <<'PY'
+          import base64,os,time,urllib.parse,urllib.request,urllib.error,json
+          import jwt
+          key=base64.b64decode(os.environ.get('ASC_API_KEY_BASE64',''))
+          if not key:raise SystemExit('Apple API secret unavailable')
+          token=jwt.encode({'iss':os.environ['ASC_ISSUER_ID'],'iat':int(time.time()),'exp':int(time.time())+480,'aud':'appstoreconnect-v1'},key,algorithm='ES256',headers={'kid':os.environ['ASC_KEY_ID'],'typ':'JWT'})
+          def get(path,params=None):
+            qs=('?'+urllib.parse.urlencode(params)) if params else ''
+            req=urllib.request.Request('https://api.appstoreconnect.apple.com/v1'+path+qs,headers={'Authorization':'Bearer '+token,'Accept':'application/json'})
+            try:
+              with urllib.request.urlopen(req,timeout=25) as out:return json.load(out)
+            except urllib.error.HTTPError as e:
+              print('READ_ONLY_ENDPOINT_STATUS',path,e.code)
+              return {}
+            except Exception as e:
+              print('READ_ONLY_ENDPOINT_UNAVAILABLE',path,type(e).__name__)
+              return {}
+          app_id='6798078543'
+          versions=get('/apps/'+app_id+'/appStoreVersions',{'filter[platform]':'IOS','limit':'50','fields[appStoreVersions]':'versionString,appStoreState,platform,createdDate'})
+          rows=versions.get('data',[])
+          rows.sort(key=lambda r:r.get('attributes',{}).get('createdDate',''),reverse=True)
+          print('APP_STORE_IOS_VERSIONS',[(v.get('attributes',{}).get('versionString'),v.get('attributes',{}).get('appStoreState')) for v in rows[:8]])
+          if not rows:raise SystemExit('NO_IOS_VERSION_ACCESSIBLE')
+          version=next((v for v in rows if v.get('attributes',{}).get('versionString')=='1.0'),rows[0])
+          ver_id=version['id']
+          selected=get('/appStoreVersions/'+ver_id+'/build',{'fields[builds]':'version,uploadedDate,processingState'})
+          selected_build=selected.get('data',{})
+          print('SELECTED_APP_STORE_BUILD',selected_build.get('attributes',{}).get('version'),'PROCESSING',selected_build.get('attributes',{}).get('processingState'))
+          locs=get('/appStoreVersions/'+ver_id+'/appStoreVersionLocalizations',{'limit':'100','fields[appStoreVersionLocalizations]':'locale,description,subtitle,keywords,promotionalText'})
+          for loc in locs.get('data',[]):
+            a=loc.get('attributes',{})
+            print('LOCALIZATION',a.get('locale'),'DESCRIPTION_PRESENT',bool(a.get('description')),'SUBTITLE_PRESENT',bool(a.get('subtitle')),'KEYWORDS_PRESENT',bool(a.get('keywords')))
+            sets=get('/appStoreVersionLocalizations/'+loc['id']+'/appScreenshotSets',{'limit':'50','fields[appScreenshotSets]':'screenshotDisplayType'})
+            gallery=[]
+            for item in sets.get('data',[]):
+              pics=get('/appScreenshotSets/'+item['id']+'/appScreenshots',{'limit':'50','fields[appScreenshots]':'fileName,assetDeliveryState'})
+              gallery.append({'display':item.get('attributes',{}).get('screenshotDisplayType'),'count':len(pics.get('data',[]))})
+            print('GALLERIES',json.dumps(gallery))
+          reviews=get('/appStoreVersions/'+ver_id+'/appStoreReviewDetail',{'fields[appStoreReviewDetails]':'contactFirstName,contactLastName,contactPhone,contactEmail,demoAccountRequired'})
+          print('REVIEW_DETAIL_CONFIGURED',bool(reviews.get('data')))
+          builds=get('/builds',{'filter[app]':app_id,'filter[version]':'48','limit':'10','fields[builds]':'version,processingState,uploadedDate'})
+          b48=[r.get('attributes',{}) for r in builds.get('data',[]) if r.get('attributes',{}).get('version')=='48']
+          print('BUILD48_PRESENT',bool(b48),'PROCESSING',b48[0].get('processingState') if b48 else 'unknown')
+          print('AUDIT_IS_READ_ONLY - NO_TESTFLIGHT_BUILD_NO_APPSTORE_MUTATION')
+          PY

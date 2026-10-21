@@ -1,0 +1,48 @@
+name: One-time read-only approved American Rider App Store description
+on:
+  push:
+    branches: [ci/one-time-read-apple-description-20261021]
+    paths: ['.github/workflows/one-time-read-apple-description-20261021.yml']
+permissions:
+  contents: read
+jobs:
+  read-existing-store-description:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
+      ASC_KEY_ID: LS74L322NV
+      ASC_ISSUER_ID: 2fa282d5-2b2c-4820-8fe9-6928ac1e8d33
+    steps:
+      - name: Read en-US description of existing iOS 1.0 listing without changing Apple data
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet PyJWT cryptography
+          python3 - <<'PY'
+          import base64,json,os,time,urllib.request,urllib.parse,urllib.error
+          import jwt
+          assert os.environ.get('ASC_API_KEY_BASE64'), 'App Store Connect credential unavailable'
+          key=base64.b64decode(os.environ['ASC_API_KEY_BASE64'])
+          token=jwt.encode({'iss':os.environ['ASC_ISSUER_ID'],'iat':int(time.time()),'exp':int(time.time())+600,'aud':'appstoreconnect-v1'},key,algorithm='ES256',headers={'kid':os.environ['ASC_KEY_ID'],'typ':'JWT'})
+          root='https://api.appstoreconnect.apple.com/v1'
+          def get(path,params=None):
+              url=root+path+('?' + urllib.parse.urlencode(params) if params else '')
+              req=urllib.request.Request(url,headers={'Authorization':'Bearer '+token,'Accept':'application/json'})
+              with urllib.request.urlopen(req,timeout=22) as resp: return json.load(resp)
+          versions=get('/apps/6798078543/appStoreVersions',{'filter[platform]':'IOS','include':'appStoreVersionLocalizations','limit':'30'})
+          found=False
+          for v in versions.get('data',[]):
+              if v.get('attributes',{}).get('versionString')!='1.0':continue
+              for loc in v.get('relationships',{}).get('appStoreVersionLocalizations',{}).get('data',[]):
+                  data=get('/appStoreVersionLocalizations/'+loc['id'])
+                  a=data.get('data',{}).get('attributes',{})
+                  if a.get('locale')=='en-US' and a.get('description'):
+                      out={'version':'1.0','locale':'en-US','description':a['description'],'appVersionState':v.get('attributes',{}).get('appVersionState')}
+                      print('AMERICAN_RIDER_EXACT_APPLE_DESCRIPTION_START')
+                      print(json.dumps(out,ensure_ascii=False))
+                      print('AMERICAN_RIDER_EXACT_APPLE_DESCRIPTION_END')
+                      found=True
+          if not found: raise SystemExit('No en-US description returned from existing App Store 1.0 listing')
+          print('Read-only; no metadata, secrets, screenshots or reviews changed.')
+          PY

@@ -36,19 +36,19 @@ jobs:
                   print('APPLE_CRASH_API_STATUS',e.code,path.split('?')[0])
                   return {}
           app_id='6798078543'
-          builds=read('/builds',{'filter[app]':app_id,'filter[version]':'48','limit':'20','fields[builds]':'version,processingState,uploadedDate'})
-          bid=next((x['id'] for x in builds.get('data',[]) if x.get('attributes',{}).get('version')=='48'),None)
-          print('BUILD_48_FOUND', bool(bid))
+          builds=read('/builds',{'filter[app]':app_id,'filter[version]':'49','limit':'20','fields[builds]':'version,processingState,uploadedDate'})
+          bid=next((x['id'] for x in builds.get('data',[]) if x.get('attributes',{}).get('version')=='49'),None)
+          print('BUILD_49_FOUND', bool(bid))
           data=read('/apps/'+app_id+'/betaFeedbackCrashSubmissions',{'limit':'60','sort':'-createdDate','fields[betaFeedbackCrashSubmissions]':'createdDate,deviceModel,osVersion,appUptimeInMilliseconds,buildBundleId,build,crashLog','include':'build','fields[builds]':'version'})
           matches=[]
           included={x['id']:x for x in data.get('included',[])}
           for row in data.get('data',[]):
               b=row.get('relationships',{}).get('build',{}).get('data')
               version=included.get((b or {}).get('id'),{}).get('attributes',{}).get('version')
-              if (bid and (b or {}).get('id')==bid) or version=='48':
+              if (bid and (b or {}).get('id')==bid) or version=='49':
                   matches.append(row)
           print('CRASH_FEEDBACK_TOTAL_RETURNED',len(data.get('data',[])))
-          print('CRASH_FEEDBACK_FOR_BUILD_48',len(matches))
+          print('CRASH_FEEDBACK_FOR_BUILD_49',len(matches))
           for i,row in enumerate(matches[:5]):
               a=row.get('attributes',{})
               print('CRASH_RECORD',i+1,json.dumps({k:a.get(k) for k in ['createdDate','deviceModel','osVersion','appUptimeInMilliseconds']}))

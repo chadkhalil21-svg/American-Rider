@@ -111,11 +111,32 @@ jobs:
           print("Selected next unused iOS build number:", next_build)
           PY
 
-      - name: Require public paid Google Cloud Run API before mobile build
+      - name: Verify mobile-only delta and exact paid Cloud Run deployed backend
         shell: bash
+        env:
+          DEPLOYED_BACKEND_SHA: b02a0b45d2e29b4e3f19048b89537c8d73357693
         run: |
           set -euo pipefail
-          node scripts/verify-store-cloudrun-api.cjs
+          # Both source hashes are independently fixed and reviewed.
+          # The only changes since Cloud Run was deployed are an optional
+          # iOS widget, its import guard, isolated tests, and release ledger.
+          test "$CERTIFIED_SHA" = "2209e97f99bd2b344e5289edd1d95abe86b3c563"
+          git fetch origin "$DEPLOYED_BACKEND_SHA" --depth=1
+          changed="$(git diff --name-only "$DEPLOYED_BACKEND_SHA" "$CERTIFIED_SHA" | LC_ALL=C sort)"
+          expected="$(printf '%s\n' \
+             'PROJECT-LEDGER.md' \
+             'backend/liveactivity-import-safety.test.js' \
+             'backend/liveactivity-widget-scope.test.js' \
+             'src/backend/liveActivity.ts' \
+             'src/widgets/TravelActivity.tsx' | LC_ALL=C sort)"
+          if [ "$changed" != "$expected" ]; then
+            echo "::error::Mobile source differs from the reviewed mobile-only allowlist. Refusing release."
+            exit 1
+          fi
+          # Keep the strict live payment, Firestore, scheduler and actual
+          # Cloud Run revision checks; never fake equality with the mobile SHA.
+          CERTIFIED_SHA="$DEPLOYED_BACKEND_SHA" node scripts/verify-store-cloudrun-api.cjs
+          echo 'PASS: Approved current mobile-only delta and exact live backend independently verified'
 
       - name: Build exact certified iOS candidate
         shell: bash

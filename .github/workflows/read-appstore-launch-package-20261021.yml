@@ -51,6 +51,13 @@ jobs:
           for loc in locs.get('data',[]):
             a=loc.get('attributes',{})
             print('LOCALIZATION',a.get('locale'),'DESCRIPTION_PRESENT',bool(a.get('description')),'PROMOTIONAL_TEXT_PRESENT',bool(a.get('promotionalText')),'KEYWORDS_PRESENT',bool(a.get('keywords')))
+            expected_markers=[
+              'American Rider is a refined transportation platform connecting Travelers with independent Operators.',
+              'Operators retain 99% of each Travel Fare.',
+              'Booking currently operates in Miami-Dade, Broward and Palm Beach counties in Florida'
+            ]
+            print('APPROVED_DESCRIPTION_CORE_CLAIMS_MATCH',all(m in (a.get('description') or '') for m in expected_markers))
+            print('DESCRIPTION_CHARACTER_COUNT',len(a.get('description') or ''))
             sets=get('/appStoreVersionLocalizations/'+loc['id']+'/appScreenshotSets',{'limit':'50','fields[appScreenshotSets]':'screenshotDisplayType'})
             gallery=[]
             for item in sets.get('data',[]):

@@ -1,0 +1,74 @@
+name: One-time read-only TestFlight crash diagnosis (no build)
+on:
+  push:
+    branches: [ci/one-time-read-testflight-crashes-20261021]
+    paths: ['.github/workflows/one-time-read-testflight-crashes-20261021.yml']
+permissions:
+  contents: read
+jobs:
+  inspect-existing-build-crashes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
+      ASC_KEY_ID: LS74L322NV
+      ASC_ISSUER_ID: 2fa282d5-2b2c-4820-8fe9-6928ac1e8d33
+    steps:
+      - name: Inspect existing TestFlight crash feedback in Apple API; read-only no build
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet PyJWT cryptography
+          python3 - <<'PY'
+          import base64,json,os,time,urllib.request,urllib.parse,urllib.error,re
+          import jwt
+          key_b64=os.environ.get('ASC_API_KEY_BASE64')
+          if not key_b64: raise SystemExit("APP_STORE_CREDENTIAL_UNAVAILABLE")
+          key=base64.b64decode(key_b64)
+          token=jwt.encode({'iss':os.environ['ASC_ISSUER_ID'],'iat':int(time.time()),'exp':int(time.time())+480,'aud':'appstoreconnect-v1'},key,algorithm='ES256',headers={'kid':os.environ['ASC_KEY_ID'],'typ':'JWT'})
+          def read(path,params=None):
+              root='https://api.appstoreconnect.apple.com/v1'
+              url=root+path+('?' + urllib.parse.urlencode(params) if params else '')
+              req=urllib.request.Request(url,headers={'Authorization':'Bearer '+token,'Accept':'application/json'})
+              try:
+                  with urllib.request.urlopen(req,timeout=20) as z:return json.load(z)
+              except urllib.error.HTTPError as e:
+                  print('APPLE_CRASH_API_STATUS',e.code,path.split('?')[0])
+                  return {}
+          app_id='6798078543'
+          builds=read('/builds',{'filter[app]':app_id,'filter[version]':'48','limit':'20','fields[builds]':'version,processingState,uploadedDate'})
+          bid=next((x['id'] for x in builds.get('data',[]) if x.get('attributes',{}).get('version')=='48'),None)
+          print('BUILD_48_FOUND', bool(bid))
+          data=read('/apps/'+app_id+'/betaFeedbackCrashSubmissions',{'limit':'60','sort':'-createdDate','fields[betaFeedbackCrashSubmissions]':'createdDate,deviceModel,osVersion,appUptimeInMilliseconds,buildBundleId,build,crashLog','include':'build','fields[builds]':'version'})
+          matches=[]
+          included={x['id']:x for x in data.get('included',[])}
+          for row in data.get('data',[]):
+              b=row.get('relationships',{}).get('build',{}).get('data')
+              version=included.get((b or {}).get('id'),{}).get('attributes',{}).get('version')
+              if (bid and (b or {}).get('id')==bid) or version=='48':
+                  matches.append(row)
+          print('CRASH_FEEDBACK_TOTAL_RETURNED',len(data.get('data',[])))
+          print('CRASH_FEEDBACK_FOR_BUILD_48',len(matches))
+          for i,row in enumerate(matches[:5]):
+              a=row.get('attributes',{})
+              print('CRASH_RECORD',i+1,json.dumps({k:a.get(k) for k in ['createdDate','deviceModel','osVersion','appUptimeInMilliseconds']}))
+              log=read('/betaFeedbackCrashSubmissions/'+row['id']+'/crashLog',{'fields[betaCrashLogs]':'logText'})
+              logtext=(log.get('data') or {}).get('attributes',{}).get('logText','')
+              if not isinstance(logtext,str):logtext=''
+              # Apple crashlog contains paths and app/private identifiers: print only
+              # the termination reason, exception type, and implicated function names.
+              lines=logtext.splitlines()
+              patterns=r'^(Exception Type:|Exception Subtype:|Termination Reason:|Triggered by Thread:|Last Exception Backtrace:|Application Specific Information:|Exception Codes:)'
+              headers=[x[:240] for x in lines if re.search(patterns,x)][:12]
+              func=[]
+              for ln in lines:
+                  if 'American Rider' in ln or 'americanrider' in ln.lower() or 'hermes' in ln.lower() or 'RCT' in ln or 'expo' in ln.lower():
+                      if re.match(r'^\\s*[0-9]+\\s+',ln):
+                          m=re.search(r'(?:\\+\\s*[0-9]+)$',ln)
+                          if m:ln=ln[:m.start()]
+                          func.append(ln[:205])
+                      if len(func)>=12:break
+              print('CRASH_EXCEPTION_HEADERS',json.dumps(headers,ensure_ascii=False))
+              print('CRASH_FRAMES_REDACTED',json.dumps(func,ensure_ascii=False))
+          print('Read-only complete: no new TestFlight build, no App Store submission, no changed metadata.')
+          PY

@@ -47,10 +47,10 @@ jobs:
           selected=get('/appStoreVersions/'+ver_id+'/build',{'fields[builds]':'version,uploadedDate,processingState'})
           selected_build=selected.get('data',{})
           print('SELECTED_APP_STORE_BUILD',selected_build.get('attributes',{}).get('version'),'PROCESSING',selected_build.get('attributes',{}).get('processingState'))
-          locs=get('/appStoreVersions/'+ver_id+'/appStoreVersionLocalizations',{'limit':'100','fields[appStoreVersionLocalizations]':'locale,description,subtitle,keywords,promotionalText'})
+          locs=get('/appStoreVersions/'+ver_id+'/appStoreVersionLocalizations',{'limit':'100','fields[appStoreVersionLocalizations]':'locale,description,keywords,promotionalText'})
           for loc in locs.get('data',[]):
             a=loc.get('attributes',{})
-            print('LOCALIZATION',a.get('locale'),'DESCRIPTION_PRESENT',bool(a.get('description')),'SUBTITLE_PRESENT',bool(a.get('subtitle')),'KEYWORDS_PRESENT',bool(a.get('keywords')))
+            print('LOCALIZATION',a.get('locale'),'DESCRIPTION_PRESENT',bool(a.get('description')),'PROMOTIONAL_TEXT_PRESENT',bool(a.get('promotionalText')),'KEYWORDS_PRESENT',bool(a.get('keywords')))
             sets=get('/appStoreVersionLocalizations/'+loc['id']+'/appScreenshotSets',{'limit':'50','fields[appScreenshotSets]':'screenshotDisplayType'})
             gallery=[]
             for item in sets.get('data',[]):

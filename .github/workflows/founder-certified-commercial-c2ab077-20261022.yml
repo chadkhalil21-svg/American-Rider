@@ -13,8 +13,8 @@ permissions:
 
 jobs:
   build-submit-certified-ios:
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
+    runs-on: macos-26-intel
+    timeout-minutes: 120
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
@@ -129,21 +129,16 @@ jobs:
           set -euo pipefail
           node scripts/verify-store-cloudrun-api.cjs
 
-      - name: Build exact certified iOS candidate
+      - name: Build certified iOS locally on GitHub macOS without Expo cloud build quota
         shell: bash
         run: |
           set -euo pipefail
-          npx --yes eas-cli@latest build --platform ios --profile production --non-interactive --wait --json > "$RUNNER_TEMP/eas-build.json"
-          node - "$RUNNER_TEMP/eas-build.json" <<'NODE'
-          const fs = require('fs');
-          const p = process.argv[2];
-          const data = JSON.parse(fs.readFileSync(p, 'utf8'));
-          const row = Array.isArray(data) ? data[0] : data;
-          const id = row?.id;
-          if (!id) throw new Error('EAS build completed without a build ID.');
-          fs.appendFileSync(process.env.GITHUB_ENV, 'EAS_BUILD_ID=' + id + '\n');
-          console.log('Exact EAS build ID:', id);
-          NODE
+          xcodebuild -version
+          command -v pod
+          command -v fastlane
+          npx --yes eas-cli@latest build --platform ios --profile production --local --non-interactive --output "$RUNNER_TEMP/american-rider-certified.ipa"
+          test -s "$RUNNER_TEMP/american-rider-certified.ipa" || { echo "::error::Signed iOS archive missing."; exit 1; }
+          echo "PASS: exact Commercial app built and signed locally. Prepared for Apple upload."
 
       - name: Refuse any Commercial change before submission
         shell: bash
@@ -154,9 +149,9 @@ jobs:
           git fetch origin release/current --depth=1
           test "$(git rev-parse FETCH_HEAD)" = "$EXPECTED_TIP" || { echo "::error::Commercial release changed during iOS signing; do not submit stale app."; exit 1; }
 
-      - name: Submit exact build to TestFlight
+      - name: Submit exact signed local iOS archive to TestFlight
         shell: bash
         run: |
           set -euo pipefail
-          test -n "$EAS_BUILD_ID" || { echo "::error::Exact EAS build ID is unavailable."; exit 1; }
-          npx --yes eas-cli@latest submit --platform ios --id "$EAS_BUILD_ID" --profile production --non-interactive --wait --verbose
+          test -s "$RUNNER_TEMP/american-rider-certified.ipa" || { echo "::error::Signed iOS archive missing."; exit 1; }
+          npx --yes eas-cli@latest submit --platform ios --path "$RUNNER_TEMP/american-rider-certified.ipa" --profile production --non-interactive --wait --verbose

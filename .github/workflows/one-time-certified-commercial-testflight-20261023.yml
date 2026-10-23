@@ -63,7 +63,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m pip install --quiet PyJWT cryptography
+          python3 -m venv "$RUNNER_TEMP/asc-python"
+          "$RUNNER_TEMP/asc-python/bin/python" -m pip install --quiet PyJWT cryptography
           KEY_PATH="$RUNNER_TEMP/AuthKey_${ASC_KEY_ID}.p8"
           printf '%s' "$ASC_API_KEY_BASE64" | base64 --decode > "$KEY_PATH"
           grep -q -- '-----BEGIN PRIVATE KEY-----' "$KEY_PATH"
@@ -71,7 +72,7 @@ jobs:
           chmod 600 "$KEY_PATH"
           echo "ASC_API_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
 
-          python3 - "$KEY_PATH" "$ASC_KEY_ID" "$ASC_ISSUER_ID" <<'PY'
+          "$RUNNER_TEMP/asc-python/bin/python" - "$KEY_PATH" "$ASC_KEY_ID" "$ASC_ISSUER_ID" <<'PY'
           import base64, json, sys, time, urllib.parse, urllib.request
           key_path, key_id, issuer_id = sys.argv[1:]
           try:

@@ -1,0 +1,81 @@
+name: Verify American Rider Universal Links prerequisites (read only)
+on:
+  push:
+    branches: [ops/ios-universal-links-audit-20261025]
+    paths: [.github/workflows/audit-universal-links-20261025.yml]
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
+      ASC_KEY_ID: LS74L322NV
+      ASC_ISSUER_ID: 2fa282d5-2b2c-4820-8fe9-6928ac1e8d33
+    steps:
+      - name: Install isolated JWT tooling
+        run: python3 -m pip install --quiet --user PyJWT cryptography
+      - name: Read only Apple ID, signing profile and live AASA audit
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import base64, json, os, time, urllib.parse, urllib.request, urllib.error, sys
+          import jwt
+          APP_ID='com.americanrider.app'
+          EXPECTED='6Z24V6YD4A.'+APP_ID
+          KEY=os.environ.get('ASC_API_KEY_BASE64','')
+          if not KEY: raise SystemExit('PRECHECK: existing App Store Connect secret unavailable in this repository')
+          secret=base64.b64decode(KEY)
+          token=jwt.encode({'iss':os.environ['ASC_ISSUER_ID'],'iat':int(time.time()),'exp':int(time.time())+500,
+            'aud':'appstoreconnect-v1'},secret,algorithm='ES256',
+            headers={'kid':os.environ['ASC_KEY_ID'],'typ':'JWT'})
+          def get(url,apple=False):
+            req=urllib.request.Request(url,headers={
+              'Accept':'application/json',
+              **({'Authorization':'Bearer '+token} if apple else {'User-Agent':'AmericanRiderAssociationPreflight/1.0'})})
+            try:
+              with urllib.request.urlopen(req,timeout=16) as resp:
+                if not apple:
+                  print('AASA status',resp.status,'URL',resp.url,'content-type',resp.headers.get('content-type'))
+                return json.load(resp)
+            except urllib.error.HTTPError as e:
+              print(('APPLE' if apple else 'AASA'),'HTTP',e.code,'for',url.split('?')[0])
+              return None
+            except Exception as e:
+              print(('APPLE' if apple else 'AASA'),'unavailable:',type(e).__name__)
+              return None
+          aasa=get('https://americanrider.tech/.well-known/apple-app-site-association')
+          if isinstance(aasa,dict):
+            details=aasa.get('applinks',{}).get('details',[])
+            associations=[x for d in details for x in (d.get('appIDs',[]) + ([d['appID']] if d.get('appID') else []))]
+            print('AASA matches signed app identifier:',EXPECTED in associations)
+            print('AASA details entries:',len(details))
+          else: print('AASA verified: false; website publish or network verification required')
+          base='https://api.appstoreconnect.apple.com/v1'
+          q=urllib.parse.urlencode({'filter[identifier]':APP_ID,'limit':10})
+          ids=get(base+'/bundleIds?'+q,True)
+          if not isinstance(ids,dict):
+            print('APPLE_DEVELOPER_API: unavailable for this key, requires authorized Developer access')
+            sys.exit(0)
+          entries=[x for x in ids.get('data',[]) if x.get('attributes',{}).get('identifier')==APP_ID]
+          print('Bundle identifier located:',bool(entries))
+          if not entries: sys.exit(0)
+          bid=entries[0]['id']
+          caps=get(base+'/bundleIds/'+bid+'/bundleIdCapabilities?limit=100',True)
+          if isinstance(caps,dict):
+            types=[x.get('attributes',{}).get('capabilityType') for x in caps.get('data',[])]
+            print('Associated Domains enabled at Apple:', 'ASSOCIATED_DOMAINS' in types)
+            print('Apple enabled capability types:',','.join(sorted(str(x) for x in types if x)))
+          else: print('Apple capability state not verified')
+          profiles=get(base+'/bundleIds/'+bid+'/profiles?limit=100',True)
+          if isinstance(profiles,dict):
+            p=profiles.get('data',[])
+            print('Available profiles for this bundle ID:',len(p))
+            for x in p[:12]:
+              attrs=x.get('attributes',{})
+              print('Profile:',attrs.get('profileType'),attrs.get('profileState'),'expires',attrs.get('expirationDate'))
+            print('NOTE: profile listing does not establish embedded Associated Domains entitlement.')
+          else: print('Apple provisioning profiles inaccessible to this API key')
+          print('AUDIT COMPLETE: no Apple capability, certificate, provisioning profile or repository was changed.')
+          PY

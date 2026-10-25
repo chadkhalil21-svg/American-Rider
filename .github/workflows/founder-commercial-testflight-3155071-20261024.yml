@@ -3,7 +3,8 @@ name: Founder-authorized exact current Commercial TestFlight 3155071 (24 Oct 202
 # One-time founder-authorized signed build of CURRENT commercial release using existing LEGACY repository secrets.
 # No secrets copied to the Commercial repository, artifacts or logs.
 # TestFlight only. Public App Store submission requires separate review and approval.
-# Retry after verified Fastlane Xcode build-settings timeout; no new credentials.
+# Retry after Fastlane timeout fix; temporary build-only entitlement compatibility for existing Apple profile.
+# Does not claim native Universal Links verified; full entitlement requires revised Apple/Expo profile.
 # Check out exact current Commercial application; do not copy credentials or deploy backend.
 on:
   push:
@@ -116,7 +117,18 @@ jobs:
           next_build = max(nums, default=0) + 1
           with open("app.json") as fh:
               app = json.load(fh)
-          app.setdefault("expo", {}).setdefault("ios", {})["buildNumber"] = str(next_build)
+          ios_config = app.setdefault("expo", {}).setdefault("ios", {})
+          ios_config["buildNumber"] = str(next_build)
+          # The existing September distribution profile does not authorize the
+          # Associated Domains entitlement. Keep the unmodified certified SHA,
+          # native app code, normal booking/payment, scheme links and manual
+          # referral-code flow. Only omit iOS Universal Links from THIS signed
+          # TestFlight build until Apple + Expo profiles are updated properly.
+          domains = ios_config.get("associatedDomains", [])
+          if domains != ["applinks:americanrider.tech"]:
+              raise SystemExit("Unexpected Associated Domains config: fail closed, do not strip additional entitlements.")
+          ios_config.pop("associatedDomains")
+          print("TESTFLIGHT SIGNING COMPATIBILITY: iOS Universal Links OMITTED in this build because existing Apple profile does not authorize Associated Domains. Manual-code/web invites remain; native universal-link verification is NOT certified.")
           with open("app.json", "w") as fh:
               json.dump(app, fh, indent=2); fh.write("\n")
           with open("eas.json") as fh:

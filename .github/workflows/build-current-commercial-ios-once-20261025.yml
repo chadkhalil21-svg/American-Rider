@@ -159,13 +159,33 @@ jobs:
           pod --version
           fastlane --version
 
+      - name: Omit optional Universal Links entitlement for this TestFlight binary only
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Existing Apple App Store provisioning profile predates the native
+          # Associated Domains capability. Keep the verified Commercial source
+          # pinned; modify only the disposable checkout used for this beta IPA.
+          # Website invitation/referral links remain operational via web + code.
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const assert = require('node:assert/strict');
+          const p = 'app.json';
+          const app = JSON.parse(fs.readFileSync(p, 'utf8'));
+          assert.deepEqual(app.expo.ios.associatedDomains, ['applinks:americanrider.tech']);
+          delete app.expo.ios.associatedDomains;
+          fs.writeFileSync(p, JSON.stringify(app, null, 2) + '\n');
+          console.log('Beta signing profile compatibility: native Universal Links disabled in this build only.');
+          NODE
+          test "$(git rev-parse HEAD)" = "$CERTIFIED_SHA"
+
       - name: Build exact Commercial iOS candidate on Mac without cloud build quota
         shell: bash
         run: |
           set -euo pipefail
           export EAS_BUILD_GIT_COMMIT_HASH="$CERTIFIED_SHA"
           export EXPO_PUBLIC_COMMIT="$CERTIFIED_SHA"
-          npx --yes eas-cli@latest build --platform ios --profile production --local --non-interactive --output "$RUNNER_TEMP/american-rider-commercial.ipa"
+          EXPO_NO_CAPABILITY_SYNC=1 npx --yes eas-cli@latest build --platform ios --profile production --local --non-interactive --output "$RUNNER_TEMP/american-rider-commercial.ipa"
           test -s "$RUNNER_TEMP/american-rider-commercial.ipa"
           echo "IOS_IPA_PATH=$RUNNER_TEMP/american-rider-commercial.ipa" >> "$GITHUB_ENV"
 

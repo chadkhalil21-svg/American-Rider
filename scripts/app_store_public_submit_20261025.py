@@ -38,7 +38,10 @@ def req(method,path,query=None,payload=None):
         try:
             obj=json.loads(exc.read(16000))
             errs=[{"status":x.get("status"),"code":x.get("code"),
-                   "detail":str(x.get("detail",""))[:250]} for x in obj.get("errors",[])][:5]
+                   "detail":str(x.get("detail",""))[:250],
+                   "associatedErrors":{key:[{"code":z.get("code"),"detail":str(z.get("detail",""))[:280]} for z in value[:15]]
+                         for key,value in x.get("meta",{}).get("associatedErrors",{}).items()}}
+                   for x in obj.get("errors",[])][:5]
         except Exception: errs=[]
         fail("APP_STORE_CONNECT_API_REJECTED "+method+" "+path+" HTTP "+str(exc.code)+" "+json.dumps(errs))
 

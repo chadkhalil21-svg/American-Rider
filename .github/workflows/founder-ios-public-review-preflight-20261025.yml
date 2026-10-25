@@ -52,7 +52,7 @@ jobs:
               'processingState':x.get('attributes',{}).get('processingState'),
               'expired':x.get('attributes',{}).get('expired')} for x in builds.get('data',[])]
           print('BUILDS',json.dumps(sorted(bs,key=lambda x:int(x.get('number') or 0),reverse=True)[:10]))
-          versions=get('versions','/appStoreVersions',{'filter[app]':'6798078543','filter[platform]':'IOS','limit':'100',
+          versions=get('versions','/apps/6798078543/appStoreVersions',{'filter[platform]':'IOS','limit':'100',
               'fields[appStoreVersions]':'platform,versionString,appStoreState,appVersionState,releaseType,downloadable'})
           vs=[{'id':x.get('id'),**{k:v for k,v in x.get('attributes',{}).items()}} for x in versions.get('data',[])]
           print('APP_STORE_VERSIONS',json.dumps(vs[:10]))

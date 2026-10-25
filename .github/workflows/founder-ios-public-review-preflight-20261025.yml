@@ -1,0 +1,68 @@
+name: Founder Apple App Store public-review preflight (Build 53)
+# Read-only App Store Connect status. Never print key payload or account identity.
+on:
+  push:
+    branches: [ci/founder-ios-public-review-preflight-20261025]
+    paths: ['.github/workflows/founder-ios-public-review-preflight-20261025.yml']
+permissions:
+  contents: read
+jobs:
+  apple-read-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
+      ASC_KEY_ID: LS74L322NV
+      ASC_ISSUER_ID: 2fa282d5-2b2c-4820-8fe9-6928ac1e8d33
+    steps:
+      - name: Install isolated dependencies
+        run: python3 -m pip install --quiet PyJWT cryptography
+      - name: Verify Apple iOS build 53 and App Review metadata without writes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64, json, os, time, urllib.request, urllib.parse, urllib.error
+          import jwt
+          assert os.environ.get('ASC_API_KEY_BASE64'), 'App Store Connect API secret unavailable'
+          pk=base64.b64decode(os.environ['ASC_API_KEY_BASE64'])
+          token=jwt.encode({'iss':os.environ['ASC_ISSUER_ID'],'iat':int(time.time()),
+              'exp':int(time.time())+600,'aud':'appstoreconnect-v1'},pk,'ES256',
+              headers={'kid':os.environ['ASC_KEY_ID'],'typ':'JWT'})
+          base='https://api.appstoreconnect.apple.com/v1'
+          def get(name,route,query={}):
+              qs=urllib.parse.urlencode(query)
+              req=urllib.request.Request(base+route+('?' + qs if qs else ''),
+                    headers={'Authorization':'Bearer '+token,'Accept':'application/json'})
+              try:
+                  with urllib.request.urlopen(req,timeout=45) as resp:return json.load(resp)
+              except urllib.error.HTTPError as e:
+                  try:
+                      obj=json.loads(e.read(16000))
+                      errors=[{'status':x.get('status'),'code':x.get('code'),'detail':str(x.get('detail',''))[:220]} for x in obj.get('errors',[])][:4]
+                  except Exception: errors=[]
+                  print('APPLE_API_PREFLIGHT_ERROR',name,'http',e.code,json.dumps(errors))
+                  return {'data':[],'errors':errors}
+          app=get('app','/apps/6798078543')
+          a=app.get('data') or {}
+          if isinstance(a,dict):
+              print('APP',json.dumps({'id':a.get('id'),'name':a.get('attributes',{}).get('name'),'bundleId':a.get('attributes',{}).get('bundleId')}))
+          builds=get('builds','/builds',{'filter[app]':'6798078543','filter[preReleaseVersion.version]':'1.0.0','limit':'200','fields[builds]':'version,processingState,expired'})
+          bs=[{'id':x.get('id'),'number':x.get('attributes',{}).get('version'),
+              'processingState':x.get('attributes',{}).get('processingState'),
+              'expired':x.get('attributes',{}).get('expired')} for x in builds.get('data',[])]
+          print('BUILDS',json.dumps(sorted(bs,key=lambda x:int(x.get('number') or 0),reverse=True)[:10]))
+          versions=get('versions','/appStoreVersions',{'filter[app]':'6798078543','filter[platform]':'IOS','limit':'100',
+              'fields[appStoreVersions]':'platform,versionString,appStoreState,appVersionState,releaseType,downloadable'})
+          vs=[{'id':x.get('id'),**{k:v for k,v in x.get('attributes',{}).items()}} for x in versions.get('data',[])]
+          print('APP_STORE_VERSIONS',json.dumps(vs[:10]))
+          for v in vs[:5]:
+              item=get('version_build','/appStoreVersions/'+v['id']+'/build')
+              b=item.get('data')
+              print('VERSION_ATTACHED_BUILD',v['id'],json.dumps({'id':b.get('id'),'number':b.get('attributes',{}).get('version')} if isinstance(b,dict) else None))
+          submissions=get('review_submissions','/apps/6798078543/reviewSubmissions',{'filter[platform]':'IOS','limit':'50'})
+          subs=[{'id':x.get('id'),'state':x.get('attributes',{}).get('state'),
+                  'submittedDate':x.get('attributes',{}).get('submittedDate')} for x in submissions.get('data',[])]
+          print('REVIEW_SUBMISSIONS',json.dumps(subs[:10]))
+          print('PREFLIGHT_READ_ONLY_COMPLETE')
+          PY

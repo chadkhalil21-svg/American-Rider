@@ -1,0 +1,27 @@
+name: Founder verify live legacy About link (read only)
+on:
+  push:
+    branches: [ci/founder-legacy-about-live-20261025]
+    paths: ['.github/workflows/founder-legacy-about-live-20261025.yml']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Verify /about legacy signed app address and /company canonical page
+        shell: bash
+        run: |
+          set -euo pipefail
+          for p in about about/ company/; do
+            dest="$(mktemp)"
+            code="$(curl --retry 2 --retry-all-errors --retry-delay 2 --fail --location --silent --show-error --max-time 35 --output "$dest" --write-out '%{http_code}' "https://americanrider.tech/$p")"
+            test "$code" = "200" || { echo "::error::Live /$p returned $code"; exit 1; }
+            grep -Fqi "American Rider" "$dest" || { echo "::error::No Company content at /$p"; exit 1; }
+            if [ "$p" = "about" ]; then cp "$dest" /tmp/ar-legacy-about.html; fi
+            if [ "$p" = "company/" ]; then cp "$dest" /tmp/ar-company.html; fi
+            echo "PASS: /$p returns 200 and American Rider content"
+          done
+          cmp -s /tmp/ar-legacy-about.html /tmp/ar-company.html || { echo "::error::Old signed About route differs from canonical Company page"; exit 1; }
+          echo "PASS: older signed iOS Build 53 About opens the exact current Company page."

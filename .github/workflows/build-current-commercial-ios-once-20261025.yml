@@ -27,7 +27,7 @@ jobs:
       ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
       ASC_KEY_ID: LS74L322NV
       ASC_ISSUER_ID: 2fa282d5-2b2c-4820-8fe9-6928ac1e8d33
-      CERTIFIED_SHA: 6b3eb0e1f17bfff07076cd10a89820754866af46
+      CERTIFIED_SHA: 1231f67fa1d6170f57aafd2553c9058fbd441226
 
     steps:
       - name: Check out older credential repository marker
@@ -43,7 +43,7 @@ jobs:
           set -euo pipefail
           test -f authority/ops/activation/build-commercial-ios-20261025.approved
           grep -Fxq 'FOUNDER_APPROVED=BUILD_COMMERCIAL_IOS_WITH_LINKS_20261025' authority/ops/activation/build-commercial-ios-20261025.approved
-          grep -Fxq 'CERTIFIED_SHA=6b3eb0e1f17bfff07076cd10a89820754866af46' authority/ops/activation/build-commercial-ios-20261025.approved
+          grep -Fxq 'CERTIFIED_SHA=1231f67fa1d6170f57aafd2553c9058fbd441226' authority/ops/activation/build-commercial-ios-20261025.approved
           test "$(wc -l < authority/ops/activation/build-commercial-ios-20261025.approved)" -eq 2
 
       - name: Check out exact Commercial release, never older application source
@@ -131,6 +131,8 @@ jobs:
           nums = [int(x["attributes"]["version"]) for x in data.get("data", [])
                   if str(x.get("attributes", {}).get("version", "")).isdigit()]
           next_build = max(nums, default=0) + 1
+          if next_build != 56:
+              raise SystemExit(f"Expected Apple build 56, but App Store Connect next unused number is {next_build}; refusing to mislabel or overwrite.")
           with open("app.json") as fh:
               app = json.load(fh)
           app.setdefault("expo", {}).setdefault("ios", {})["buildNumber"] = str(next_build)

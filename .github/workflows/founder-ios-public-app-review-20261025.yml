@@ -2,6 +2,7 @@ name: Founder-submit American Rider Build 53 for public App Store Review
 # Explicit Founder authorization to submit existing processed Build 53 for PUBLIC review.
 # This is not a TestFlight build/rebuild or an automatic App Store approval.
 # Fail closed if Apple metadata, build, or account permissions do not pass.
+# Capture Apple's nested validation errors, without exposing provider credentials.
 on:
   push:
     branches: [ci/founder-ios-public-review-preflight-20261025]

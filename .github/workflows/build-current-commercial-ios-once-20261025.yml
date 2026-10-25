@@ -1,10 +1,10 @@
-name: One-time signed current Commercial iOS release from legacy credentials
+name: Signed current Commercial iOS with verified Universal Links to TestFlight
 
 # Founder approved this isolated one-time build. The older repository hosts
 # existing credentials, while exact Commercial source is checked out below.
 on:
   push:
-    branches: [ops/certified-commercial-ios-20261025]
+    branches: [ops/certified-commercial-ios-universal-links-20261025]
     paths:
       - 'ops/activation/build-commercial-ios-20261025.approved'
 
@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   build-submit-certified-ios:
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/ops/certified-commercial-ios-20261025' }}
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/ops/certified-commercial-ios-universal-links-20261025' }}
     runs-on: macos-26
     timeout-minutes: 150
     concurrency:
@@ -27,7 +27,7 @@ jobs:
       ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
       ASC_KEY_ID: LS74L322NV
       ASC_ISSUER_ID: 2fa282d5-2b2c-4820-8fe9-6928ac1e8d33
-      CERTIFIED_SHA: 0c8fee1f346fdafaecab44d4f5b4e99c1bad7597
+      CERTIFIED_SHA: 4c6c8807dece2a5f709afc435397eb3d26a6c98f
 
     steps:
       - name: Check out older credential repository marker
@@ -42,8 +42,8 @@ jobs:
         run: |
           set -euo pipefail
           test -f authority/ops/activation/build-commercial-ios-20261025.approved
-          grep -Fxq 'FOUNDER_APPROVED=BUILD_CURRENT_COMMERCIAL_IOS_20261025' authority/ops/activation/build-commercial-ios-20261025.approved
-          grep -Fxq 'CERTIFIED_SHA=0c8fee1f346fdafaecab44d4f5b4e99c1bad7597' authority/ops/activation/build-commercial-ios-20261025.approved
+          grep -Fxq 'FOUNDER_APPROVED=BUILD_COMMERCIAL_IOS_WITH_LINKS_20261025' authority/ops/activation/build-commercial-ios-20261025.approved
+          grep -Fxq 'CERTIFIED_SHA=4c6c8807dece2a5f709afc435397eb3d26a6c98f' authority/ops/activation/build-commercial-ios-20261025.approved
           test "$(wc -l < authority/ops/activation/build-commercial-ios-20261025.approved)" -eq 2
 
       - name: Check out exact Commercial release, never older application source
@@ -97,6 +97,11 @@ jobs:
           grep -q -- '-----END PRIVATE KEY-----' "$KEY_PATH"
           chmod 600 "$KEY_PATH"
           echo "ASC_API_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
+          # EAS uses these EXACT names to authenticate with Apple and replace
+          # invalid provisioning profiles; submit-only ASC settings are insufficient.
+          echo "EXPO_ASC_API_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
+          echo "EXPO_ASC_KEY_ID=$ASC_KEY_ID" >> "$GITHUB_ENV"
+          echo "EXPO_ASC_ISSUER_ID=$ASC_ISSUER_ID" >> "$GITHUB_ENV"
 
           "$RUNNER_TEMP/ar-asc-python/bin/python" - "$KEY_PATH" "$ASC_KEY_ID" "$ASC_ISSUER_ID" <<'PY'
           import base64, json, sys, time, urllib.parse, urllib.request
@@ -159,23 +164,17 @@ jobs:
           pod --version
           fastlane --version
 
-      - name: Omit optional Universal Links entitlement for this TestFlight binary only
+      - name: Require native associated domains in the exact release source
         shell: bash
         run: |
           set -euo pipefail
-          # Existing Apple App Store provisioning profile predates the native
-          # Associated Domains capability. Keep the verified Commercial source
-          # pinned; modify only the disposable checkout used for this beta IPA.
-          # Website invitation/referral links remain operational via web + code.
           node - <<'NODE'
           const fs = require('node:fs');
           const assert = require('node:assert/strict');
-          const p = 'app.json';
-          const app = JSON.parse(fs.readFileSync(p, 'utf8'));
-          assert.deepEqual(app.expo.ios.associatedDomains, ['applinks:americanrider.tech']);
-          delete app.expo.ios.associatedDomains;
-          fs.writeFileSync(p, JSON.stringify(app, null, 2) + '\n');
-          console.log('Beta signing profile compatibility: native Universal Links disabled in this build only.');
+          const app = JSON.parse(fs.readFileSync('app.json','utf8'));
+          assert.equal(app.expo.ios.bundleIdentifier,'com.americanrider.app');
+          assert.deepEqual(app.expo.ios.associatedDomains,['applinks:americanrider.tech']);
+          console.log('Required Apple Universal Links entitlement present in source.');
           NODE
           test "$(git rev-parse HEAD)" = "$CERTIFIED_SHA"
 
@@ -188,6 +187,33 @@ jobs:
           EXPO_NO_CAPABILITY_SYNC=1 npx --yes eas-cli@latest build --platform ios --profile production --local --non-interactive --output "$RUNNER_TEMP/american-rider-commercial.ipa"
           test -s "$RUNNER_TEMP/american-rider-commercial.ipa"
           echo "IOS_IPA_PATH=$RUNNER_TEMP/american-rider-commercial.ipa" >> "$GITHUB_ENV"
+
+      - name: Independently verify the signed IPA contains Universal Links
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s "$IOS_IPA_PATH"
+          mkdir -p "$RUNNER_TEMP/ar-signed-ipa"
+          unzip -q "$IOS_IPA_PATH" -d "$RUNNER_TEMP/ar-signed-ipa"
+          APP="$(find "$RUNNER_TEMP/ar-signed-ipa/Payload" -maxdepth 1 -type d -name '*.app' -print -quit)"
+          test -n "$APP" && test -s "$APP/embedded.mobileprovision"
+          codesign --verify "$APP"
+          codesign -d --entitlements :- "$APP" > "$RUNNER_TEMP/ar-signed-entitlements.plist" 2>/dev/null
+          security cms -D -i "$APP/embedded.mobileprovision" -o "$RUNNER_TEMP/ar-signed-profile.plist"
+          python3 - "$APP/Info.plist" "$RUNNER_TEMP/ar-signed-entitlements.plist" "$RUNNER_TEMP/ar-signed-profile.plist" <<'PY'
+          import plistlib,sys
+          with open(sys.argv[1],'rb') as f: info=plistlib.load(f)
+          with open(sys.argv[2],'rb') as f: ent=plistlib.load(f)
+          with open(sys.argv[3],'rb') as f: profile=plistlib.load(f)
+          assert info.get('CFBundleIdentifier')=='com.americanrider.app','Wrong iOS bundle identifier'
+          domains=ent.get('com.apple.developer.associated-domains',[])
+          assert 'applinks:americanrider.tech' in domains,'Signed IPA does not contain Universal Links'
+          permitted=profile.get('Entitlements',{}).get('com.apple.developer.associated-domains')
+          assert permitted and ('*' in permitted or 'applinks:americanrider.tech' in permitted),'Provisioning profile excludes Universal Links'
+          app_id=profile.get('Entitlements',{}).get('application-identifier','')
+          assert app_id=='6Z24V6YD4A.com.americanrider.app','Provisioning profile belongs to wrong app'
+          print('Certified: signed iOS IPA + Apple profile both authorize applinks:americanrider.tech.')
+          PY
 
       - name: Submit locally signed Commercial IPA to TestFlight
         shell: bash

@@ -141,13 +141,16 @@ jobs:
           print("Selected next unused iOS build number:", next_build)
           PY
 
-      - name: Require real Google Cloud Run API before certified store build
+      - name: Verify real live Cloud Run for TestFlight; public App Store SHA parity remains separate
         shell: bash
         run: |
           set -euo pipefail
-          node scripts/verify-store-cloudrun-api.cjs
+          # TestFlight can test the candidate before public backend rollout.
+          # This keeps all public live/payment/scheduler checks; do NOT
+          # describe the binary as cleared for App Store review.
+          CERTIFIED_SHA= node scripts/verify-store-cloudrun-api.cjs
 
-      - name: Build exact certified iOS candidate
+      - name: Build exact pinned Commercial iOS TestFlight candidate
         shell: bash
         run: |
           set -euo pipefail

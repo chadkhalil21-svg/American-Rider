@@ -1,0 +1,31 @@
+name: Founder-submit American Rider Build 53 for public App Store Review
+# Explicit Founder authorization to submit existing processed Build 53 for PUBLIC review.
+# This is not a TestFlight build/rebuild or an automatic App Store approval.
+# Fail closed if Apple metadata, build, or account permissions do not pass.
+on:
+  push:
+    branches: [ci/founder-ios-public-review-preflight-20261025]
+    paths: ['.github/workflows/founder-ios-public-app-review-20261025.yml']
+permissions:
+  contents: read
+concurrency:
+  group: american-rider-apple-public-review-v1-build53
+  cancel-in-progress: false
+jobs:
+  submit-public-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
+      ASC_KEY_ID: LS74L322NV
+      ASC_ISSUER_ID: 2fa282d5-2b2c-4820-8fe9-6928ac1e8d33
+    steps:
+      - name: Check out the one-time Apple review workflow and guarded implementation
+        uses: actions/checkout@v4
+      - name: Install isolated Apple API Python dependencies
+        run: python3 -m pip install --quiet PyJWT cryptography
+      - name: Submit exact verified iOS Build 53 for PUBLIC App Store Review (not TestFlight)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/app_store_public_submit_20261025.py

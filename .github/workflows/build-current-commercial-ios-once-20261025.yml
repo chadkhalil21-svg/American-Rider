@@ -102,6 +102,8 @@ jobs:
           echo "EXPO_ASC_API_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
           echo "EXPO_ASC_KEY_ID=$ASC_KEY_ID" >> "$GITHUB_ENV"
           echo "EXPO_ASC_ISSUER_ID=$ASC_ISSUER_ID" >> "$GITHUB_ENV"
+          # EAS must not request the Apple Team interactively on CI.
+          echo "EXPO_APPLE_TEAM_ID=6Z24V6YD4A" >> "$GITHUB_ENV"
 
           "$RUNNER_TEMP/ar-asc-python/bin/python" - "$KEY_PATH" "$ASC_KEY_ID" "$ASC_ISSUER_ID" <<'PY'
           import base64, json, sys, time, urllib.parse, urllib.request
@@ -184,7 +186,20 @@ jobs:
           set -euo pipefail
           export EAS_BUILD_GIT_COMMIT_HASH="$CERTIFIED_SHA"
           export EXPO_PUBLIC_COMMIT="$CERTIFIED_SHA"
-          EXPO_NO_CAPABILITY_SYNC=1 npx --yes eas-cli@latest build --platform ios --profile production --local --non-interactive --output "$RUNNER_TEMP/american-rider-commercial.ipa"
+          # MapLibre SwiftPM occasionally times out fetching its binary from GitHub.
+          # Retry only the same exact source build, never skip signing verification.
+          for attempt in 1 2 3; do
+            if EXPO_NO_CAPABILITY_SYNC=1 npx --yes eas-cli@latest build --platform ios --profile production --local --non-interactive --output "$RUNNER_TEMP/american-rider-commercial.ipa"; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::iOS build failed after three identical, safe attempts."
+              exit 1
+            fi
+            echo "::warning::iOS build attempt $attempt failed, retrying same certified SHA after transient dependency/network failure."
+            rm -f "$RUNNER_TEMP/american-rider-commercial.ipa"
+            sleep 15
+          done
           test -s "$RUNNER_TEMP/american-rider-commercial.ipa"
           echo "IOS_IPA_PATH=$RUNNER_TEMP/american-rider-commercial.ipa" >> "$GITHUB_ENV"
 

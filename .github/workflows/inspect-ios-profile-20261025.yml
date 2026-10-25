@@ -29,8 +29,9 @@ jobs:
             req=urllib.request.Request('https://api.appstoreconnect.apple.com/v1'+path,
               headers={'Authorization':'Bearer '+token,'Accept':'application/json'})
             with urllib.request.urlopen(req,timeout=25) as response: return json.load(response)
-          ids=get('/bundleIds?'+urllib.parse.urlencode({'filter[identifier]':'com.americanrider.app'}))['data']
-          if len(ids)!=1:raise SystemExit('Expected one American Rider identifier')
+          ids=get('/bundleIds?'+urllib.parse.urlencode({'filter[identifier]':'com.americanrider.app','limit':10}))['data']
+          ids=[x for x in ids if x.get('attributes',{}).get('identifier')=='com.americanrider.app']
+          if len(ids)!=1:raise SystemExit('Expected exactly one American Rider identifier; found '+str(len(ids)))
           bid=ids[0]['id']
           data=get('/bundleIds/'+bid+'/profiles?'+urllib.parse.urlencode({
             'fields[profiles]':'name,profileType,profileState,expirationDate,profileContent','limit':100}))

@@ -1,0 +1,86 @@
+name: Create American Rider Associated Domains distribution profile
+on:
+  push:
+    branches: [ops/ios-universal-links-audit-20261025]
+    paths: [.github/workflows/create-associated-domains-profile-20261025.yml]
+permissions:
+  contents: read
+jobs:
+  profile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
+      ASC_KEY_ID: LS74L322NV
+      ASC_ISSUER_ID: 2fa282d5-2b2c-4820-8fe9-6928ac1e8d33
+    steps:
+      - name: Install authenticated Apple API libraries
+        run: python3 -m pip install --quiet --user PyJWT cryptography
+      - name: Create only an eligible App Store distribution profile
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os,json,time,base64,urllib.parse,urllib.request,urllib.error,subprocess,plistlib
+          import jwt
+          APP='com.americanrider.app'
+          NAME='American Rider Universal Links 20261025'
+          token=jwt.encode({'iss':os.environ['ASC_ISSUER_ID'],'iat':int(time.time()),
+            'exp':int(time.time())+500,'aud':'appstoreconnect-v1'},
+            base64.b64decode(os.environ['ASC_API_KEY_BASE64']),algorithm='ES256',
+            headers={'kid':os.environ['ASC_KEY_ID'],'typ':'JWT'})
+          urlbase='https://api.appstoreconnect.apple.com/v1'
+          def api(path,body=None):
+            method='POST' if body is not None else 'GET'
+            req=urllib.request.Request(urlbase+path,method=method,data=(json.dumps(body).encode() if body is not None else None),
+              headers={'Authorization':'Bearer '+token,'Content-Type':'application/json','Accept':'application/json'})
+            try:
+              with urllib.request.urlopen(req,timeout=30) as r:return json.load(r)
+            except urllib.error.HTTPError as e:
+              try:
+                details=[(v.get('title'),v.get('detail','')[:160]) for v in json.loads(e.read()).get('errors',[])]
+              except Exception:details=[]
+              raise SystemExit('APPLE '+method+' '+path.split('?')[0]+' HTTP '+str(e.code)+' '+str(details))
+          ids=api('/bundleIds?'+urllib.parse.urlencode({'filter[identifier]':APP}))['data']
+          correct=[x for x in ids if x.get('attributes',{}).get('identifier')==APP]
+          if len(correct)!=1:raise SystemExit('No unique registered American Rider app')
+          bid=correct[0]['id']
+          types={x.get('attributes',{}).get('capabilityType') for x in api('/bundleIds/'+bid+'/bundleIdCapabilities')['data']}
+          if 'ASSOCIATED_DOMAINS' not in types:raise SystemExit('STOP: Apple capability absent')
+          profiles=api('/bundleIds/'+bid+'/profiles?'+urllib.parse.urlencode({
+            'fields[profiles]':'name,profileType,profileState,expirationDate,profileContent','limit':100}))['data']
+          def entitlements(b64):
+            try:
+              r=subprocess.run(['openssl','cms','-verify','-noverify','-inform','DER'],
+                input=base64.b64decode(b64),capture_output=True,timeout=8)
+              if r.returncode:return {}
+              return plistlib.loads(r.stdout).get('Entitlements',{})
+            except Exception:return {}
+          for p in profiles:
+            a=p.get('attributes',{})
+            if a.get('profileType')=='IOS_APP_STORE' and a.get('profileState')=='ACTIVE' and
+               entitlements(a.get('profileContent','')).get('com.apple.developer.associated-domains'):
+              print('EXISTING READY App Store profile:',a.get('name'),'valid and contains Associated Domains.')
+              raise SystemExit(0)
+          old=[x for x in profiles if x.get('attributes',{}).get('profileType')=='IOS_APP_STORE']
+          if not old:raise SystemExit('No existing App Store distribution certificate association')
+          prior=sorted(old,key=lambda x:x.get('attributes',{}).get('expirationDate',''),reverse=True)[0]
+          certificates=api('/profiles/'+prior['id']+'/certificates')['data']
+          certs=[x for x in certificates if x.get('attributes',{}).get('certificateType') in ('DISTRIBUTION','IOS_DISTRIBUTION')]
+          if len(certs)!=1:raise SystemExit('Refusing to guess which Apple distribution certificate to reuse')
+          profile={'data':{'type':'profiles',
+            'attributes':{'name':NAME,'profileType':'IOS_APP_STORE'},
+            'relationships':{
+              'bundleId':{'data':{'type':'bundleIds','id':bid}},
+              'certificates':{'data':[{'type':'certificates','id':certs[0]['id']}]}}}}
+          result=api('/profiles',profile)['data']
+          attrs=result.get('attributes',{})
+          ent=entitlements(attrs.get('profileContent',''))
+          if 'applinks:americanrider.tech' not in ent.get('com.apple.developer.associated-domains',[]):
+            raise SystemExit('Apple created profile but domain entitlement not verified; do not sign release')
+          print('VERIFIED: new IOS_APP_STORE profile is ACTIVE:',attrs.get('profileState')=='ACTIVE')
+          print('VERIFIED: new signing profile includes applinks:americanrider.tech')
+          print('Profile expires:',attrs.get('expirationDate'))
+          print('Profile name:',NAME)
+          print('Existing Apple distribution certificate reused; no certificate revoked.')
+          print('NEXT: sync new profile with the EAS build signing credentials before compiling.')
+          PY

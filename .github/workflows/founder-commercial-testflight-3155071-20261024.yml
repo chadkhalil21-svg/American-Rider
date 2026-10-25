@@ -1,10 +1,9 @@
-name: Founder-authorized exact current Commercial TestFlight 3155071 (24 Oct 2026)
+name: Founder-authorized complete Commercial iOS App Store candidate 3155071 (24 Oct 2026)
 
-# One-time founder-authorized signed build of CURRENT commercial release using existing LEGACY repository secrets.
-# No secrets copied to the Commercial repository, artifacts or logs.
-# TestFlight only. Public App Store submission requires separate review and approval.
-# Retry after Fastlane timeout fix; temporary build-only entitlement compatibility for existing Apple profile.
-# Does not claim native Universal Links verified; full entitlement requires revised Apple/Expo profile.
+# Founder-authorized full-feature iOS distribution signing using existing secret-held Apple API key.
+# Repair Apple/Expo Associated Domains provisioning profile; never strip app entitlements.
+# Upload complete IPA to App Store Connect; public App Review submission remains a separate provider action.
+# No signing secrets copied to the Commercial repository, logs, or artifacts.
 # Check out exact current Commercial application; do not copy credentials or deploy backend.
 on:
   push:
@@ -119,16 +118,11 @@ jobs:
               app = json.load(fh)
           ios_config = app.setdefault("expo", {}).setdefault("ios", {})
           ios_config["buildNumber"] = str(next_build)
-          # The existing September distribution profile does not authorize the
-          # Associated Domains entitlement. Keep the unmodified certified SHA,
-          # native app code, normal booking/payment, scheme links and manual
-          # referral-code flow. Only omit iOS Universal Links from THIS signed
-          # TestFlight build until Apple + Expo profiles are updated properly.
+          # This release MUST retain Universal Links. Expo/Apple must provision them properly.
           domains = ios_config.get("associatedDomains", [])
           if domains != ["applinks:americanrider.tech"]:
-              raise SystemExit("Unexpected Associated Domains config: fail closed, do not strip additional entitlements.")
-          ios_config.pop("associatedDomains")
-          print("TESTFLIGHT SIGNING COMPATIBILITY: iOS Universal Links OMITTED in this build because existing Apple profile does not authorize Associated Domains. Manual-code/web invites remain; native universal-link verification is NOT certified.")
+              raise SystemExit("Universal Links entitlement missing or unexpected; refuse incomplete public candidate.")
+          print("PUBLIC CANDIDATE REQUIREMENT: retain applinks:americanrider.tech; require Apple authorized provisioning profile.")
           with open("app.json", "w") as fh:
               json.dump(app, fh, indent=2); fh.write("\n")
           with open("eas.json") as fh:
@@ -178,9 +172,14 @@ jobs:
           echo "PASS: certified iOS tip includes corporate-only changes since deployed backend."
           node scripts/verify-store-cloudrun-api.cjs
 
-      - name: Build certified iOS locally on GitHub macOS without Expo cloud build quota
+      - name: Build full-featured certified iOS with Apple API signing repair
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_ASC_API_KEY_PATH: ${{ env.ASC_API_KEY_PATH }}
+          EXPO_ASC_KEY_ID: ${{ env.ASC_KEY_ID }}
+          EXPO_ASC_ISSUER_ID: ${{ env.ASC_ISSUER_ID }}
+          EXPO_APPLE_TEAM_ID: 6Z24V6YD4A
+          EXPO_APPLE_TEAM_TYPE: INDIVIDUAL
           # Xcode 26.6 reached Fastlane; its 3/6/12/24s settings lookup timed out.
           FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT: "120"
           FASTLANE_XCODEBUILD_SETTINGS_RETRIES: "3"
@@ -194,6 +193,21 @@ jobs:
           test -s "$RUNNER_TEMP/american-rider-certified.ipa" || { echo "::error::Signed iOS archive missing."; exit 1; }
           echo "PASS: exact Commercial app built and signed locally. Prepared for Apple upload."
 
+      - name: Verify signed IPA AND Apple profile both contain Universal Links entitlement
+        shell: bash
+        run: |
+          set -euo pipefail
+          IPA_DIR="$RUNNER_TEMP/ar-full-feature-signed-ipa"
+          mkdir -p "$IPA_DIR"
+          unzip -q "$RUNNER_TEMP/american-rider-certified.ipa" -d "$IPA_DIR"
+          APP="$(find "$IPA_DIR/Payload" -maxdepth 1 -type d -name '*.app' -print -quit)"
+          test -n "$APP" || { echo "::error::Signed iOS app not found in IPA."; exit 1; }
+          codesign -d --entitlements :- "$APP" > "$RUNNER_TEMP/ar-app-entitlements.plist" 2>/dev/null
+          plutil -p "$RUNNER_TEMP/ar-app-entitlements.plist" | grep -Fq "applinks:americanrider.tech" || { echo "::error::Signed app lacks Universal Links entitlement."; exit 1; }
+          security cms -D -i "$APP/embedded.mobileprovision" > "$RUNNER_TEMP/ar-profile.plist"
+          plutil -p "$RUNNER_TEMP/ar-profile.plist" | grep -Fq "applinks:americanrider.tech" || { echo "::error::Apple App Store provisioning profile lacks authorized Associated Domains."; exit 1; }
+          echo "PASS: signed app + provisioned Apple profile BOTH authorize applinks:americanrider.tech."
+
       - name: Refuse release drift during signing
         shell: bash
         env:
@@ -203,7 +217,7 @@ jobs:
           git fetch origin release/current --depth=1
           test "$(git rev-parse FETCH_HEAD)" = "$EXPECTED_TIP" || { echo "::error::Commercial release changed during iOS signing; do not submit stale app."; exit 1; }
 
-      - name: Submit exact signed local iOS archive to TestFlight
+      - name: Upload complete signed release IPA to App Store Connect for public review selection
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         shell: bash

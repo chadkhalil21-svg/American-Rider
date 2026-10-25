@@ -1,0 +1,51 @@
+name: Inspect new American Rider signing profile safely
+on:
+  push:
+    branches: [ops/ios-universal-links-audit-20261025]
+    paths: [.github/workflows/inspect-ios-profile-20261025.yml]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
+      ASC_KEY_ID: LS74L322NV
+      ASC_ISSUER_ID: 2fa282d5-2b2c-4820-8fe9-6928ac1e8d33
+    steps:
+      - run: python3 -m pip install --quiet --user PyJWT cryptography
+      - name: Read only Apple provisioning profile entitlements, never log profile data
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os,base64,urllib.request,urllib.parse,json,time,subprocess,plistlib
+          import jwt
+          token=jwt.encode({'iss':os.environ['ASC_ISSUER_ID'],'iat':int(time.time()),
+            'exp':int(time.time())+450,'aud':'appstoreconnect-v1'},
+            base64.b64decode(os.environ['ASC_API_KEY_BASE64']),
+            algorithm='ES256',headers={'kid':os.environ['ASC_KEY_ID'],'typ':'JWT'})
+          def get(path):
+            req=urllib.request.Request('https://api.appstoreconnect.apple.com/v1'+path,
+              headers={'Authorization':'Bearer '+token,'Accept':'application/json'})
+            with urllib.request.urlopen(req,timeout=25) as response: return json.load(response)
+          ids=get('/bundleIds?'+urllib.parse.urlencode({'filter[identifier]':'com.americanrider.app'}))['data']
+          if len(ids)!=1:raise SystemExit('Expected one American Rider identifier')
+          bid=ids[0]['id']
+          data=get('/bundleIds/'+bid+'/profiles?'+urllib.parse.urlencode({
+            'fields[profiles]':'name,profileType,profileState,expirationDate,profileContent','limit':100}))
+          for p in data['data']:
+            a=p['attributes']
+            if a.get('profileType')!='IOS_APP_STORE':continue
+            decoded=subprocess.run(['openssl','cms','-verify','-noverify','-inform','DER'],
+              input=base64.b64decode(a['profileContent']),capture_output=True,timeout=8)
+            if decoded.returncode:raise SystemExit('Could not decode provisioning profile')
+            plist=plistlib.loads(decoded.stdout)
+            ent=plist.get('Entitlements',{})
+            domains=ent.get('com.apple.developer.associated-domains',None)
+            print('PROFILE',a.get('name'),'STATE',a.get('profileState'),
+              'ASSOCIATED_DOMAINS_KEY',domains is not None,
+              'ASSOCIATED_DOMAINS_VALUE',json.dumps(domains),
+              'EXPECTED_APP_ID',ent.get('application-identifier')=='6Z24V6YD4A.com.americanrider.app')
+          print('Read-only provisioning inspection complete.')
+          PY

@@ -14,8 +14,8 @@ permissions:
 jobs:
   build-submit-certified-ios:
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/ops/certified-commercial-ios-20261025' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
+    runs-on: macos-26
+    timeout-minutes: 150
     concurrency:
       group: one-time-certified-commercial-ios-20261025
       cancel-in-progress: false
@@ -89,7 +89,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m pip install --quiet PyJWT cryptography
+          python3 -m venv "$RUNNER_TEMP/ar-asc-python"
+          "$RUNNER_TEMP/ar-asc-python/bin/python" -m pip install --quiet PyJWT cryptography
           KEY_PATH="$RUNNER_TEMP/AuthKey_${ASC_KEY_ID}.p8"
           printf '%s' "$ASC_API_KEY_BASE64" | base64 --decode > "$KEY_PATH"
           grep -q -- '-----BEGIN PRIVATE KEY-----' "$KEY_PATH"
@@ -97,7 +98,7 @@ jobs:
           chmod 600 "$KEY_PATH"
           echo "ASC_API_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
 
-          python3 - "$KEY_PATH" "$ASC_KEY_ID" "$ASC_ISSUER_ID" <<'PY'
+          "$RUNNER_TEMP/ar-asc-python/bin/python" - "$KEY_PATH" "$ASC_KEY_ID" "$ASC_ISSUER_ID" <<'PY'
           import base64, json, sys, time, urllib.parse, urllib.request
           key_path, key_id, issuer_id = sys.argv[1:]
           try:
@@ -150,25 +151,27 @@ jobs:
           # describe the binary as cleared for App Store review.
           CERTIFIED_SHA= node scripts/verify-store-cloudrun-api.cjs
 
-      - name: Build exact pinned Commercial iOS TestFlight candidate
+      - name: Verify hosted Mac signing prerequisites
         shell: bash
         run: |
           set -euo pipefail
-          npx --yes eas-cli@latest build --platform ios --profile production --non-interactive --wait --json > "$RUNNER_TEMP/eas-build.json"
-          node - "$RUNNER_TEMP/eas-build.json" <<'NODE'
-          const fs = require('fs');
-          const p = process.argv[2];
-          const data = JSON.parse(fs.readFileSync(p, 'utf8'));
-          const row = Array.isArray(data) ? data[0] : data;
-          const id = row?.id;
-          if (!id) throw new Error('EAS build completed without a build ID.');
-          fs.appendFileSync(process.env.GITHUB_ENV, 'EAS_BUILD_ID=' + id + '\n');
-          console.log('Exact EAS build ID:', id);
-          NODE
+          xcodebuild -version
+          pod --version
+          fastlane --version
 
-      - name: Submit exact build to TestFlight
+      - name: Build exact Commercial iOS candidate on Mac without cloud build quota
         shell: bash
         run: |
           set -euo pipefail
-          test -n "$EAS_BUILD_ID" || { echo "::error::Exact EAS build ID is unavailable."; exit 1; }
-          npx --yes eas-cli@latest submit --platform ios --id "$EAS_BUILD_ID" --profile production --non-interactive --wait --verbose
+          export EAS_BUILD_GIT_COMMIT_HASH="$CERTIFIED_SHA"
+          export EXPO_PUBLIC_COMMIT="$CERTIFIED_SHA"
+          npx --yes eas-cli@latest build --platform ios --profile production --local --non-interactive --output "$RUNNER_TEMP/american-rider-commercial.ipa"
+          test -s "$RUNNER_TEMP/american-rider-commercial.ipa"
+          echo "IOS_IPA_PATH=$RUNNER_TEMP/american-rider-commercial.ipa" >> "$GITHUB_ENV"
+
+      - name: Submit locally signed Commercial IPA to TestFlight
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s "$IOS_IPA_PATH" || { echo "::error::Signed IPA missing."; exit 1; }
+          npx --yes eas-cli@latest submit --platform ios --path "$IOS_IPA_PATH" --profile production --non-interactive --wait --verbose

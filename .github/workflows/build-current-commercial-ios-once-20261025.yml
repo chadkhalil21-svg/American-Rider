@@ -4,7 +4,7 @@ name: One-time signed current Commercial iOS release from legacy credentials
 # existing credentials, while exact Commercial source is checked out below.
 on:
   push:
-    branches: [release/current]
+    branches: [ops/certified-commercial-ios-20261025]
     paths:
       - 'ops/activation/build-commercial-ios-20261025.approved'
 
@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   build-submit-certified-ios:
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/release/current' }}
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/ops/certified-commercial-ios-20261025' }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     concurrency:

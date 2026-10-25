@@ -132,10 +132,38 @@ jobs:
           print("Selected next unused iOS build number:", next_build)
           PY
 
-      - name: Verify actual paid Cloud Run production API (read only)
+      - name: Verify unchanged backend and actual paid Cloud Run production API (read only)
         shell: bash
+        env:
+          BACKEND_SHA: 9f58d41596a3d52764a45066756ff72cbf1472f8
+          CERTIFIED_SHA: 9f58d41596a3d52764a45066756ff72cbf1472f8
         run: |
           set -euo pipefail
+          # Exact release/current is 3155071, but its sole parent-change since
+          # the deployed 9f58d41 backend consists of corporate website/docs/tests.
+          # Prove this on actual Git objects. Any app/runtime/backend change fails
+          # closed rather than declaring stale Cloud Run acceptable.
+          git fetch origin "$BACKEND_SHA" --depth=1
+          git cat-file -e "$BACKEND_SHA^{commit}"
+          changed="$(git diff --name-only "$BACKEND_SHA" HEAD)"
+          test -n "$changed" || { echo "::error::Expected corporate-only release delta missing."; exit 1; }
+          while IFS= read -r file; do
+            case "$file" in
+              .github/workflows/live-website-preview-acceptance-20261024.yml|\
+              .github/workflows/live-website-user-audit-20261024.yml|\
+              PROJECT-LEDGER.md|\
+              backend/corporate-website.test.js|\
+              backend/referral-link-recovery-contract.test.js|\
+              docs/audits/2026-10-24-national-website-voice-and-user-journey.md|\
+              scripts/audit-corporate-live-site.cjs|\
+              scripts/build-corporate-website.cjs|\
+              scripts/corporate-heritage-design.cjs|\
+              scripts/corporate-recruiter-portal.cjs|\
+              scripts/test-corporate-website.cjs) ;;
+              *) echo "::error::Runtime drift found in $file; require exact protected backend deployment."; exit 1 ;;
+            esac
+          done <<< "$changed"
+          echo "PASS: certified iOS tip includes corporate-only changes since deployed backend."
           node scripts/verify-store-cloudrun-api.cjs
 
       - name: Build certified iOS locally on GitHub macOS without Expo cloud build quota

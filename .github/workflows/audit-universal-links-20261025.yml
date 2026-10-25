@@ -40,7 +40,7 @@ jobs:
                   print('AASA status',resp.status,'URL',resp.url,'content-type',resp.headers.get('content-type'))
                 return json.load(resp)
             except urllib.error.HTTPError as e:
-              print(('APPLE' if apple else 'AASA'),'HTTP',e.code,'for',url.split('?')[0])
+              print(('APPLE' if apple else 'AASA'),'HTTP',e.code,'for',url.split('?')[0]); print('Apple API errors:',[(x.get('code'),x.get('title'),x.get('detail','')[:180]) for x in json.loads(e.read()).get('errors',[])] if apple else 'not applicable')
               return None
             except Exception as e:
               print(('APPLE' if apple else 'AASA'),'unavailable:',type(e).__name__)
@@ -53,13 +53,15 @@ jobs:
             print('AASA details entries:',len(details))
           else: print('AASA verified: false; website publish or network verification required')
           base='https://api.appstoreconnect.apple.com/v1'
-          q=urllib.parse.urlencode({'filter[identifier]':APP_ID,'limit':10})
+          q=urllib.parse.urlencode({'filter[identifier]':APP_ID,'limit':10,'include':'bundleIdCapabilities','limit[bundleIdCapabilities]':50})
           ids=get(base+'/bundleIds?'+q,True)
           if not isinstance(ids,dict):
             print('APPLE_DEVELOPER_API: unavailable for this key, requires authorized Developer access')
             sys.exit(0)
           entries=[x for x in ids.get('data',[]) if x.get('attributes',{}).get('identifier')==APP_ID]
           print('Bundle identifier located:',bool(entries))
+          included=ids.get('included',[])
+          print('Associated Domains in bundle listing:',any(x.get('attributes',{}).get('capabilityType')=='ASSOCIATED_DOMAINS' for x in included))
           if not entries: sys.exit(0)
           bid=entries[0]['id']
           caps=get(base+'/bundleIds/'+bid+'/bundleIdCapabilities?limit=100',True)
@@ -68,13 +70,23 @@ jobs:
             print('Associated Domains enabled at Apple:', 'ASSOCIATED_DOMAINS' in types)
             print('Apple enabled capability types:',','.join(sorted(str(x) for x in types if x)))
           else: print('Apple capability state not verified')
-          profiles=get(base+'/bundleIds/'+bid+'/profiles?limit=100',True)
+          profiles=get(base+'/bundleIds/'+bid+'/profiles?'+urllib.parse.urlencode({'limit':100,'fields[profiles]':'name,profileType,profileState,expirationDate,profileContent'}),True)
           if isinstance(profiles,dict):
             p=profiles.get('data',[])
             print('Available profiles for this bundle ID:',len(p))
             for x in p[:12]:
               attrs=x.get('attributes',{})
               print('Profile:',attrs.get('profileType'),attrs.get('profileState'),'expires',attrs.get('expirationDate'))
+              if attrs.get('profileType')=='IOS_APP_STORE' and attrs.get('profileState')=='ACTIVE':
+                import subprocess, plistlib
+                try:
+                  blob=base64.b64decode(attrs['profileContent'])
+                  r=subprocess.run(['openssl','cms','-verify','-noverify','-inform','DER'],input=blob,capture_output=True,timeout=5)
+                  p=plistlib.loads(r.stdout) if r.returncode==0 else {}
+                  ent=p.get('Entitlements',{})
+                  print('Active App Store profile has Associated Domains entitlement:',bool(ent.get('com.apple.developer.associated-domains')))
+                except (ValueError,KeyError,OSError,subprocess.TimeoutExpired) as e:
+                  print('Active profile entitlement inspection unavailable:',type(e).__name__)
             print('NOTE: profile listing does not establish embedded Associated Domains entitlement.')
           else: print('Apple provisioning profiles inaccessible to this API key')
           print('AUDIT COMPLETE: no Apple capability, certificate, provisioning profile or repository was changed.')

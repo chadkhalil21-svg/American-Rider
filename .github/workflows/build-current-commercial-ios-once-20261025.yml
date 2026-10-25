@@ -27,7 +27,7 @@ jobs:
       ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
       ASC_KEY_ID: LS74L322NV
       ASC_ISSUER_ID: 2fa282d5-2b2c-4820-8fe9-6928ac1e8d33
-      CERTIFIED_SHA: 4c6c8807dece2a5f709afc435397eb3d26a6c98f
+      CERTIFIED_SHA: 6b3eb0e1f17bfff07076cd10a89820754866af46
 
     steps:
       - name: Check out older credential repository marker
@@ -43,7 +43,7 @@ jobs:
           set -euo pipefail
           test -f authority/ops/activation/build-commercial-ios-20261025.approved
           grep -Fxq 'FOUNDER_APPROVED=BUILD_COMMERCIAL_IOS_WITH_LINKS_20261025' authority/ops/activation/build-commercial-ios-20261025.approved
-          grep -Fxq 'CERTIFIED_SHA=4c6c8807dece2a5f709afc435397eb3d26a6c98f' authority/ops/activation/build-commercial-ios-20261025.approved
+          grep -Fxq 'CERTIFIED_SHA=6b3eb0e1f17bfff07076cd10a89820754866af46' authority/ops/activation/build-commercial-ios-20261025.approved
           test "$(wc -l < authority/ops/activation/build-commercial-ios-20261025.approved)" -eq 2
 
       - name: Check out exact Commercial release, never older application source

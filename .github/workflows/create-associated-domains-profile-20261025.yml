@@ -57,8 +57,8 @@ jobs:
             except Exception:return {}
           for p in profiles:
             a=p.get('attributes',{})
-            if a.get('profileType')=='IOS_APP_STORE' and a.get('profileState')=='ACTIVE' and
-               entitlements(a.get('profileContent','')).get('com.apple.developer.associated-domains'):
+            if (a.get('profileType')=='IOS_APP_STORE' and a.get('profileState')=='ACTIVE' and
+                entitlements(a.get('profileContent','')).get('com.apple.developer.associated-domains')):
               print('EXISTING READY App Store profile:',a.get('name'),'valid and contains Associated Domains.')
               raise SystemExit(0)
           old=[x for x in profiles if x.get('attributes',{}).get('profileType')=='IOS_APP_STORE']

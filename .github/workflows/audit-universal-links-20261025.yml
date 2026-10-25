@@ -64,7 +64,7 @@ jobs:
           print('Associated Domains in bundle listing:',any(x.get('attributes',{}).get('capabilityType')=='ASSOCIATED_DOMAINS' for x in included))
           if not entries: sys.exit(0)
           bid=entries[0]['id']
-          caps=get(base+'/bundleIds/'+bid+'/bundleIdCapabilities?limit=100',True)
+          caps=get(base+'/bundleIds/'+bid+'/bundleIdCapabilities',True)
           if isinstance(caps,dict):
             types=[x.get('attributes',{}).get('capabilityType') for x in caps.get('data',[])]
             print('Associated Domains enabled at Apple:', 'ASSOCIATED_DOMAINS' in types)

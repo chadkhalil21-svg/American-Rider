@@ -19,17 +19,17 @@ jobs:
       CI: "1"
       EXPO_PUBLIC_API_URL: https://american-rider-api-production-623854974930.us-east1.run.app
     steps:
-      - name: Read exact cross-platform test candidate PR 349
+      - name: Read exact merged cross-platform production release
         uses: actions/checkout@v4
         with:
           repository: chadkhalil21-svg/American-Rider-Commercial
-          ref: f62c8e1bbe376cb6a6cbdbe51c7d34f2b60241d0
+          ref: 3bb0cd75df19d98c46e9e5ad845e27f1c5d4fc23
           persist-credentials: false
-      - name: Verify exact unmerged candidate and iOS identity
+      - name: Verify exact merged production release and iOS identity
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = f62c8e1bbe376cb6a6cbdbe51c7d34f2b60241d0
+          test "$(git rev-parse HEAD)" = 3bb0cd75df19d98c46e9e5ad845e27f1c5d4fc23
           node - <<'NODE'
           const fs=require('fs');
           const a=JSON.parse(fs.readFileSync('app.json','utf8')).expo;

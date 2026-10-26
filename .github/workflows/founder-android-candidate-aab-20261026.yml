@@ -1,0 +1,78 @@
+name: Build corrected American Rider signed Android AAB candidate
+
+on:
+  push:
+    branches:
+      - release/one-time-android-aab-20261025
+    paths:
+      - .github/workflows/founder-android-candidate-aab-20261026.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: american-rider-android-candidate-eas-20261026
+  cancel-in-progress: false
+
+jobs:
+  build-signed-aab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      CANDIDATE_SHA: f62c8e1bbe376cb6a6cbdbe51c7d34f2b60241d0
+      LIVE_BACKEND_SHA: 4c3e056cc1335413fc6dc3cfe61183f1c8e43193
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - name: Check out exact Android correction without merging or deploying
+        uses: actions/checkout@v4
+        with:
+          repository: chadkhalil21-svg/American-Rider-Commercial
+          ref: f62c8e1bbe376cb6a6cbdbe51c7d34f2b60241d0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify candidate contains only scoped Android build resource fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
+          git fetch origin "$LIVE_BACKEND_SHA" --depth=1
+          test "$(git diff --name-only "$LIVE_BACKEND_SHA" "$CANDIDATE_SHA" | sort)" = "$(printf 'app.config.js\nplugins/with-android-photo-permission-default.js')" || { echo "::error::Source differs beyond Android localization correction."; exit 1; }
+          node - <<'NODE'
+          const fs=require('fs');
+          const a=JSON.parse(fs.readFileSync('app.json','utf8')).expo;
+          const e=JSON.parse(fs.readFileSync('eas.json','utf8'));
+          if(a.android?.package!=='com.americanrider.app'||a.ios?.bundleIdentifier!=='com.americanrider.app')
+            throw Error('Unexpected native application identity');
+          if(a.ios?.usesAppleSignIn!==true)throw Error('Apple sign-in capability changed');
+          if(e.build?.production?.env?.EXPO_PUBLIC_API_URL!=='https://american-rider-api-production-623854974930.us-east1.run.app')
+            throw Error('Unexpected production API');
+          if(e.build?.production?.android?.buildType==='apk')throw Error('Production must build Play App Bundle');
+          console.log('Exactly two Android localization files changed; iOS and production source unchanged.');
+          NODE
+      - name: Install tests without lifecycle scripts
+        run: |
+          npm ci --ignore-scripts
+          npm ci --prefix backend --ignore-scripts
+      - name: Run synthetic tests against exact candidate
+        run: node scripts/prelaunch-synthetic-acceptance.cjs
+      - name: Verify unchanged backend still live, ready and payment-capable
+        shell: bash
+        run: |
+          set -euo pipefail
+          CERTIFIED_SHA="$LIVE_BACKEND_SHA" node scripts/verify-store-cloudrun-api.cjs
+      - name: Produce signed Android AAB candidate using existing protected Expo keystore
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$EXPO_TOKEN" || { echo "::error::Expo secret unavailable in build repository."; exit 1; }
+          echo "Candidate is UNMERGED and NOT submitted to Play. Expo cloud build logs show candidate test outcome."
+          npx --yes eas-cli@latest build --platform android --profile production --non-interactive --wait
+          {
+            echo '## Candidate Android AAB'
+            echo 'Source: `f62c8e1bbe376cb6a6cbdbe51c7d34f2b60241d0` (PR #349, unmerged)'
+            echo 'Unchanged production backend: `4c3e056cc1335413fc6dc3cfe61183f1c8e43193`'
+            echo 'Built via verified Expo credentials; **no Google Play upload performed**.'
+          } >> "$GITHUB_STEP_SUMMARY"

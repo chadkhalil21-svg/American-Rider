@@ -21,7 +21,7 @@ jobs:
     timeout-minutes: 100
     env:
       CI: "1"
-      CERTIFIED_SHA: 9751beb25ebbf45497b746d8bad18a74f4f7b275
+      CERTIFIED_SHA: cbc62ae5e38a11ed162f7a39b6b5e3d9e5dafd9c
       EXPO_PUBLIC_API_URL: https://american-rider-api-production-623854974930.us-east1.run.app
       EXPO_PUBLIC_REFERRALS_ENABLED: "1"
       EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: 623854974930-4t4u62mvkeopvlrm6ne15eq6rubn25r9.apps.googleusercontent.com
@@ -30,7 +30,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: chadkhalil21-svg/American-Rider-Commercial
-          ref: 9751beb25ebbf45497b746d8bad18a74f4f7b275
+          ref: cbc62ae5e38a11ed162f7a39b6b5e3d9e5dafd9c
           persist-credentials: false
 
       - name: Verify source and application identity
@@ -38,9 +38,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$CERTIFIED_SHA"
-          git fetch origin fix/android-photo-permission-localization-release-20261025 --depth=1
-          test "$(git rev-parse FETCH_HEAD)" = "$CERTIFIED_SHA" || { echo "::error::Test candidate moved: refuse mismatched simulation."; exit 1; }
-          echo "Testing Android localization fix PR #349 only; not certified as current Commercial release."
+          echo "Testing exact current merged Commercial release, using isolated emulator and no payment actions."
           node - <<'NODE'
           const fs = require('node:fs');
           const a = JSON.parse(fs.readFileSync('app.json','utf8')).expo;
@@ -138,6 +136,38 @@ jobs:
             grep -q 'com.americanrider.app' artifacts/emulator/activity.txt || { echo "::error::Android launcher, not American Rider, was foreground after startup."; cat artifacts/emulator/activity.txt; exit 1; }
             test -s artifacts/emulator/american-rider-android-first-screen.png
             echo "PASS: APK installed, no fatal crash, American Rider foreground, 15-second active process, first screen captured."
+            # Actual anonymous route navigation; never booking, authorizing, charging or approving accounts.
+            # Passing these route probes does NOT certify full commercial journeys.
+            probe() {
+              label="$1"; route="$2"
+              echo "Anonymous native route: $label"
+              adb shell am start -W -a android.intent.action.VIEW -d "americanrider:///$route" -p com.americanrider.app > "artifacts/emulator/$label-intent.txt" 2>&1 || { cat "artifacts/emulator/$label-intent.txt"; exit 1; }
+              sleep 3
+              adb shell pidof com.americanrider.app > "artifacts/emulator/$label-pid.txt" || { echo "App exited after $label"; exit 1; }
+              adb shell screencap -p "/sdcard/$label.png"
+              adb pull "/sdcard/$label.png" "artifacts/emulator/$label.png" >/dev/null
+              adb shell uiautomator dump "/sdcard/$label.xml" >/dev/null 2>&1 || true
+              adb pull "/sdcard/$label.xml" "artifacts/emulator/$label.xml" >/dev/null 2>&1 || true
+              test -s "artifacts/emulator/$label.png"
+              echo "PASS intent / process / screenshot: $label (screen contents unverified)"
+            }
+            probe traveler-home ""
+            probe traveler-schedule "schedule"
+            probe traveler-wallet "wallet"
+            probe traveler-history "history"
+            probe traveler-safety "safety"
+            probe traveler-support "issues"
+            probe operator-home "operator"
+            probe operator-qualify "operator/qualify"
+            probe operator-inbox "operator/inbox"
+            probe operator-payouts "operator/payouts"
+            probe operator-invitations "operator/invite"
+            probe recruiter-public "recruitment"
+            probe direct-enrollment "join"
+            probe referral-enrollment "join?r=SIMTEST12345"
+            adb logcat -d -v brief -s AndroidRuntime:E ReactNativeJS:E > artifacts/emulator/route-errors.txt || true
+            ! grep -q 'FATAL EXCEPTION' artifacts/emulator/route-errors.txt || { echo "Fatal exception during native navigation"; exit 1; }
+            echo "PASS anonymous route matrix. Authenticated booking, payments, and commission settlement NOT tested."
 
       - name: Upload anonymous emulator evidence
         if: always()

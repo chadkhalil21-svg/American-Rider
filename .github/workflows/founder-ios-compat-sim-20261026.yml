@@ -13,8 +13,8 @@ permissions:
 
 jobs:
   ios-simulator:
-    runs-on: macos-15
-    timeout-minutes: 90
+    runs-on: macos-26
+    timeout-minutes: 110
     env:
       CI: "1"
       EXPO_PUBLIC_API_URL: https://american-rider-api-production-623854974930.us-east1.run.app

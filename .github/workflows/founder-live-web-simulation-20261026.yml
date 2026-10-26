@@ -51,6 +51,11 @@ jobs:
             for(const [device,w,h] of [['phone',390,844],['tablet',1024,768],['desktop',1440,900]]){
               const page=await browser.newPage({viewport:{width:w,height:h}});
               await page.goto('https://americanrider.tech/founder/',{waitUntil:'domcontentloaded',timeout:30000});
+              const pageHtml=await page.content();
+              if(!pageHtml.includes('accounts.google.com/gsi/client')||!pageHtml.includes('signInWithCredential'))
+                issues.push(device+' published Founder page does not contain the new direct Google sign-in');
+              if(!pageHtml.includes('founder-google-alternate'))
+                issues.push(device+' Founder alternate Google method missing');
               await page.screenshot({path:'site-audit-images/founder-'+device+'.png',fullPage:true});
               if(!await page.locator('#founder-google').isVisible())issues.push(device+' founder Google control missing');
               if(await page.locator('#founder-workspace').isVisible())issues.push(device+' PRIVATE founder metrics visible before sign-in');

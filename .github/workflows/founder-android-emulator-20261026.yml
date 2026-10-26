@@ -111,7 +111,7 @@ jobs:
           emulator-options: -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect
           disable-animations: true
           script: |
-            set -euo pipefail
+            set -eu
             mkdir -p artifacts/emulator
             adb install -r android/app/build/outputs/apk/release/app-release.apk
             adb shell pm list packages | grep -q 'package:com.americanrider.app'

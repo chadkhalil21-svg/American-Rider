@@ -1,0 +1,128 @@
+name: Run American Rider on a simulated Android phone
+
+on:
+  push:
+    branches:
+      - release/one-time-android-aab-20261025
+    paths:
+      - .github/workflows/founder-android-emulator-20261026.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: american-rider-android-emulator-20261026
+  cancel-in-progress: false
+
+jobs:
+  android-pixel-emulator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 100
+    env:
+      CI: "1"
+      CERTIFIED_SHA: 4c3e056cc1335413fc6dc3cfe61183f1c8e43193
+      EXPO_PUBLIC_API_URL: https://american-rider-api-production-623854974930.us-east1.run.app
+      EXPO_PUBLIC_REFERRALS_ENABLED: "1"
+      EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: 623854974930-4t4u62mvkeopvlrm6ne15eq6rubn25r9.apps.googleusercontent.com
+    steps:
+      - name: Check out current Commercial application
+        uses: actions/checkout@v4
+        with:
+          repository: chadkhalil21-svg/American-Rider-Commercial
+          ref: 4c3e056cc1335413fc6dc3cfe61183f1c8e43193
+          persist-credentials: false
+
+      - name: Verify source and application identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$CERTIFIED_SHA"
+          git fetch origin release/current --depth=1
+          test "$(git rev-parse FETCH_HEAD)" = "$CERTIFIED_SHA" || { echo "::error::Commercial release moved, simulator proof cannot be called current."; exit 1; }
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const a = JSON.parse(fs.readFileSync('app.json','utf8')).expo;
+          const e = JSON.parse(fs.readFileSync('eas.json','utf8'));
+          if(a.android?.package!=='com.americanrider.app')throw Error('Incorrect Android package');
+          if(e.build?.production?.env?.EXPO_PUBLIC_API_URL!==process.env.EXPO_PUBLIC_API_URL)throw Error('Incorrect production API');
+          console.log('Pinned Commercial source and Android configuration confirmed');
+          NODE
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install Android SDK tools
+        uses: android-actions/setup-android@v3
+
+      - name: Enable Android emulator acceleration
+        shell: bash
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Install application dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts
+
+      - name: Generate isolated native Android application
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx expo prebuild --platform android --clean --non-interactive
+          test -f android/gradlew
+
+      - name: Build standalone APK for the emulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd android
+          chmod +x gradlew
+          ./gradlew --no-daemon --max-workers=2 --console=plain :app:assembleRelease
+          test -f app/build/outputs/apk/release/app-release.apk
+
+      - name: Boot Pixel and test installed American Rider application
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect
+          disable-animations: true
+          script: |
+            set -euo pipefail
+            mkdir -p artifacts/emulator
+            adb install -r android/app/build/outputs/apk/release/app-release.apk
+            adb shell pm list packages | grep -q 'package:com.americanrider.app'
+            adb logcat -c
+            adb shell am start -W -n com.americanrider.app/.MainActivity
+            sleep 15
+            adb shell pidof com.americanrider.app > artifacts/emulator/app-pid.txt
+            adb shell screencap -p /sdcard/ar-home.png
+            adb pull /sdcard/ar-home.png artifacts/emulator/american-rider-android-first-screen.png
+            adb shell uiautomator dump /sdcard/ar-ui.xml || true
+            adb pull /sdcard/ar-ui.xml artifacts/emulator/ui.xml || true
+            adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity|mCurrentFocus' | head -10 > artifacts/emulator/activity.txt || true
+            test -s artifacts/emulator/american-rider-android-first-screen.png
+            echo "PASS: release APK installed, Android app launched and remained running, first-screen screenshot captured."
+
+      - name: Upload anonymous emulator evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: american-rider-android-emulator-evidence
+          path: artifacts/emulator/
+          if-no-files-found: warn
+          retention-days: 14

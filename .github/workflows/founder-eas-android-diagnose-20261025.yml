@@ -18,6 +18,13 @@ jobs:
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
     steps:
+      - name: Check out verified Expo project configuration
+        uses: actions/checkout@v4
+        with:
+          repository: chadkhalil21-svg/American-Rider-Commercial
+          ref: 4c3e056cc1335413fc6dc3cfe61183f1c8e43193
+          persist-credentials: false
+
       - name: Inspect failed EAS Android build (no write or new build)
         shell: bash
         run: |

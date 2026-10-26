@@ -60,8 +60,14 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Install Android SDK tools
-        uses: android-actions/setup-android@v3
+      - name: Use GitHub-hosted Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}" || { echo "::error::GitHub Android SDK missing."; exit 1; }
+          command -v adb
+          command -v sdkmanager
+          sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "platform-tools"
 
       - name: Enable Android emulator acceleration
         shell: bash

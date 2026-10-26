@@ -1,0 +1,87 @@
+name: One-time Android AAB from current Commercial release
+
+on:
+  push:
+    branches:
+      - release/current
+    paths:
+      - .github/workflows/founder-android-once-20261025.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: founder-android-aab-20261025
+  cancel-in-progress: false
+
+jobs:
+  android-aab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      CERTIFIED_SHA: 4c3e056cc1335413fc6dc3cfe61183f1c8e43193
+    steps:
+      - name: Check out exact Commercial source without copying credentials
+        uses: actions/checkout@v4
+        with:
+          repository: chadkhalil21-svg/American-Rider-Commercial
+          ref: 4c3e056cc1335413fc6dc3cfe61183f1c8e43193
+          persist-credentials: false
+
+      - name: Verify exact current Commercial release
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$CERTIFIED_SHA" || { echo "::error::Commercial source SHA mismatch."; exit 1; }
+          git fetch origin release/current --depth=1
+          test "$(git rev-parse FETCH_HEAD)" = "$CERTIFIED_SHA" || { echo "::error::Commercial release/current moved. Re-certify the latest source before building."; exit 1; }
+          node - <<'NODE'
+          const fs = require('fs');
+          const a = JSON.parse(fs.readFileSync('app.json','utf8')).expo;
+          const e = JSON.parse(fs.readFileSync('eas.json','utf8'));
+          if (a.owner !== 'american-rider' || a.extra?.eas?.projectId !== '00931e42-3ff9-4eca-88d0-04d677953bbb')
+            throw Error('Unexpected Expo project identity.');
+          if (a.android?.package !== 'com.americanrider.app') throw Error('Unexpected Android app package.');
+          if (e.build?.production?.env?.EXPO_PUBLIC_API_URL !== 'https://american-rider-api-production-623854974930.us-east1.run.app')
+            throw Error('Production API target mismatch.');
+          if (e.build?.production?.distribution === 'internal' || e.build?.production?.android?.buildType === 'apk')
+            throw Error('Production must build an Android App Bundle.');
+          console.log('Commercial source, Android package, Expo project and production API checked.');
+          NODE
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts
+
+      - name: Run existing isolated synthetic release checks
+        run: node scripts/prelaunch-synthetic-acceptance.cjs
+
+      - name: Verify paid production API and exact source parity
+        run: node scripts/verify-store-cloudrun-api.cjs
+
+      - name: Build signed production Android App Bundle
+        shell: bash
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$EXPO_TOKEN" || { echo "::error::The legacy builder has no EXPO_TOKEN configured."; exit 1; }
+          npx --yes eas-cli@latest build --platform android --profile production --non-interactive --wait --json > "$RUNNER_TEMP/android-aab-build.json"
+          node - "$RUNNER_TEMP/android-aab-build.json" <<'NODE'
+          const fs = require('fs');
+          const d = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          const b = Array.isArray(d) ? d[0] : d;
+          if (!b?.id || String(b.platform).toLowerCase() !== 'android' || String(b.status).toLowerCase() !== 'finished')
+            throw Error('EAS did not confirm a finished Android build.');
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,
+            '## Signed Android AAB built\n\n' +
+            'Commercial SHA: ' + process.env.CERTIFIED_SHA + '\n\n' +
+            'EAS build ID: ' + b.id + '\n\n' +
+            'Google Play not uploaded. Store registration, device checks and approval remain separate.\n');
+          console.log('Signed Android production App Bundle completed. EAS build ID: ' + b.id);
+          NODE

@@ -1,0 +1,43 @@
+name: Diagnose failed Android EAS cloud build
+
+on:
+  push:
+    branches:
+      - release/one-time-android-aab-20261025
+    paths:
+      - .github/workflows/founder-eas-android-diagnose-20261025.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - name: Inspect failed EAS Android build (no write or new build)
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$EXPO_TOKEN" || { echo "::error::Existing Expo token unavailable."; exit 1; }
+          npx --yes eas-cli@latest build:view 63316362-db49-4eb6-9512-1f6e718dc6d9 --json > "$RUNNER_TEMP/expo-build.json"
+          node - "$RUNNER_TEMP/expo-build.json" <<'NODE'
+          const fs = require('fs');
+          const b = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          const safe = {
+            id: b.id, platform: b.platform, status: b.status,
+            error: b.error && {
+              errorCode: b.error.errorCode,
+              message: b.error.message,
+              docsUrl: b.error.docsUrl,
+            },
+            buildProfile: b.buildProfile,
+            releaseChannel: b.releaseChannel,
+          };
+          const msg = JSON.stringify(safe,null,2);
+          console.log(msg);
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,'### Failed Android cloud build details\n\n```json\n' + msg + '\n```\n');
+          NODE

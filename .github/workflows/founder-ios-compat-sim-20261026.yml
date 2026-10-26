@@ -23,13 +23,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: chadkhalil21-svg/American-Rider-Commercial
-          ref: 3bb0cd75df19d98c46e9e5ad845e27f1c5d4fc23
+          ref: cbc62ae5e38a11ed162f7a39b6b5e3d9e5dafd9c
           persist-credentials: false
       - name: Verify exact merged production release and iOS identity
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = 3bb0cd75df19d98c46e9e5ad845e27f1c5d4fc23
+          test "$(git rev-parse HEAD)" = cbc62ae5e38a11ed162f7a39b6b5e3d9e5dafd9c
           node - <<'NODE'
           const fs=require('fs');
           const a=JSON.parse(fs.readFileSync('app.json','utf8')).expo;
@@ -122,6 +122,33 @@ jobs:
           xcrun simctl spawn "$SIM_DEVICE" launchctl list | grep -q 'com.americanrider.app' || true
           test -s artifacts/ios/american-rider-ios-first-screen.png
           echo "PASS candidate installed and iPhone simulator screenshot created" >> "$GITHUB_STEP_SUMMARY"
+          # Native iPhone route navigation only. No test accounts, production writes, or fake payouts.
+          probe() {
+            label="$1"; route="$2"
+            echo "Anonymous iPhone route: $label"
+            xcrun simctl openurl "$SIM_DEVICE" "americanrider:///$route" || {
+              echo "::error::iPhone could not open route: $label"; exit 1;
+            }
+            sleep 3
+            xcrun simctl io "$SIM_DEVICE" screenshot "artifacts/ios/$label.png"
+            test -s "artifacts/ios/$label.png"
+            echo "PASS iPhone route opening and screenshot: $label (screen contents unverified)"
+          }
+          probe traveler-home ""
+          probe traveler-schedule "schedule"
+          probe traveler-wallet "wallet"
+          probe traveler-history "history"
+          probe traveler-safety "safety"
+          probe traveler-support "issues"
+          probe operator-home "operator"
+          probe operator-qualify "operator/qualify"
+          probe operator-inbox "operator/inbox"
+          probe operator-payouts "operator/payouts"
+          probe operator-invitations "operator/invite"
+          probe recruiter-public "recruitment"
+          probe direct-enrollment "join"
+          probe referral-enrollment "join?r=SIMTEST12345"
+          echo "Anonymous iPhone native route matrix completed; authenticated commercial acceptance and bank payouts remain unverified." >> "$GITHUB_STEP_SUMMARY"
       - name: Upload simulated iPhone screenshot
         if: always()
         uses: actions/upload-artifact@v4

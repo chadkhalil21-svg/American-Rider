@@ -1,0 +1,54 @@
+name: Verify Twilio Android startup autolinking guard
+
+on:
+  push:
+    branches:
+      - release/one-time-android-aab-20261025
+    paths:
+      - .github/workflows/founder-twilio-android-autolink-20261026.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-autolinking:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - name: Checkout exact Android crash correction
+        uses: actions/checkout@v4
+        with:
+          repository: chadkhalil21-svg/American-Rider-Commercial
+          ref: 9751beb25ebbf45497b746d8bad18a74f4f7b275
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts
+      - name: Verify real Expo autolinking respects disabled Android Voice
+        shell: bash
+        run: |
+          set -euo pipefail
+          node backend/native-voice-release-autolink.test.js
+          env -u EXPO_PUBLIC_NATIVE_VOICE_ENABLED npx --no-install expo-modules-autolinking react-native-config --platform android > /tmp/ar-autolink-disabled.json
+          node - <<'NODE'
+          const fs=require('node:fs');
+          const cfg=JSON.parse(fs.readFileSync('/tmp/ar-autolink-disabled.json','utf8'));
+          const dep=cfg.dependencies?.['@twilio/voice-react-native-sdk'];
+          if(dep?.platforms?.android) throw Error('UNSAFE: Android Twilio is still autolinked when Native Voice is disabled');
+          console.log('PASS: Expo Android autolinking excludes unconfigured native Twilio');
+          NODE
+      - name: Verify optional provisioned Android Voice remains linkable
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXPO_PUBLIC_NATIVE_VOICE_ENABLED=true npx --no-install expo-modules-autolinking react-native-config --platform android > /tmp/ar-autolink-enabled.json
+          node - <<'NODE'
+          const fs=require('node:fs');
+          const cfg=JSON.parse(fs.readFileSync('/tmp/ar-autolink-enabled.json','utf8'));
+          const dep=cfg.dependencies?.['@twilio/voice-react-native-sdk'];
+          if(!dep?.platforms?.android)throw Error('Twilio must remain linkable with explicitly provisioned Native Voice');
+          console.log('PASS: optional provisioned Android Voice remains linkable');
+          NODE

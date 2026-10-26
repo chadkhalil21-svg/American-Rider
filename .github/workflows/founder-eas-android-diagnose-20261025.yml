@@ -25,26 +25,24 @@ jobs:
           ref: 4c3e056cc1335413fc6dc3cfe61183f1c8e43193
           persist-credentials: false
 
-      - name: Inspect failed EAS Android build (no write or new build)
+      - name: Install project dependencies for authenticated Expo CLI
+        shell: bash
+        run: npm ci --ignore-scripts
+
+      - name: Read existing EAS Android build results (no new build)
         shell: bash
         run: |
           set -euo pipefail
           test -n "$EXPO_TOKEN" || { echo "::error::Existing Expo token unavailable."; exit 1; }
-          npx --yes eas-cli@latest build:view 63316362-db49-4eb6-9512-1f6e718dc6d9 --json > "$RUNNER_TEMP/expo-build.json"
-          node - "$RUNNER_TEMP/expo-build.json" <<'NODE'
-          const fs = require('fs');
-          const b = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
-          const safe = {
-            id: b.id, platform: b.platform, status: b.status,
-            error: b.error && {
-              errorCode: b.error.errorCode,
-              message: b.error.message,
-              docsUrl: b.error.docsUrl,
-            },
-            buildProfile: b.buildProfile,
-            releaseChannel: b.releaseChannel,
-          };
-          const msg = JSON.stringify(safe,null,2);
-          console.log(msg);
-          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,'### Failed Android cloud build details\n\n```json\n' + msg + '\n```\n');
+          npx --yes eas-cli@latest build:list --platform android --limit 8 --json > "$RUNNER_TEMP/expo-builds.json"
+          node - "$RUNNER_TEMP/expo-builds.json" <<'NODE'
+          const fs=require('node:fs');
+          const items=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));
+          const rows=(Array.isArray(items)?items:(items.builds||[])).map(b=>({
+            id:b.id,status:b.status,platform:b.platform,buildProfile:b.buildProfile,
+            error:b.error?{errorCode:b.error.errorCode,message:String(b.error.message||'').slice(0,450)}:null,
+          }));
+          console.log('ANDROID_EAS_BUILDS',JSON.stringify(rows));
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,'### Existing Android EAS builds\\n\\n'+
+            '```json\\n'+JSON.stringify(rows,null,2)+'\\n```\\n');
           NODE

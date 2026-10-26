@@ -60,8 +60,14 @@ jobs:
           LOG: ${{ runner.temp }}/american-rider-ios-simulator.log
         run: |
           set -euo pipefail
-          bash scripts/build-simulator.sh
           mkdir -p artifacts/ios
+          if ! bash scripts/build-simulator.sh; then
+            echo "::error::iPhone simulator Xcode build failed; final compiler diagnostics follow."
+            grep -E "error:|fatal error:|Undefined symbols|BUILD FAILED|warning:" "$LOG" | tail -80 || true
+            tail -35 "$LOG" || true
+            cp "$LOG" artifacts/ios/build-error.log
+            exit 1
+          fi
           xcrun simctl io "$SIM_DEVICE" screenshot artifacts/ios/american-rider-ios-first-screen.png
           xcrun simctl spawn "$SIM_DEVICE" launchctl list | grep -q 'com.americanrider.app' || true
           test -s artifacts/ios/american-rider-ios-first-screen.png

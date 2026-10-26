@@ -1,0 +1,164 @@
+name: Simulate live Recruiter referral and synthetic commission journey
+
+on:
+  push:
+    branches:
+      - release/one-time-android-aab-20261025
+    paths:
+      - .github/workflows/founder-recruiter-referral-simulation-20261026.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  recruiter-simulation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      SITE_AUDIT_BASE: https://americanrider.tech
+    steps:
+      - name: Read exact current Commercial release
+        uses: actions/checkout@v4
+        with:
+          repository: chadkhalil21-svg/American-Rider-Commercial
+          ref: 915e7ecd549e1ffa4037324bbe2be521ea9134f0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install application backend dependencies (no lifecycle)
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts
+          npm ci --prefix backend --ignore-scripts
+      - name: Run isolated recruiter referral and simulated Stripe scenarios
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const cp=require('node:child_process');
+          const fs=require('node:fs');
+          const suites=[
+            'backend/referral-service.test.js',
+            'backend/referral-accrual.test.js',
+            'backend/referral-policy.test.js',
+            'backend/referral-link-recovery-contract.test.js',
+            'backend/referral-source-contract.test.js',
+            'backend/referral-margin-economics.test.js',
+            'backend/recruiter-portal.test.js',
+            'backend/recruiter-portal-source.test.js',
+            'backend/recruiter-invite-service.test.js',
+            'backend/recruiter-approval.test.js',
+            'backend/recruiter-commercial-terms.test.js',
+            'backend/recruiter-reward-budget.test.js',
+            'backend/recruiter-eligibility.test.js',
+            'backend/recruiter-commission-ledger.test.js',
+            'backend/recruiter-accrual-sweep.test.js',
+            'backend/recruiter-reversal-sweep.test.js',
+            'backend/recruiter-refund-reversal.test.js',
+            'backend/recruiter-payout-policy.test.js',
+            'backend/recruiter-payout-reserve-sweep.test.js',
+            'backend/recruiter-stripe-accounts.test.js',
+            'backend/recruiter-operator-connect.test.js',
+            'backend/recruiter-operator-transfers.test.js',
+            'backend/recruiter-stripe-payout.test.js',
+            'backend/recruiter-ach-batch.test.js',
+            'backend/recruiter-tax-readiness.test.js',
+            'backend/recruiter-roster.test.js',
+            'backend/recruiter-travel-activity.test.js',
+            'backend/recruiter-native-share-reporting.test.js',
+            'backend/recruiter-qr-source.test.js',
+            'backend/recruiter-crosschannel-source.test.js',
+            'backend/recruiter-dashboard-source.test.js',
+            'backend/operator-recruiter-sharing-contract.test.js',
+            'backend/operator-invite-preview.test.js',
+            'backend/corporate-website.test.js',
+          ];
+          let passed=0;let failed=[];
+          for(const suite of suites){
+            if(!fs.existsSync(suite)){console.log('SKIP absent',suite);continue;}
+            const res=cp.spawnSync(process.execPath,[suite],{stdio:'inherit',timeout:120000,env:{...process.env,NODE_ENV:'test'}});
+            if(res.status===0){passed++;console.log('SIM_PASS',suite);}
+            else{failed.push(suite);console.error('SIM_FAIL',suite,res.error?.message||res.status);}
+          }
+          console.log('RECRUITER_SYNTHETIC_RESULT',JSON.stringify({passed,failed,realMoneyMoved:false,realAccountCreated:false}));
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,
+            '### Recruiter and referral isolated synthetic checks\\n'+
+            'Passed: '+passed+'; failed: '+failed.length+'. No live money, real accounts or invitations.\\n');
+          if(failed.length||passed<25)process.exitCode=1;
+          NODE
+      - name: Install Chromium for live website simulation
+        shell: bash
+        run: |
+          mkdir -p /tmp/ar-playwright
+          npm install --prefix /tmp/ar-playwright playwright@1.56.1 --no-audit --no-fund
+          /tmp/ar-playwright/node_modules/.bin/playwright install --with-deps chromium
+      - name: Test live Recruiter intake invitation referral and guest safeguards
+        shell: bash
+        run: |
+          mkdir -p artifacts/referrals
+          node <<'NODE'
+          const {chromium}=require('/tmp/ar-playwright/node_modules/playwright');
+          const fs=require('node:fs');
+          const origin='https://americanrider.tech';
+          (async()=>{
+            const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
+            const failures=[],records=[];
+            for(const [label,width,height] of [['iphone',390,844],['ipad',1024,768],['desktop',1440,900]]){
+              const page=await browser.newPage({viewport:{width,height}});
+              const check=(c,msg)=>{if(!c)failures.push(label+': '+msg);};
+              try{
+                let response=await page.goto(origin+'/recruitment/',{waitUntil:'domcontentloaded',timeout:30000});
+                check(response.status()===200,'Recruiter landing does not load');
+                check((await page.locator('main a[href="/recruiters/portal/"]').count())===1,'Recruiter portal link missing/duplicated');
+                await page.screenshot({path:'artifacts/referrals/recruitment-'+label+'.png',fullPage:true});
+                await page.locator('main a[href="/recruiters/portal/"]').click();
+                check(page.url()===origin+'/recruiters/portal/','Recruiter login navigation failed');
+                check(await page.locator('#recruiter-email').isVisible(),'Recruiter email not displayed');
+                check(!await page.locator('#workspace').isVisible(),'Private Recruiter workspace visible to guest');
+                const email=page.locator('#recruiter-email');
+                await email.fill('not-an-email');
+                await page.locator('#recruiter-password').fill('testpassword123');
+                check(!(await email.evaluate(el=>el.checkValidity())),'Invalid email is accepted');
+                await page.screenshot({path:'artifacts/referrals/portal-'+label+'.png',fullPage:true});
+                const badToken='A'.repeat(43);
+                response=await page.goto(origin+'/recruitment/accept/?token='+badToken,{waitUntil:'domcontentloaded',timeout:30000});
+                check(response.status()===200,'Recruiter invitation acceptance not reachable');
+                await page.waitForFunction(()=>!location.search,{timeout:12000});
+                check(!new URL(page.url()).searchParams.has('token'),'Invite token remains in URL');
+                check(!(await page.locator('#approved-actions').isVisible()),'Accept invitation visible before verified sign-in');
+                check(await page.locator('#signin-form').isVisible(),'Private invitation sign-in form missing');
+                await page.screenshot({path:'artifacts/referrals/accept-'+label+'.png',fullPage:true});
+                for(const role of ['operator','traveler']){
+                  const code=role==='operator'?'FAKECODE01':'FAKECODE02';
+                  response=await page.goto(origin+'/join/?r='+code+'&role='+role,{waitUntil:'domcontentloaded',timeout:30000});
+                  check(response.status()===200,'Referral landing failed for '+role);
+                  await page.waitForFunction((v)=>document.getElementById('join-referral-code')?.textContent===v,code,{timeout:12000});
+                  check(page.url()===origin+'/join/','Referral sensitive query remains for '+role);
+                  check(await page.locator('#join-copy').isVisible(),'Copy referral link unavailable for '+role);
+                  check((await page.locator('#join-referral-code').innerText())===code,'Referral code not preserved for '+role);
+                  await page.screenshot({path:'artifacts/referrals/'+role+'-invite-'+label+'.png',fullPage:true});
+                }
+                records.push({device:label,intake:'pass',invitation:'guest protected',roles:['operator','traveler'],writes:0,payouts:0});
+                console.log('LIVE_RECRUITER_DEVICE',label,'intake/referral/guest checks completed');
+              }catch(e){failures.push(label+': '+String(e.message).slice(0,300));}
+              await page.close();
+            }
+            await browser.close();
+            console.log('RECRUITER_LIVE_BROWSER_RESULT',JSON.stringify({records,failures,noRealInvitations:true,noMoneyMoved:true}));
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,
+              '### Real website guest flows\\n'+records.map(r=>r.device+': recruitment, invitation and both referral roles exercised\\n').join('')+
+              'Errors: '+JSON.stringify(failures)+'\\n');
+            if(failures.length)process.exitCode=1;
+          })().catch(e=>{console.error('LIVE_RECRUITER_FATAL',e);process.exitCode=1});
+          NODE
+      - name: Upload read-only simulation screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: recruiter-referral-website-simulation
+          path: artifacts/referrals/
+          if-no-files-found: warn
+          retention-days: 14

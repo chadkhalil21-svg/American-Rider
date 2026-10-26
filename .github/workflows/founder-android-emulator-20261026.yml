@@ -21,7 +21,7 @@ jobs:
     timeout-minutes: 100
     env:
       CI: "1"
-      CERTIFIED_SHA: f62c8e1bbe376cb6a6cbdbe51c7d34f2b60241d0
+      CERTIFIED_SHA: 9751beb25ebbf45497b746d8bad18a74f4f7b275
       EXPO_PUBLIC_API_URL: https://american-rider-api-production-623854974930.us-east1.run.app
       EXPO_PUBLIC_REFERRALS_ENABLED: "1"
       EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: 623854974930-4t4u62mvkeopvlrm6ne15eq6rubn25r9.apps.googleusercontent.com
@@ -30,7 +30,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: chadkhalil21-svg/American-Rider-Commercial
-          ref: f62c8e1bbe376cb6a6cbdbe51c7d34f2b60241d0
+          ref: 9751beb25ebbf45497b746d8bad18a74f4f7b275
           persist-credentials: false
 
       - name: Verify source and application identity
@@ -126,8 +126,10 @@ jobs:
             adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity|mCurrentFocus' | head -10 > artifacts/emulator/activity.txt || true
             adb logcat -d -v brief -s AndroidRuntime:E ReactNativeJS:E ReactNative:E Expo:E > artifacts/emulator/startup-errors.txt || true
             adb shell pidof com.americanrider.app > artifacts/emulator/app-pid.txt || { echo "::error::American Rider exited after launch; inspect startup-errors.txt in artifact."; tail -90 artifacts/emulator/startup-errors.txt; exit 1; }
+            ! grep -q 'FATAL EXCEPTION' artifacts/emulator/startup-errors.txt || { echo "::error::American Rider crashed after launch, even if Android restarted its process."; tail -75 artifacts/emulator/startup-errors.txt; exit 1; }
+            grep -q 'com.americanrider.app' artifacts/emulator/activity.txt || { echo "::error::Android launcher, not American Rider, was foreground after startup."; cat artifacts/emulator/activity.txt; exit 1; }
             test -s artifacts/emulator/american-rider-android-first-screen.png
-            echo "PASS: release APK installed, Android app launched and remained running, first-screen screenshot captured."
+            echo "PASS: APK installed, no fatal crash, American Rider foreground, 15-second active process, first screen captured."
 
       - name: Upload anonymous emulator evidence
         if: always()

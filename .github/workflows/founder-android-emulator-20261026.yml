@@ -21,7 +21,7 @@ jobs:
     timeout-minutes: 100
     env:
       CI: "1"
-      CERTIFIED_SHA: 4c3e056cc1335413fc6dc3cfe61183f1c8e43193
+      CERTIFIED_SHA: f62c8e1bbe376cb6a6cbdbe51c7d34f2b60241d0
       EXPO_PUBLIC_API_URL: https://american-rider-api-production-623854974930.us-east1.run.app
       EXPO_PUBLIC_REFERRALS_ENABLED: "1"
       EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: 623854974930-4t4u62mvkeopvlrm6ne15eq6rubn25r9.apps.googleusercontent.com
@@ -30,7 +30,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: chadkhalil21-svg/American-Rider-Commercial
-          ref: 4c3e056cc1335413fc6dc3cfe61183f1c8e43193
+          ref: f62c8e1bbe376cb6a6cbdbe51c7d34f2b60241d0
           persist-credentials: false
 
       - name: Verify source and application identity
@@ -38,8 +38,9 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$CERTIFIED_SHA"
-          git fetch origin release/current --depth=1
-          test "$(git rev-parse FETCH_HEAD)" = "$CERTIFIED_SHA" || { echo "::error::Commercial release moved, simulator proof cannot be called current."; exit 1; }
+          git fetch origin fix/android-photo-permission-localization-release-20261025 --depth=1
+          test "$(git rev-parse FETCH_HEAD)" = "$CERTIFIED_SHA" || { echo "::error::Test candidate moved: refuse mismatched simulation."; exit 1; }
+          echo "Testing Android localization fix PR #349 only; not certified as current Commercial release."
           node - <<'NODE'
           const fs = require('node:fs');
           const a = JSON.parse(fs.readFileSync('app.json','utf8')).expo;

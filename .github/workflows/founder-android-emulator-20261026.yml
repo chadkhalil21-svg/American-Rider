@@ -118,12 +118,18 @@ jobs:
             adb logcat -c
             adb shell am start -W -n com.americanrider.app/.MainActivity
             sleep 15
-            adb shell pidof com.americanrider.app > artifacts/emulator/app-pid.txt
-            adb shell screencap -p /sdcard/ar-home.png
-            adb pull /sdcard/ar-home.png artifacts/emulator/american-rider-android-first-screen.png
+            # Capture evidence even if React Native closes after initial Activity launch.
+            adb shell screencap -p /sdcard/ar-home.png || true
+            adb pull /sdcard/ar-home.png artifacts/emulator/american-rider-android-first-screen.png || true
             adb shell uiautomator dump /sdcard/ar-ui.xml || true
             adb pull /sdcard/ar-ui.xml artifacts/emulator/ui.xml || true
             adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity|mCurrentFocus' | head -10 > artifacts/emulator/activity.txt || true
+            adb logcat -d -v brief -s AndroidRuntime:E ReactNativeJS:E ReactNative:E Expo:E > artifacts/emulator/startup-errors.txt || true
+            if ! adb shell pidof com.americanrider.app > artifacts/emulator/app-pid.txt; then
+              echo "::error::American Rider exited after initial Android launch. Review sanitized startup-errors.txt in the run artifact."
+              cat artifacts/emulator/startup-errors.txt | tail -90
+              exit 1
+            fi
             test -s artifacts/emulator/american-rider-android-first-screen.png
             echo "PASS: release APK installed, Android app launched and remained running, first-screen screenshot captured."
 

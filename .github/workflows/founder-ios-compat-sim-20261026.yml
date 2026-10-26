@@ -62,11 +62,44 @@ jobs:
           set -euo pipefail
           mkdir -p artifacts/ios
           if ! bash scripts/build-simulator.sh; then
-            echo "::error::iPhone simulator Xcode build failed; final compiler diagnostics follow."
-            grep -E "error:|fatal error:|Undefined symbols|BUILD FAILED|warning:" "$LOG" | tail -80 || true
-            tail -35 "$LOG" || true
-            cp "$LOG" artifacts/ios/build-error.log
-            exit 1
+            echo "Initial simulator build failed. Inspecting failure before retry."
+            if grep -q "Could not resolve package dependencies" "$LOG"; then
+              echo "Xcode Swift package resolution failed on fresh GitHub macOS runner; retrying only package resolution."
+              resolved=0
+              for attempt in 1 2 3; do
+                echo "Swift package resolver attempt $attempt of 3"
+                if xcodebuild -resolvePackageDependencies -workspace ios/AmericanRider.xcworkspace -scheme AmericanRider -scmProvider system >> "$LOG" 2>&1; then
+                  resolved=1
+                  break
+                fi
+                sleep 6
+              done
+              if [ "$resolved" -eq 1 ]; then
+                echo "Swift package resolution recovered; compiling same exact candidate without modifying source."
+                DD="$HOME/Library/Developer/Xcode/DerivedData/AmericanRider-simulator"
+                if xcodebuild -workspace ios/AmericanRider.xcworkspace -scheme AmericanRider -configuration Release -destination "id=$SIM_DEVICE" -derivedDataPath "$DD" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build >> "$LOG" 2>&1; then
+                  APP="$DD/Build/Products/Release-iphonesimulator/AmericanRider.app"
+                  test -d "$APP"
+                  xcrun simctl install "$SIM_DEVICE" "$APP"
+                  xcrun simctl launch "$SIM_DEVICE" com.americanrider.app
+                else
+                  echo "::error::Simulator compilation still failed after successful Swift package resolution."
+                  tail -110 "$LOG" || true
+                  cp "$LOG" artifacts/ios/build-error.log
+                  exit 1
+                fi
+              else
+                echo "::error::Swift package resolution failed after three attempts. Runner/environment dependency unresolved; this does not diagnose signed Build 56."
+                grep -E -A 12 -B 8 "Could not resolve package dependencies|error:|fatal error:|authentication failed|timed out" "$LOG" | tail -130 || true
+                cp "$LOG" artifacts/ios/build-error.log
+                exit 1
+              fi
+            else
+              echo "::error::iPhone simulator failed for reason other than Swift package resolution."
+              grep -E -A 7 -B 5 "error:|fatal error:|Undefined symbols|BUILD FAILED" "$LOG" | tail -120 || true
+              cp "$LOG" artifacts/ios/build-error.log
+              exit 1
+            fi
           fi
           xcrun simctl io "$SIM_DEVICE" screenshot artifacts/ios/american-rider-ios-first-screen.png
           xcrun simctl spawn "$SIM_DEVICE" launchctl list | grep -q 'com.americanrider.app' || true

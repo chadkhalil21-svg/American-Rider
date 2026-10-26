@@ -1,4 +1,4 @@
-name: Diagnose failed Android EAS cloud build
+name: Verify ongoing signed Android EAS cloud build status
 
 on:
   push:

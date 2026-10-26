@@ -1,4 +1,5 @@
 name: Read-only live Recruiter and Founder website browser simulation
+# Verify post-merge recruiter hidden-workspace fix (#350) against actual live pages.
 
 on:
   push:

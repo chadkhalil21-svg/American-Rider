@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - release/current
+      - release/one-time-android-aab-20261025
     paths:
       - .github/workflows/founder-android-once-20261025.yml
   workflow_dispatch:

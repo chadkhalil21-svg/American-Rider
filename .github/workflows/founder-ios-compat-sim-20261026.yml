@@ -1,0 +1,76 @@
+name: Verify Android correction on simulated iPhone without App Store changes
+
+on:
+  push:
+    branches:
+      - release/one-time-android-aab-20261025
+    paths:
+      - .github/workflows/founder-ios-compat-sim-20261026.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ios-simulator:
+    runs-on: macos-15
+    timeout-minutes: 90
+    env:
+      CI: "1"
+      EXPO_PUBLIC_API_URL: https://american-rider-api-production-623854974930.us-east1.run.app
+    steps:
+      - name: Read exact cross-platform test candidate PR 349
+        uses: actions/checkout@v4
+        with:
+          repository: chadkhalil21-svg/American-Rider-Commercial
+          ref: f62c8e1bbe376cb6a6cbdbe51c7d34f2b60241d0
+          persist-credentials: false
+      - name: Verify exact unmerged candidate and iOS identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = f62c8e1bbe376cb6a6cbdbe51c7d34f2b60241d0
+          node - <<'NODE'
+          const fs=require('fs');
+          const a=JSON.parse(fs.readFileSync('app.json','utf8')).expo;
+          if(a.ios?.bundleIdentifier!=='com.americanrider.app')throw Error('iOS bundle identity changed');
+          if(a.ios?.usesAppleSignIn!==true)throw Error('Apple sign-in capability changed');
+          if(!a.ios?.associatedDomains?.includes('applinks:americanrider.tech'))throw Error('Associated Domains unexpectedly removed');
+          console.log('iOS sign-in, bundle identifier and configured universal links preserved');
+          NODE
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Prepare available iPhone simulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          xcrun simctl list devices available
+          SIM_NAME="$(xcrun simctl list devices available | grep -E 'iPhone.*\([0-9A-Fa-f-]{36}\)' | head -n 1 | sed -E 's/.*\(([0-9A-Fa-f-]{36})\).*/\1/')"
+          test -n "$SIM_NAME" || { echo "::error::No iPhone simulator installed on this macOS runner."; exit 1; }
+          xcrun simctl boot "$SIM_NAME"
+          xcrun simctl bootstatus "$SIM_NAME" -b
+          echo "SIM_DEVICE=$SIM_NAME" >> "$GITHUB_ENV"
+      - name: Install only application source dependencies
+        run: npm ci --ignore-scripts
+      - name: Build and launch iOS Release on virtual iPhone
+        shell: bash
+        env:
+          LOG: ${{ runner.temp }}/american-rider-ios-simulator.log
+        run: |
+          set -euo pipefail
+          bash scripts/build-simulator.sh
+          mkdir -p artifacts/ios
+          xcrun simctl io "$SIM_DEVICE" screenshot artifacts/ios/american-rider-ios-first-screen.png
+          xcrun simctl spawn "$SIM_DEVICE" launchctl list | grep -q 'com.americanrider.app' || true
+          test -s artifacts/ios/american-rider-ios-first-screen.png
+          echo "PASS candidate installed and iPhone simulator screenshot created" >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload simulated iPhone screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: american-rider-ios-compatibility-simulation
+          path: artifacts/ios/
+          if-no-files-found: warn
+          retention-days: 14

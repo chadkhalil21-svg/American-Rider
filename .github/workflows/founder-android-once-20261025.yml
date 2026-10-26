@@ -56,8 +56,12 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Install dependencies without lifecycle scripts
-        run: npm ci --ignore-scripts
+      - name: Install application and backend dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts
+          npm ci --prefix backend --ignore-scripts
 
       - name: Run existing isolated synthetic release checks
         run: node scripts/prelaunch-synthetic-acceptance.cjs

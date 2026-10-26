@@ -115,6 +115,14 @@ jobs:
             mkdir -p artifacts/emulator
             adb install -r android/app/build/outputs/apk/release/app-release.apk
             adb shell pm list packages | grep -q 'package:com.americanrider.app'
+            # Simulate a Traveler/Operator who accepted Android's runtime
+            # permission prompt. A separate denial test is still required;
+            # startup certification must not mistake PermissionController for a crash.
+            adb shell pm grant com.americanrider.app android.permission.ACCESS_COARSE_LOCATION
+            adb shell pm grant com.americanrider.app android.permission.ACCESS_FINE_LOCATION
+            adb shell pm grant com.americanrider.app android.permission.ACCESS_BACKGROUND_LOCATION
+            adb shell dumpsys package com.americanrider.app | grep -E 'ACCESS_(COARSE|FINE|BACKGROUND)_LOCATION: granted=true' > artifacts/emulator/granted-permissions.txt
+            test "$(wc -l < artifacts/emulator/granted-permissions.txt)" -ge 3 || { echo "::error::Location permissions not granted in isolated test fixture."; exit 1; }
             adb logcat -c
             adb shell am start -W -n com.americanrider.app/.MainActivity
             sleep 15

@@ -1,5 +1,5 @@
 name: Read-only live Recruiter and Founder website browser simulation
-# Verify post-merge recruiter hidden-workspace fix (#350) against actual live pages.
+# Retest Founder restored Google popup (#352) and Recruiter public security after production deployment.
 
 on:
   push:
@@ -23,7 +23,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: chadkhalil21-svg/American-Rider-Commercial
-          ref: 4c3e056cc1335413fc6dc3cfe61183f1c8e43193
+          ref: 915e7ecd549e1ffa4037324bbe2be521ea9134f0
           persist-credentials: false
       - name: Node 22
         uses: actions/setup-node@v4
@@ -52,10 +52,10 @@ jobs:
               const page=await browser.newPage({viewport:{width:w,height:h}});
               await page.goto('https://americanrider.tech/founder/',{waitUntil:'domcontentloaded',timeout:30000});
               const pageHtml=await page.content();
-              if(!pageHtml.includes('accounts.google.com/gsi/client')||!pageHtml.includes('signInWithCredential'))
-                issues.push(device+' published Founder page does not contain the new direct Google sign-in');
-              if(!pageHtml.includes('founder-google-alternate'))
-                issues.push(device+' Founder alternate Google method missing');
+              if(!pageHtml.includes('signInWithPopup(auth,provider)'))
+                issues.push(device+' published Founder page lacks proven Firebase Google popup method');
+              if(pageHtml.includes('accounts.google.com/gsi/client')||pageHtml.includes('founder-google-alternate'))
+                issues.push(device+' obsolete unregistered Google GIS method remains live');
               await page.screenshot({path:'site-audit-images/founder-'+device+'.png',fullPage:true});
               if(!await page.locator('#founder-google').isVisible())issues.push(device+' founder Google control missing');
               if(await page.locator('#founder-workspace').isVisible())issues.push(device+' PRIVATE founder metrics visible before sign-in');

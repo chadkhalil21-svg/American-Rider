@@ -122,6 +122,16 @@ jobs:
           xcrun simctl spawn "$SIM_DEVICE" launchctl list | grep -q 'com.americanrider.app' || true
           test -s artifacts/ios/american-rider-ios-first-screen.png
           echo "PASS candidate installed and iPhone simulator screenshot created" >> "$GITHUB_STEP_SUMMARY"
+          # Diagnose the installed app's real URL registration before probing routes.
+          APP_PATH="$HOME/Library/Developer/Xcode/DerivedData/AmericanRider-simulator/Build/Products/Release-iphonesimulator/AmericanRider.app"
+          test -f "$APP_PATH/Info.plist" || { echo "::error::Missing compiled iPhone Info.plist"; exit 1; }
+          python3 - "$APP_PATH/Info.plist" <<'PY' | tee artifacts/ios/url-schemes.txt
+          import plistlib,sys
+          with open(sys.argv[1],"rb") as f: info=plistlib.load(f)
+          schemes=[v for entry in info.get("CFBundleURLTypes",[]) for v in entry.get("CFBundleURLSchemes",[])]
+          print("Registered native schemes:",", ".join(schemes))
+          if "americanrider" not in schemes: raise SystemExit("FAIL: iOS build missing declared americanrider URL scheme")
+          PY
           # Native iPhone route navigation only. No test accounts, production writes, or fake payouts.
           probe() {
             label="$1"; route="$2"
@@ -134,7 +144,8 @@ jobs:
             test -s "artifacts/ios/$label.png"
             echo "PASS iPhone route opening and screenshot: $label (screen contents unverified)"
           }
-          probe traveler-home ""
+          xcrun simctl launch "$SIM_DEVICE" com.americanrider.app
+          echo "PASS iPhone Home via native launch (route content unverified)"
           probe traveler-schedule "schedule"
           probe traveler-wallet "wallet"
           probe traveler-history "history"

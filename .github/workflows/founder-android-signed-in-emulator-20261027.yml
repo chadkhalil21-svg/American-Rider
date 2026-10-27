@@ -28,13 +28,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: chadkhalil21-svg/American-Rider-Commercial
-          ref: b339363b2034ecd3280ba5a6c94d8771a73a42c1
+          ref: 7817017df19dd332219af6bbe024ea10805ae44a
           persist-credentials: false
       - name: Assert NO production Firebase, Stripe or backend target
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = b339363b2034ecd3280ba5a6c94d8771a73a42c1
+          test "$(git rev-parse HEAD)" = 7817017df19dd332219af6bbe024ea10805ae44a
           test "$EXPO_PUBLIC_AR_NATIVE_QA" = 1
           test "$NODE_ENV" = test
           test "$AR_NATIVE_QA_LOCAL" = 1

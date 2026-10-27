@@ -1,0 +1,89 @@
+name: Read-only live Recruiter and Founder website browser simulation
+# Retest Founder restored Google popup (#352) and Recruiter public security after production deployment.
+
+on:
+  push:
+    branches:
+      - release/one-time-android-aab-20261025
+    paths:
+      - .github/workflows/founder-live-web-simulation-20261026.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser-simulation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 32
+    env:
+      SITE_AUDIT_BASE: https://americanrider.tech
+    steps:
+      - name: Checkout exact current Commercial source (read only)
+        uses: actions/checkout@v4
+        with:
+          repository: chadkhalil21-svg/American-Rider-Commercial
+          ref: 915e7ecd549e1ffa4037324bbe2be521ea9134f0
+          persist-credentials: false
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install independent browser and Chromium
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/ar-playwright
+          npm install --prefix /tmp/ar-playwright playwright@1.56.1 --no-audit --no-fund
+          /tmp/ar-playwright/node_modules/.bin/playwright install --with-deps chromium
+      - name: Check actual live links and recruiter public routes
+        run: node scripts/audit-corporate-live-site.cjs
+      - name: Simulate recruitment browsing on phone, tablet and desktop
+        run: node scripts/audit-corporate-live-site.cjs browser
+      - name: Verify unauthenticated Recruiter and Founder safeguards
+        shell: bash
+        run: |
+          node <<'NODE'
+          const {chromium}=require('/tmp/ar-playwright/node_modules/playwright');
+          (async()=>{
+            const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
+            const issues=[];
+            for(const [device,w,h] of [['phone',390,844],['tablet',1024,768],['desktop',1440,900]]){
+              const page=await browser.newPage({viewport:{width:w,height:h}});
+              await page.goto('https://americanrider.tech/founder/',{waitUntil:'domcontentloaded',timeout:30000});
+              const pageHtml=await page.content();
+              if(!pageHtml.includes('signInWithPopup(auth,provider)'))
+                issues.push(device+' published Founder page lacks proven Firebase Google popup method');
+              if(pageHtml.includes('accounts.google.com/gsi/client')||pageHtml.includes('founder-google-alternate'))
+                issues.push(device+' obsolete unregistered Google GIS method remains live');
+              await page.screenshot({path:'site-audit-images/founder-'+device+'.png',fullPage:true});
+              if(!await page.locator('#founder-google').isVisible())issues.push(device+' founder Google control missing');
+              if(await page.locator('#founder-workspace').isVisible())issues.push(device+' PRIVATE founder metrics visible before sign-in');
+              await page.goto('https://americanrider.tech/recruitment/accept/',{waitUntil:'domcontentloaded',timeout:30000});
+              await page.screenshot({path:'site-audit-images/recruiter-invitation-'+device+'.png',fullPage:true});
+              if(await page.locator('#approved-actions').isVisible())issues.push(device+' invite acceptance shown without verified account');
+              if(!await page.locator('#signin-form').isVisible())issues.push(device+' recruiter signup form missing');
+              await page.goto('https://americanrider.tech/recruiters/portal/',{waitUntil:'domcontentloaded',timeout:30000});
+              if(await page.locator('#workspace').isVisible())issues.push(device+' recruiter private workspace exposed');
+              const input=page.locator('#recruiter-email');
+              await input.fill('not-an-email');
+              await page.locator('#recruiter-password').fill('notarealpassword');
+              await page.locator('#recruiter-sign-in button[type=submit]').click();
+              const valid=await input.evaluate(el=>el.checkValidity());
+              if(valid)issues.push(device+' invalid recruiter email incorrectly accepted');
+              console.log('GUEST_BROWSER_CHECK',device,'founder hidden, recruiter form available, invalid email blocked',!valid);
+              await page.close();
+            }
+            await browser.close();
+            console.log('LIVE_GUEST_AUDIT',JSON.stringify({issues}));
+            if(issues.length)process.exitCode=1;
+          })().catch(e=>{console.error('LIVE_GUEST_FATAL',e.message);process.exitCode=1});
+          NODE
+      - name: Upload screenshot evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-american-rider-website-browser-evidence
+          path: site-audit-images/
+          if-no-files-found: warn
+          retention-days: 14

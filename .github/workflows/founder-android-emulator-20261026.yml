@@ -1,0 +1,171 @@
+name: Run American Rider on a simulated Android phone
+
+on:
+  push:
+    branches:
+      - release/one-time-android-aab-20261025
+    paths:
+      - .github/workflows/founder-android-emulator-20261026.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: american-rider-android-emulator-20261026
+  cancel-in-progress: false
+
+jobs:
+  android-pixel-emulator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 100
+    env:
+      CI: "1"
+      CERTIFIED_SHA: ed7c362034271132cde3fd7de896cb9c93331edf
+      EXPO_PUBLIC_API_URL: https://american-rider-api-production-623854974930.us-east1.run.app
+      EXPO_PUBLIC_REFERRALS_ENABLED: "1"
+      EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: 623854974930-4t4u62mvkeopvlrm6ne15eq6rubn25r9.apps.googleusercontent.com
+    steps:
+      - name: Check out current Commercial application
+        uses: actions/checkout@v4
+        with:
+          repository: chadkhalil21-svg/American-Rider-Commercial
+          ref: ed7c362034271132cde3fd7de896cb9c93331edf
+          persist-credentials: false
+
+      - name: Verify source and application identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$CERTIFIED_SHA"
+          echo "Testing exact current merged Commercial release, using isolated emulator and no payment actions."
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const a = JSON.parse(fs.readFileSync('app.json','utf8')).expo;
+          const e = JSON.parse(fs.readFileSync('eas.json','utf8'));
+          if(a.android?.package!=='com.americanrider.app')throw Error('Incorrect Android package');
+          if(e.build?.production?.env?.EXPO_PUBLIC_API_URL!==process.env.EXPO_PUBLIC_API_URL)throw Error('Incorrect production API');
+          console.log('Pinned Commercial source and Android configuration confirmed');
+          NODE
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up current Android SDK without deprecated tools package
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
+
+      - name: Install Android 36 SDK for Expo
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager --install "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Enable Android emulator acceleration
+        shell: bash
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Install application dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts
+
+      - name: Generate isolated native Android application
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx expo prebuild --platform android --clean --non-interactive
+          test -f android/gradlew
+
+      - name: Build standalone APK for the emulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd android
+          chmod +x gradlew
+          ./gradlew --no-daemon --max-workers=2 --console=plain :app:assembleRelease
+          test -f app/build/outputs/apk/release/app-release.apk
+
+      - name: Boot Pixel and test installed American Rider application
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect
+          disable-animations: true
+          script: |
+            set -eu
+            mkdir -p artifacts/emulator
+            adb install -r android/app/build/outputs/apk/release/app-release.apk
+            adb shell pm list packages | grep -q 'package:com.americanrider.app'
+            # Simulate a Traveler/Operator who accepted Android's runtime
+            # permission prompt. A separate denial test is still required;
+            # startup certification must not mistake PermissionController for a crash.
+            adb shell pm grant com.americanrider.app android.permission.ACCESS_COARSE_LOCATION
+            adb shell pm grant com.americanrider.app android.permission.ACCESS_FINE_LOCATION
+            adb shell pm grant com.americanrider.app android.permission.ACCESS_BACKGROUND_LOCATION
+            adb shell dumpsys package com.americanrider.app | grep -E 'ACCESS_(COARSE|FINE|BACKGROUND)_LOCATION: granted=true' > artifacts/emulator/granted-permissions.txt
+            test "$(wc -l < artifacts/emulator/granted-permissions.txt)" -ge 3 || { echo "::error::Location permissions not granted in isolated test fixture."; exit 1; }
+            adb logcat -c
+            adb shell am start -W -n com.americanrider.app/.MainActivity
+            sleep 15
+            # Capture evidence even if React Native closes after initial Activity launch.
+            adb shell screencap -p /sdcard/ar-home.png || true
+            adb pull /sdcard/ar-home.png artifacts/emulator/american-rider-android-first-screen.png || true
+            adb shell uiautomator dump /sdcard/ar-ui.xml || true
+            adb pull /sdcard/ar-ui.xml artifacts/emulator/ui.xml || true
+            adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity|mCurrentFocus' | head -10 > artifacts/emulator/activity.txt || true
+            adb logcat -d -v brief -s AndroidRuntime:E ReactNativeJS:E ReactNative:E Expo:E > artifacts/emulator/startup-errors.txt || true
+            adb shell pidof com.americanrider.app > artifacts/emulator/app-pid.txt || { echo "::error::American Rider exited after launch; inspect startup-errors.txt in artifact."; tail -90 artifacts/emulator/startup-errors.txt; exit 1; }
+            ! grep -q 'FATAL EXCEPTION' artifacts/emulator/startup-errors.txt || { echo "::error::American Rider crashed after launch, even if Android restarted its process."; tail -75 artifacts/emulator/startup-errors.txt; exit 1; }
+            grep -q 'com.americanrider.app' artifacts/emulator/activity.txt || { echo "::error::Android launcher, not American Rider, was foreground after startup."; cat artifacts/emulator/activity.txt; exit 1; }
+            test -s artifacts/emulator/american-rider-android-first-screen.png
+            echo "PASS: APK installed, no fatal crash, American Rider foreground, 15-second active process, first screen captured."
+            # Actual anonymous route navigation; never booking, authorizing, charging or approving accounts.
+            # Passing these route probes does NOT certify full commercial journeys.
+            # Android emulator runner invokes each script line in its own sh process.
+            # Every probe must therefore be one POSIX shell command without functions.
+            echo "Probing traveler-home"; adb shell am start -W -a android.intent.action.VIEW -d 'americanrider:///' -p com.americanrider.app > artifacts/emulator/traveler-home-intent.txt 2>&1 && sleep 2 && adb shell pidof com.americanrider.app > artifacts/emulator/traveler-home-pid.txt && adb shell screencap -p /sdcard/traveler-home.png && adb pull /sdcard/traveler-home.png artifacts/emulator/traveler-home.png >/dev/null && test -s artifacts/emulator/traveler-home.png || { echo 'Failed traveler-home intent, process or screenshot'; cat artifacts/emulator/traveler-home-intent.txt; exit 1; }
+            echo "Probing traveler-schedule"; adb shell am start -W -a android.intent.action.VIEW -d 'americanrider:///schedule' -p com.americanrider.app > artifacts/emulator/traveler-schedule-intent.txt 2>&1 && sleep 2 && adb shell pidof com.americanrider.app > artifacts/emulator/traveler-schedule-pid.txt && adb shell screencap -p /sdcard/traveler-schedule.png && adb pull /sdcard/traveler-schedule.png artifacts/emulator/traveler-schedule.png >/dev/null && test -s artifacts/emulator/traveler-schedule.png || { echo 'Failed traveler-schedule intent, process or screenshot'; cat artifacts/emulator/traveler-schedule-intent.txt; exit 1; }
+            echo "Probing traveler-wallet"; adb shell am start -W -a android.intent.action.VIEW -d 'americanrider:///wallet' -p com.americanrider.app > artifacts/emulator/traveler-wallet-intent.txt 2>&1 && sleep 2 && adb shell pidof com.americanrider.app > artifacts/emulator/traveler-wallet-pid.txt && adb shell screencap -p /sdcard/traveler-wallet.png && adb pull /sdcard/traveler-wallet.png artifacts/emulator/traveler-wallet.png >/dev/null && test -s artifacts/emulator/traveler-wallet.png || { echo 'Failed traveler-wallet intent, process or screenshot'; cat artifacts/emulator/traveler-wallet-intent.txt; exit 1; }
+            echo "Probing traveler-history"; adb shell am start -W -a android.intent.action.VIEW -d 'americanrider:///history' -p com.americanrider.app > artifacts/emulator/traveler-history-intent.txt 2>&1 && sleep 2 && adb shell pidof com.americanrider.app > artifacts/emulator/traveler-history-pid.txt && adb shell screencap -p /sdcard/traveler-history.png && adb pull /sdcard/traveler-history.png artifacts/emulator/traveler-history.png >/dev/null && test -s artifacts/emulator/traveler-history.png || { echo 'Failed traveler-history intent, process or screenshot'; cat artifacts/emulator/traveler-history-intent.txt; exit 1; }
+            echo "Probing traveler-safety"; adb shell am start -W -a android.intent.action.VIEW -d 'americanrider:///safety' -p com.americanrider.app > artifacts/emulator/traveler-safety-intent.txt 2>&1 && sleep 2 && adb shell pidof com.americanrider.app > artifacts/emulator/traveler-safety-pid.txt && adb shell screencap -p /sdcard/traveler-safety.png && adb pull /sdcard/traveler-safety.png artifacts/emulator/traveler-safety.png >/dev/null && test -s artifacts/emulator/traveler-safety.png || { echo 'Failed traveler-safety intent, process or screenshot'; cat artifacts/emulator/traveler-safety-intent.txt; exit 1; }
+            echo "Probing traveler-support"; adb shell am start -W -a android.intent.action.VIEW -d 'americanrider:///issues' -p com.americanrider.app > artifacts/emulator/traveler-support-intent.txt 2>&1 && sleep 2 && adb shell pidof com.americanrider.app > artifacts/emulator/traveler-support-pid.txt && adb shell screencap -p /sdcard/traveler-support.png && adb pull /sdcard/traveler-support.png artifacts/emulator/traveler-support.png >/dev/null && test -s artifacts/emulator/traveler-support.png || { echo 'Failed traveler-support intent, process or screenshot'; cat artifacts/emulator/traveler-support-intent.txt; exit 1; }
+            echo "Probing operator-home"; adb shell am start -W -a android.intent.action.VIEW -d 'americanrider:///operator' -p com.americanrider.app > artifacts/emulator/operator-home-intent.txt 2>&1 && sleep 2 && adb shell pidof com.americanrider.app > artifacts/emulator/operator-home-pid.txt && adb shell screencap -p /sdcard/operator-home.png && adb pull /sdcard/operator-home.png artifacts/emulator/operator-home.png >/dev/null && test -s artifacts/emulator/operator-home.png || { echo 'Failed operator-home intent, process or screenshot'; cat artifacts/emulator/operator-home-intent.txt; exit 1; }
+            echo "Probing operator-qualify"; adb shell am start -W -a android.intent.action.VIEW -d 'americanrider:///operator/qualify' -p com.americanrider.app > artifacts/emulator/operator-qualify-intent.txt 2>&1 && sleep 2 && adb shell pidof com.americanrider.app > artifacts/emulator/operator-qualify-pid.txt && adb shell screencap -p /sdcard/operator-qualify.png && adb pull /sdcard/operator-qualify.png artifacts/emulator/operator-qualify.png >/dev/null && test -s artifacts/emulator/operator-qualify.png || { echo 'Failed operator-qualify intent, process or screenshot'; cat artifacts/emulator/operator-qualify-intent.txt; exit 1; }
+            echo "Probing operator-inbox"; adb shell am start -W -a android.intent.action.VIEW -d 'americanrider:///operator/inbox' -p com.americanrider.app > artifacts/emulator/operator-inbox-intent.txt 2>&1 && sleep 2 && adb shell pidof com.americanrider.app > artifacts/emulator/operator-inbox-pid.txt && adb shell screencap -p /sdcard/operator-inbox.png && adb pull /sdcard/operator-inbox.png artifacts/emulator/operator-inbox.png >/dev/null && test -s artifacts/emulator/operator-inbox.png || { echo 'Failed operator-inbox intent, process or screenshot'; cat artifacts/emulator/operator-inbox-intent.txt; exit 1; }
+            echo "Probing operator-payouts"; adb shell am start -W -a android.intent.action.VIEW -d 'americanrider:///operator/payouts' -p com.americanrider.app > artifacts/emulator/operator-payouts-intent.txt 2>&1 && sleep 2 && adb shell pidof com.americanrider.app > artifacts/emulator/operator-payouts-pid.txt && adb shell screencap -p /sdcard/operator-payouts.png && adb pull /sdcard/operator-payouts.png artifacts/emulator/operator-payouts.png >/dev/null && test -s artifacts/emulator/operator-payouts.png || { echo 'Failed operator-payouts intent, process or screenshot'; cat artifacts/emulator/operator-payouts-intent.txt; exit 1; }
+            echo "Probing operator-invitations"; adb shell am start -W -a android.intent.action.VIEW -d 'americanrider:///operator/invite' -p com.americanrider.app > artifacts/emulator/operator-invitations-intent.txt 2>&1 && sleep 2 && adb shell pidof com.americanrider.app > artifacts/emulator/operator-invitations-pid.txt && adb shell screencap -p /sdcard/operator-invitations.png && adb pull /sdcard/operator-invitations.png artifacts/emulator/operator-invitations.png >/dev/null && test -s artifacts/emulator/operator-invitations.png || { echo 'Failed operator-invitations intent, process or screenshot'; cat artifacts/emulator/operator-invitations-intent.txt; exit 1; }
+            echo "Probing recruiter-public"; adb shell am start -W -a android.intent.action.VIEW -d 'americanrider:///recruitment' -p com.americanrider.app > artifacts/emulator/recruiter-public-intent.txt 2>&1 && sleep 2 && adb shell pidof com.americanrider.app > artifacts/emulator/recruiter-public-pid.txt && adb shell screencap -p /sdcard/recruiter-public.png && adb pull /sdcard/recruiter-public.png artifacts/emulator/recruiter-public.png >/dev/null && test -s artifacts/emulator/recruiter-public.png || { echo 'Failed recruiter-public intent, process or screenshot'; cat artifacts/emulator/recruiter-public-intent.txt; exit 1; }
+            echo "Probing direct-enrollment"; adb shell am start -W -a android.intent.action.VIEW -d 'americanrider:///join' -p com.americanrider.app > artifacts/emulator/direct-enrollment-intent.txt 2>&1 && sleep 2 && adb shell pidof com.americanrider.app > artifacts/emulator/direct-enrollment-pid.txt && adb shell screencap -p /sdcard/direct-enrollment.png && adb pull /sdcard/direct-enrollment.png artifacts/emulator/direct-enrollment.png >/dev/null && test -s artifacts/emulator/direct-enrollment.png || { echo 'Failed direct-enrollment intent, process or screenshot'; cat artifacts/emulator/direct-enrollment-intent.txt; exit 1; }
+            echo "Probing referral-enrollment"; adb shell am start -W -a android.intent.action.VIEW -d 'americanrider:///join?r=SIMTEST12345' -p com.americanrider.app > artifacts/emulator/referral-enrollment-intent.txt 2>&1 && sleep 2 && adb shell pidof com.americanrider.app > artifacts/emulator/referral-enrollment-pid.txt && adb shell screencap -p /sdcard/referral-enrollment.png && adb pull /sdcard/referral-enrollment.png artifacts/emulator/referral-enrollment.png >/dev/null && test -s artifacts/emulator/referral-enrollment.png || { echo 'Failed referral-enrollment intent, process or screenshot'; cat artifacts/emulator/referral-enrollment-intent.txt; exit 1; }
+            adb logcat -d -v brief -s AndroidRuntime:E ReactNativeJS:E > artifacts/emulator/route-errors.txt || true
+            ! grep -q 'FATAL EXCEPTION' artifacts/emulator/route-errors.txt || { echo "Fatal exception during native navigation"; exit 1; }
+            echo "PASS anonymous route matrix. Authenticated booking, payments, and commission settlement NOT tested."
+            python3 scripts/android-native-interaction-acceptance.py
+
+      - name: Upload real touchscreen and anonymous emulator evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: american-rider-android-emulator-evidence
+          path: |
+            artifacts/emulator/
+            artifacts/android-native-interaction/
+          if-no-files-found: warn
+          retention-days: 14

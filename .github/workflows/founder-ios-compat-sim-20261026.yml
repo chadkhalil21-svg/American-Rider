@@ -1,0 +1,170 @@
+name: Verify Android correction on simulated iPhone without App Store changes
+
+on:
+  push:
+    branches:
+      - release/one-time-android-aab-20261025
+    paths:
+      - .github/workflows/founder-ios-compat-sim-20261026.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ios-simulator:
+    runs-on: macos-26
+    timeout-minutes: 110
+    env:
+      CI: "1"
+      EXPO_PUBLIC_API_URL: https://american-rider-api-production-623854974930.us-east1.run.app
+    steps:
+      - name: Read exact merged cross-platform production release
+        uses: actions/checkout@v4
+        with:
+          repository: chadkhalil21-svg/American-Rider-Commercial
+          ref: a4570210e69231bd0d08b52da739204547102b6b
+          persist-credentials: false
+      - name: Verify exact merged production release and iOS identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = a4570210e69231bd0d08b52da739204547102b6b
+          node - <<'NODE'
+          const fs=require('fs');
+          const a=JSON.parse(fs.readFileSync('app.json','utf8')).expo;
+          if(a.ios?.bundleIdentifier!=='com.americanrider.app')throw Error('iOS bundle identity changed');
+          if(a.ios?.usesAppleSignIn!==true)throw Error('Apple sign-in capability changed');
+          if(!a.ios?.associatedDomains?.includes('applinks:americanrider.tech'))throw Error('Associated Domains unexpectedly removed');
+          console.log('iOS sign-in, bundle identifier and configured universal links preserved');
+          NODE
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Select Xcode 26 or later with Swift 6.2
+        shell: bash
+        run: |
+          set -euo pipefail
+          XCODE_APP="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)"
+          test -n "$XCODE_APP" || { echo "::error::GitHub runner has no Xcode 26 for Swift Tools 6.2 dependency."; exit 1; }
+          sudo xcode-select -s "$XCODE_APP/Contents/Developer"
+          xcodebuild -version
+          xcrun swift --version
+          ! xcodebuild -version | grep -q 'Xcode 16' || { echo "::error::Wrong Xcode 16.4 selected."; exit 1; }
+      - name: Prepare iOS 26 iPhone simulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun simctl list devices available -j > "$RUNNER_TEMP/ar-sims.json"
+          node - <<'NODE'
+          const fs=require('node:fs');
+          const d=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+'/ar-sims.json','utf8'));
+          const runtime=Object.entries(d.devices).filter(([key])=>key.includes('iOS-26'));
+          const phones=runtime.flatMap(([,values])=>values).filter(v=>v.name?.startsWith('iPhone')&&v.isAvailable!==false);
+          if(!phones.length)throw Error('GitHub macOS runner has no iOS 26 iPhone simulator.');
+          fs.writeFileSync(process.env.RUNNER_TEMP+'/ar-udid',phones[0].udid);
+          console.log('Selected iOS 26 simulator:',phones[0].name);
+          NODE
+          SIM_DEVICE="$(cat "$RUNNER_TEMP/ar-udid")"
+          echo "SIM_DEVICE=$SIM_DEVICE" >> "$GITHUB_ENV"
+          xcrun simctl boot "$SIM_DEVICE"
+          xcrun simctl bootstatus "$SIM_DEVICE" -b
+      - name: Install only application source dependencies
+        run: npm ci --ignore-scripts
+      - name: Build and launch iOS Release on virtual iPhone
+        shell: bash
+        env:
+          LOG: ${{ runner.temp }}/american-rider-ios-simulator.log
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/ios
+          if ! bash scripts/build-simulator.sh; then
+            echo "Initial simulator build failed. Inspecting failure before retry."
+            if grep -q "Could not resolve package dependencies" "$LOG"; then
+              echo "Xcode Swift package resolution failed on fresh GitHub macOS runner; retrying only package resolution."
+              resolved=0
+              for attempt in 1 2 3; do
+                echo "Swift package resolver attempt $attempt of 3"
+                if xcodebuild -resolvePackageDependencies -workspace ios/AmericanRider.xcworkspace -scheme AmericanRider -scmProvider system >> "$LOG" 2>&1; then
+                  resolved=1
+                  break
+                fi
+                sleep 6
+              done
+              if [ "$resolved" -eq 1 ]; then
+                echo "Swift package resolution recovered; compiling same exact candidate without modifying source."
+                DD="$HOME/Library/Developer/Xcode/DerivedData/AmericanRider-simulator"
+                if xcodebuild -workspace ios/AmericanRider.xcworkspace -scheme AmericanRider -configuration Release -destination "id=$SIM_DEVICE" -derivedDataPath "$DD" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build >> "$LOG" 2>&1; then
+                  APP="$DD/Build/Products/Release-iphonesimulator/AmericanRider.app"
+                  test -d "$APP"
+                  xcrun simctl install "$SIM_DEVICE" "$APP"
+                  xcrun simctl launch "$SIM_DEVICE" com.americanrider.app
+                else
+                  echo "::error::Simulator compilation still failed after successful Swift package resolution."
+                  tail -110 "$LOG" || true
+                  cp "$LOG" artifacts/ios/build-error.log
+                  exit 1
+                fi
+              else
+                echo "::error::Swift package resolution failed after three attempts. Runner/environment dependency unresolved; this does not diagnose signed Build 56."
+                grep -E -A 12 -B 8 "Could not resolve package dependencies|error:|fatal error:|authentication failed|timed out" "$LOG" | tail -130 || true
+                cp "$LOG" artifacts/ios/build-error.log
+                exit 1
+              fi
+            else
+              echo "::error::iPhone simulator failed for reason other than Swift package resolution."
+              grep -E -A 7 -B 5 "error:|fatal error:|Undefined symbols|BUILD FAILED" "$LOG" | tail -120 || true
+              cp "$LOG" artifacts/ios/build-error.log
+              exit 1
+            fi
+          fi
+          xcrun simctl io "$SIM_DEVICE" screenshot artifacts/ios/american-rider-ios-first-screen.png
+          xcrun simctl spawn "$SIM_DEVICE" launchctl list | grep -q 'com.americanrider.app' || true
+          test -s artifacts/ios/american-rider-ios-first-screen.png
+          echo "PASS candidate installed and iPhone simulator screenshot created" >> "$GITHUB_STEP_SUMMARY"
+          # Diagnose the installed app's real URL registration before probing routes.
+          APP_PATH="$HOME/Library/Developer/Xcode/DerivedData/AmericanRider-simulator/Build/Products/Release-iphonesimulator/AmericanRider.app"
+          test -f "$APP_PATH/Info.plist" || { echo "::error::Missing compiled iPhone Info.plist"; exit 1; }
+          python3 - "$APP_PATH/Info.plist" <<'PY' | tee artifacts/ios/url-schemes.txt
+          import plistlib,sys
+          with open(sys.argv[1],"rb") as f: info=plistlib.load(f)
+          schemes=[v for entry in info.get("CFBundleURLTypes",[]) for v in entry.get("CFBundleURLSchemes",[])]
+          print("Registered native schemes:",", ".join(schemes))
+          if "americanrider" not in schemes: raise SystemExit("FAIL: iOS build missing declared americanrider URL scheme")
+          PY
+          # Native iPhone route navigation only. No test accounts, production writes, or fake payouts.
+          probe() {
+            label="$1"; route="$2"
+            echo "Anonymous iPhone route: $label"
+            xcrun simctl openurl "$SIM_DEVICE" "americanrider:///$route" || {
+              echo "::error::iPhone could not open route: $label"; exit 1;
+            }
+            sleep 3
+            xcrun simctl io "$SIM_DEVICE" screenshot "artifacts/ios/$label.png"
+            test -s "artifacts/ios/$label.png"
+            echo "PASS iPhone route opening and screenshot: $label (screen contents unverified)"
+          }
+          xcrun simctl launch "$SIM_DEVICE" com.americanrider.app
+          echo "PASS iPhone Home via native launch (route content unverified)"
+          probe traveler-schedule "schedule"
+          probe traveler-wallet "wallet"
+          probe traveler-history "history"
+          probe traveler-safety "safety"
+          probe traveler-support "issues"
+          probe operator-home "operator"
+          probe operator-qualify "operator/qualify"
+          probe operator-inbox "operator/inbox"
+          probe operator-payouts "operator/payouts"
+          probe operator-invitations "operator/invite"
+          probe recruiter-public "recruitment"
+          probe direct-enrollment "join"
+          probe referral-enrollment "join?r=SIMTEST12345"
+          echo "Anonymous iPhone native route matrix completed; authenticated commercial acceptance and bank payouts remain unverified." >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload simulated iPhone screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: american-rider-ios-compatibility-simulation
+          path: artifacts/ios/
+          if-no-files-found: warn
+          retention-days: 14

@@ -21,7 +21,7 @@ jobs:
     timeout-minutes: 100
     env:
       CI: "1"
-      CERTIFIED_SHA: cbc62ae5e38a11ed162f7a39b6b5e3d9e5dafd9c
+      CERTIFIED_SHA: 848ad21c7bfaff7619cff439f81a652a5e399d68
       EXPO_PUBLIC_API_URL: https://american-rider-api-production-623854974930.us-east1.run.app
       EXPO_PUBLIC_REFERRALS_ENABLED: "1"
       EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: 623854974930-4t4u62mvkeopvlrm6ne15eq6rubn25r9.apps.googleusercontent.com
@@ -30,7 +30,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: chadkhalil21-svg/American-Rider-Commercial
-          ref: cbc62ae5e38a11ed162f7a39b6b5e3d9e5dafd9c
+          ref: 848ad21c7bfaff7619cff439f81a652a5e399d68
           persist-credentials: false
 
       - name: Verify source and application identity
@@ -157,12 +157,15 @@ jobs:
             adb logcat -d -v brief -s AndroidRuntime:E ReactNativeJS:E > artifacts/emulator/route-errors.txt || true
             ! grep -q 'FATAL EXCEPTION' artifacts/emulator/route-errors.txt || { echo "Fatal exception during native navigation"; exit 1; }
             echo "PASS anonymous route matrix. Authenticated booking, payments, and commission settlement NOT tested."
+            python3 scripts/android-native-interaction-acceptance.py
 
-      - name: Upload anonymous emulator evidence
+      - name: Upload real touchscreen and anonymous emulator evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: american-rider-android-emulator-evidence
-          path: artifacts/emulator/
+          path: |
+            artifacts/emulator/
+            artifacts/android-native-interaction/
           if-no-files-found: warn
           retention-days: 14

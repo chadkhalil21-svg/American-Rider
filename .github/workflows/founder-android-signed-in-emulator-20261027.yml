@@ -118,10 +118,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npx expo prebuild --platform android --clean --non-interactive
+          # Expo Router native release bundling must use the production Babel mode.
+          # Keep NODE_ENV=test for the separately started local Firebase/API QA services;
+          # only the native build steps override it. No production data or keys are used.
+          NODE_ENV=production npx expo prebuild --platform android --clean --non-interactive
           cd android
           chmod +x gradlew
-          ./gradlew --no-daemon --max-workers=2 --console=plain :app:assembleRelease
+          NODE_ENV=production ./gradlew --no-daemon --max-workers=2 --console=plain :app:assembleRelease
           test -s app/build/outputs/apk/release/app-release.apk
       - name: Actually TAP, LOG IN, RESTART and examine Traveler/Operator/Recruiter screens
         uses: reactivecircus/android-emulator-runner@v2

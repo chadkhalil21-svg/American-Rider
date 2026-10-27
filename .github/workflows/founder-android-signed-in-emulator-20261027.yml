@@ -66,7 +66,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ./infra/rules-emulator/node_modules/.bin/firebase emulators:start --only auth,firestore --project demo-american-rider-qa --config firebase.json > "$RUNNER_TEMP/qa-firebase.log" 2>&1 &
+          # The production firebase.json intentionally has no Auth emulator stanza.
+          # Generate a QA-only config in the checked-out repo root, never edit
+          # production Firebase configuration or connect to the real project.
+          node - <<'NODE'
+          const fs=require('node:fs');
+          const config=JSON.parse(fs.readFileSync('firebase.json','utf8'));
+          config.emulators={...(config.emulators||{}),auth:{host:'127.0.0.1',port:9099},firestore:{host:'127.0.0.1',port:8080}};
+          fs.writeFileSync('firebase-qa.generated.json',JSON.stringify(config));
+          NODE
+          ./infra/rules-emulator/node_modules/.bin/firebase emulators:start --only auth,firestore --project demo-american-rider-qa --config firebase-qa.generated.json > "$RUNNER_TEMP/qa-firebase.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/qa-firebase.pid"
           for i in $(seq 1 90); do
             if curl --fail --silent http://127.0.0.1:9099/emulator/v1/projects/demo-american-rider-qa/config >/dev/null; then break; fi

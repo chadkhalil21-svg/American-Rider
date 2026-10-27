@@ -1,0 +1,139 @@
+name: Real signed-in Android QA against isolated Firebase emulators
+on:
+  push:
+    branches: [release/one-time-android-aab-20261025]
+    paths: [.github/workflows/founder-android-signed-in-emulator-20261027.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  android-qa-signed-in:
+    runs-on: ubuntu-latest
+    timeout-minutes: 105
+    env:
+      CI: '1'
+      EXPO_PUBLIC_AR_NATIVE_QA: '1'
+      EXPO_PUBLIC_API_URL: http://10.0.2.2:4242
+      EXPO_PUBLIC_REFERRALS_ENABLED: '1'
+      FIRESTORE_EMULATOR_HOST: 127.0.0.1:8080
+      FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:9099
+      FIREBASE_PROJECT_ID: demo-american-rider-qa
+      GOOGLE_CLOUD_PROJECT: demo-american-rider-qa
+      PORT: '4242'
+      EXTERNAL_SWEEPS: '1'
+    steps:
+      - name: Check out strictly isolated QA snapshot of latest Commercial application
+        uses: actions/checkout@v4
+        with:
+          repository: chadkhalil21-svg/American-Rider-Commercial
+          ref: 11b2a8da4aab661096f27173ccbadadc0dc24f5e
+          persist-credentials: false
+      - name: Assert NO production Firebase, Stripe or backend target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 11b2a8da4aab661096f27173ccbadadc0dc24f5e
+          test "$EXPO_PUBLIC_AR_NATIVE_QA" = 1
+          test "$EXPO_PUBLIC_API_URL" = 'http://10.0.2.2:4242'
+          test "$GOOGLE_CLOUD_PROJECT" = 'demo-american-rider-qa'
+          if [ -n "${STRIPE_SECRET_KEY:-}" ] || [ -n "${STRIPE_LIVE_SECRET_KEY:-}" ]; then
+            echo "::error::Live payment keys must never enter native QA fixture"; exit 1
+          fi
+          echo "Verified isolated native QA project, local API and no money key"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
+      - name: Install Android 36 build SDK
+        run: sdkmanager --install "platforms;android-36" "build-tools;36.0.0"
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Install pinned dependencies, real backend and Firestore/Auth emulators
+        run: |
+          npm ci --ignore-scripts
+          npm ci --prefix backend --omit=dev
+          npm ci --prefix infra/rules-emulator
+      - name: Start ISOLATED Firebase Auth and Firestore emulators
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./infra/rules-emulator/node_modules/.bin/firebase emulators:start --only auth,firestore --project demo-american-rider-qa --config firebase.json > "$RUNNER_TEMP/qa-firebase.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/qa-firebase.pid"
+          for i in $(seq 1 90); do
+            if curl --fail --silent http://127.0.0.1:9099/emulator/v1/projects/demo-american-rider-qa/config >/dev/null; then break; fi
+            sleep 2
+          done
+          curl --fail --silent http://127.0.0.1:9099/emulator/v1/projects/demo-american-rider-qa/config >/dev/null || { tail -70 "$RUNNER_TEMP/qa-firebase.log"; exit 1; }
+          curl --fail --silent http://127.0.0.1:8080 >/dev/null || true
+          echo "Local Auth/Firestore emulator ready"
+      - name: Create disposal-only QA sign-in identity in LOCAL emulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,urllib.request
+          data=json.dumps({"email":"native.qa.traveler@example.test","password":"QA-Native-Only-7819-Strong","returnSecureToken":True}).encode()
+          url="http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=native-qa-local-only"
+          r=urllib.request.urlopen(urllib.request.Request(url,data,{"Content-Type":"application/json"}),timeout=15)
+          item=json.load(r)
+          if not item.get("localId"):raise SystemExit("No local fixture identity")
+          print("Created ONLY in local Firebase Auth emulator; zero production accounts")
+          PY
+      - name: Start REAL application backend against local QA emulators with payments disabled
+        shell: bash
+        run: |
+          set -euo pipefail
+          node backend/server.js > "$RUNNER_TEMP/qa-backend.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/qa-backend.pid"
+          for i in $(seq 1 45); do
+            if curl --fail --silent http://127.0.0.1:4242/health >/dev/null; then break; fi
+            sleep 2
+          done
+          curl --fail --silent http://127.0.0.1:4242/health >/dev/null || { tail -100 "$RUNNER_TEMP/qa-backend.log"; exit 1; }
+          echo "Real American Rider API responding on local fixture port"
+      - name: Build isolated Android native QA APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx expo prebuild --platform android --clean --non-interactive
+          cd android
+          chmod +x gradlew
+          ./gradlew --no-daemon --max-workers=2 --console=plain :app:assembleRelease
+          test -s app/build/outputs/apk/release/app-release.apk
+      - name: Actually TAP, LOG IN, RESTART and examine Traveler/Operator/Recruiter screens
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect
+          disable-animations: true
+          script: |
+            adb install -r android/app/build/outputs/apk/release/app-release.apk
+            adb shell pm grant com.americanrider.app android.permission.ACCESS_COARSE_LOCATION
+            adb shell pm grant com.americanrider.app android.permission.ACCESS_FINE_LOCATION
+            adb shell pm grant com.americanrider.app android.permission.ACCESS_BACKGROUND_LOCATION
+            python3 scripts/android-authenticated-emulator-qa.py
+      - name: Preserve real-device evidence, even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: american-rider-local-authenticated-android-evidence
+          path: artifacts/native-qa/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: State acceptance limits precisely
+        if: always()
+        run: |
+          echo '## Isolated native QA evidence only' >> "$GITHUB_STEP_SUMMARY"
+          echo 'This is actual on-device UI tapping with LOCAL Firebase Auth/Firestore emulators. The app has no Stripe money key and cannot certify commercial payments, insurer-approved Operators or bank payouts.' >> "$GITHUB_STEP_SUMMARY"

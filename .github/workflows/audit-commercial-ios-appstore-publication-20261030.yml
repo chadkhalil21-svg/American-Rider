@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     env:
-      ASC_API_KEY_BASE64: \${{ secrets.ASC_API_KEY_BASE64 }}
+      ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
       ASC_KEY_ID: LS74L322NV
       ASC_ISSUER_ID: 2fa282d5-2b2c-4820-8fe9-6928ac1e8d33
     steps:
@@ -89,8 +89,8 @@ jobs:
                                 'deviceType':s.get('attributes',{}).get('screenshotDisplayType'),'count':len(imgs.get('data',[]))})
               review=get('/v1/appStoreVersions/'+vid+'/appStoreReviewDetail')
               record('REVIEW_DETAILS',{'version':a.get('versionString'),'exists':bool(review and review.get('data')),
-                'hasDemoAccount':bool((review or {}).get('data',{}).get('attributes',{}).get('demoAccountName')),
-                'demoAccountRequired':(review or {}).get('data',{}).get('attributes',{}).get('demoAccountRequired')})
+                'hasDemoAccount':bool(((review or {}).get('data') or {}).get('attributes',{}).get('demoAccountName')),
+                'demoAccountRequired':((review or {}).get('data') or {}).get('attributes',{}).get('demoAccountRequired')})
           submissions=get('/v1/apps/'+app+'/reviewSubmissions',{'limit':200})
           if submissions is not None:
               record('REVIEW_SUBMISSIONS',[{'id':s['id'],'state':s.get('attributes',{}).get('state'),

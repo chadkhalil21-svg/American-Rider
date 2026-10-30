@@ -95,6 +95,18 @@ jobs:
           if submissions is not None:
               record('REVIEW_SUBMISSIONS',[{'id':s['id'],'state':s.get('attributes',{}).get('state'),
                 'submittedDate':s.get('attributes',{}).get('submittedDate')} for s in submissions.get('data',[])[:12]])
+          for sub in (submissions or {}).get('data',[]):
+              sid=sub['id']
+              items=get('/v1/reviewSubmissions/'+sid+'/items',{'limit':200})
+              if items is not None:
+                  record('REVIEW_SUBMISSION_ITEMS',{'submissionId':sid,
+                    'items':[{'id':x['id'],'state':x.get('attributes',{}).get('state'),
+                    'versionId':x.get('relationships',{}).get('appStoreVersion',{}).get('data',{}).get('id') if x.get('relationships',{}).get('appStoreVersion',{}).get('data') else None}
+                    for x in items.get('data',[])]})
+          check=get('/v1/apps/'+app+'/appAvailabilityV2')
+          if check is not None:
+              record('STORE_AVAILABILITY',{'status':(check.get('data') or {}).get('attributes',{}).get('availableInNewTerritories'),
+                'territoryAvailabilityId':(check.get('data') or {}).get('id')})
           infos=get('/v1/apps/'+app+'/appInfos',{'limit':10})
           for i in (infos or {}).get('data',[]):
               local=get('/v1/appInfos/'+i['id']+'/appInfoLocalizations',{'limit':30})

@@ -1,0 +1,62 @@
+name: Verify Apple TestFlight Build 59 processing (read only)
+on:
+  push:
+    branches: [ops/commercial-build59-secure-bridge-20261030]
+    paths:
+      - 'ops/activation/verify-commercial-ios59-20261030.approved'
+
+permissions:
+  contents: read
+
+jobs:
+  check-apple-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
+      ASC_KEY_ID: LS74L322NV
+      ASC_ISSUER_ID: 2fa282d5-2b2c-4820-8fe9-6928ac1e8d33
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Require exact founder-approved read-only inspection
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f ops/activation/verify-commercial-ios59-20261030.approved
+          grep -Fxq 'FOUNDER_APPROVED=VERIFY_APPLE_BUILD_59_READ_ONLY' ops/activation/verify-commercial-ios59-20261030.approved
+          test -n "$ASC_API_KEY_BASE64"
+      - name: Check exact Apple Build 59 in App Store Connect without uploading or building
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --quiet PyJWT cryptography
+          python - <<'PY'
+          import base64, json, os, time, urllib.parse, urllib.request
+          import jwt
+          key=base64.b64decode(''.join(os.environ['ASC_API_KEY_BASE64'].split()),validate=True)
+          now=int(time.time())
+          token=jwt.encode({'iss':os.environ['ASC_ISSUER_ID'],'iat':now,'exp':now+600,
+             'aud':'appstoreconnect-v1'},key,algorithm='ES256',
+             headers={'kid':os.environ['ASC_KEY_ID'],'typ':'JWT'})
+          query=urllib.parse.urlencode({'filter[app]':'6798078543',
+             'filter[preReleaseVersion.version]':'1.0.0',
+             'filter[preReleaseVersion.platform]':'IOS',
+             'fields[builds]':'version,processingState,uploadedDate',
+             'limit':'200'})
+          req=urllib.request.Request('https://api.appstoreconnect.apple.com/v1/builds?'+query,
+             headers={'Authorization':'Bearer '+token,'Accept':'application/json'})
+          with urllib.request.urlopen(req,timeout=50) as response: result=json.load(response)
+          builds=[r for r in result.get('data',[]) if str(r.get('attributes',{}).get('version'))=='59']
+          if not builds:
+              report='Apple Build 59 not yet visible in returned App Store Connect builds; Apple upload delivery was separately accepted.'
+          else:
+              b=builds[0]['attributes']
+              report=('Apple Build 59 found. Processing state: '+str(b.get('processingState','unavailable'))+
+                     '; upload date: '+str(b.get('uploadedDate','unavailable')))
+          print(report)
+          with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as f:
+              f.write('### Read-only Apple Build 59 check\n\n'+report+'\n')
+          PY

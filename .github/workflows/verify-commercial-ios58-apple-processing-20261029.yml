@@ -54,8 +54,8 @@ jobs:
               report='Apple Build 58 not yet visible in returned App Store Connect builds; Apple upload delivery was separately accepted.'
           else:
               b=builds[0]['attributes']
-              report='Apple Build 58 found. Processing state: '+str(b.get('processingState','unavailable'))+
-                     '; upload date: '+str(b.get('uploadedDate','unavailable'))
+              report=('Apple Build 58 found. Processing state: '+str(b.get('processingState','unavailable'))+
+                     '; upload date: '+str(b.get('uploadedDate','unavailable')))
           print(report)
           with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as f:
               f.write('### Read-only Apple Build 58 check\n\n'+report+'\n')

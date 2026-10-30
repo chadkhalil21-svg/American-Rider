@@ -1,0 +1,107 @@
+name: Audit commercial iOS App Store publication readiness (read only)
+on:
+  push:
+    branches: [ops/commercial-build60-secure-bridge-20261030]
+    paths: ['ops/activation/audit-ios-publication-20261030.approved']
+permissions:
+  contents: read
+jobs:
+  audit-appstore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      ASC_API_KEY_BASE64: \${{ secrets.ASC_API_KEY_BASE64 }}
+      ASC_KEY_ID: LS74L322NV
+      ASC_ISSUER_ID: 2fa282d5-2b2c-4820-8fe9-6928ac1e8d33
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Require exact read-only founder publication audit request
+        run: |
+          set -euo pipefail
+          test -n "$ASC_API_KEY_BASE64"
+          grep -Fxq 'FOUNDER_APPROVED=READ_ONLY_APPSTORE_PUBLICATION_AUDIT' ops/activation/audit-ios-publication-20261030.approved
+      - name: Read existing App Store version, live build, metadata, screenshots and review status
+        run: |
+          set -euo pipefail
+          python -m pip install --quiet PyJWT cryptography
+          python - <<'PY'
+          import base64,json,os,time,urllib.parse,urllib.request,urllib.error
+          import jwt
+          key=base64.b64decode(''.join(os.environ['ASC_API_KEY_BASE64'].split()),validate=True)
+          now=int(time.time())
+          token=jwt.encode({'iss':os.environ['ASC_ISSUER_ID'],'iat':now,'exp':now+600,'aud':'appstoreconnect-v1'},
+             key,algorithm='ES256',headers={'kid':os.environ['ASC_KEY_ID'],'typ':'JWT'})
+          api='https://api.appstoreconnect.apple.com'
+          def get(path,params=None):
+              url=api+path+('?' + urllib.parse.urlencode(params) if params else '')
+              req=urllib.request.Request(url,headers={'Authorization':'Bearer '+token,'Accept':'application/json'})
+              try:
+                  with urllib.request.urlopen(req,timeout=40) as response: return json.load(response)
+              except urllib.error.HTTPError as e:
+                  print('READ_ERROR',path,'HTTP',e.code)
+                  return None
+          app='6798078543'
+          summary=[]
+          def record(name,info):
+              line=name+' '+json.dumps(info,sort_keys=True,ensure_ascii=True)
+              summary.append(line)
+              print(line,flush=True)
+          versions=get('/v1/apps/'+app+'/appStoreVersions',{'filter[platform]':'IOS','limit':200})
+          if versions is None:
+              raise SystemExit('Cannot read App Store versions: audit incomplete')
+          vv=versions.get('data',[])
+          record('IOS_VERSIONS',[{'id':v['id'],'version':v.get('attributes',{}).get('versionString'),
+            'state':v.get('attributes',{}).get('appStoreState'),
+            'releaseType':v.get('attributes',{}).get('releaseType'),
+            'earliestReleaseDate':v.get('attributes',{}).get('earliestReleaseDate')} for v in vv])
+          builds=get('/v1/builds',{'filter[app]':app,'filter[preReleaseVersion.platform]':'IOS',
+                  'fields[builds]':'version,processingState,uploadedDate','limit':200})
+          if builds:
+              record('LATEST_IOS_BUILDS',[{'id':b['id'],'number':b.get('attributes',{}).get('version'),
+                'state':b.get('attributes',{}).get('processingState')} for b in builds.get('data',[])[:15]])
+          for v in vv:
+              a=v.get('attributes',{})
+              if a.get('versionString') not in ('1.0.0','1.0','1.0.1') and len(vv)>4: continue
+              vid=v['id']
+              b=get('/v1/appStoreVersions/'+vid+'/build')
+              record('VERSION_ATTACHED_BUILD',{'version':a.get('versionString'),
+                'id':vid,'buildId':b['data']['id'] if b and b.get('data') else None})
+              loc=get('/v1/appStoreVersions/'+vid+'/appStoreVersionLocalizations',{'limit':200})
+              for l in (loc or {}).get('data',[]):
+                  la=l.get('attributes',{})
+                  record('STORE_LOCALIZATION',{'locale':la.get('locale'),
+                     'hasDescription':bool(la.get('description')),
+                     'hasWhatsNew':bool(la.get('whatsNew')),
+                     'hasKeywords':bool(la.get('keywords')),
+                     'hasSupportUrl':bool(la.get('supportUrl')),
+                     'hasMarketingUrl':bool(la.get('marketingUrl'))})
+                  sets=get('/v1/appStoreVersionLocalizations/'+l['id']+'/appScreenshotSets',{'limit':200})
+                  if sets is not None:
+                      record('SCREENSHOT_SET_COUNT',{'locale':la.get('locale'),'count':len(sets.get('data',[])),
+                        'deviceTypes':[x.get('attributes',{}).get('screenshotDisplayType') for x in sets.get('data',[])]})
+                      for s in sets.get('data',[]):
+                          imgs=get('/v1/appScreenshotSets/'+s['id']+'/appScreenshots',{'limit':200})
+                          if imgs is not None:
+                              record('SCREENSHOTS',{'locale':la.get('locale'),
+                                'deviceType':s.get('attributes',{}).get('screenshotDisplayType'),'count':len(imgs.get('data',[]))})
+              review=get('/v1/appStoreVersions/'+vid+'/appStoreReviewDetail')
+              record('REVIEW_DETAILS',{'version':a.get('versionString'),'exists':bool(review and review.get('data')),
+                'hasDemoAccount':bool((review or {}).get('data',{}).get('attributes',{}).get('demoAccountName')),
+                'demoAccountRequired':(review or {}).get('data',{}).get('attributes',{}).get('demoAccountRequired')})
+          submissions=get('/v1/apps/'+app+'/reviewSubmissions',{'limit':200})
+          if submissions is not None:
+              record('REVIEW_SUBMISSIONS',[{'id':s['id'],'state':s.get('attributes',{}).get('state'),
+                'submittedDate':s.get('attributes',{}).get('submittedDate')} for s in submissions.get('data',[])[:12]])
+          infos=get('/v1/apps/'+app+'/appInfos',{'limit':10})
+          for i in (infos or {}).get('data',[]):
+              local=get('/v1/appInfos/'+i['id']+'/appInfoLocalizations',{'limit':30})
+              record('APP_INFO_LOCALIZATIONS',[{'locale':x.get('attributes',{}).get('locale'),
+                'hasPrivacyPolicyUrl':bool(x.get('attributes',{}).get('privacyPolicyUrl')),
+                'hasPrivacyChoicesUrl':bool(x.get('attributes',{}).get('privacyChoicesUrl'))} for x in (local or {}).get('data',[])])
+          with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as f:
+              f.write('### Apple public publication readiness (read-only)\n\n')
+              for line in summary:f.write('- '+line.replace('<','&lt;')+'\n')
+          PY
